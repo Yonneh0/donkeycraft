@@ -76,11 +76,22 @@
         var self = this;
         return new Promise(function(resolve, reject) {
             if (typeof source === 'string') {
-                // Fetch from URL
-                fetch(source)
-                    .then(function(response) { return response.arrayBuffer(); })
-                    .then(function(data) { self._decodeAudio(name, data); resolve(); })
-                    .catch(reject);
+                // Load from URL — use XHR for file:/// compatibility
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', source, true);
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = function() {
+                    if (xhr.status === 200 || xhr.status === 0) {
+                        self._decodeAudio(name, xhr.response);
+                        resolve();
+                    } else {
+                        reject(new Error('Failed to load audio: ' + source + ' (status ' + xhr.status + ')'));
+                    }
+                };
+                xhr.onerror = function() {
+                    reject(new Error('Failed to load audio: ' + source));
+                };
+                xhr.send();
             } else {
                 // Direct ArrayBuffer
                 self._decodeAudio(name, source);
@@ -126,10 +137,10 @@
         var buffer = this._soundCache[name];
         var source = this._context.createBufferSource();
         source.buffer = buffer;
-        source.playbackRate.value = options.pitch || 1;
+        source.playbackRate.value = (options.pitch !== undefined && options.pitch !== null) ? options.pitch : 1;
 
         var gainNode = this._context.createGain();
-        gainNode.gain.value = (options.volume !== undefined ? options.volume : 1) * this._volume;
+        gainNode.gain.value = ((options.volume !== undefined && options.volume !== null) ? options.volume : 1) * this._volume;
 
         // Positional audio: create panner if position provided
         var panner = null;

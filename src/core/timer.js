@@ -14,6 +14,7 @@
         this._tickInterval = 1000 / ticksPerSecond; // ms per tick
         this._lastTickTime = 0;
         this._accumulator = 0;
+        this._tickCount = 0;
         this._deltaTime = 0;
         this._lastFrameTime = 0;
         this._frameCount = 0;
@@ -127,11 +128,10 @@
 
         // Accumulate time and process game ticks
         this._accumulator += this._deltaTime;
-        var tickDt = 1 / (this._tickInterval / 1000); // ticks per second as dt
+        var tickDt = this._tickInterval / 1000; // seconds per tick (fixed point)
 
         while (this._accumulator >= this._tickInterval / 1000) {
             this._accumulator -= this._tickInterval / 1000;
-            if (!this._tickCount) this._tickCount = 0;
             this._tickCount++;
 
             // Call tick callbacks

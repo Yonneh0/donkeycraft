@@ -16,9 +16,9 @@
      * @param {number} [z=0]
      */
     Donkeycraft.Vector3 = function(x, y, z) {
-        this.x = x || 0;
-        this.y = y || 0;
-        this.z = z || 0;
+        this.x = (x !== undefined && !isNaN(x)) ? x : 0;
+        this.y = (y !== undefined && !isNaN(y)) ? y : 0;
+        this.z = (z !== undefined && !isNaN(z)) ? z : 0;
     };
 
     /**
@@ -554,11 +554,6 @@
      */
     Donkeycraft.PerlinNoise = (function() {
         var _perm = new Uint8Array(512);
-        var _grad3 = [
-            [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
-            [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
-            [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
-        ];
 
         /**
          * Initialize with a seed.

@@ -10,6 +10,7 @@
      */
     Donkeycraft.Input = function() {
         this._keyStates = {};
+        this._keyJustPressed = {};
         this._mouseState = {
             left: false,
             right: false,
@@ -78,12 +79,37 @@
     };
 
     /**
-     * Check if a key was just pressed this frame.
+     * Check if a key was just pressed this frame (pressed now but not previously).
      * @param {string} keyCode
      * @returns {boolean}
      */
     Donkeycraft.Input.prototype.isKeyJustPressed = function(keyCode) {
-        return !!this._keyStates[keyCode];
+        return !!this._keyJustPressed[keyCode];
+    };
+
+    /**
+     * Get the current key state snapshot. Call at end of each frame to update just-pressed detection.
+     * @returns {{}} Copy of current key states.
+     */
+    Donkeycraft.Input.prototype.getKeyStateSnapshot = function() {
+        var snapshot = {};
+        for (var key in this._keyStates) {
+            snapshot[key] = this._keyStates[key];
+        }
+        return snapshot;
+    };
+
+    /**
+     * Update just-pressed detection. Call at the start of each frame.
+     */
+    Donkeycraft.Input.prototype.updateKeyStates = function() {
+        // Keys that were pressed last frame but not this frame are "just released"
+        // Keys that are pressed now but weren't last frame are "just pressed"
+        for (var key in this._keyJustPressed) {
+            if (!this._keyStates[key]) {
+                delete this._keyJustPressed[key];
+            }
+        }
     };
 
     /**
@@ -121,11 +147,11 @@
     };
 
     /**
-     * Reset per-frame key states (for just-pressed detection).
+     * Reset per-frame mouse deltas. Call at the start of each frame.
      */
     Donkeycraft.Input.prototype.resetKeyStates = function() {
         // Key states are persistent (held = true), no reset needed for isKeyDown
-        // but we could track just-pressed separately if needed
+        // Use updateKeyStates() instead for just-pressed detection
     };
 
     /**
@@ -146,11 +172,22 @@
 
     Donkeycraft.Input.prototype._onKeyDown = function(e) {
         this._keyStates[e.code] = true;
-        e.preventDefault();
+        this._keyJustPressed[e.code] = true;
+
+        // Only prevent default for game-relevant keys to avoid blocking browser shortcuts
+        var gameKeys = [
+            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ControlLeft',
+            'KeyE', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
+            'Digit6', 'Digit7', 'Digit8', 'Digit9'
+        ];
+        if (gameKeys.indexOf(e.code) !== -1) {
+            e.preventDefault();
+        }
     };
 
     Donkeycraft.Input.prototype._onKeyUp = function(e) {
         this._keyStates[e.code] = false;
+        delete this._keyJustPressed[e.code];
     };
 
     Donkeycraft.Input.prototype._onMouseDown = function(e) {
