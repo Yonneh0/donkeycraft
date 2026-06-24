@@ -44,7 +44,8 @@
      * @param {number} volume
      */
     Donkeycraft.AudioSystem.prototype.setVolume = function(volume) {
-        this._volume = Donkeycraft.clamp(volume, 0, 1);
+        // Inline clamp — Donkeycraft.clamp may not be available yet (math-utils.js loads after audio.js)
+        this._volume = Math.min(1, Math.max(0, volume));
         if (this._masterGain) {
             this._masterGain.gain.value = this._volume;
         }
@@ -82,8 +83,7 @@
                 xhr.responseType = 'arraybuffer';
                 xhr.onload = function() {
                     if (xhr.status === 200 || xhr.status === 0) {
-                        self._decodeAudio(name, xhr.response);
-                        resolve();
+                        self._decodeAudio(name, xhr.response, resolve, reject);
                     } else {
                         reject(new Error('Failed to load audio: ' + source + ' (status ' + xhr.status + ')'));
                     }
@@ -94,8 +94,7 @@
                 xhr.send();
             } else {
                 // Direct ArrayBuffer
-                self._decodeAudio(name, source);
-                resolve();
+                self._decodeAudio(name, source, resolve, reject);
             }
         });
     };
@@ -104,17 +103,24 @@
      * Decode audio data and cache it.
      * @param {string} name
      * @param {ArrayBuffer} buffer
+     * @param {Function} resolve - Promise resolve callback.
+     * @param {Function} reject - Promise reject callback.
      * @private
      */
-    Donkeycraft.AudioSystem.prototype._decodeAudio = function(name, buffer) {
+    Donkeycraft.AudioSystem.prototype._decodeAudio = function(name, buffer, resolve, reject) {
         var self = this;
-        if (!this._context) return;
+        if (!this._context) {
+            reject(new Error('Audio context not initialized'));
+            return;
+        }
         this._context.decodeAudioData(buffer, function(audioBuffer) {
             self._soundCache[name] = audioBuffer;
-        }, function() {
+            if (resolve) resolve();
+        }, function(e) {
             if (Donkeycraft.Logger) {
                 Donkeycraft.Logger.error('Failed to decode audio:', name);
             }
+            if (reject) reject(new Error('Failed to decode audio: ' + name));
         });
     };
 

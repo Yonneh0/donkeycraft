@@ -123,15 +123,22 @@
         if (this._fpsTimer >= 1.0) {
             this._fps = Math.round(this._frameCount / this._fpsTimer);
             this._frameCount = 0;
-            this._fpsTimer = this._fpsTimer % 1.0;
+            this._fpsTimer = Math.max(0, this._fpsTimer - 1.0);
         }
 
         // Accumulate time and process game ticks
         this._accumulator += this._deltaTime;
+
+        // Cap accumulator to prevent spiral-of-death after long freezes (max 500ms catch-up)
+        var maxAccumulator = (this._tickInterval / 1000) * 10;
+        if (this._accumulator > maxAccumulator) {
+            this._accumulator = maxAccumulator;
+        }
+
         var tickDt = this._tickInterval / 1000; // seconds per tick (fixed point)
 
-        while (this._accumulator >= this._tickInterval / 1000) {
-            this._accumulator -= this._tickInterval / 1000;
+        while (this._accumulator >= tickDt) {
+            this._accumulator -= tickDt;
             this._tickCount++;
 
             // Call tick callbacks

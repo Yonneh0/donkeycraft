@@ -11,6 +11,7 @@
     Donkeycraft.Input = function() {
         this._keyStates = {};
         this._keyJustPressed = {};
+        this._keyLastFrame = {};
         this._mouseState = {
             left: false,
             right: false,
@@ -22,6 +23,9 @@
         };
         this._mouseCaptured = false;
         this._wheelDelta = 0;
+
+        // Track raw just-pressed state from event handlers for same-frame press+release
+        this._keyJustPressedRaw = {};
 
         this._onKeyDown = this._onKeyDown.bind(this);
         this._onKeyUp = this._onKeyUp.bind(this);
@@ -88,27 +92,33 @@
     };
 
     /**
-     * Get the current key state snapshot. Call at end of each frame to update just-pressed detection.
-     * @returns {{}} Copy of current key states.
-     */
-    Donkeycraft.Input.prototype.getKeyStateSnapshot = function() {
-        var snapshot = {};
-        for (var key in this._keyStates) {
-            snapshot[key] = this._keyStates[key];
-        }
-        return snapshot;
-    };
-
-    /**
      * Update just-pressed detection. Call at the start of each frame.
+     * Combines: (1) raw just-pressed flags from event handlers (catches same-frame press+release),
+     * and (2) state transitions detected by comparing against last frame's snapshot.
      */
     Donkeycraft.Input.prototype.updateKeyStates = function() {
-        // Keys that were pressed last frame but not this frame are "just released"
-        // Keys that are pressed now but weren't last frame are "just pressed"
-        for (var key in this._keyJustPressed) {
-            if (!this._keyStates[key]) {
-                delete this._keyJustPressed[key];
+        // Clear all just-pressed flags — we'll re-set only the valid ones this frame.
+        // This prevents held keys from incorrectly returning true across multiple frames.
+        this._keyJustPressed = {};
+
+        // Merge raw just-pressed flags from event handlers (same-frame press+release detection).
+        for (var key in this._keyJustPressedRaw) {
+            this._keyJustPressed[key] = true;
+        }
+        this._keyJustPressedRaw = {};
+
+        // Keys that are currently pressed but were not pressed last frame
+        // are newly pressed — mark as just-pressed.
+        for (var key in this._keyStates) {
+            if (this._keyStates[key] && !this._keyLastFrame[key]) {
+                this._keyJustPressed[key] = true;
             }
+        }
+
+        // Snapshot current state for next frame's comparison.
+        this._keyLastFrame = {};
+        for (var key in this._keyStates) {
+            this._keyLastFrame[key] = !!this._keyStates[key];
         }
     };
 
@@ -139,19 +149,17 @@
     };
 
     /**
-     * Reset per-frame mouse deltas. Call at the start of each frame.
+     * Get the accumulated mouse delta since the last call (and auto-reset).
+     * Returns {{deltaX: number, deltaY: number}} and resets deltas to zero.
+     * This auto-resets so callers don't need to manually call resetMouseDelta().
+     * @returns {{deltaX: number, deltaY: number}}
      */
-    Donkeycraft.Input.prototype.resetMouseDelta = function() {
+    Donkeycraft.Input.prototype.getMouseDelta = function() {
+        var dx = this._mouseState.deltaX;
+        var dy = this._mouseState.deltaY;
         this._mouseState.deltaX = 0;
         this._mouseState.deltaY = 0;
-    };
-
-    /**
-     * Reset per-frame mouse deltas. Call at the start of each frame.
-     */
-    Donkeycraft.Input.prototype.resetKeyStates = function() {
-        // Key states are persistent (held = true), no reset needed for isKeyDown
-        // Use updateKeyStates() instead for just-pressed detection
+        return { deltaX: dx, deltaY: dy };
     };
 
     /**
@@ -172,7 +180,8 @@
 
     Donkeycraft.Input.prototype._onKeyDown = function(e) {
         this._keyStates[e.code] = true;
-        this._keyJustPressed[e.code] = true;
+        // Mark as raw just-pressed so same-frame press+release is captured.
+        this._keyJustPressedRaw[e.code] = true;
 
         // Only prevent default for game-relevant keys to avoid blocking browser shortcuts
         var gameKeys = [
@@ -187,7 +196,8 @@
 
     Donkeycraft.Input.prototype._onKeyUp = function(e) {
         this._keyStates[e.code] = false;
-        delete this._keyJustPressed[e.code];
+        // Don't clear _keyJustPressedRaw — the key WAS pressed this frame,
+        // and updateKeyStates() will handle merging/cleanup.
     };
 
     Donkeycraft.Input.prototype._onMouseDown = function(e) {

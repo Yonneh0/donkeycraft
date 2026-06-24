@@ -3,7 +3,8 @@
 (function() {
     'use strict';
 
-    var Donkeycraft = window.Donkeycraft = {
+    // Defensive check: preserve existing namespace if file is loaded twice
+    var Donkeycraft = window.Donkeycraft = window.Donkeycraft || {
         VERSION: '0.1.0',
         NAME: 'Donkeycraft',
         // Registry for all systems, populated as they initialize

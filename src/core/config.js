@@ -47,7 +47,7 @@
             SKY_LIGHT_DECAY: 1,         // Light decay per block
             BLOCK_LIGHT_DECAY: 1,       // Block light decay per tick
 
-            // Key bindings
+            // Key bindings (keyboard only — mouse buttons are accessed via Input.getMouseState())
             KEYBINDS: {
                 MOVE_FORWARD: 'KeyW',
                 MOVE_BACKWARD: 'KeyS',
@@ -68,9 +68,7 @@
                 PICK_ITEM_7: 'Digit7',
                 PICK_ITEM_8: 'Digit8',
                 PICK_ITEM_9: 'Digit9',
-                DROP_ITEM: 'Q',
-                USE_ITEM: 'Mouse0',    // Left click (use/break)
-                PLACE_BLOCK: 'Mouse1'  // Right click (place/interact)
+                DROP_ITEM: 'KeyQ'
             },
 
             // Chunk persistence

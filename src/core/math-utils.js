@@ -217,18 +217,18 @@
      * Matrix4 — 4×4 column-major matrix.
      */
     Donkeycraft.Matrix4 = (function() {
-        var _mat = new Float32Array(16);
 
         /**
          * Create identity matrix.
          * @returns {Donkeycraft.Matrix4}
          */
         function createIdentity() {
-            _mat[0] = 1; _mat[1] = 0; _mat[2] = 0; _mat[3] = 0;
-            _mat[4] = 0; _mat[5] = 1; _mat[6] = 0; _mat[7] = 0;
-            _mat[8] = 0; _mat[9] = 0; _mat[10] = 1; _mat[11] = 0;
-            _mat[12] = 0; _mat[13] = 0; _mat[14] = 0; _mat[15] = 1;
-            return new Donkeycraft.Matrix4(_mat.slice());
+            var data = new Float32Array(16);
+            data[0] = 1;  data[1] = 0;  data[2] = 0;  data[3] = 0;
+            data[4] = 0;  data[5] = 1;  data[6] = 0;  data[7] = 0;
+            data[8] = 0;  data[9] = 0;  data[10] = 1; data[11] = 0;
+            data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
+            return new Donkeycraft.Matrix4(data);
         }
 
         /**
@@ -242,11 +242,12 @@
         function createPerspective(fovRadians, aspect, near, far) {
             var f = 1.0 / Math.tan(fovRadians / 2);
             var nf = 1 / (near - far);
-            _mat[0] = f / aspect; _mat[1] = 0;           _mat[2] = 0;              _mat[3] = 0;
-            _mat[4] = 0;          _mat[5] = f;           _mat[6] = 0;              _mat[7] = 0;
-            _mat[8] = 0;          _mat[9] = 0;           _mat[10] = (far + near) * nf;  _mat[11] = -1;
-            _mat[12] = 0;         _mat[13] = 0;          _mat[14] = 2 * far * near * nf; _mat[15] = 0;
-            return new Donkeycraft.Matrix4(_mat.slice());
+            var data = new Float32Array(16);
+            data[0]  = f / aspect;    data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
+            data[4]  = 0;             data[5]  = f;             data[6]  = 0;              data[7]  = 0;
+            data[8]  = 0;             data[9]  = 0;             data[10] = (far + near) * nf; data[11] = -1;
+            data[12] = 0;             data[13] = 0;             data[14] = 2 * far * near * nf; data[15] = 0;
+            return new Donkeycraft.Matrix4(data);
         }
 
         /**
@@ -261,14 +262,15 @@
          */
         function createOrthographic(left, right, bottom, top, near, far) {
             var dx = right - left, dy = top - bottom, dz = far - near;
-            _mat[0] = 2 / dx;  _mat[1] = 0;           _mat[2] = 0;              _mat[3] = 0;
-            _mat[4] = 0;       _mat[5] = 2 / dy;      _mat[6] = 0;              _mat[7] = 0;
-            _mat[8] = 0;       _mat[9] = 0;           _mat[10] = -2 / dz;       _mat[11] = 0;
-            _mat[12] = -(right + left) / dx;
-            _mat[13] = -(top + bottom) / dy;
-            _mat[14] = -(far + near) / dz;
-            _mat[15] = 1;
-            return new Donkeycraft.Matrix4(_mat.slice());
+            var data = new Float32Array(16);
+            data[0]  = 2 / dx;        data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
+            data[4]  = 0;             data[5]  = 2 / dy;      data[6]  = 0;              data[7]  = 0;
+            data[8]  = 0;             data[9]  = 0;             data[10] = -2 / dz;        data[11] = 0;
+            data[12] = -(right + left) / dx;
+            data[13] = -(top + bottom) / dy;
+            data[14] = -(far + near) / dz;
+            data[15] = 1;
+            return new Donkeycraft.Matrix4(data);
         }
 
         /**
@@ -283,14 +285,15 @@
             var xAxis = Donkeycraft.Vector3.copy(up).cross(zAxis).normalize();
             var yAxis = Donkeycraft.Vector3.copy(zAxis).cross(xAxis);
 
-            _mat[0] = xAxis.x;    _mat[1] = yAxis.x;    _mat[2] = zAxis.x;    _mat[3] = 0;
-            _mat[4] = xAxis.y;    _mat[5] = yAxis.y;    _mat[6] = zAxis.y;    _mat[7] = 0;
-            _mat[8] = xAxis.z;    _mat[9] = yAxis.z;    _mat[10] = zAxis.z;   _mat[11] = 0;
-            _mat[12] = -xAxis.dot(eye);
-            _mat[13] = -yAxis.dot(eye);
-            _mat[14] = -zAxis.dot(eye);
-            _mat[15] = 1;
-            return new Donkeycraft.Matrix4(_mat.slice());
+            var data = new Float32Array(16);
+            data[0]  = xAxis.x;       data[1]  = yAxis.x;       data[2]  = zAxis.x;      data[3]  = 0;
+            data[4]  = xAxis.y;       data[5]  = yAxis.y;       data[6]  = zAxis.y;      data[7]  = 0;
+            data[8]  = xAxis.z;       data[9]  = yAxis.z;       data[10] = zAxis.z;      data[11] = 0;
+            data[12] = -xAxis.dot(eye);
+            data[13] = -yAxis.dot(eye);
+            data[14] = -zAxis.dot(eye);
+            data[15] = 1;
+            return new Donkeycraft.Matrix4(data);
         }
 
         /**
@@ -363,10 +366,14 @@
         DonkeycraftMatrix4.prototype.multiply = function(m) {
             var a = this._data, b = m._data;
             var r = new Float32Array(16);
+            // Column-major multiplication: R = A × B
+            // R[i*4+j] = Σ(k=0..3) A[i*4+k] × B[k*4+j]
             for (var i = 0; i < 4; i++) {
                 for (var j = 0; j < 4; j++) {
-                    r[j * 4 + i] = a[i] * b[j * 4] + a[4 + i] * b[j * 4 + 1] +
-                                   a[8 + i] * b[j * 4 + 2] + a[12 + i] * b[j * 4 + 3];
+                    r[i * 4 + j] = a[i * 4]     * b[j]       +
+                                   a[i * 4 + 1] * b[4 + j] +
+                                   a[i * 4 + 2] * b[8 + j]  +
+                                   a[i * 4 + 3] * b[12 + j];
                 }
             }
             return new Donkeycraft.Matrix4(r);
@@ -557,14 +564,14 @@
 
         /**
          * Initialize with a seed.
-         * @param {number} seed
+         * @param {number} [seed] - Seed value (default: 42). Use 0 for deterministic zero-seed.
          */
         function init(seed) {
             var p = new Uint8Array(256);
             for (var i = 0; i < 256; i++) p[i] = i;
 
-            // Shuffle using seed
-            var s = seed || 0;
+            // Shuffle using seed — use 42 as default, but allow seed=0 explicitly
+            var s = (seed !== undefined && seed !== null) ? seed : 42;
             for (var i = 255; i > 0; i--) {
                 s = (s * 16807 + 0) % 2147483647;
                 var j = s % (i + 1);

@@ -41,22 +41,20 @@ After thoroughly auditing each phase for functional correctness, update the stat
 
 ---
 
-## Phase 1: Core Infrastructure [STATUS: PENDING]
+## Phase 1: Core Infrastructure [STATUS: FULLY OPERATIONAL]
 
 Foundation layer — event system, math utilities, input handling, audio, configuration.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 1 | `src/core/namespace.js` | Global `Donkeycraft` namespace object, version, utility constants | 15 | [ ] |
-| 2 | `src/core/eventbus.js` | Publish/subscribe event system for decoupled communication between systems | 60 | [ ] |
-| 3 | `src/core/config.js` | Game configuration: render distance, chunk size, tick rates, keybinds | 80 | [ ] |
-| 4 | `src/core/timer.js` | Delta-time accumulator, tick scheduler (game ticks at 20 TPS) | 50 | [ ] |
-| 5 | `src/core/logger.js` | Tiered logging system (debug, info, warn, error) with toggle | 40 | [ ] |
-| 6 | `src/core/input.js` | Keyboard/mouse input handler: key states, mouse capture, wheel events | 120 | [ ] |
-| 7 | `src/core/math-utils.js` | Vector3, Matrix4, Quaternion classes, noise functions (Perlin/Simplex) | 350 | [ ] |
-| 8 | `src/core/audio.js` | Web Audio API wrapper: sound playback, music, ambient sounds, positional audio | 150 | [ ] |
-
-**Subtotal Phase 1: ~865 lines, 8 files**
+| 1 | `src/core/namespace.js` | Global `Donkeycraft` namespace object, version, utility constants | 15 | [FULLY OPERATIONAL] |
+| 2 | `src/core/eventbus.js` | Publish/subscribe event system for decoupled communication between systems | 60 | [FULLY OPERATIONAL] |
+| 3 | `src/core/config.js` | Game configuration: render distance, chunk size, tick rates, keybinds | 80 | [FULLY OPERATIONAL] |
+| 4 | `src/core/logger.js` | Tiered logging system (debug, info, warn, error) with toggle | 40 | [FULLY OPERATIONAL] |
+| 5 | `src/core/timer.js` | Delta-time accumulator, tick scheduler (game ticks at 20 TPS) | 50 | [FULLY OPERATIONAL] |
+| 6 | `src/core/input.js` | Keyboard/mouse input handler: key states, mouse capture, wheel events | 120 | [FULLY OPERATIONAL] |
+| 7 | `src/core/math-utils.js` | Vector3, Matrix4, Quaternion classes, noise functions (Perlin/Simplex) | 350 | [FULLY OPERATIONAL] |
+| 8 | `src/core/audio.js` | Web Audio API wrapper: sound playback, music, ambient sounds, positional audio | 150 | [FULLY OPERATIONAL] |
 
 ---
 
@@ -451,10 +449,10 @@ Scripts are loaded in this order in `index.html`:
 1. `src/core/namespace.js`
 2. `src/core/eventbus.js`
 3. `src/core/config.js`
-4. `src/core/timer.js`
-5. `src/core/logger.js`
+4. `src/core/logger.js`       ← must precede timer (timer references Logger)
+5. `src/core/timer.js`
 6. `src/core/input.js`
-7. `src/core/math-utils.js`
+7. `src/core/math-utils.js`   ← must precede audio (audio uses Donkeycraft.clamp)
 8. `src/core/audio.js`
 9-22. Phase 2 files (render/)
 23-28. Phase 3 files (world/block*)

@@ -44,11 +44,16 @@
      */
     Donkeycraft.EventBus.prototype.once = function(event, callback, context) {
         var self = this;
+        var key = this._namespace + event;
         var wrapped = function() {
-            self.off(event, wrapped);
+            // Remove from listeners directly to avoid off() matching issues
+            if (self._listeners[key]) {
+                self._listeners[key] = self._listeners[key].filter(function(entry) {
+                    return entry.callback !== wrapped;
+                });
+            }
             callback.apply(context || self, arguments);
         };
-        wrapped._original = callback;
         this.on(event, wrapped, context);
     };
 
