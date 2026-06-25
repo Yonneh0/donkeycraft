@@ -5,6 +5,10 @@
 
     var Donkeycraft = window.Donkeycraft;
 
+    // WeakMap for permanent program keys (avoids property pollution on WebGLProgram objects)
+    var _programKeys = new WeakMap();
+    var _programCounter = 0;
+
     /**
      * ShaderManager — Compiles and manages WebGL shaders and programs.
      */
@@ -144,24 +148,18 @@
     };
 
     /**
-     * Get a unique key for a program.
-     * Uses the WebGLProgram object's identity (via a permanent internal property)
-     * so that re-linking the same program doesn't invalidate cached locations.
+     * Get or assign a permanent key for a WebGLProgram using WeakMap.
      * @private
      * @param {WebGLProgram} program
      * @returns {string}
      */
     Donkeycraft.ShaderManager.prototype._getProgramKey = function(program) {
-        var key = program._dcKey;
+        var key = _programKeys.get(program);
         if (key) return key;
 
-        // Assign a permanent key based on the object's internal identity.
-        // We use a counter since WebGLProgram objects don't have stable numeric IDs.
-        if (!Donkeycraft.ShaderManager._dcCounter) {
-            Donkeycraft.ShaderManager._dcCounter = 0;
-        }
-        program._dcKey = 'prog_' + (Donkeycraft.ShaderManager._dcCounter++);
-        return program._dcKey;
+        key = 'prog_' + (_programCounter++);
+        _programKeys.set(program, key);
+        return key;
     };
 
     /**
@@ -229,14 +227,72 @@
     };
 
     /**
-     * Get the WebGLProgram for the currently active program.
+     * Get the active WebGLProgram.
      * @private
      * @returns {WebGLProgram|null}
      */
-    Donkeycraft.ShaderManager.prototype._getActiveWebGLProgram = function() {
+    Donkeycraft.ShaderManager.prototype._getActiveProgram = function() {
         if (this._currentProgram) return this._currentProgram;
         var gl = this._gl;
         return gl && gl.currentProgram || null;
+    };
+
+    /**
+     * Get a cached or queried uniform location for the given program.
+     * @private
+     * @param {WebGLProgram} prog - The WebGL program.
+     * @param {string} name - Uniform name.
+     * @returns {WebGLUniformLocation|null}
+     */
+    Donkeycraft.ShaderManager.prototype._getUniformLocation = function(prog, name) {
+        var cacheKey = this._getProgramKey(prog);
+
+        if (this._cachedLocations[cacheKey] &&
+            this._cachedLocations[cacheKey].uniforms[name] !== undefined) {
+            return this._cachedLocations[cacheKey].uniforms[name];
+        }
+
+        var gl = this._gl;
+        var loc = gl.getUniformLocation(prog, name);
+
+        if (loc !== null && cacheKey) {
+            this._cachedLocations[cacheKey].uniforms[name] = loc;
+        }
+
+        return loc;
+    };
+
+    /**
+     * Set a uniform by name, delegating to the appropriate WebGL call.
+     * @private
+     * @param {string} name - Uniform name.
+     * @param {Function} setter - Function(gl, loc, ...) that writes the uniform value.
+     * @param {...*} args - Arguments to pass to the setter function.
+     * @returns {boolean} True if the uniform was set successfully.
+     */
+    Donkeycraft.ShaderManager.prototype._setUniform = function(name, setter) {
+        var gl = this._gl;
+        if (!gl) return false;
+
+        var prog = this._getActiveProgram();
+        if (!prog) {
+            Donkeycraft.Logger.warn('ShaderManager', 'No program active when setting uniform: ' + name);
+            return false;
+        }
+
+        var loc = this._getUniformLocation(prog, name);
+        if (loc === null) {
+            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found in shader: ' + name);
+            return false;
+        }
+
+        // Extract arguments after 'name' and 'setter'
+        var args = [];
+        for (var i = 2; i < arguments.length; i++) {
+            args.push(arguments[i]);
+        }
+        setter.apply(null, [gl, loc].concat(args));
+        return true;
     };
 
     /**
@@ -246,36 +302,10 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setMat4 = function(name, value) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        // Try cached location first, fall back to GPU query + cache on miss
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            // Cache on miss so future calls don't hit the GPU
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniformMatrix4fv(loc, false, value.getData());
-        return true;
+        var self = this;
+        return this._setUniform(name, function(gl, loc, val) {
+            loc && gl.uniformMatrix4fv(loc, false, val.getData());
+        }, value);
     };
 
     /**
@@ -287,34 +317,7 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setVec3 = function(name, x, y, z) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniform3f(loc, x, y, z);
-        return true;
+        return this._setUniform(name, function(gl, loc, a, b, c) { gl.uniform3f(loc, a, b, c); }, x, y, z);
     };
 
     /**
@@ -327,34 +330,7 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setVec4 = function(name, x, y, z, w) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniform4f(loc, x, y, z, w);
-        return true;
+        return this._setUniform(name, function(gl, loc, a, b, c, d) { gl.uniform4f(loc, a, b, c, d); }, x, y, z, w);
     };
 
     /**
@@ -365,34 +341,7 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setVec2 = function(name, x, y) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniform2f(loc, x, y);
-        return true;
+        return this._setUniform(name, function(gl, loc, a, b) { gl.uniform2f(loc, a, b); }, x, y);
     };
 
     /**
@@ -402,108 +351,44 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setFloat = function(name, value) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniform1f(loc, value);
-        return true;
+        return this._setUniform(name, function(gl, loc, v) { gl.uniform1f(loc, v); }, value);
     };
 
     /**
-     * Set an integer uniform (converted to float for WebGL).
+     * Set an integer uniform.
      * @param {string} name - Uniform name.
      * @param {number} value - Integer value.
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setInt = function(name, value) {
-        var gl = this._gl;
-        if (!gl) return false;
-
-        var prog = this._getActiveWebGLProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
-            return false;
-        }
-
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
-            return false;
-        }
-
-        gl.uniform1i(loc, value);
-        return true;
+        return this._setUniform(name, function(gl, loc, v) { gl.uniform1i(loc, v); }, value);
     };
 
     /**
      * Set a sampler (texture unit) uniform.
      * @param {string} name - Uniform name.
-     * @param {number} unit - Texture unit number (0-7 for WebGL 1).
+     * @param {number} [unit=0] - Texture unit number (0-7 for WebGL 1).
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setSampler = function(name, unit) {
         var gl = this._gl;
         if (!gl) return false;
 
-        var prog = this._getActiveWebGLProgram();
+        var prog = this._getActiveProgram();
         if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program currently active');
+            Donkeycraft.Logger.warn('ShaderManager', 'No program active when setting uniform: ' + name);
             return false;
         }
 
-        var currentKey = this._getCurrentProgramKey();
-        var loc = null;
-        if (currentKey && this._cachedLocations[currentKey] &&
-            this._cachedLocations[currentKey].uniforms[name] !== undefined) {
-            loc = this._cachedLocations[currentKey].uniforms[name];
-        } else {
-            loc = gl.getUniformLocation(prog, name);
-            if (loc !== null && currentKey) {
-                this._cachedLocations[currentKey].uniforms[name] = loc;
-            }
-        }
-
-        if (!loc) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found: ' + name);
+        unit = unit || 0;
+        var loc = this._getUniformLocation(prog, name);
+        if (loc === null) {
+            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found in shader: ' + name);
             return false;
         }
 
-        gl.activeTexture(gl.TEXTURE0 + (unit || 0));
-        gl.uniform1i(loc, unit || 0);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.uniform1i(loc, unit);
         return true;
     };
 
@@ -525,7 +410,7 @@
     };
 
     /**
-     * Get a uniform location by name.
+     * Get a uniform location by name (queries active program).
      * @param {string} name - Uniform name.
      * @returns {WebGLUniformLocation|null}
      */
@@ -537,7 +422,7 @@
         }
 
         var gl = this._gl;
-        var prog = this._getActiveWebGLProgram();
+        var prog = this._getActiveProgram();
         if (!gl || !prog) return null;
         return gl.getUniformLocation(prog, name);
     };
@@ -552,20 +437,13 @@
     };
 
     /**
-     * Get the current program's cache key.
+     * Get the cache key for the active program.
      * @private
      * @returns {string|null}
      */
     Donkeycraft.ShaderManager.prototype._getCurrentProgramKey = function() {
-        // Use tracked _currentProgram first, fall back to gl.currentProgram
-        var prog = this._currentProgram;
-        if (!prog) {
-            var gl = this._gl;
-            prog = gl && gl.currentProgram || null;
-        }
+        var prog = this._getActiveProgram();
         if (!prog) return null;
-
-        // Return the cache key for this program
         return this._getProgramKey(prog);
     };
 

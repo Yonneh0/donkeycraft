@@ -84,7 +84,7 @@
 
     /**
      * Render the held item in the bottom-right corner of the screen.
-     * Uses orthographic projection overlay.
+     * Uses orthographic projection overlay with model matrix for transform.
      * @param {Camera} camera - The camera instance.
      * @param {number} canvasWidth - Current canvas width in pixels.
      * @param {number} canvasHeight - Current canvas height in pixels.
@@ -105,7 +105,7 @@
         var identity = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uView', identity);
 
-        // Apply bob animation (subtle up/down oscillation)
+        // Bob animation (subtle up/down oscillation)
         var bobY = Math.sin(this._bobAngle) * 0.05;
         var bobX = Math.cos(this._bobAngle * 0.5) * 0.02;
 
@@ -117,11 +117,17 @@
         var scaleX = 0.3 / Math.max(aspect, 1);
         var scaleY = 0.3;
 
-        // Build model matrix for item position and scale
-        var modelMatrix = Donkeycraft.Matrix4.createTranslation(itemX, itemY, 0);
-        var scaleMatrix = Donkeycraft.Matrix4.createScale(scaleX, scaleY, 1);
-        modelMatrix = Donkeycraft.Matrix4.multiply(scaleMatrix, modelMatrix);
+        // Rotation angle for slight sway
+        var itemAngle = -0.3 + Math.sin(this._bobAngle * 0.3) * 0.05;
 
+        // Build model matrix: translate → scale → rotate around Y axis
+        var translateMatrix = Donkeycraft.Matrix4.createTranslation(itemX, itemY, 0);
+        var scaleMatrix = Donkeycraft.Matrix4.createScale(scaleX, scaleY, 1);
+        var rotMatrix = Donkeycraft.Matrix4.createRotation(itemAngle, new Donkeycraft.Vector3(0, 1, 0));
+
+        var modelMatrix = Donkeycraft.Matrix4.multiply(rotMatrix,
+            Donkeycraft.Matrix4.multiply(scaleMatrix, translateMatrix)
+        );
         this._shaderManager.setMat4('uModel', modelMatrix);
 
         // Get item color and modify vertex data for per-vertex color
@@ -135,48 +141,31 @@
             vertices[ci + 3] = 1.0;
         }
 
-        // Billboard: rotate quad to face camera (first-person view, slightly angled)
-        var bobAngle = this._bobAngle;
-        var itemAngle = -0.3 + Math.sin(bobAngle * 0.3) * 0.05; // Slight sway rotation
-        var cosA = Math.cos(itemAngle);
-        var sinA = Math.sin(itemAngle);
-
-        for (var v2 = 0; v2 < 4; v2++) {
-            var vi = v2 * 9;
-            var px = vertices[vi];
-            var pz = vertices[vi + 2];
-            // Rotate around Y axis to billboard toward camera
-            vertices[vi]     = px * cosA - pz * sinA;
-            vertices[vi + 2] = px * sinA + pz * cosA;
-        }
-
-        // Lazy buffer initialization — create buffers if they don't exist
+        // Ensure buffers exist — init lazily if context was lost and restored
         if (!this._itemVertexBuf || !this._itemIndexBuf) {
             this._initBuffers();
         }
-
-        // Safety check: bail out if buffers aren't ready
         if (!this._itemVertexBuf || !this._itemIndexBuf) return;
 
-        // Bind geometry attributes directly — buffer must be bound for each vertexAttribPointer
+        // Upload modified vertex data to persistent buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+
+        // Bind geometry attributes
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
 
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
-            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
         }
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 

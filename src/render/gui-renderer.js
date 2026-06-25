@@ -118,7 +118,7 @@
         var gl = this._gl;
         if (!gl) return;
 
-        // Build geometries
+        // Build geometries first (in case they haven't been created yet)
         this._buildCrosshairGeometry();
         this._buildHotbarGeometry();
 
@@ -136,6 +136,9 @@
         // Create hotbar buffers
         if (this._hotbarGeometry) {
             this._hotbarVertexBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._hotbarVertexBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, this._hotbarGeometry.vertices, gl.STATIC_DRAW);
+
             this._hotbarIndexBuf = gl.createBuffer();
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarIndexBuf);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._hotbarGeometry.indices, gl.STATIC_DRAW);
@@ -195,15 +198,20 @@
 
     /**
      * Render the hotbar with selected slot highlighted.
-     * Copies base geometry, modifies vertex colors for the selected slot highlight,
-     * then uploads to persistent vertex buffer.
+     * Modifies vertex colors for the selected slot highlight, then uploads to persistent buffer.
      * @param {number} selectedSlot - Currently selected hotbar slot (0-8).
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
     Donkeycraft.GUIRenderer.prototype.renderHotbar = function(selectedSlot, canvasWidth, canvasHeight) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight || !this._hotbarVertexBuf) return;
+        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
+
+        // Lazy buffer init — create buffers if context was lost and restored
+        if (!this._hotbarVertexBuf || !this._hotbarIndexBuf) {
+            this._initBuffers();
+        }
+        if (!this._hotbarVertexBuf || !this._hotbarIndexBuf) return;
 
         // Use GUI shader
         if (!this._shaderManager.use('gui')) return;
@@ -268,14 +276,13 @@
 
     /**
      * Render debug info text overlay.
+     * For Phase 2, this is a no-op — HTML overlay handles debug display.
      * @param {Object} debugInfo - Debug information to display.
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
     Donkeycraft.GUIRenderer.prototype.renderDebugInfo = function(debugInfo, canvasWidth, canvasHeight) {
-        // For Phase 2, debug info is rendered via HTML overlay instead of WebGL text
-        // This method is a placeholder for Phase 7+ GUI rendering
-        if (!debugInfo || !canvasWidth || !canvasHeight) return;
+        // Phase 2: debug info rendered via HTML overlay (no WebGL needed yet)
     };
 
     /**

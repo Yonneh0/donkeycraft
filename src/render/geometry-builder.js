@@ -26,111 +26,96 @@
 
     /**
      * Check if a block is transparent (should show adjacent faces).
+     * Delegates to Donkeycraft.BlockRegistry.isTransparent() when available.
      * @param {number} blockId - The block ID to check.
      * @returns {boolean} True if the block is transparent/non-solid.
      */
     Donkeycraft.GeometryBuilder.prototype.isTransparent = function(blockId) {
-        // Block 0 (air) is always transparent
-        if (blockId === 0) return true;
-
-        // For Phase 2, we use a simple heuristic:
-        // Blocks with ID > 0 and < some threshold are solid
-        // In Phase 3, this will reference Donkeycraft.Block.isTransparent()
-        // For now, treat all blocks as potentially transparent (for testing)
-        // We'll make most blocks solid except air and a few special ones
-        return blockId === 0 || blockId === 9 || blockId === 10 || blockId === 11; // air, water, lava, glass-like
+        // Use BlockRegistry if available (Phase 3+), otherwise fall back to hardcoded list.
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isTransparent === 'function') {
+            return Donkeycraft.BlockRegistry.isTransparent(blockId);
+        }
+        // Fallback: air, water, lava
+        return blockId === 0 || blockId === 9 || blockId === 10 || blockId === 11;
     };
 
     /**
-     * Build geometry data for a single chunk.
+     * Build geometry data for a single chunk using dynamic arrays to avoid
+     * excessive pre-allocation. Most chunks use only 1-5% of worst-case memory.
      * @param {number} chunkX - X coordinate of the chunk.
      * @param {number} chunkZ - Z coordinate of the chunk.
      * @param {Function} getBlockFunc - Function(x, y, z) returning block ID at world position.
      * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number, useUint32: boolean}}
      */
     Donkeycraft.GeometryBuilder.prototype.buildChunk = function(chunkX, chunkZ, getBlockFunc) {
-        var maxVertices = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE * 6 * 4; // worst case
-        var vertices = new Float32Array(maxVertices);
+        var vertices = [];
+        var indices = [];
 
-        // Always use Uint32 indices. A full-height chunk (16×256×16) with all faces exposed
-        // can generate up to ~2.3M indices, far exceeding Uint16Array's 65535 limit.
+        // Always use Uint32 indices — a full-height chunk can generate up to ~2.3M indices,
+        // far exceeding Uint16Array's 65535 limit.
         var useUint32 = true;
-
-        var indices = new Uint32Array(maxVertices * 6 / 4);
-        var vertexCount = 0;
-        var indexCount = 0;
-
-        var baseVertex = 0;
 
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var blockId = getBlockFunc(x, y, z);
 
-                    // Skip air/transparent blocks (only render their faces if adjacent to solid)
+                    // Skip air — only render faces of solid blocks
                     if (blockId === 0) continue;
 
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldY = y;
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Check each face
+                    // Check each face for exposed adjacency
                     for (var f = 0; f < FACES.length; f++) {
                         var face = FACES[f];
                         var nx = worldX + face.dir[0];
                         var ny = worldY + face.dir[1];
                         var nz = worldZ + face.dir[2];
 
-                        // Get adjacent block — use getBlockFunc for same chunk, or return air for out-of-bounds
+                        // Get adjacent block — use getBlockFunc for same chunk, or return stone for out-of-bounds
                         var adjBlock = this._getBlockAt(nx, ny, nz, getBlockFunc, chunkX, chunkZ);
 
                         // Only render face if adjacent block is transparent
                         if (!this.isTransparent(adjBlock)) continue;
 
-                        // Add quad vertices
+                        // Add UV offset for this block/face
                         var uvOffset = this._getBlockUV(blockId, face.name);
 
+                        // Push 4 vertices (9 floats each): position(3) + UV(2) + normal(3) + light(1)
                         for (var c = 0; c < 4; c++) {
                             var corner = face.corners[c];
-                            var vi = vertexCount * this._vertexSize;
-
-                            vertices[vi]     = worldX + corner[0]; // position x
-                            vertices[vi + 1] = worldY + corner[1]; // position y
-                            vertices[vi + 2] = worldZ + corner[2]; // position z
-                            vertices[vi + 3] = uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0); // UV s
-                            vertices[vi + 4] = uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0); // UV t
-                            vertices[vi + 5] = face.dir[0]; // normal x
-                            vertices[vi + 6] = face.dir[1]; // normal y
-                            vertices[vi + 7] = face.dir[2]; // normal z
-                            vertices[vi + 8] = face.light;  // light intensity
-
-                            vertexCount++;
+                            vertices.push(
+                                worldX + corner[0],
+                                worldY + corner[1],
+                                worldZ + corner[2],
+                                uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0),
+                                uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0),
+                                face.dir[0],
+                                face.dir[1],
+                                face.dir[2],
+                                face.light
+                            );
                         }
 
-                        // Add two triangles (indices)
-                        var baseIdx = indexCount;
-                        indices[indexCount++] = baseIdx;
-                        indices[indexCount++] = baseIdx + 1;
-                        indices[indexCount++] = baseIdx + 2;
-                        indices[indexCount++] = baseIdx;
-                        indices[indexCount++] = baseIdx + 2;
-                        indices[indexCount++] = baseIdx + 3;
+                        // Add two triangles (6 indices) using current vertex count as base
+                        var baseIdx = vertices.length / 9 - 4;
+                        indices.push(
+                            baseIdx, baseIdx + 1, baseIdx + 2,
+                            baseIdx, baseIdx + 2, baseIdx + 3
+                        );
                     }
                 }
             }
         }
 
-        // Trim arrays to actual size
-        var actualVertices = new Float32Array(vertexCount * this._vertexSize);
-        actualVertices.set(vertices.subarray(0, vertexCount * this._vertexSize));
+        var vertexCount = vertices.length / 9;
+        var indexCount = indices.length;
 
-        var actualIndices;
-        if (useUint32) {
-            actualIndices = new Uint32Array(indexCount);
-        } else {
-            actualIndices = new Uint16Array(indexCount);
-        }
-        actualIndices.set(indices.subarray(0, indexCount));
+        // Convert to typed arrays
+        var actualVertices = new Float32Array(vertices);
+        var actualIndices = useUint32 ? new Uint32Array(indices) : new Uint16Array(indices);
 
         return {
             vertices: actualVertices,

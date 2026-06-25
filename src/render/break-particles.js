@@ -38,20 +38,19 @@
         // Context lost flag — prevents rendering after context loss
         this._contextLost = false;
 
-        // Register context loss listener if valid GL context provided.
-        // Note: WebGL contexts don't have addEventListener — we need the
-        // source element (canvas).  Since we only have the gl object here,
-        // we try to walk backwards via _dcCanvas (set by gl-context.js) or
-        // use a no-op fallback.
+        // Register context loss/restore listeners on the source canvas.
         if (gl) {
             var self = this;
-            // Try to find the source canvas — gl-context.js stores it on _dcCanvas
             var srcEl = gl.canvas || (gl._dcCanvas);
             if (srcEl && typeof srcEl.addEventListener === 'function') {
                 srcEl.addEventListener('webglcontextlost', function(e) {
                     e.preventDefault();
                     self._contextLost = true;
-                    self._vertexBuffer = null; // Will be recreated on context restore
+                    self._vertexBuffer = null;
+                });
+                srcEl.addEventListener('webglcontextrestored', function() {
+                    self._contextLost = false;
+                    self._vertexBuffer = null; // Recreated on next render
                 });
             }
         }
@@ -65,7 +64,7 @@
      * @param {number} blockId - The block ID that was broken.
      */
     Donkeycraft.BreakParticles.prototype.spawn = function(x, y, z, blockId) {
-        var count = 8; // Number of particles per break
+        var count = 8;
         for (var i = 0; i < count && this._particles.length < this._maxParticles; i++) {
             var vx = (Math.random() - 0.5) * 2;
             var vy = Math.random() * 1.5 + 0.5;
@@ -172,18 +171,16 @@
             // Four corners: bottom-left, bottom-right, top-right, top-left
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
-            var trx = cx + rx + ux, try_ = cy + ry + uy, trz = cz + rz + uz;
+            var trx = cx + rx + ux, try__ = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
             // Quad vertices: position(3) + UV(2) + Color(4) = 9 floats each
             vertices.push(
-                // Triangle 1 (bottom-left, bottom-right, top-right)
                 blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
                 brx, bry, brz,   1, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                trx, try_, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
-                // Triangle 2 (bottom-left, top-right, top-left)
+                trx, try__, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
                 blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                trx, try_, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
+                trx, try__, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
                 tlx, tly, tlz,   0, 1,   p.color.r, p.color.g, p.color.b, alpha
             );
         }

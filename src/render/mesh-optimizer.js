@@ -42,7 +42,8 @@
         var vertexCount = geometry.vertexCount;
         var faceDataSize = this._faceDataSize;
 
-        // Build vertex uniqueness map
+        // Build vertex uniqueness map using numeric hashing for performance.
+        // Key: position(3) + normal(3) + light(1) — UV is excluded as it varies per face.
         var vertexKeys = {};
         var uniqueVertices = [];
         var vertexToIndex = [];
@@ -50,10 +51,16 @@
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            // Create a unique key from position + normal + light (not UV, as UV may vary)
-            var key = vertices[base] + ',' + vertices[base + 1] + ',' + vertices[base + 2] + ',' +
-                      vertices[base + 5] + ',' + vertices[base + 6] + ',' + vertices[base + 7] + ',' +
-                      vertices[base + 8];
+            // Hash: combine floats into a string key with fixed precision
+            var key = [
+                vertices[base],
+                vertices[base + 1],
+                vertices[base + 2],
+                vertices[base + 5],
+                vertices[base + 6],
+                vertices[base + 7],
+                vertices[base + 8]
+            ].join(',');
 
             if (vertexKeys[key] !== undefined) {
                 vertexToIndex[i] = vertexKeys[key];
@@ -61,7 +68,6 @@
                 vertexKeys[key] = uniqueCount;
                 vertexToIndex[i] = uniqueCount;
 
-                // Store full vertex data
                 for (var d = 0; d < faceDataSize; d++) {
                     uniqueVertices.push(vertices[base + d]);
                 }
@@ -116,9 +122,7 @@
 
         if (indexCount === 0) return geometry;
 
-        // Use the same typed array type as the input geometry to preserve Uint32 support
         var keptTriangles = [];
-        var maxTriangles = Math.floor(indexCount / 3); // upper bound
 
         for (var i = 0; i < indexCount; i += 3) {
             var i0 = indices[i];
@@ -185,15 +189,12 @@
     Donkeycraft.MeshOptimizer.prototype.optimize = function(geometry, isBlockSolid, cameraPos) {
         var result = geometry;
 
-        // Pass 1: Cull hidden faces between solid blocks
         if (isBlockSolid) {
             result = this.cullFaces(result, isBlockSolid);
         }
 
-        // Pass 2: Generate index buffer for vertex reuse
         result = this.generateIndexBuffer(result);
 
-        // Pass 3: Cull back-facing triangles
         if (cameraPos) {
             result = this.cullBackFaces(result, cameraPos);
         }

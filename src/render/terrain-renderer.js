@@ -290,7 +290,7 @@
      */
     Donkeycraft.TerrainRenderer.prototype.render = function(camera) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager || !this._getBlockFunc) return;
+        if (!gl || !this._shaderManager || !this._getBlockFunc || !camera) return;
 
         // Use terrain shader program
         if (!this._shaderManager.use('terrain')) return;
@@ -356,12 +356,12 @@
      * @param {ChunkMesh} chunkMesh - The chunk mesh to draw.
      */
     Donkeycraft.TerrainRenderer.prototype._drawChunk = function(chunkMesh) {
-        if (!chunkMesh || chunkMesh.getIndexCount() === 0) return;
-        chunkMesh.draw();
+        if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
+        return chunkMesh.draw();
     };
 
     /**
-     * Get or create a placeholder texture for Phase 2.
+     * Get or create a 1x1 white placeholder texture.
      * @private
      * @returns {WebGLTexture|null}
      */
@@ -369,7 +369,6 @@
         if (!this._gl) return null;
 
         if (!this._placeholderTexture) {
-            // Create a 1×1 white texture as placeholder
             var gl = this._gl;
             this._placeholderTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);

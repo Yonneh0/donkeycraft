@@ -7,15 +7,15 @@
     var FOV = Donkeycraft.Config.FOV; // 70 degrees
 
     /**
-     * Camera — First-person camera with position, rotation, and projection.
+     * Camera — First-person camera with position, rotation, and projection matrix, FOV.
      * @param {number} [fov] - Field of view in degrees (default: 70).
      * @param {number} [near=0.1] - Near clipping plane.
      * @param {number} [far=1000] - Far clipping plane.
      */
     Donkeycraft.Camera = function(fov, near, far) {
         this._position = new Donkeycraft.Vector3(0, 64, 0);
-        this._yaw = 0;       // Y-axis rotation (radians)
-        this._pitch = 0;     // X-axis rotation (radians)
+        this._yaw = 0;
+        this._pitch = 0;
         this._fov = fov || FOV;
         this._near = near || 0.1;
         this._far = far || 1000;
@@ -79,11 +79,7 @@
         sensitivity = sensitivity || Donkeycraft.Config.MOUSE_SENSITIVITY;
         this._yaw -= deltaX * sensitivity;
         this._pitch -= deltaY * sensitivity;
-
-        // Clamp pitch to prevent flipping
-        var maxPitch = Math.PI / 2 - 0.01;
-        if (this._pitch > maxPitch) this._pitch = maxPitch;
-        if (this._pitch < -maxPitch) this._pitch = -maxPitch;
+        this._pitch = Donkeycraft.clamp(this._pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
     };
 
     /**
@@ -112,16 +108,6 @@
         var sinYaw = Math.sin(this._yaw);
 
         return new Donkeycraft.Vector3(cosYaw, 0, -sinYaw).normalized();
-    };
-
-    /**
-     * Get the up direction vector.
-     * @returns {Donkeycraft.Vector3} Normalized up vector.
-     */
-    Donkeycraft.Camera.prototype.getUp = function() {
-        var forward = this.getForward();
-        var right = this.getRight();
-        return Donkeycraft.Vector3.copy(right).cross(forward).normalized();
     };
 
     /**
