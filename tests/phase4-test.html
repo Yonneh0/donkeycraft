@@ -917,7 +917,7 @@
         var hasBedrock = false;
         for (var x = 0; x < 16; x++) {
             for (var z = 0; z < 16; z++) {
-                if (chunk.getBlock(x, WORLD_HEIGHT - 3, z) === 7) { // bedrock
+                if (chunk.getBlock(x, 253, z) === 7) { // bedrock at Y=253
                     hasBedrock = true;
                     break;
                 }
