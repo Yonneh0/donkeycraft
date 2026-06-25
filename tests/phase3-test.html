@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donkeycraft Phase 3 — Block System Test</title>
+    <style>
+        body { font-family: 'Courier New', monospace; margin: 0; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+        h1 { color: #00ff88; border-bottom: 2px solid #00ff88; padding-bottom: 10px; }
+        h2 { color: #4488ff; margin-top: 30px; }
+        .test-section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .pass { color: #00ff88; font-weight: bold; }
+        .fail { color: #ff4444; font-weight: bold; }
+        .info { color: #aaaaaa; font-style: italic; }
+        .test-result { padding: 3px 0; }
+        .summary { background: #0f3460; padding: 15px; margin-top: 20px; border-radius: 5px; font-size: 1.2em; }
+        pre { background: #0a0a1a; padding: 10px; overflow-x: auto; border: 1px solid #333; }
+        #canvas-container { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Donkeycraft Phase 3 — Block System Test</h1>
+    <p class="info">Testing: Block Definitions, Block State, Block Types, Texture Atlas, Block Models, Recipe Registry</p>
+
+    <div id="results"></div>
+    <div id="summary" class="summary"></div>
+
+    <!-- Hidden canvas for WebGL/TextureAtlas tests -->
+    <div id="canvas-container">
+        <canvas id="test-canvas" width="256" height="256"></canvas>
+    </div>
+
+    <!-- Load Phase 1 dependencies first -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+    <script src="../src/core/timer.js"></script>
+    <script src="../src/core/input.js"></script>
+    <script src="../src/core/math-utils.js"></script>
+    <script src="../src/core/audio.js"></script>
+
+    <!-- Load Phase 3 files -->
+    <script src="../src/world/block.js"></script>
+    <script src="../src/world/block-state.js"></script>
+    <script src="../src/world/block-types.js"></script>
+    <script src="../src/world/texture-atlas.js"></script>
+    <script src="../src/world/block-models.js"></script>
+    <script src="../src/world/recipe-registry.js"></script>
+
+    <script>
+    (function() {
+        'use strict';
+
+        var results = document.getElementById('results');
+        var summary = document.getElementById('summary');
+        var passCount = 0;
+        var failCount = 0;
+        var totalTests = 0;
+
+        function log(msg) {
+            results.innerHTML += '<div class="test-result">' + msg + '</div>';
+        }
+
+        function test(name, assertion, detail) {
+            totalTests++;
+            if (assertion) {
+                passCount++;
+                var d = detail ? ' — ' + detail : '';
+                log('<span class="pass">PASS</span>: ' + name + d);
+            } else {
+                failCount++;
+                var d2 = detail ? ' — ' + detail : '';
+                log('<span class="fail">FAIL</span>: ' + name + d2);
+            }
+        }
+
+        function info(msg) {
+            results.innerHTML += '<div class="test-result"><span class="info">INFO:</span> ' + msg + '</div>';
+        }
+
+        // ============================================================
+        // TEST 1: Block Definitions (block.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 1: Block Definitions (block.js)</h2>';
+
+        // Test basic block retrieval
+        var air = Donkeycraft.BlockRegistry.getBlockById(0);
+        test('Air block exists', air !== null, 'id=0');
+        test('Air name is "air"', air && air.name === 'air', 'name=' + (air ? air.name : 'null'));
+        test('Air is transparent', air && air.transparent === true, 'transparent=' + (air ? air.transparent : 'null'));
+        test('Air hardness is -1', air && air.hardness === -1, 'hardness=' + (air ? air.hardness : 'null'));
+
+        var stone = Donkeycraft.BlockRegistry.getBlockById(1);
+        test('Stone block exists', stone !== null, 'id=1');
+        test('Stone name is "stone"', stone && stone.name === 'stone', 'name=' + (stone ? stone.name : 'null'));
+        test('Stone hardness is 1.5', stone && stone.hardness === 1.5, 'hardness=' + (stone ? stone.hardness : 'null'));
+        test('Stone blast resistance is 6.0', stone && stone.blastResistance === 6.0, 'blastRes=' + (stone ? stone.blastResistance : 'null'));
+        test('Stone dropBlockId is 1', stone && stone.dropBlockId === 1, 'dropId=' + (stone ? stone.dropBlockId : 'null'));
+        test('Stone is not transparent', stone && stone.transparent === false, 'transparent=' + (stone ? stone.transparent : 'null'));
+        test('Stone lightOpacity is 15', stone && stone.lightOpacity === 15, 'lightOpacity=' + (stone ? stone.lightOpacity : 'null'));
+
+        // Test lookup by name
+        var stoneByName = Donkeycraft.BlockRegistry.getBlockByName('stone');
+        test('Lookup stone by name', stoneByName !== null && stoneByName.id === 1);
+
+        var glassByName = Donkeycraft.BlockRegistry.getBlockByName('glass');
+        test('Lookup glass by name', glassByName !== null && glassByName.id === 45);
+        test('Glass is transparent', glassByName && glassByName.transparent === true);
+
+        // Test non-existent blocks
+        test('Non-existent block returns null', Donkeycraft.BlockRegistry.getBlockById(999) === null);
+        test('Non-existent name returns null', Donkeycraft.BlockRegistry.getBlockByName('nonexistent_block') === null);
+
+        // Test all blocks have required properties
+        var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
+        test('Block count > 250', allBlocks.length > 250, 'count=' + allBlocks.length);
+
+        var allHaveProps = true;
+        var missingProps = [];
+        for (var i = 0; i < allBlocks.length; i++) {
+            var b = allBlocks[i];
+            if (b.id === undefined || b.id === null || !b.name || b.hardness === undefined || b.blastResistance === undefined) {
+                allHaveProps = false;
+                missingProps.push('id=' + b.id + ' name=' + b.name);
+            }
+        }
+        test('All blocks have required properties', allHaveProps, missingProps.length > 0 ? 'Missing: ' + missingProps.join(', ') : '');
+
+        // Test specific block categories
+        var water = Donkeycraft.BlockRegistry.getBlockById(212);
+        test('Water exists', water !== null);
+        test('Water is transparent', water && water.transparent === true);
+        test('Water lightOpacity is 1', water && water.lightOpacity === 1);
+
+        var lava = Donkeycraft.BlockRegistry.getBlockById(213);
+        test('Lava exists', lava !== null);
+        test('Lava is emissive', lava && lava.emissive === true);
+        test('Lava lightLevel is 15', lava && lava.lightLevel === 15);
+
+        var obsidian = Donkeycraft.BlockRegistry.getBlockById(17);
+        test('Obsidian blast resistance >= 1200', obsidian && obsidian.blastResistance >= 1200, 'br=' + (obsidian ? obsidian.blastResistance : 'null'));
+
+        // ============================================================
+        // TEST 2: Block Type Queries (block.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 2: Block Type Queries (block.js)</h2>';
+
+        test('isTransparent(0) [air]', Donkeycraft.BlockRegistry.isTransparent(0) === true);
+        test('isTransparent(45) [glass]', Donkeycraft.BlockRegistry.isTransparent(45) === true);
+        test('isTransparent(1) [stone]', Donkeycraft.BlockRegistry.isTransparent(1) === false);
+
+        test('isSolid(1) [stone]', Donkeycraft.BlockRegistry.isSolid(1) === true);
+        test('isSolid(45) [glass]', Donkeycraft.BlockRegistry.isSolid(45) === false);
+        test('isSolid(0) [air]', Donkeycraft.BlockRegistry.isSolid(0) === false);
+
+        test('isOpaque(1) [stone]', Donkeycraft.BlockRegistry.isOpaque(1) === true);
+        test('isOpaque(45) [glass]', Donkeycraft.BlockRegistry.isOpaque(45) === false);
+
+        test('isLiquid(212) [water]', Donkeycraft.BlockRegistry.isLiquid(212) === true);
+        test('isLiquid(213) [lava]', Donkeycraft.BlockRegistry.isLiquid(213) === true);
+        test('isLiquid(1) [stone]', Donkeycraft.BlockRegistry.isLiquid(1) === false);
+
+        test('isReplaceable(0) [air]', Donkeycraft.BlockRegistry.isReplaceable(0) === true);
+        test('getDropBlockId(1) = 1', Donkeycraft.BlockRegistry.getDropBlockId(1) === 1);
+        test('getDropBlockId(45) [glass] = -1', Donkeycraft.BlockRegistry.getDropBlockId(45) === -1);
+        test('getDropItemCount(1) = 1', Donkeycraft.BlockRegistry.getDropItemCount(1) === 1);
+
+        // ============================================================
+        // TEST 3: Block State System (block-state.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 3: Block State System (block-state.js)</h2>';
+
+        // Test BlockState class
+        var state1 = new Donkeycraft.BlockState({ axis: 'y', color: 'red' });
+        test('BlockState created', state1 !== null);
+        test('Get property "axis"', state1.get('axis') === 'y');
+        test('Get property "color"', state1.get('color') === 'red');
+        test('Get non-existent property', state1.get('nonexistent') === null);
+
+        var state2 = new Donkeycraft.BlockState({ axis: 'y', color: 'red' });
+        test('States match (same properties)', state1.matches(state2) === true);
+
+        var state3 = new Donkeycraft.BlockState({ axis: 'x', color: 'red' });
+        test('States do not match (different axis)', state1.matches(state3) === false);
+
+        var emptyState = new Donkeycraft.BlockState();
+        test('Empty state is empty', emptyState.isEmpty() === true);
+        test('Non-empty state is not empty', state1.isEmpty() === false);
+
+        var cloned = state1.clone();
+        test('Clone matches original', state1.matches(cloned) === true);
+
+        // Test property setters/getters
+        state1.set('newProp', 'newValue');
+        test('Set and get property', state1.get('newProp') === 'newValue');
+
+        // Test BlockStateRegistry
+        var logStates = Donkeycraft.BlockStateRegistry.getPossibleStates(24); // oak_log
+        test('Oak log has states', logStates.length > 0, 'count=' + logStates.length);
+        test('Oak log has 3 axis variants', logStates.length === 3);
+
+        var firstLogState = logStates[0];
+        test('First log state axis is "y"', firstLogState.get('axis') === 'y');
+
+        // Test state serialization
+        var stateStr = Donkeycraft.BlockStateRegistry.getStateString(state1);
+        test('State string serialization', stateStr.indexOf('axis=y') >= 0 && stateStr.indexOf('color=red') >= 0);
+
+        // Test hasStates
+        test('Oak log has states', Donkeycraft.BlockStateRegistry.hasStates(24) === true);
+        test('Stone has no states', Donkeycraft.BlockStateRegistry.hasStates(1) === false);
+
+        // Test getDefaultState
+        var defaultLog = Donkeycraft.BlockStateRegistry.getDefaultState(24);
+        test('Default log state axis is y', defaultLog.get('axis') === 'y');
+
+        // Test findMatchingState
+        var found = Donkeycraft.BlockStateRegistry.findMatchingState(24, { axis: 'z' });
+        test('Find matching state for axis=z', found !== null && found.get('axis') === 'z');
+
+        // Test ColorValues constants
+        test('ColorValues.WHITE exists', Donkeycraft.ColorValues.WHITE === 'white');
+        test('ColorValues.RED exists', Donkeycraft.ColorValues.RED === 'red');
+        test('AxisValues.Y exists', Donkeycraft.AxisValues.Y === 'y');
+        test('FacingValues.NORTH exists', Donkeycraft.FacingValues.NORTH === 'north');
+
+        // ============================================================
+        // TEST 4: Block Types Classification (block-types.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 4: Block Types Classification (block-types.js)</h2>';
+
+        test('BlockTypes.isSolid(1) [stone]', Donkeycraft.BlockTypes.isSolid(1) === true);
+        test('BlockTypes.isSolid(45) [glass]', Donkeycraft.BlockTypes.isSolid(45) === false);
+        test('BlockTypes.isSolid(212) [water]', Donkeycraft.BlockTypes.isSolid(212) === false);
+
+        test('BlockTypes.isTransparent(45) [glass]', Donkeycraft.BlockTypes.isTransparent(45) === true);
+        test('BlockTypes.isTransparent(1) [stone]', Donkeycraft.BlockTypes.isTransparent(1) === false);
+        test('BlockTypes.isTransparent(118) [oak_leaves]', Donkeycraft.BlockTypes.isTransparent(118) === true);
+
+        test('BlockTypes.isOpaque(1) [stone]', Donkeycraft.BlockTypes.isOpaque(1) === true);
+        test('BlockTypes.isOpaque(45) [glass]', Donkeycraft.BlockTypes.isOpaque(45) === false);
+
+        test('BlockTypes.isLiquid(212) [water]', Donkeycraft.BlockTypes.isLiquid(212) === true);
+        test('BlockTypes.isLiquid(213) [lava]', Donkeycraft.BlockTypes.isLiquid(213) === true);
+        test('BlockTypes.isLiquid(1) [stone]', Donkeycraft.BlockTypes.isLiquid(1) === false);
+
+        test('BlockTypes.isReplaceable(0) [air]', Donkeycraft.BlockTypes.isReplaceable(0) === true);
+        test('BlockTypes.isReplaceable(158) [grass plant]', Donkeycraft.BlockTypes.isReplaceable(158) === true);
+
+        test('BlockTypes.isFullBlock(1) [stone]', Donkeycraft.BlockTypes.isFullBlock(1) === true);
+        test('BlockTypes.isFullBlock(45) [glass]', Donkeycraft.BlockTypes.isFullBlock(45) === false);
+        test('BlockTypes.isFullBlock(127) [stone_slab]', Donkeycraft.BlockTypes.isFullBlock(127) === false);
+
+        test('BlockTypes.isCollidable(1) [stone]', Donkeycraft.BlockTypes.isCollidable(1) === true);
+        test('BlockTypes.isCollidable(212) [water]', Donkeycraft.BlockTypes.isCollidable(212) === true);
+
+        test('BlockTypes.blocksLight(1) [stone]', Donkeycraft.BlockTypes.blocksLight(1) === true);
+        test('BlockTypes.blocksLight(45) [glass]', Donkeycraft.BlockTypes.blocksLight(45) === false);
+
+        test('BlockTypes.getLightOpacity(1) = 15', Donkeycraft.BlockTypes.getLightOpacity(1) === 15);
+        test('BlockTypes.getLightOpacity(45) = 0', Donkeycraft.BlockTypes.getLightOpacity(45) === 0);
+
+        var solidIds = Donkeycraft.BlockTypes.getIdsByType('solid');
+        test('getIdsByType("solid") returns array', Array.isArray(solidIds) && solidIds.length > 0, 'count=' + (solidIds ? solidIds.length : 0));
+
+        var liquidIds = Donkeycraft.BlockTypes.getIdsByType('liquid');
+        test('getIdsByType("liquid") contains water and lava', liquidIds && liquidIds.indexOf(212) >= 0 && liquidIds.indexOf(213) >= 0);
+
+        // ============================================================
+        // TEST 5: Texture Atlas (texture-atlas.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 5: Texture Atlas (texture-atlas.js)</h2>';
+
+        var canvas = document.getElementById('test-canvas');
+        if (canvas) {
+            try {
+                var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    var atlas = new Donkeycraft.TextureAtlas(gl);
+
+                    // Test UV coordinates without generating (before images loaded)
+                    // UVs should still be computed based on block IDs
+                    test('TextureAtlas created', atlas !== null);
+
+                    // Generate the atlas (will use placeholder for unloaded images)
+                    var genResult = atlas.generate();
+                    test('Atlas generation succeeded', genResult === true);
+
+                    test('Atlas is ready after generation', atlas.isReady() === true);
+
+                    // Test UV lookup
+                    var stoneUV = atlas.getUVs(1);
+                    test('Stone UV coordinates exist', stoneUV !== null);
+                    if (stoneUV) {
+                        test('Stone U is 0.0625 (1/16)', Math.abs(stoneUV.u - 0.0625) < 0.001, 'u=' + stoneUV.u);
+                        test('Stone V is 0.0', stoneUV.v === 0);
+                        test('Stone uSize is 0.0625 (1/16)', Math.abs(stoneUV.uSize - 0.0625) < 0.001);
+                    }
+
+                    // Test UV for block at different atlas positions
+                    var glassUV = atlas.getUVs(45);
+                    test('Glass UV coordinates exist', glassUV !== null);
+                    if (glassUV) {
+                        // Glass is ID 45: col=45%16=13, row=45/16=2
+                        // u = 13*16/256 = 0.8125, v = 2*16/256 = 0.125
+                        test('Glass U is ~0.8125', Math.abs(glassUV.u - 0.8125) < 0.001, 'u=' + glassUV.u);
+                        test('Glass V is ~0.125', Math.abs(glassUV.v - 0.125) < 0.001, 'v=' + glassUV.v);
+                    }
+
+                    // Test pixel UVs
+                    var stonePixelUV = atlas.getPixelUVs(1);
+                    test('Stone pixel UVs exist', stonePixelUV !== null);
+                    if (stonePixelUV) {
+                        test('Stone pixelU is 16', stonePixelUV.pixelU === 16);
+                        test('Stone pixelV is 0', stonePixelUV.pixelV === 0);
+                    }
+
+                    // Test bind
+                    atlas.bind();
+                    test('Atlas bind succeeded (no error)', true);
+
+                    // Test destroy
+                    atlas.destroy();
+                    test('Atlas destroyed successfully', atlas.isReady() === false);
+
+                } else {
+                    info('WebGL not available — skipping texture atlas tests');
+                }
+            } catch (e) {
+                failCount++;
+                log('<span class="fail">ERROR</span>: Texture Atlas test threw: ' + e.message);
+            }
+        } else {
+            info('Test canvas not found — skipping texture atlas tests');
+        }
+
+        // ============================================================
+        // TEST 6: Block Models (block-models.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 6: Block Models (block-models.js)</h2>';
+
+        // Test BlockModel class
+        var stoneModel = new Donkeycraft.BlockModel(1);
+        test('BlockModel created for stone', stoneModel !== null);
+        test('Stone model blockId is 1', stoneModel.blockId === 1);
+        test('Stone model uses default texture', stoneModel.getFaceTexture('up') === 'stone');
+
+        // Test face textures
+        test('All 6 faces have textures',
+            stoneModel.getFaceTexture('up') &&
+            stoneModel.getFaceTexture('down') &&
+            stoneModel.getFaceTexture('north') &&
+            stoneModel.getFaceTexture('south') &&
+            stoneModel.getFaceTexture('east') &&
+            stoneModel.getFaceTexture('west'));
+
+        // Test AO
+        test('Default model has no AO', stoneModel.hasAO() === false);
+
+        // Test AO weights
+        var upAO = stoneModel.getAOWeights('up');
+        test('AO weights are array of 4 values', Array.isArray(upAO) && upAO.length === 4);
+        test('Full AO weights are all 1.0', upAO[0] === 1.0 && upAO[1] === 1.0 && upAO[2] === 1.0 && upAO[3] === 1.0);
+
+        // Test BlockModelRegistry
+        var regStoneModel = Donkeycraft.BlockModelRegistry.getBlockModel(1);
+        test('Registry returns stone model', regStoneModel !== null);
+        test('Registry stone model has AO (solid block)', regStoneModel.hasAO() === true);
+
+        var regGlassModel = Donkeycraft.BlockModelRegistry.getBlockModel(45);
+        test('Registry returns glass model', regGlassModel !== null);
+        test('Registry glass model has no AO (transparent)', regGlassModel.hasAO() === false);
+
+        // Test grass block model with custom faces
+        var grassModel = Donkeycraft.BlockModelRegistry.getBlockModel(8);
+        test('Grass block model exists', grassModel !== null);
+        if (grassModel) {
+            test('Grass top is grass_block_top', grassModel.getFaceTexture('up') === 'grass_block_top');
+            test('Grass bottom is dirt', grassModel.getFaceTexture('down') === 'dirt');
+            test('Grass side is grass_block_side', grassModel.getFaceTexture('north') === 'grass_block_side');
+            test('Grass model has AO', grassModel.hasAO() === true);
+        }
+
+        // Test hasAO function
+        test('BlockModelRegistry.hasAO(1) [stone]', Donkeycraft.BlockModelRegistry.hasAO(1) === true);
+        test('BlockModelRegistry.hasAO(45) [glass]', Donkeycraft.BlockModelRegistry.hasAO(45) === false);
+
+        // Test face constants
+        test('FACE_UP = 0', Donkeycraft.BlockModelRegistry.FACE_UP === 0);
+        test('FACE_DOWN = 1', Donkeycraft.BlockModelRegistry.FACE_DOWN === 1);
+        test('FACE_NORTH = 2', Donkeycraft.BlockModelRegistry.FACE_NORTH === 2);
+
+        // Test FACE_NORMALS
+        var upNormal = Donkeycraft.BlockModelRegistry.FACE_NORMALS[0];
+        test('UP normal is (0,1,0)', upNormal.x === 0 && upNormal.y === 1 && upNormal.z === 0);
+        var downNormal = Donkeycraft.BlockModelRegistry.FACE_NORMALS[1];
+        test('DOWN normal is (0,-1,0)', downNormal.x === 0 && downNormal.y === -1 && downNormal.z === 0);
+
+        // Test model count
+        var modelCount = Donkeycraft.BlockModelRegistry.getModelCount();
+        test('Model count > 200', modelCount > 200, 'count=' + modelCount);
+
+        // ============================================================
+        // TEST 7: Recipe Registry (recipe-registry.js)
+        // ============================================================
+        document.getElementById('results').innerHTML += '<h2>Test 7: Recipe Registry (recipe-registry.js)</h2>';
+
+        // Test recipe counts
+        var shapedCount = Donkeycraft.RecipeRegistry.getShapedCount();
+        test('Shaped recipes registered', shapedCount > 0, 'count=' + shapedCount);
+
+        var shapelessCount = Donkeycraft.RecipeRegistry.getShapelessCount();
+        test('Shapeless recipes registered', shapelessCount > 0, 'count=' + shapelessCount);
+
+        var smeltCount = Donkeycraft.RecipeRegistry.getSmeltCount();
+        test('Smelting recipes registered', smeltCount > 0, 'count=' + smeltCount);
+
+        // Test smelting recipe lookup
+        var ironOreSmelt = Donkeycraft.RecipeRegistry.getSmeltRecipe(11); // iron_ore
+        test('Iron ore has smelt recipe', ironOreSmelt !== null);
+        if (ironOreSmelt) {
+            test('Iron ore smelts to iron_ingot', ironOreSmelt.outputBlockId === 221);
+            test('Smelting time is 200 ticks', ironOreSmelt.cookingTime === 200);
+        }
+
+        var sandSmelt = Donkeycraft.RecipeRegistry.getSmeltOutput(19); // sand
+        test('Sand smelts to glass (45)', sandSmelt === 45);
+
+        // Test shaped recipe matching
+        // Create a 2×2 grid with oak_planks (30) for crafting table
+        var planksGrid = [
+            [30, 30],
+            [30, 30]
+        ];
+        var craftedTable = Donkeycraft.RecipeRegistry.matchShapedRecipe(planksGrid, 2, 2);
+        test('4 oak_planks craft crafting_table', craftedTable !== null && craftedTable.outputBlockId === 195);
+
+        // Test shapeless recipe matching
+        var itemCounts = { 221: 9 }; // 9 iron_ingot (block ID 221)
+        var shapelessMatch = Donkeycraft.RecipeRegistry.matchShapelessRecipe(itemCounts);
+        test('9 iron_ingots match shapeless recipe', shapelessMatch !== null && shapelessMatch.outputBlockId === 226);
+
+        // Test non-matching recipes
+        var emptyGrid = [
+            [null, null],
+            [null, null]
+        ];
+        var noMatch = Donkeycraft.RecipeRegistry.matchShapedRecipe(emptyGrid, 2, 2);
+        test('Empty grid matches no shaped recipe', noMatch === null);
+
+        var wrongCounts = { 999: 5 }; // block ID 999 doesn't exist in any recipe
+        var noShapelessMatch = Donkeycraft.RecipeRegistry.matchShapelessRecipe(wrongCounts);
+        test('Wrong items match no shapeless recipe', noShapelessMatch === null);
+
+        // Test getSmeltTime
+        var smeltTime = Donkeycraft.RecipeRegistry.getSmeltTime(11); // iron_ore
+        test('Iron ore smelt time is 200', smeltTime === 200);
+
+        var unknownSmelt = Donkeycraft.RecipeRegistry.getSmeltTime(999);
+        test('Unknown block smelt time defaults to 200', unknownSmelt === 200);
+
+        // Test getAllRecipes
+        var allRecipes = Donkeycraft.RecipeRegistry.getAllRecipes();
+        test('getAllRecipes returns array', Array.isArray(allRecipes));
+        test('Total recipes > shaped + shapeless + smelt', allRecipes.length >= shapedCount + shapelessCount + smeltCount);
+
+        // Test Recipe class
+        var testRecipe = new Donkeycraft.Recipe(999, 'shaped', [1, 2, 3, 4], 2, 5, 2);
+        test('Recipe object created', testRecipe !== null);
+        test('Recipe type is "shaped"', testRecipe.type === 'shaped');
+        test('Recipe outputBlockId is 5', testRecipe.outputBlockId === 5);
+        test('Recipe outputCount is 2', testRecipe.outputCount === 2);
+
+        // ============================================================
+        // SUMMARY
+        // ============================================================
+        summary.innerHTML = '<strong>Phase 3 Test Summary</strong><br>' +
+            'Total tests: ' + totalTests + '<br>' +
+            '<span class="pass">Passed: ' + passCount + '</span><br>' +
+            '<span class="fail">Failed: ' + failCount + '</span>';
+
+        if (failCount === 0) {
+            summary.innerHTML += '<br><br><span class="pass">ALL TESTS PASSED!</span>';
+        } else {
+            summary.innerHTML += '<br><br><span class="fail">' + failCount + ' TEST(S) FAILED</span>';
+        }
+
+    })();
+    </script>
+</body>
+</html>
