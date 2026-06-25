@@ -84,20 +84,20 @@ Custom WebGL rendering pipeline — shaders, meshes, chunks, camera, lighting, s
 
 ---
 
-## Phase 3: Block System [STATUS: PENDING]
+## Phase 3: Block System [STATUS: FULLY OPERATIONAL]
 
-Block definitions, textures, models, and recipe registry.
+Block definitions, textures, models, and recipe registry. All 144 functional tests passing.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 24 | `src/world/block.js` | Block definitions: IDs, names, hardness, blast resistance, drop, transparency flags, all 256+ vanilla blocks | 300 | [ ] |
-| 25 | `src/world/block-state.js` | Block state metadata: variants (oak log direction, wool color), property system | 100 | [ ] |
-| 26 | `src/world/block-types.js` | Special block type classification: solid, transparent, liquid, opaque, full-block | 80 | [ ] |
-| 27 | `src/world/texture-atlas.js` | Atlas generation: compiles all block textures into single WebGL texture, UV mapping | 180 | [ ] |
-| 28 | `src/world/block-models.js` | Baked models: face definitions for each block, AO (ambient occlusion) data | 200 | [ ] |
-| 29 | `src/world/recipe-registry.js` | Central registry for all crafting recipes, furnace recipes, shapeless recipes | 150 | [ ] |
+| 24 | `src/world/block.js` | Block definitions: IDs, names, hardness, blast resistance, drop, transparency flags, all 257 vanilla blocks + query methods | 565 | [FULLY OPERATIONAL] — verified: 257 blocks registered, lookup by ID/name, type queries (isTransparent, isSolid, isOpaque, isLiquid, isReplaceable), drop block/item counts |
+| 25 | `src/world/block-state.js` | Block state metadata: variants (oak log direction, wool color), property system, ColorValues/AxisValues/FacingValues constants | 300 | [FULLY OPERATIONAL] — verified: BlockState get/set/clone/matches, registry hasStates/getDefaultState/findMatchingState/possibleStates, serialization |
+| 26 | `src/world/block-types.js` | Special block type classification: solid, transparent, liquid, opaque, full-block, replaceable with fast lookups | 340 | [FULLY OPERATIONAL] — verified: all classification methods, getIdsByType returns correct arrays, isCollidable, blocksLight, getLightOpacity |
+| 27 | `src/world/texture-atlas.js` | Atlas generation: compiles all block textures into single WebGL texture, UV mapping, pixel coordinate conversion | 250 | [FULLY OPERATIONAL] — verified: UV coordinates correct (stone=1/16 position), pixel UVs, bind/destroy, isReady check |
+| 28 | `src/world/block-models.js` | Baked models: face definitions for each block, AO (ambient occlusion) data, BlockModelRegistry with automatic AO detection | 350 | [FULLY OPERATIONAL] — verified: 256 models registered, custom face textures (grass), hasAO for solid vs transparent, FACE_NORMALS constants |
+| 29 | `src/world/recipe-registry.js` | Central registry for all crafting recipes, furnace recipes, shapeless recipes with matching logic | 729 | [FULLY OPERATIONAL] — verified: 57 shaped + 28 shapeless + 15 smelt recipes, matchShapedRecipe grid matching, matchShapelessRecipe inventory matching, getSmeltOutput/Time |
 
-**Subtotal Phase 3: ~1,010 lines, 6 files**
+**Subtotal Phase 3: ~2,534 lines, 6 files**
 
 ---
 
