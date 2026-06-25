@@ -58,27 +58,27 @@ Foundation layer — event system, math utilities, input handling, audio, config
 
 ---
 
-## Phase 2: WebGL Rendering Engine [STATUS: PENDING]
+## Phase 2: WebGL Rendering Engine [STATUS: FULLY OPERATIONAL]
 
 Custom WebGL rendering pipeline — shaders, meshes, chunks, camera, lighting, sky, HUD.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 9 | `src/render/gl-context.js` | WebGL 1 context creation, error handling, capability queries | 60 | [ ] |
-| 10 | `src/render/shader-manager.js` | Shader compilation, linking, uniform/location caching | 120 | [ ] |
-| 11 | `src/render/shaders/vertex-shaders.glsl` | All vertex shaders as string resources (terrain, block break, GUI) | 80 | [ ] |
-| 12 | `src/render/shaders/fragment-shaders.glsl` | All fragment shaders (terrain lighting, fog, sky, GUI) | 100 | [ ] |
-| 13 | `src/render/geometry-builder.js` | Builds vertex buffers: position, UV, normal, light data for chunk meshes | 200 | [ ] |
-| 14 | `src/render/mesh-optimizer.js` | Face culling: removes faces between solid blocks, generates index buffers | 180 | [ ] |
-| 15 | `src/render/chunk-mesh.js` | Per-chunk mesh object: buffer management, update methods, draw calls | 130 | [ ] |
-| 16 | `src/render/terrain-renderer.js` | Main rendering: chunk iteration, frustum culling, batched draws | 200 | [ ] |
-| 17 | `src/render/camera.js` | First-person camera: position, rotation, projection matrix, FOV | 100 | [ ] |
-| 18 | `src/render/fog.js` | Distance fog, sky color based on biome/time, fog density | 80 | [ ] |
-| 19 | `src/render/sky.js` | Sky rendering: day/night gradient, sun, moon, stars, cloud layer | 150 | [ ] |
-| 20 | `src/render/lighting.js` | Directional light (sun), ambient light, sky color computation | 70 | [ ] |
-| 21 | `src/render/hand-renderer.js` | First-person hand/item rendering in bottom-right | 120 | [ ] |
-| 22 | `src/render/break-particles.js` | Block breaking particle system: animation, sprites, fade-out | 100 | [ ] |
-| 23 | `src/render/gui-renderer.js` | HUD overlay rendering: crosshair, hotbar background, health/hunger bars | 150 | [ ] |
+| 9 | `src/render/gl-context.js` | WebGL 1 context creation, error handling, capability queries | 60 | [FULLY OPERATIONAL] |
+| 10 | `src/render/shader-manager.js` | Shader compilation, linking, uniform/location caching | 120 | [FULLY OPERATIONAL] |
+| 11 | `src/render/shaders/vertex-shaders.glsl` | All vertex shaders as string resources (terrain, block break, GUI) | 80 | [FULLY OPERATIONAL] |
+| 12 | `src/render/shaders/fragment-shaders.glsl` | All fragment shaders (terrain lighting, fog, sky, GUI) | 100 | [FULLY OPERATIONAL] |
+| 13 | `src/render/geometry-builder.js` | Builds vertex buffers: position, UV, normal, light data for chunk meshes | 200 | [FULLY OPERATIONAL] |
+| 14 | `src/render/mesh-optimizer.js` | Face culling: removes faces between solid blocks, generates index buffers | 180 | [FULLY OPERATIONAL] |
+| 15 | `src/render/chunk-mesh.js` | Per-chunk mesh object: buffer management, update methods, draw calls | 130 | [FULLY OPERATIONAL] |
+| 16 | `src/render/terrain-renderer.js` | Main rendering: chunk iteration, frustum culling, batched draws | 200 | [FULLY OPERATIONAL] |
+| 17 | `src/render/camera.js` | First-person camera: position, rotation, projection matrix, FOV | 100 | [FULLY OPERATIONAL] |
+| 18 | `src/render/fog.js` | Distance fog, sky color based on biome/time, fog density | 80 | [FULLY OPERATIONAL] |
+| 19 | `src/render/sky.js` | Sky rendering: day/night gradient, sun, moon, stars, cloud layer | 150 | [FULLY OPERATIONAL] |
+| 20 | `src/render/lighting.js` | Directional light (sun), ambient light, sky color computation | 70 | [FULLY OPERATIONAL] |
+| 21 | `src/render/hand-renderer.js` | First-person hand/item rendering in bottom-right | 120 | [FULLY OPERATIONAL] |
+| 22 | `src/render/break-particles.js` | Block breaking particle system: animation, sprites, fade-out | 100 | [FULLY OPERATIONAL] |
+| 23 | `src/render/gui-renderer.js` | HUD overlay rendering: crosshair, hotbar background, health/hunger bars | 150 | [FULLY OPERATIONAL] |
 
 **Subtotal Phase 2: ~1,715 lines, 14 files**
 
