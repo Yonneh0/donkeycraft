@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Test Suite</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 20px; }
+.category { margin: 20px 0; }
+.category h2 { color: #f1c40f; font-size: 1.1em; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid #333; }
+.test-link { display: block; padding: 10px 16px; margin: 6px 0; background: #16213e; border-radius: 6px; border-left: 4px solid #333; text-decoration: none; color: #e0e0e0; transition: background 0.2s, border-color 0.2s; }
+.test-link:hover { background: #1a2a4a; border-left-color: #00d4ff; }
+.test-link .title { font-weight: bold; font-size: 0.95em; }
+.test-link .desc { color: #888; font-size: 0.82em; margin-top: 3px; }
+.placeholder { color: #666; font-style: italic; padding: 10px 0; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<h1>Donkeycraft — Test Suite</h1>
+<div class="subtitle">Functional tests for each development phase and integrated milestones. Click a test to open it in your browser.</div>
+
+<div class="category">
+    <h2>Milestone Tests (Integrated Pipelines)</h2>
+    <a href="milestone1-test.html" class="test-link">
+        <div class="title">Milestone 1: "Hello World"</div>
+        <div class="desc">Verify rendering pipeline works — rotating colored cube at 60 FPS (Phase 1 + Phase 2)</div>
+    </a>
+    <a href="milestone2-test.html" class="test-link">
+        <div class="title">Milestone 2: "Voxel World"</div>
+        <div class="desc">Verify world generation and rendering integration — generated chunk with terrain, ores, caves in WebGL viewport</div>
+    </a>
+</div>
+
+<div class="category">
+    <h2>Phase Tests (Isolated Subsystems)</h2>
+    <a href="phase1-test.html" class="test-link">
+        <div class="title">Phase 1: Core Infrastructure</div>
+        <div class="desc">Namespace, EventBus, Config, Logger, Timer, Input, Math Utilities (Vector3/Matrix4/Quaternion), AudioSystem</div>
+    </a>
+    <a href="phase2-test.html" class="test-link">
+        <div class="title">Phase 2: WebGL Rendering</div>
+        <div class="desc">GLContext, ShaderManager, GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer, BreakParticles, GUIRenderer</div>
+    </a>
+    <a href="phase3-test.html" class="test-link">
+        <div class="title">Phase 3: Block System</div>
+        <div class="desc">Block Definitions, Block State, Block Types, Texture Atlas, Block Models, Recipe Registry</div>
+    </a>
+    <a href="phase4-test.html" class="test-link">
+        <div class="title">Phase 4: World Generation</div>
+        <div class="desc">Chunk, ChunkManager, Biome, TerrainGenerator, OreGenerator, CaveGenerator, StructureGenerator, WaterGenerator, TerrainSurface, LightingEngine, Physics</div>
+    </a>
+</div>
+
+<div class="category">
+    <h2>Future Tests</h2>
+    <div class="placeholder">Phase 5+: Player & Movement, Interaction, Inventory & UI, Crafting, Entities, Redstone, and more — coming soon.</div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+    // Auto-detect which phases have source files and update the index
+    var testFiles = [
+        { file: 'phase5-test.html', name: 'Phase 5: Player & Movement', desc: 'Player position, movement ticks, physics, fly mode toggle' },
+        { file: 'phase6-test.html', name: 'Phase 6: Interaction', desc: 'Mining, placing blocks, DDA raycasting, reach distance' },
+        { file: 'phase7-test.html', name: 'Phase 7: Inventory & UI', desc: 'Inventories, slots, hotbar, GUI rendering' },
+        { file: 'phase8-test.html', name: 'Phase 8: Crafting', desc: '2x2 and 3x3 shaped/shapeless recipe matching' },
+        { file: 'phase9-test.html', name: 'Phase 9: Entities & Mobs', desc: 'Entity spawning, ticking, mob AI pathfinding' },
+        { file: 'phase10-test.html', name: 'Phase 10: Redstone', desc: 'Redstone wires, repeaters, comparators, signal propagation, pistons' }
+    ];
+
+    var futureSection = document.querySelector('.category:last-child .placeholder');
+    if (futureSection) {
+        // Remove placeholder text
+        futureSection.parentNode.removeChild(futureSection);
+
+        // Check which test files exist and add links
+        var linkContainer = document.createElement('div');
+        testFiles.forEach(function(t) {
+            var a = document.createElement('a');
+            a.href = t.file;
+            a.className = 'test-link';
+            a.innerHTML = '<div class="title">' + t.name + '</div><div class="desc">' + t.desc + '</div>';
+            linkContainer.appendChild(a);
+        });
+        document.querySelector('.category:last-child').appendChild(linkContainer);
+    }
+})();
+</script>
+</body>
+</html>
