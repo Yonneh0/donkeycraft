@@ -12,7 +12,6 @@
     Donkeycraft.Timer = function(ticksPerSecond) {
         ticksPerSecond = ticksPerSecond || Donkeycraft.Config.GAME_TICKS_PER_SECOND;
         this._tickInterval = 1000 / ticksPerSecond; // ms per tick
-        this._lastTickTime = 0;
         this._accumulator = 0;
         this._tickCount = 0;
         this._deltaTime = 0;
@@ -61,7 +60,6 @@
         if (this._running) return;
         this._running = true;
         this._lastFrameTime = performance.now();
-        this._lastTickTime = this._lastFrameTime;
         var self = this;
         this._animationFrameId = requestAnimationFrame(function(ts) { self._loop(ts); });
     };

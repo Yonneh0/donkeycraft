@@ -63,9 +63,9 @@
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
     Donkeycraft.Vector3.prototype.set = function(x, y, z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        this.x = (x !== undefined && !isNaN(x)) ? x : 0;
+        this.y = (y !== undefined && !isNaN(y)) ? y : 0;
+        this.z = (z !== undefined && !isNaN(z)) ? z : 0;
         return this;
     };
 
@@ -572,8 +572,9 @@
 
             // Shuffle using seed — use 42 as default, but allow seed=0 explicitly
             var s = (seed !== undefined && seed !== null) ? seed : 42;
+            if (s <= 0) s += 2147483647;  // Ensure positive starting value for LCG
             for (var i = 255; i > 0; i--) {
-                s = (s * 16807 + 0) % 2147483647;
+                s = (s * 16807) % 2147483647;
                 var j = s % (i + 1);
                 var tmp = p[i]; p[i] = p[j]; p[j] = tmp;
             }

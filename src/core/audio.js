@@ -44,8 +44,7 @@
      * @param {number} volume
      */
     Donkeycraft.AudioSystem.prototype.setVolume = function(volume) {
-        // Inline clamp — Donkeycraft.clamp may not be available yet (math-utils.js loads after audio.js)
-        this._volume = Math.min(1, Math.max(0, volume));
+        this._volume = Donkeycraft.clamp(volume, 0, 1);
         if (this._masterGain) {
             this._masterGain.gain.value = this._volume;
         }

@@ -41,6 +41,22 @@
             },
 
             /**
+             * Enable or disable the [Donkeycraft] tag in log output.
+             * @param {boolean} enabled
+             */
+            setTagEnabled: function(enabled) {
+                _tagEnabled = !!enabled;
+            },
+
+            /**
+             * Check if the tag is currently enabled.
+             * @returns {boolean}
+             */
+            getTagEnabled: function() {
+                return _tagEnabled;
+            },
+
+            /**
              * Log a debug message.
              * @param {...*} args
              */

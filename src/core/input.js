@@ -187,7 +187,8 @@
         var gameKeys = [
             'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ControlLeft',
             'KeyE', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
-            'Digit6', 'Digit7', 'Digit8', 'Digit9'
+            'Digit6', 'Digit7', 'Digit8', 'Digit9',
+            'F3', 'F5'
         ];
         if (gameKeys.indexOf(e.code) !== -1) {
             e.preventDefault();
@@ -217,9 +218,13 @@
     };
 
     Donkeycraft.Input.prototype._onMouseMove = function(e) {
+        // Always track absolute mouse position (client coordinates)
+        this._mouseState.x = e.clientX;
+        this._mouseState.y = e.clientY;
+
         if (this._mouseCaptured) {
-            this._mouseState.deltaX += e.movementX || e.movement.x || 0;
-            this._mouseState.deltaY += e.movementY || e.movement.y || 0;
+            this._mouseState.deltaX += e.movementX || 0;
+            this._mouseState.deltaY += e.movementY || 0;
         }
     };
 
