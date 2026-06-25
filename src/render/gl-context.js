@@ -35,7 +35,7 @@
                 antialias: false,
                 depth: true,
                 stencil: false,
-                preserveDrawingBuffer: false
+                preserveDrawingBuffer: true
             });
 
             if (!this._context) {

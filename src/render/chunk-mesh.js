@@ -156,6 +156,8 @@
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (normLoc >= 0) gl.disableVertexAttribArray(normLoc);
         if (lightLoc >= 0) gl.disableVertexAttribArray(lightLoc);
+
+        return true;
     };
 
     /**

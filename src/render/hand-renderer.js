@@ -150,27 +150,35 @@
             vertices[vi + 2] = px * sinA + pz * cosA;
         }
 
-        // Bind geometry attributes directly
+        // Lazy buffer initialization — create buffers if they don't exist
+        if (!this._itemVertexBuf || !this._itemIndexBuf) {
+            this._initBuffers();
+        }
+
+        // Safety check: bail out if buffers aren't ready
+        if (!this._itemVertexBuf || !this._itemIndexBuf) return;
+
+        // Bind geometry attributes directly — buffer must be bound for each vertexAttribPointer
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
 
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
         }
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
-
-        // Upload modified vertex data to persistent buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
 
         // Draw the item quad using persistent index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemIndexBuf);
@@ -214,6 +222,8 @@
 
         // Create persistent vertex buffer (reused every frame, updated with modified positions)
         this._itemVertexBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, this._itemGeometry.vertices, gl.DYNAMIC_DRAW);
     };
 
     /**

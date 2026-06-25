@@ -38,14 +38,22 @@
         // Context lost flag — prevents rendering after context loss
         this._contextLost = false;
 
-        // Register context loss listener if valid GL context provided
+        // Register context loss listener if valid GL context provided.
+        // Note: WebGL contexts don't have addEventListener — we need the
+        // source element (canvas).  Since we only have the gl object here,
+        // we try to walk backwards via _dcCanvas (set by gl-context.js) or
+        // use a no-op fallback.
         if (gl) {
             var self = this;
-            gl.addEventListener('webglcontextlost', function(e) {
-                e.preventDefault();
-                self._contextLost = true;
-                self._vertexBuffer = null; // Will be recreated on context restore
-            });
+            // Try to find the source canvas — gl-context.js stores it on _dcCanvas
+            var srcEl = gl.canvas || (gl._dcCanvas);
+            if (srcEl && typeof srcEl.addEventListener === 'function') {
+                srcEl.addEventListener('webglcontextlost', function(e) {
+                    e.preventDefault();
+                    self._contextLost = true;
+                    self._vertexBuffer = null; // Will be recreated on context restore
+                });
+            }
         }
     };
 

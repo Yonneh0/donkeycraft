@@ -82,10 +82,11 @@
      * @param {ShaderManager} shaderManager - The shader manager instance.
      */
     Donkeycraft.Fog.prototype.applyToFogUniforms = function(shaderManager) {
-        if (!shaderManager || !this._enabled) return;
+        if (!shaderManager || !this._enabled) return false;
 
-        shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b);
-        shaderManager.setFloat('uFogDensity', this._density);
+        var ok1 = shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b);
+        var ok2 = shaderManager.setFloat('uFogDensity', this._density);
+        return ok1 && ok2;
     };
 
 })();

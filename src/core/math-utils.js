@@ -315,6 +315,22 @@
     };
 
     /**
+     * Create a scale matrix.
+     * @param {number} x - Scale factor on X axis.
+     * @param {number} y - Scale factor on Y axis.
+     * @param {number} z - Scale factor on Z axis.
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createScale = function(x, y, z) {
+        var data = new Float32Array(16);
+        data[0] = x;  data[1] = 0;  data[2] = 0;  data[3] = 0;
+        data[4] = 0;  data[5] = y;  data[6] = 0;  data[7] = 0;
+        data[8] = 0;  data[9] = 0;  data[10] = z; data[11] = 0;
+        data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
+        return new Donkeycraft.Matrix4(data);
+    };
+
+    /**
      * Create a rotation matrix around axis.
      * @param {number} angleRadians
      * @param {Donkeycraft.Vector3} axis
@@ -343,6 +359,26 @@
         m._data[14] = 0;
         m._data[15] = 1;
         return m;
+    };
+
+    /**
+     * Static multiply: multiply two matrices (a × b).
+     * @param {Donkeycraft.Matrix4} a
+     * @param {Donkeycraft.Matrix4} b
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.multiply = function(a, b) {
+        var aa = a._data, bb = b._data;
+        var r = new Float32Array(16);
+        for (var i = 0; i < 4; i++) {
+            for (var j = 0; j < 4; j++) {
+                r[i * 4 + j] = aa[i * 4]     * bb[j]       +
+                               aa[i * 4 + 1] * bb[4 + j] +
+                               aa[i * 4 + 2] * bb[8 + j]  +
+                               aa[i * 4 + 3] * bb[12 + j];
+            }
+        }
+        return new Donkeycraft.Matrix4(r);
     };
 
     /**
