@@ -358,6 +358,9 @@
 
         Donkeycraft.Matrix4.prototype = DonkeycraftMatrix4.prototype;
 
+        // Return the Matrix4 constructor so the outer assignment works correctly
+        return Donkeycraft.Matrix4;
+
         /**
          * Multiply by another matrix.
          * @param {Donkeycraft.Matrix4} m
