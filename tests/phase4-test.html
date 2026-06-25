@@ -208,6 +208,9 @@
         assert(chunk.getBlock(0, 0, 0) === 0, 'Initial block at (0,0,0) = air (0)');
         assert(chunk.getBlock(15, 127, 15) === 0, 'Initial block at (15,127,15) = air (0)');
 
+        // Test: Dirty flag (check BEFORE any modifications)
+        assert(!chunk.isDirty(), 'New chunk is not dirty');
+
         // Test: setBlock/getBlock
         chunk.setBlock(5, 10, 7, 1); // stone
         assert(chunk.getBlock(5, 10, 7) === 1, 'Set and get block ID 1 at (5,10,7)');
@@ -220,9 +223,7 @@
         assert(chunk.getBlock(0, 0, -1) === 0, 'getBlock(0,0,-1) = air');
         assert(chunk.getBlock(0, 0, 16) === 0, 'getBlock(0,0,16) = air');
 
-        // Test: Dirty flag
-        assert(!chunk.isDirty(), 'New chunk is not dirty');
-        chunk.setBlock(0, 0, 0, 2); // grass
+        // Test: Chunk becomes dirty after setBlock
         assert(chunk.isDirty(), 'Chunk becomes dirty after setBlock');
 
         // Test: markClean/markDirty
@@ -289,17 +290,21 @@
         chunk2.setBlock(0, 0, 0, 1); // same value
         assert(!chunk2.isDirty(), 'Setting same block value does not mark dirty');
 
-        // Test: Sky light clamping
-        chunk.setSkyLight(0, 0, 0, 20);
-        assert(chunk.getSkyLight(0, 0, 0) === 15, 'Sky light clamped to max 15 (got ' + chunk.getSkyLight(0, 0, 0) + ')');
-        chunk.setSkyLight(0, 0, 0, -5);
-        assert(chunk.getSkyLight(0, 0, 0) === 0, 'Sky light clamped to min 0');
+        // Test: Sky light clamping (use fresh chunk since chunk was destroyed)
+        chunk2.setSkyLight(0, 0, 0, 20);
+        assert(chunk2.getSkyLight(0, 0, 0) === 15, 'Sky light clamped to max 15 (got ' + chunk2.getSkyLight(0, 0, 0) + ')');
+        chunk2.setSkyLight(0, 0, 0, -5);
+        assert(chunk2.getSkyLight(0, 0, 0) === 0, 'Sky light clamped to min 0');
 
         // Test: Block data size
         var chunk3 = new Donkeycraft.Chunk(0, 0);
         assert(chunk3.blocks.length === 65536, 'Block array size = 16×256×16 = 65536 (got ' + chunk3.blocks.length + ')');
         assert(chunk3.skyLight.length === 65536, 'Sky light array size = 65536');
         assert(chunk3.blockLight.length === 65536, 'Block light array size = 65536');
+
+        // Clean up all chunks
+        chunk2.destroy();
+        chunk3.destroy();
     }
 
     // ============================================================
