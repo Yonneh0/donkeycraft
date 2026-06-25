@@ -16,7 +16,10 @@
 
         // Item quad geometry (2 triangles forming a rectangle)
         this._itemGeometry = null;
-        this._itemMesh = null;
+        this._itemIndexBuf = null;
+
+        // Persistent vertex buffer for item quad (avoids per-frame allocation)
+        this._itemVertexBuf = null;
 
         // Current held item ID
         this._heldItemId = 1; // Default: stone
@@ -102,10 +105,6 @@
         var identity = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uView', identity);
 
-        // Set item color based on held item
-        var itemColor = this._getItemColor(this._heldItemId);
-        this._shaderManager.setVec4('aColor', itemColor.r, itemColor.g, itemColor.b, 1.0);
-
         // Apply bob animation (subtle up/down oscillation)
         var bobY = Math.sin(this._bobAngle) * 0.05;
         var bobX = Math.cos(this._bobAngle * 0.5) * 0.02;
@@ -125,6 +124,32 @@
 
         this._shaderManager.setMat4('uModel', modelMatrix);
 
+        // Get item color and modify vertex data for per-vertex color
+        var itemColor = this._getItemColor(this._heldItemId);
+        var vertices = new Float32Array(this._itemGeometry.vertices);
+        for (var v = 0; v < 4; v++) {
+            var ci = v * 9 + 5; // Color starts at index 5 in each 9-float vertex (pos:0-2, UV:3-4, color:5-8)
+            vertices[ci]     = itemColor.r;
+            vertices[ci + 1] = itemColor.g;
+            vertices[ci + 2] = itemColor.b;
+            vertices[ci + 3] = 1.0;
+        }
+
+        // Billboard: rotate quad to face camera (first-person view, slightly angled)
+        var bobAngle = this._bobAngle;
+        var itemAngle = -0.3 + Math.sin(bobAngle * 0.3) * 0.05; // Slight sway rotation
+        var cosA = Math.cos(itemAngle);
+        var sinA = Math.sin(itemAngle);
+
+        for (var v2 = 0; v2 < 4; v2++) {
+            var vi = v2 * 9;
+            var px = vertices[vi];
+            var pz = vertices[vi + 2];
+            // Rotate around Y axis to billboard toward camera
+            vertices[vi]     = px * cosA - pz * sinA;
+            vertices[vi + 2] = px * sinA + pz * cosA;
+        }
+
         // Bind geometry attributes directly
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
@@ -143,8 +168,12 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw the item quad
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemMesh);
+        // Upload modified vertex data to persistent buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+
+        // Draw the item quad using persistent index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._itemGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         // Disable attributes
@@ -178,10 +207,13 @@
         var gl = this._gl;
         if (!gl || !this._itemGeometry) return;
 
-        // Create index buffer
-        this._itemMesh = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemMesh);
+        // Create index buffer (static, never changes)
+        this._itemIndexBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemIndexBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._itemGeometry.indices, gl.STATIC_DRAW);
+
+        // Create persistent vertex buffer (reused every frame, updated with modified positions)
+        this._itemVertexBuf = gl.createBuffer();
     };
 
     /**
@@ -191,9 +223,14 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._itemMesh) {
-            gl.deleteBuffer(this._itemMesh);
-            this._itemMesh = null;
+        if (this._itemIndexBuf) {
+            gl.deleteBuffer(this._itemIndexBuf);
+            this._itemIndexBuf = null;
+        }
+
+        if (this._itemVertexBuf) {
+            gl.deleteBuffer(this._itemVertexBuf);
+            this._itemVertexBuf = null;
         }
 
         this._itemGeometry = null;

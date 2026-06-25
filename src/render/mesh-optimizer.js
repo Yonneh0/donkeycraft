@@ -15,20 +15,17 @@
     /**
      * Cull hidden faces from raw vertex data.
      * Removes faces that are between two solid (opaque) blocks.
-     * Note: This is a placeholder implementation that keeps all faces.
-     * Real adjacency culling requires world/block lookup which is handled
-     * by GeometryBuilder.isTransparent() during geometry build.
+     * Note: Face culling is already performed during geometry build by GeometryBuilder.
+     * GeometryBuilder.isTransparent() only renders a face if the adjacent block
+     * is transparent, so all hidden faces are already excluded from the geometry.
+     * This method returns geometry unchanged as a no-op placeholder for future
+     * post-build optimization (e.g., interior face culling of large solid structures).
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Function} isBlockSolid - Function(blockId) returning true if block is fully opaque.
-     * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.MeshOptimizer.prototype.cullFaces = function(geometry, isBlockSolid) {
-        // Face culling is already performed during geometry build by GeometryBuilder.
-        // GeometryBuilder.isTransparent() only renders a face if the adjacent block
-        // is transparent, so all hidden faces are already excluded from the geometry.
-        // This method returns geometry unchanged as a no-op placeholder.
-        // In a future optimization pass, we could add post-build culling for
-        // interior faces of large solid structures (e.g., a 16x256x16 chunk of stone).
+        // No-op: culling already happens during geometry build.
         return geometry;
     };
 
@@ -106,9 +103,10 @@
     /**
      * Remove back-facing faces from a chunk mesh.
      * Optimizes rendering by not sending invisible geometry to GPU.
-     * @param {Object} geometry - Geometry object.
+     * Preserves the original index type (Uint16 or Uint32) from the input geometry.
+     * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Donkeycraft.Vector3} cameraPos - Camera position for face culling.
-     * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.MeshOptimizer.prototype.cullBackFaces = function(geometry, cameraPos) {
         var vertices = geometry.vertices;
@@ -118,7 +116,9 @@
 
         if (indexCount === 0) return geometry;
 
+        // Use the same typed array type as the input geometry to preserve Uint32 support
         var keptTriangles = [];
+        var maxTriangles = Math.floor(indexCount / 3); // upper bound
 
         for (var i = 0; i < indexCount; i += 3) {
             var i0 = indices[i];
@@ -147,21 +147,29 @@
             var ny = e1z * e2x - e1x * e2z;
             var nz = e1x * e2y - e1y * e2x;
 
-            // Vector from triangle center to camera
-            var cx = (v0x + v1x + v2x) / 3 - cameraPos.x;
-            var cy = (v0y + v1y + v2y) / 3 - cameraPos.y;
-            var cz = (v0z + v1z + v2z) / 3 - cameraPos.z;
+            // Vector from triangle center to camera (camera minus center)
+            var cx = cameraPos.x - (v0x + v1x + v2x) / 3;
+            var cy = cameraPos.y - (v0y + v1y + v2y) / 3;
+            var cz = cameraPos.z - (v0z + v1z + v2z) / 3;
 
-        // Dot product: if positive, face is front-facing (normal points toward camera)
-        var dot = nx * cx + ny * cy + nz * cz;
-        if (dot > 0) {
-            keptTriangles.push(i0, i1, i2);
+            // Dot product: if positive, face is front-facing (normal points toward camera)
+            var dot = nx * cx + ny * cy + nz * cz;
+            if (dot > 0) {
+                keptTriangles.push(i0, i1, i2);
+            }
         }
+
+        // Preserve the original index type from input geometry
+        var resultIndices;
+        if (geometry.indices instanceof Uint32Array) {
+            resultIndices = new Uint32Array(keptTriangles);
+        } else {
+            resultIndices = new Uint16Array(keptTriangles);
         }
 
         return {
             vertices: vertices,
-            indices: new Uint16Array(keptTriangles),
+            indices: resultIndices,
             vertexCount: geometry.vertexCount,
             indexCount: keptTriangles.length
         };

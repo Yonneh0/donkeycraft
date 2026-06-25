@@ -100,6 +100,8 @@
 
     /**
      * Cache uniform and attribute locations for a program.
+     * If locations are already cached (e.g., from a previous link), they are preserved
+     * since WebGLProgram objects maintain stable attribute/uniform layouts across links.
      * @private
      * @param {WebGLProgram} program - The linked program to cache locations for.
      */
@@ -107,7 +109,9 @@
         var gl = this._gl;
         var cacheKey = this._getProgramKey(program);
 
-        // Cache uniforms
+        // Only cache if not already present — preserves locations across re-links
+        if (this._cachedLocations[cacheKey]) return;
+
         this._cachedLocations[cacheKey] = { uniforms: {}, attributes: {} };
 
         var uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
@@ -117,7 +121,7 @@
                 var loc = gl.getUniformLocation(program, uniformInfo.name);
                 this._cachedLocations[cacheKey].uniforms[uniformInfo.name] = loc;
 
-                // Handle arrays
+                // Handle arrays: cache each element individually
                 if (uniformInfo.size > 1 && uniformInfo.type === gl.FLOAT_VEC4) {
                     for (var j = 0; j < uniformInfo.size; j++) {
                         var arrayName = uniformInfo.name + '[' + j + ']';
@@ -141,14 +145,22 @@
 
     /**
      * Get a unique key for a program.
+     * Uses the WebGLProgram object's identity (via a permanent internal property)
+     * so that re-linking the same program doesn't invalidate cached locations.
      * @private
      * @param {WebGLProgram} program
      * @returns {string}
      */
     Donkeycraft.ShaderManager.prototype._getProgramKey = function(program) {
-        if (!program._dcKey) {
-            program._dcKey = 'prog_' + (this._programCount + Math.random()).toString(36).substring(7);
+        var key = program._dcKey;
+        if (key) return key;
+
+        // Assign a permanent key based on the object's internal identity.
+        // We use a counter since WebGLProgram objects don't have stable numeric IDs.
+        if (!Donkeycraft.ShaderManager._dcCounter) {
+            Donkeycraft.ShaderManager._dcCounter = 0;
         }
+        program._dcKey = 'prog_' + (Donkeycraft.ShaderManager._dcCounter++);
         return program._dcKey;
     };
 
@@ -243,7 +255,7 @@
             return false;
         }
 
-        // Try cached location first
+        // Try cached location first, fall back to GPU query + cache on miss
         var currentKey = this._getCurrentProgramKey();
         var loc = null;
         if (currentKey && this._cachedLocations[currentKey] &&
@@ -251,6 +263,10 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            // Cache on miss so future calls don't hit the GPU
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -287,6 +303,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -324,6 +343,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -359,6 +381,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -393,6 +418,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -427,6 +455,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {
@@ -461,6 +492,9 @@
             loc = this._cachedLocations[currentKey].uniforms[name];
         } else {
             loc = gl.getUniformLocation(prog, name);
+            if (loc !== null && currentKey) {
+                this._cachedLocations[currentKey].uniforms[name] = loc;
+            }
         }
 
         if (!loc) {

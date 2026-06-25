@@ -7,6 +7,8 @@
 
     /**
      * Sky — Renders the sky dome with gradients, sun, moon, and stars.
+     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
+     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.Sky = function(gl, shaderManager) {
         this._gl = gl;
@@ -17,9 +19,11 @@
 
         // Sky dome geometry (simple hemisphere)
         this._skyDomeGeometry = null;
-        this._skyDomeMesh = null;
+        this._skyDomeVertBuf = null;   // Persistent vertex buffer for positions+UVs
+        this._skyDomeIndexBuf = null;  // Index buffer
 
         this._buildSkyDome();
+        this._initBuffers();
     };
 
     /**
@@ -108,7 +112,7 @@
      */
     Donkeycraft.Sky.prototype.render = function(camera, lighting) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager) return;
+        if (!gl || !this._shaderManager || !this._skyDomeVertBuf) return;
 
         // Use sky shader program
         if (!this._shaderManager.use('sky')) return;
@@ -147,21 +151,25 @@
         // Horizon line position
         this._shaderManager.setFloat('uHorizon', 0.1);
 
-        // Bind geometry attributes (reuse geometry data directly)
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var uvLoc = this._shaderManager.getAttribute('aUV');
+        // Bind vertex buffer for sky dome geometry
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
 
+        // Position attribute: 3 floats per vertex, stride = 5 floats (3 pos + 2 uv), offset = 0
+        var posLoc = this._shaderManager.getAttribute('aPosition');
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
-        }
-        if (uvLoc >= 0) {
-            gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 5 * 4, 0);
         }
 
-        // Draw sky dome
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeMesh);
+        // UV attribute: 2 floats per vertex, stride = 5 floats, offset = 3*4 bytes
+        var uvLoc = this._shaderManager.getAttribute('aUV');
+        if (uvLoc >= 0) {
+            gl.enableVertexAttribArray(uvLoc);
+            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 5 * 4, 12);
+        }
+
+        // Draw sky dome using persistent index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._skyDomeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         // Disable attributes
@@ -171,15 +179,20 @@
 
     /**
      * Initialize sky dome buffers.
+     * Creates persistent vertex and index buffers for the sky dome geometry.
      */
     Donkeycraft.Sky.prototype._initBuffers = function() {
         var gl = this._gl;
         if (!gl || !this._skyDomeGeometry) return;
 
-        // For Phase 2, use simple buffer approach
-        // Store index buffer reference
-        this._skyDomeMesh = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeMesh);
+        // Create vertex buffer for positions + UVs
+        this._skyDomeVertBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, this._skyDomeGeometry.vertices, gl.STATIC_DRAW);
+
+        // Create index buffer
+        this._skyDomeIndexBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeGeometry.indices, gl.STATIC_DRAW);
     };
 
@@ -190,9 +203,14 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._skyDomeMesh) {
-            gl.deleteBuffer(this._skyDomeMesh);
-            this._skyDomeMesh = null;
+        if (this._skyDomeVertBuf) {
+            gl.deleteBuffer(this._skyDomeVertBuf);
+            this._skyDomeVertBuf = null;
+        }
+
+        if (this._skyDomeIndexBuf) {
+            gl.deleteBuffer(this._skyDomeIndexBuf);
+            this._skyDomeIndexBuf = null;
         }
 
         this._skyDomeGeometry = null;

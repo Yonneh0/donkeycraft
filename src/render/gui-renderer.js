@@ -16,17 +16,16 @@
 
         // Crosshair geometry (center screen marker)
         this._crosshairGeometry = null;
-        this._crosshairMesh = null;
+        this._crosshairVertBuf = null;  // Persistent vertex buffer
+        this._crosshairIndexBuf = null; // Index buffer
 
         // Hotbar geometry
         this._hotbarGeometry = null;
-        this._hotbarMesh = null;
+        this._hotbarIndexBuf = null;    // Index buffer
+        this._hotbarVertexBuf = null;   // Persistent vertex buffer (updated each frame for highlight)
 
         // Debug text geometry
         this._debugGeometry = null;
-
-        // Reusable vertex buffer for hotbar (avoids per-frame allocation)
-        this._hotbarVertexBuf = null;
 
         // Initialize buffers immediately
         this._initBuffers();
@@ -34,6 +33,7 @@
 
     /**
      * Build crosshair geometry (small + shape at center).
+     * Two crossing line quads with position(3) + UV(2) + color(4) = 9 floats per vertex.
      * @private
      */
     Donkeycraft.GUIRenderer.prototype._buildCrosshairGeometry = function() {
@@ -42,12 +42,12 @@
         var lineLength = 0.03;
 
         var vertices = new Float32Array([
-            // Horizontal line
+            // Horizontal line — 4 vertices × 9 floats
             -lineLength, 0, 0,   0, 0,   1, 1, 1, 1,
              lineLength, 0, 0,   1, 0,   1, 1, 1, 1,
              lineLength, lineWidth, 0,   1, 1,   1, 1, 1, 1,
             -lineLength, lineWidth, 0,   0, 1,   1, 1, 1, 1,
-            // Vertical line
+            // Vertical line — 4 vertices × 9 floats
             0, -lineLength, 0,   0, 0,   1, 1, 1, 1,
             lineWidth, -lineLength, 0,   1, 0,   1, 1, 1, 1,
             lineWidth, lineLength, 0,   1, 1,   1, 1, 1, 1,
@@ -69,6 +69,7 @@
 
     /**
      * Build hotbar slot geometry (9 slots in a row).
+     * Each slot is a quad with position(3) + UV(2) + Color(4) = 9 floats per vertex.
      * @private
      */
     Donkeycraft.GUIRenderer.prototype._buildHotbarGeometry = function() {
@@ -111,6 +112,7 @@
 
     /**
      * Initialize all GUI mesh buffers.
+     * Creates persistent vertex and index buffers for both crosshair and hotbar.
      */
     Donkeycraft.GUIRenderer.prototype._initBuffers = function() {
         var gl = this._gl;
@@ -120,28 +122,35 @@
         this._buildCrosshairGeometry();
         this._buildHotbarGeometry();
 
-        // Create index buffers
+        // Create crosshair buffers
         if (this._crosshairGeometry) {
-            this._crosshairMesh = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._crosshairMesh);
+            this._crosshairVertBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._crosshairVertBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, this._crosshairGeometry.vertices, gl.STATIC_DRAW);
+
+            this._crosshairIndexBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._crosshairIndexBuf);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._crosshairGeometry.indices, gl.STATIC_DRAW);
         }
 
+        // Create hotbar buffers
         if (this._hotbarGeometry) {
-            this._hotbarMesh = gl.createBuffer();
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarMesh);
+            this._hotbarVertexBuf = gl.createBuffer();
+            this._hotbarIndexBuf = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarIndexBuf);
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._hotbarGeometry.indices, gl.STATIC_DRAW);
         }
     };
 
     /**
      * Render the crosshair at center of screen.
+     * Uses persistent vertex and index buffers for the crosshair geometry.
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
     Donkeycraft.GUIRenderer.prototype.renderCrosshair = function(canvasWidth, canvasHeight) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
+        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight || !this._crosshairVertBuf) return;
 
         // Use GUI shader
         if (!this._shaderManager.use('gui')) return;
@@ -152,26 +161,30 @@
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
-        // Bind crosshair geometry attributes directly
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var uvLoc = this._shaderManager.getAttribute('aUV');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
+        // Bind persistent vertex buffer for crosshair
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._crosshairVertBuf);
 
+        // Position: 3 floats, stride 9*4, offset 0
+        var posLoc = this._shaderManager.getAttribute('aPosition');
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
+        // UV: 2 floats, stride 9*4, offset 12
+        var uvLoc = this._shaderManager.getAttribute('aUV');
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
         }
+        // Color: 4 floats, stride 9*4, offset 20
+        var colorLoc = this._shaderManager.getAttribute('aColor');
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw crosshair
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._crosshairMesh);
+        // Draw crosshair using persistent index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._crosshairIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._crosshairGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         // Disable attributes
@@ -182,13 +195,15 @@
 
     /**
      * Render the hotbar with selected slot highlighted.
+     * Copies base geometry, modifies vertex colors for the selected slot highlight,
+     * then uploads to persistent vertex buffer.
      * @param {number} selectedSlot - Currently selected hotbar slot (0-8).
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
     Donkeycraft.GUIRenderer.prototype.renderHotbar = function(selectedSlot, canvasWidth, canvasHeight) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
+        if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight || !this._hotbarVertexBuf) return;
 
         // Use GUI shader
         if (!this._shaderManager.use('gui')) return;
@@ -199,25 +214,23 @@
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
-        // Modify hotbar vertex colors for selected slot highlight
+        // Copy base geometry and modify colors for selected slot highlight
         var vertices = new Float32Array(this._hotbarGeometry.vertices);
-        var slotHeight = 0.08;
-        var slotWidth = 0.08;
-        var slotGap = 0.005;
-        var totalWidth = 9 * (slotWidth + slotGap) - slotGap;
-        var startX = -totalWidth / 2;
-        var y = -0.9;
+        var colorHighlight = (selectedSlot >= 0 && selectedSlot < 9) ? [0.8, 0.8, 0.8, 1] : [0.5, 0.5, 0.5, 1];
+        var colorDefault = [0.5, 0.5, 0.5, 1];
 
         for (var i = 0; i < 9; i++) {
-            var baseVertex = i * 4;
-            var colorHighlight = (i === selectedSlot) ? [0.8, 0.8, 0.8, 1] : [0.5, 0.5, 0.5, 1];
+            var isHighlighted = (i === selectedSlot);
+            var highlight = isHighlighted ? colorHighlight : colorDefault;
+            var baseVertex = i * 4; // 4 vertices per slot
 
             for (var v = 0; v < 4; v++) {
-                var colorBase = baseVertex * 9 + 6; // Color starts at index 6 in vertex data
-                vertices[colorBase + v]     = colorHighlight[0];
-                vertices[colorBase + v + 1] = colorHighlight[1];
-                vertices[colorBase + v + 2] = colorHighlight[2];
-                vertices[colorBase + v + 3] = colorHighlight[3];
+                // Each vertex = 9 floats. Color starts at index 5 within each vertex.
+                var vi = (baseVertex + v) * 9 + 5;
+                vertices[vi]     = highlight[0];
+                vertices[vi + 1] = highlight[1];
+                vertices[vi + 2] = highlight[2];
+                vertices[vi + 3] = highlight[3];
             }
         }
 
@@ -226,10 +239,7 @@
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
 
-        // Reuse or create persistent vertex buffer for hotbar
-        if (!this._hotbarVertexBuf) {
-            this._hotbarVertexBuf = gl.createBuffer();
-        }
+        // Upload modified vertex data to persistent buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this._hotbarVertexBuf);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
 
@@ -246,8 +256,8 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw hotbar
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarMesh);
+        // Draw hotbar using persistent index buffer
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._hotbarGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         // Disable attributes
@@ -295,19 +305,24 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._crosshairMesh) {
-            gl.deleteBuffer(this._crosshairMesh);
-            this._crosshairMesh = null;
+        if (this._crosshairVertBuf) {
+            gl.deleteBuffer(this._crosshairVertBuf);
+            this._crosshairVertBuf = null;
         }
 
-        if (this._hotbarMesh) {
-            gl.deleteBuffer(this._hotbarMesh);
-            this._hotbarMesh = null;
+        if (this._crosshairIndexBuf) {
+            gl.deleteBuffer(this._crosshairIndexBuf);
+            this._crosshairIndexBuf = null;
         }
 
         if (this._hotbarVertexBuf) {
             gl.deleteBuffer(this._hotbarVertexBuf);
             this._hotbarVertexBuf = null;
+        }
+
+        if (this._hotbarIndexBuf) {
+            gl.deleteBuffer(this._hotbarIndexBuf);
+            this._hotbarIndexBuf = null;
         }
 
         this._crosshairGeometry = null;

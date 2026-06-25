@@ -46,12 +46,17 @@
      * @param {number} chunkX - X coordinate of the chunk.
      * @param {number} chunkZ - Z coordinate of the chunk.
      * @param {Function} getBlockFunc - Function(x, y, z) returning block ID at world position.
-     * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number, useUint32: boolean}}
      */
     Donkeycraft.GeometryBuilder.prototype.buildChunk = function(chunkX, chunkZ, getBlockFunc) {
         var maxVertices = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE * 6 * 4; // worst case
         var vertices = new Float32Array(maxVertices);
-        var indices = new Uint16Array(maxVertices * 6 / 4); // 6 indices per quad (2 triangles), but we'll use index buffer
+
+        // Always use Uint32 indices. A full-height chunk (16×256×16) with all faces exposed
+        // can generate up to ~2.3M indices, far exceeding Uint16Array's 65535 limit.
+        var useUint32 = true;
+
+        var indices = new Uint32Array(maxVertices * 6 / 4);
         var vertexCount = 0;
         var indexCount = 0;
 
@@ -119,14 +124,20 @@
         var actualVertices = new Float32Array(vertexCount * this._vertexSize);
         actualVertices.set(vertices.subarray(0, vertexCount * this._vertexSize));
 
-        var actualIndices = new Uint16Array(indexCount);
+        var actualIndices;
+        if (useUint32) {
+            actualIndices = new Uint32Array(indexCount);
+        } else {
+            actualIndices = new Uint16Array(indexCount);
+        }
         actualIndices.set(indices.subarray(0, indexCount));
 
         return {
             vertices: actualVertices,
             indices: actualIndices,
             vertexCount: vertexCount,
-            indexCount: indexCount
+            indexCount: indexCount,
+            useUint32: useUint32
         };
     };
 
@@ -176,6 +187,7 @@
 
         return { u0: tileU0, v0: tileV0, u1: tileU1, v1: tileV1 };
     };
+
 
     /**
      * Build a simple test quad (for testing shaders).

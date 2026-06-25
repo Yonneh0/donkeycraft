@@ -27,16 +27,33 @@
 
         // Current geometry
         this._geometry = null;
+
+        // Destroyed flag — prevents drawing after destruction
+        this._destroyed = false;
+
+        // Whether Uint32 indices are supported (OES_element_index_uint extension)
+        this._supportsUint32Indices = false;
+        if (gl) {
+            var ext = gl.getExtension('OES_element_index_uint');
+            this._supportsUint32Indices = ext !== null;
+            if (!ext) {
+                Donkeycraft.Logger.warn('ChunkMesh', 'OES_element_index_uint extension not available — Uint32 indices will fall back to Uint16 (max 65535 indices)');
+            }
+        }
+
+        // Track whether this mesh uses Uint32 indices
+        this._geometryUsesUint32 = false;
     };
 
     /**
      * Update the mesh with new geometry data.
-     * @param {Object} geometry - Geometry object with vertices (Float32Array) and indices (Uint16Array).
+     * @param {Object} geometry - Geometry object with vertices (Float32Array) and indices (Uint16Array or Uint32Array).
      */
     Donkeycraft.ChunkMesh.prototype.update = function(geometry) {
         this._geometry = geometry;
         this._vertexCount = geometry.vertexCount || 0;
         this._indexCount = geometry.indexCount || 0;
+        this._geometryUsesUint32 = geometry.useUint32 === true;
         this._dirty = true;
     };
 
@@ -69,14 +86,30 @@
     /**
      * Draw the chunk mesh using the currently active shader program.
      * Binds attributes: aPosition, aUV, aNormal, aLight.
+     * @returns {boolean} True if the mesh was drawn successfully.
      */
     Donkeycraft.ChunkMesh.prototype.draw = function() {
         var gl = this._gl;
-        if (!gl || !this._indexBuffer || this._indexCount === 0) return;
+        if (!gl || !this._indexBuffer || this._indexCount === 0) return false;
+
+        // Guard: don't draw destroyed meshes
+        if (this._destroyed) return false;
 
         // Upload if dirty
         if (this._dirty && this._geometry) {
             this.uploadBuffers();
+        }
+
+        // Determine index type based on geometry data and extension support
+        var indexType = gl.UNSIGNED_SHORT;
+        if (this._geometryUsesUint32) {
+            if (this._supportsUint32Indices) {
+                indexType = gl.UNSIGNED_INT;
+            } else {
+                // Geometry requires Uint32 but extension is unavailable — cannot draw safely
+                Donkeycraft.Logger.error('ChunkMesh', 'Geometry uses Uint32 indices but OES_element_index_uint is not supported. Chunk will not render.');
+                return false;
+            }
         }
 
         // Bind vertex buffer
@@ -114,9 +147,9 @@
             gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, vertexSize * 4, 32);
         }
 
-        // Draw using indices
+        // Draw using indices (respect index type)
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
-        gl.drawElements(gl.TRIANGLES, this._indexCount, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, this._indexCount, indexType, 0);
 
         // Disable attributes
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
@@ -177,6 +210,7 @@
         this._vertexCount = 0;
         this._indexCount = 0;
         this._dirty = true;
+        this._destroyed = true;
     };
 
 })();

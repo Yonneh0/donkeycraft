@@ -25,15 +25,18 @@ void main() {
     // Pass UV coordinates to fragment shader
     vUV = aUV;
 
-    // Pass normal for lighting calculation
-    vNormal = (uView * uModel * vec4(aNormal, 0.0)).xyz;
+    // Transform normal by model matrix only (normal matrix = inverse-transpose of model-view).
+    // For rotation+translation matrices (no non-uniform scale), model matrix normal is sufficient.
+    vNormal = mat3(uModel) * aNormal;
     vNormal = normalize(vNormal);
 
     // Pass light intensity (pre-computed during geometry build)
     vLight = aLight;
 
-    // Calculate depth for fog
-    vDepth = gl_Position.w;
+    // Compute view-space position for accurate exponential distance fog.
+    // We use the negative of view-space Z because in OpenGL, camera looks down -Z.
+    vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
+    vDepth = -viewPos.z;
 }
 `;
 
@@ -68,12 +71,13 @@ attribute vec4 aColor;
 
 uniform mat4 uProjection;
 uniform mat4 uView;
+uniform mat4 uModel;
 
 varying vec2 vUV;
 varying vec4 vColor;
 
 void main() {
-    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
     vUV = aUV;
     vColor = aColor;
 }

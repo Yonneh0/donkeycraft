@@ -32,8 +32,21 @@
         this._particles = [];
         this._maxParticles = 256;
 
-        // Reusable vertex buffer (avoids creating new buffers every frame)
+        // Persistent vertex buffer (avoids per-frame WebGL allocation)
         this._vertexBuffer = null;
+
+        // Context lost flag — prevents rendering after context loss
+        this._contextLost = false;
+
+        // Register context loss listener if valid GL context provided
+        if (gl) {
+            var self = this;
+            gl.addEventListener('webglcontextlost', function(e) {
+                e.preventDefault();
+                self._contextLost = true;
+                self._vertexBuffer = null; // Will be recreated on context restore
+            });
+        }
     };
 
     /**
@@ -108,13 +121,19 @@
 
     /**
      * Render all active particles using the GUI shader program.
-     * Particles are rendered as billboards facing the camera with per-particle alpha fade.
-     * Reuses a single vertex buffer to avoid per-frame WebGL allocation.
+     * Particles are rendered as billboards that always face the camera.
+     * Each billboard is a quad constructed from the particle's world-space position,
+     * oriented using the camera's right and up vectors.
+     * Reuses a single persistent vertex buffer to avoid per-frame WebGL allocation.
+     * Skips rendering if the WebGL context was lost.
      * @param {Camera} camera - The camera instance (provides projection/view matrices).
      */
     Donkeycraft.BreakParticles.prototype.render = function(camera) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || this._particles.length === 0) return;
+
+        // Skip rendering if context was lost
+        if (this._contextLost) return;
 
         // Use GUI shader (particles share attributes: aPosition, aUV, aColor)
         if (!this._shaderManager.use('gui')) return;
@@ -124,7 +143,11 @@
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
 
-        // Build particle vertex data
+        // Get camera right and up vectors for billboard orientation
+        var right = camera.getRight();
+        var up = camera.getUp();
+
+        // Build particle vertex data with billboard quads
         var vertices = [];
         var particleSize = 0.1; // Each particle is a small quad
 
@@ -132,21 +155,32 @@
             var p = this._particles[i];
             var alpha = p.lifetime / p.maxLifetime; // Fade out
 
-            // Quad vertices: position(3) + UV(2) + Color(4) = 9 floats
-            // Simple quad facing camera, centered at particle position
+            // Billboard: offset from center by right and up vectors
+            var halfSize = particleSize;
+            var cx = p.x, cy = p.y, cz = p.z;
+            var rx = right.x * halfSize, ry = right.y * halfSize, rz = right.z * halfSize;
+            var ux = up.x * halfSize, uy = up.y * halfSize, uz = up.z * halfSize;
+
+            // Four corners: bottom-left, bottom-right, top-right, top-left
+            var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
+            var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
+            var trx = cx + rx + ux, try_ = cy + ry + uy, trz = cz + rz + uz;
+            var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
+
+            // Quad vertices: position(3) + UV(2) + Color(4) = 9 floats each
             vertices.push(
-                // Triangle 1
-                p.x - particleSize, p.y - particleSize, p.z,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                p.x + particleSize, p.y - particleSize, p.z,   1, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                p.x - particleSize, p.y + particleSize, p.z,   0, 1,   p.color.r, p.color.g, p.color.b, alpha,
-                // Triangle 2
-                p.x - particleSize, p.y + particleSize, p.z,   0, 1,   p.color.r, p.color.g, p.color.b, alpha,
-                p.x + particleSize, p.y - particleSize, p.z,   1, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                p.x + particleSize, p.y + particleSize, p.z,   1, 1,   p.color.r, p.color.g, p.color.b, alpha
+                // Triangle 1 (bottom-left, bottom-right, top-right)
+                blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
+                brx, bry, brz,   1, 0,   p.color.r, p.color.g, p.color.b, alpha,
+                trx, try_, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
+                // Triangle 2 (bottom-left, top-right, top-left)
+                blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
+                trx, try_, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
+                tlx, tly, tlz,   0, 1,   p.color.r, p.color.g, p.color.b, alpha
             );
         }
 
-        // Reuse or create vertex buffer
+        // Reuse or create persistent vertex buffer
         if (!this._vertexBuffer) {
             this._vertexBuffer = gl.createBuffer();
         }
@@ -197,15 +231,19 @@
     };
 
     /**
-     * Destroy particle resources.
+     * Destroy particle resources and free GPU memory.
+     * Resets context lost state for potential re-initialization.
      */
     Donkeycraft.BreakParticles.prototype.destroy = function() {
         var gl = this._gl;
+
         if (this._vertexBuffer && gl) {
             gl.deleteBuffer(this._vertexBuffer);
             this._vertexBuffer = null;
         }
+
         this._particles = [];
+        this._contextLost = false;
     };
 
 })();

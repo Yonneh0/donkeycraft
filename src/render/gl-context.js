@@ -8,6 +8,7 @@
     /**
      * GLContext — WebGL 1 context wrapper with error handling and capability queries.
      * @param {HTMLCanvasElement} canvas - The canvas element to create the WebGL context on.
+     * @returns {boolean} True if context creation succeeded.
      */
     Donkeycraft.GLContext = function(canvas) {
         this._canvas = canvas;
@@ -15,11 +16,11 @@
         this._capabilities = {};
         this._errorCount = 0;
 
-        /**
-         * Attempt to create the WebGL 1 context.
-         * @returns {boolean} True if context creation succeeded.
-         */
-        return this._createContext();
+        // Initialize context; return value is ignored (constructor always returns `this`)
+        var success = this._createContext();
+        if (!success) {
+            Donkeycraft.Logger.error('GLContext', 'WebGL context creation failed during construction');
+        }
     };
 
     /**
