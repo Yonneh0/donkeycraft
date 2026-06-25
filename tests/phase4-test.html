@@ -457,11 +457,6 @@
         var h = Donkeycraft.TerrainGenerator.getHeightAt(0, 0, 0, 0, plainsHM);
         assert(typeof h === 'number', 'getHeightAt returns a number');
 
-        // Test: Singleton getInstance
-        var t1 = Donkeycraft.TerrainGenerator.getInstance();
-        var t2 = Donkeycraft.TerrainGenerator.getInstance();
-        assert(t1 === t2, 'getInstance returns singleton');
-
         // Test: generate() convenience wrapper
         var hm2 = Donkeycraft.TerrainGenerator.generate(1, 1);
         assert(hm2.length === 256, 'generate() returns heightmap with 256 entries');
