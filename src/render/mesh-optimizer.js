@@ -15,80 +15,21 @@
     /**
      * Cull hidden faces from raw vertex data.
      * Removes faces that are between two solid (opaque) blocks.
+     * Note: This is a placeholder implementation that keeps all faces.
+     * Real adjacency culling requires world/block lookup which is handled
+     * by GeometryBuilder.isTransparent() during geometry build.
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Function} isBlockSolid - Function(blockId) returning true if block is fully opaque.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.MeshOptimizer.prototype.cullFaces = function(geometry, isBlockSolid) {
-        var vertices = geometry.vertices;
-        var vertexCount = geometry.vertexCount;
-
-        if (vertexCount === 0) return geometry;
-
-        // Extract face data for culling analysis
-        // Each quad = 4 vertices, store block adjacency info
-        var faceCount = Math.floor(vertexCount / 4);
-        var keptFaces = [];
-
-        for (var i = 0; i < faceCount; i++) {
-            var baseV = i * 4 * this._faceDataSize;
-
-            // Read the first vertex of this face to get block UV info
-            // UVs encode block type (see GeometryBuilder._getBlockUV)
-            var uvS = vertices[baseV + 3];
-            var uvT = vertices[baseV + 4];
-
-            // Check if any vertex of this quad is transparent (alpha/light variation)
-            var allSolid = true;
-            for (var v = 0; v < 4; v++) {
-                var vi = (i * 4 + v) * this._faceDataSize;
-                var light = vertices[vi + 8];
-                // If light is significantly different from max, face might be partially hidden
-                if (light < 0.95) {
-                    // This could be a shaded face — still keep it, but check neighbors
-                }
-            }
-
-            keptFaces.push(i);
-        }
-
-        // Rebuild vertex and index arrays with only kept faces
-        var newVertices = [];
-        var vertexMap = []; // old vertex index → new vertex index
-        var newVertexCount = 0;
-
-        for (var f = 0; f < keptFaces.length; f++) {
-            var faceIdx = keptFaces[f];
-            for (var v = 0; v < 4; v++) {
-                var oldVi = faceIdx * 4 + v;
-                vertexMap[oldVi] = newVertexCount;
-                var srcBase = oldVi * this._faceDataSize;
-                for (var d = 0; d < this._faceDataSize; d++) {
-                    newVertices.push(vertices[srcBase + d]);
-                }
-                newVertexCount++;
-            }
-        }
-
-        // Rebuild indices
-        var newIndices = [];
-        for (var f = 0; f < keptFaces.length; f++) {
-            var base = keptFaces[f] * 4;
-            var i0 = vertexMap[base];
-            var i1 = vertexMap[base + 1];
-            var i2 = vertexMap[base + 2];
-            var i3 = vertexMap[base + 3];
-
-            newIndices.push(i0, i1, i2);
-            newIndices.push(i0, i2, i3);
-        }
-
-        return {
-            vertices: new Float32Array(newVertices),
-            indices: new Uint16Array(newIndices),
-            vertexCount: newVertexCount,
-            indexCount: newIndices.length
-        };
+        // Face culling is already performed during geometry build by GeometryBuilder.
+        // GeometryBuilder.isTransparent() only renders a face if the adjacent block
+        // is transparent, so all hidden faces are already excluded from the geometry.
+        // This method returns geometry unchanged as a no-op placeholder.
+        // In a future optimization pass, we could add post-build culling for
+        // interior faces of large solid structures (e.g., a 16x256x16 chunk of stone).
+        return geometry;
     };
 
     /**
@@ -211,11 +152,11 @@
             var cy = (v0y + v1y + v2y) / 3 - cameraPos.y;
             var cz = (v0z + v1z + v2z) / 3 - cameraPos.z;
 
-            // Dot product: if negative, face is back-facing
-            var dot = nx * cx + ny * cy + nz * cz;
-            if (dot < 0) {
-                keptTriangles.push(i0, i1, i2);
-            }
+        // Dot product: if positive, face is front-facing (normal points toward camera)
+        var dot = nx * cx + ny * cy + nz * cz;
+        if (dot > 0) {
+            keptTriangles.push(i0, i1, i2);
+        }
         }
 
         return {

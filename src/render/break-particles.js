@@ -32,9 +32,8 @@
         this._particles = [];
         this._maxParticles = 256;
 
-        // Particle geometry (instanced quads)
-        this._particleGeometry = null;
-        this._particleMesh = null;
+        // Reusable vertex buffer (avoids creating new buffers every frame)
+        this._vertexBuffer = null;
     };
 
     /**
@@ -108,15 +107,17 @@
     };
 
     /**
-     * Render all active particles.
-     * @param {Camera} camera - The camera instance.
+     * Render all active particles using the GUI shader program.
+     * Particles are rendered as billboards facing the camera with per-particle alpha fade.
+     * Reuses a single vertex buffer to avoid per-frame WebGL allocation.
+     * @param {Camera} camera - The camera instance (provides projection/view matrices).
      */
     Donkeycraft.BreakParticles.prototype.render = function(camera) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || this._particles.length === 0) return;
 
-        // Use particle shader program
-        if (!this._shaderManager.use('particle')) return;
+        // Use GUI shader (particles share attributes: aPosition, aUV, aColor)
+        if (!this._shaderManager.use('gui')) return;
 
         // Set camera matrices
         var matrices = camera.getMatrices();
@@ -145,9 +146,11 @@
             );
         }
 
-        // Upload vertex data
-        var vertexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        // Reuse or create vertex buffer
+        if (!this._vertexBuffer) {
+            this._vertexBuffer = gl.createBuffer();
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 
         // Bind attributes
@@ -176,9 +179,6 @@
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
-
-        // Delete buffer
-        gl.deleteBuffer(vertexBuffer);
     };
 
     /**
@@ -200,6 +200,11 @@
      * Destroy particle resources.
      */
     Donkeycraft.BreakParticles.prototype.destroy = function() {
+        var gl = this._gl;
+        if (this._vertexBuffer && gl) {
+            gl.deleteBuffer(this._vertexBuffer);
+            this._vertexBuffer = null;
+        }
         this._particles = [];
     };
 

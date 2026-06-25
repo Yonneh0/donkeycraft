@@ -24,6 +24,12 @@
 
         // Debug text geometry
         this._debugGeometry = null;
+
+        // Reusable vertex buffer for hotbar (avoids per-frame allocation)
+        this._hotbarVertexBuf = null;
+
+        // Initialize buffers immediately
+        this._initBuffers();
     };
 
     /**
@@ -220,9 +226,11 @@
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
 
-        // Upload vertex data
-        var vertexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        // Reuse or create persistent vertex buffer for hotbar
+        if (!this._hotbarVertexBuf) {
+            this._hotbarVertexBuf = gl.createBuffer();
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._hotbarVertexBuf);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
 
         if (posLoc >= 0) {
@@ -246,9 +254,6 @@
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
-
-        // Delete temp buffer
-        gl.deleteBuffer(vertexBuffer);
     };
 
     /**
@@ -298,6 +303,11 @@
         if (this._hotbarMesh) {
             gl.deleteBuffer(this._hotbarMesh);
             this._hotbarMesh = null;
+        }
+
+        if (this._hotbarVertexBuf) {
+            gl.deleteBuffer(this._hotbarVertexBuf);
+            this._hotbarVertexBuf = null;
         }
 
         this._crosshairGeometry = null;

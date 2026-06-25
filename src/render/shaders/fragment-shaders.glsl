@@ -15,8 +15,6 @@ varying float vDepth;
 uniform sampler2D uTexture;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
-uniform float uFogStart;
-uniform float uFogEnd;
 
 void main() {
     // Sample the texture atlas
@@ -30,14 +28,10 @@ void main() {
         discard;
     }
 
-    // Apply distance fog
+    // Apply exponential distance fog
     float fogDist = vDepth;
     float fogFactor = 1.0 - exp(-fogDist * uFogDensity);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-
-    // Linear fog alternative: use start/end
-    // float fogFactor = (uFogEnd - fogDist) / (uFogEnd - uFogStart);
-    // fogFactor = clamp(fogFactor, 0.0, 1.0);
 
     finalColor = mix(finalColor, uFogColor, fogFactor);
 
