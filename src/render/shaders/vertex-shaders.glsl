@@ -106,3 +106,27 @@ void main() {
     vWorldPos = aPosition;
 }
 `;
+
+// ============================================================
+// Hand/Item Vertex Shader (First-person item rendering)
+// ============================================================
+var HAND_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec3 aNormal;
+attribute float aLight;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vUV = aUV;
+    // Pass light as color for simple item rendering
+    vColor = vec4(aLight, aLight, aLight, 1.0);
+}
+`;
