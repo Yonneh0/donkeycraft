@@ -1043,7 +1043,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
     // Order: translate * rotate * scale (applied right-to-left to vertices)
     var scaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var rotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, [1, 0, 0]);
+    var rotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, new Donkeycraft.Vector3(1, 0, 0));
     var translateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
     var temp = Donkeycraft.Matrix4.multiply(rotateMat, scaleMat);
     var modelMat = Donkeycraft.Matrix4.multiply(translateMat, temp);
@@ -1216,7 +1216,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // Model matrix: rotate quad to face camera (XY plane), translate to z=-3, scale by 2.
     // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
     var intScaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var intRotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, [1, 0, 0]);
+    var intRotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, new Donkeycraft.Vector3(1, 0, 0));
     var intTranslateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
     var intTemp = Donkeycraft.Matrix4.multiply(intRotateMat, intScaleMat);
     var intModelMat = Donkeycraft.Matrix4.multiply(intTranslateMat, intTemp);
