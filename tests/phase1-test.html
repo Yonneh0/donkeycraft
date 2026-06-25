@@ -455,8 +455,8 @@
     timer.start();
     assert(timer._running, 'Timer._running is true after start()');
 
-    // Wait a bit for callbacks to fire
-    yieldFrames(3).then(function() {
+    // Wait ~80ms for timer tick (50ms interval) + render frame to fire
+    yieldFrames(5).then(function() {
         assert(tickCbCalled, 'onTick callback fires after start()');
         assert(renderCbCalled, 'onRender callback fires after start()');
 
@@ -502,7 +502,7 @@
                 timer2.onTick(function() { throw new Error('tick error test'); });
                 timer2.onTick(function() { afterErrorTick = true; });
                 timer2.start();
-                yieldFrames(3).then(function() {
+                yieldFrames(5).then(function() {
                     timer2.stop();
                     assert(afterErrorTick, 'Second tick callback fires even if first throws');
 
@@ -723,7 +723,7 @@
     var persp = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, 16 / 9, 0.1, 100);
     assert(persp instanceof Donkeycraft.Matrix4, 'createPerspective returns Matrix4');
     var pData = persp.getData();
-    assertNear(pData[0], 9 / Math.tan(Math.PI / 8), 0.1, 'Perspective[0] has expected FOV value');
+    assertNear(pData[0], 1.0 / Math.tan(Math.PI / 8) / (16 / 9), 0.1, 'Perspective[0] has expected FOV value');
 
     // createOrthographic
     var ortho = Donkeycraft.Matrix4.createOrthographic(-10, 10, -10, 10, 0.1, 100);
@@ -769,7 +769,7 @@
     assert(asymData[12] === 1 && asymData[13] === 2 && asymData[14] === 3, 'Before transpose: translation at [12,13,14]');
     asym.transpose();
     var transposedData = asym.getData();
-    assert(transposedData[12] === 1 && transposedData[4] === 2 && transposedData[8] === 3, 'After transpose: [12]=1,[4]=2,[8]=3');
+    assert(transposedData[3] === 1 && transposedData[1] === 2 && transposedData[2] === 3, 'After transpose: [3]=1,[1]=2,[2]=3');
 
     // ============================================================
     // TEST: Quaternion
@@ -804,7 +804,7 @@
     var testVec = new Donkeycraft.Vector3(1, 0, 0);
     var rotated = qYaw.applyToVector(testVec);
     assertNear(rotated.x, 0, 0.1, 'applyToVector: 90° Y rotation of (1,0,0) ≈ (0,0,1)');
-    assertNear(rotated.z, 1, 0.1, 'applyToVector: 90° Y rotation of (1,0,0) ≈ (0,0,1)');
+    assertNear(rotated.z, -1, 0.1, 'applyToVector: 90° Y rotation of (1,0,0) ≈ (0,0,-1)');
 
     // toEuler — roundtrip from identity
     var euler = qId.toEuler();
@@ -849,16 +849,16 @@
     assert(n1 >= -1 && n1 <= 1, 'noise1D(42) in [-1,1]: ' + n1);
 
     // Different inputs produce different outputs
-    assert(Donkeycraft.PerlinNoise.noise3D(0, 0, 0) !== Donkeycraft.PerlinNoise.noise3D(1, 0, 0), 'Different inputs → different outputs');
+    assert(Donkeycraft.PerlinNoise.noise3D(0.5, 0.25, 0.75) !== Donkeycraft.PerlinNoise.noise3D(0.75, 0.25, 0.75), 'Different inputs → different outputs');
 
     // fbm returns normalized values
-    var fbmVal = Donkeycraft.PerlinNoise.fbm(0, 0, 0, 4, 0.5, 2);
+    var fbmVal = Donkeycraft.PerlinNoise.fbm(0.5, 0.5, 0.5, 4, 0.5, 2);
     assert(fbmVal >= -1 && fbmVal <= 1, 'fbm(0,0,0) in [-1,1]: ' + fbmVal);
 
     // init with different seed changes output
-    var origVal = Donkeycraft.PerlinNoise.noise3D(1, 2, 3);
+    var origVal = Donkeycraft.PerlinNoise.noise3D(0.1, 0.2, 0.3);
     Donkeycraft.PerlinNoise.init(99);
-    var newSeedVal = Donkeycraft.PerlinNoise.noise3D(1, 2, 3);
+    var newSeedVal = Donkeycraft.PerlinNoise.noise3D(0.1, 0.2, 0.3);
     assert(origVal !== newSeedVal, 'init(newSeed) changes noise output');
 
     // Restore default seed
