@@ -1062,16 +1062,25 @@ canvas { border: 1px solid #333; max-width: 100%; }
     err = gl.getError();
     assert(err === gl.NO_ERROR, 'No WebGL errors after rendering colored quad');
 
-    // Render to an offscreen FBO so readPixels works reliably on all browsers.
+    // Render to an offscreen FBO with texture attachment so readPixels works reliably.
     var fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    var rb = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA4, canvas.width || 800, canvas.height || 400);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rb);
+    // Create a texture attachment — more reliable than renderbuffers on WebKit
+    var tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width || 800, canvas.height || 400, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
 
-    // Re-render the quad into the FBO
+    // Check framebuffer completeness before rendering
+    var fboStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    assert(fboStatus === gl.FRAMEBUFFER_COMPLETE, 'FBO is complete before quad render');
+
+    // Clear and re-render the quad into the FBO
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
     gl.clearColor(0.1, 0.1, 0.2, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -1109,7 +1118,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // Clean up FBO resources and mesh
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.deleteFramebuffer(fbo);
-    gl.deleteRenderbuffer(rb);
+    gl.deleteTexture(tex);
     chunkMesh.destroy();
 
     // ============================================================
@@ -1240,16 +1249,25 @@ canvas { border: 1px solid #333; max-width: 100%; }
     err = gl.getError();
     assert(err === gl.NO_ERROR, 'No WebGL errors in integration test');
 
-    // Render to an offscreen FBO so readPixels works reliably on all browsers.
+    // Render to an offscreen FBO with texture attachment so readPixels works reliably.
     var fbo2 = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo2);
 
-    var rb2 = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, rb2);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA4, canvas.width || 800, canvas.height || 400);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rb2);
+    // Create a texture attachment — more reliable than renderbuffers on WebKit
+    var tex2 = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex2);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, canvas.width || 800, canvas.height || 400, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex2, 0);
 
-    // Re-render the quad into the FBO
+    // Check framebuffer completeness before rendering
+    var fboStatus2 = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    assert(fboStatus2 === gl.FRAMEBUFFER_COMPLETE, 'FBO is complete before integration quad render');
+
+    // Clear and re-render the quad into the FBO
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
     gl.clearColor(0.1, 0.1, 0.2, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -1286,7 +1304,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // Clean up FBO resources
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.deleteFramebuffer(fbo2);
-    gl.deleteRenderbuffer(rb2);
+    gl.deleteTexture(tex2);
 
     // Test sky rendering pipeline with actual sky geometry
     shaderMgr.use('sky');
