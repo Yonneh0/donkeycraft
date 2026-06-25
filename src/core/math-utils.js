@@ -564,7 +564,8 @@
 
         /**
          * Initialize with a seed.
-         * @param {number} [seed] - Seed value (default: 42). Use 0 for deterministic zero-seed.
+         * @param {number} [seed] - Seed value (default: 42). Values <= 0 are mapped to 2147483647.
+         *     Use any positive integer for a custom seed.
          */
         function init(seed) {
             var p = new Uint8Array(256);

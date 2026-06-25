@@ -102,28 +102,30 @@
         this._keyJustPressed = {};
 
         // Merge raw just-pressed flags from event handlers (same-frame press+release detection).
-        for (var key in this._keyJustPressedRaw) {
-            this._keyJustPressed[key] = true;
-        }
+        var self = this;
+        Object.keys(this._keyJustPressedRaw).forEach(function(key) {
+            self._keyJustPressed[key] = true;
+        });
         this._keyJustPressedRaw = {};
 
         // Keys that are currently pressed but were not pressed last frame
         // are newly pressed — mark as just-pressed.
-        for (var key in this._keyStates) {
-            if (this._keyStates[key] && !this._keyLastFrame[key]) {
-                this._keyJustPressed[key] = true;
+        Object.keys(this._keyStates).forEach(function(key) {
+            if (self._keyStates[key] && !self._keyLastFrame[key]) {
+                self._keyJustPressed[key] = true;
             }
-        }
+        });
 
         // Snapshot current state for next frame's comparison.
         this._keyLastFrame = {};
-        for (var key in this._keyStates) {
-            this._keyLastFrame[key] = !!this._keyStates[key];
-        }
+        Object.keys(this._keyStates).forEach(function(key) {
+            self._keyLastFrame[key] = !!self._keyStates[key];
+        });
     };
 
     /**
      * Get the current mouse state.
+     * NOTE: deltaX/deltaY are NOT auto-reset by this method. Use getMouseDelta() for auto-reset behavior.
      * @returns {{left: boolean, right: boolean, middle: boolean, x: number, y: number, deltaX: number, deltaY: number}}
      */
     Donkeycraft.Input.prototype.getMouseState = function() {
@@ -180,8 +182,12 @@
 
     Donkeycraft.Input.prototype._onKeyDown = function(e) {
         this._keyStates[e.code] = true;
-        // Mark as raw just-pressed so same-frame press+release is captured.
-        this._keyJustPressedRaw[e.code] = true;
+
+        // Only mark as just-pressed on the initial key-down event, not auto-repeats.
+        // Auto-repeat (held key) would cause double-jumps and repeated actions.
+        if (!e.repeat) {
+            this._keyJustPressedRaw[e.code] = true;
+        }
 
         // Only prevent default for game-relevant keys to avoid blocking browser shortcuts
         var gameKeys = [

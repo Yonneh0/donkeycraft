@@ -147,15 +147,22 @@
         var gainNode = this._context.createGain();
         gainNode.gain.value = ((options.volume !== undefined && options.volume !== null) ? options.volume : 1) * this._volume;
 
-        // Positional audio: create panner if position provided
+        // Positional audio: create panner if position provided and API is available
         var panner = null;
         if (options.position && this._context.createPanner) {
             panner = this._context.createPanner();
             panner.panningModel = 'HRTF';
             panner.distanceModel = 'inverse';
-            panner.positionX.value = options.position.x;
-            panner.positionY.value = options.position.y;
-            panner.positionZ.value = options.position.z;
+
+            // Use setPosition() if available (modern API), fall back to direct AudioParam access
+            if (typeof panner.setPosition === 'function') {
+                panner.setPosition(options.position.x, options.position.y, options.position.z);
+            } else if (panner.positionX) {
+                panner.positionX.value = options.position.x;
+                panner.positionY.value = options.position.y;
+                panner.positionZ.value = options.position.z;
+            }
+
             panner.maxDistance = options.maxDistance || 16;
             panner.refDistance = 1;
             panner.coneInnerAngle = 360;

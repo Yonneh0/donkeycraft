@@ -45,8 +45,12 @@
     Donkeycraft.EventBus.prototype.once = function(event, callback, context) {
         var self = this;
         var key = this._namespace + event;
+        var fired = false;
+
         var wrapped = function() {
-            // Remove from listeners directly to avoid off() matching issues
+            if (fired) return;
+            fired = true;
+            // Remove from listeners immediately after firing
             if (self._listeners[key]) {
                 self._listeners[key] = self._listeners[key].filter(function(entry) {
                     return entry.callback !== wrapped;
@@ -54,20 +58,33 @@
             }
             callback.apply(context || self, arguments);
         };
-        this.on(event, wrapped, context);
+
+        var unsub = this.on(event, wrapped, context);
+
+        // Store original callback reference on the entry so off(event, originalCallback) works
+        var listeners = this._listeners[key];
+        if (listeners && listeners.length > 0) {
+            listeners[listeners.length - 1]._originalCallback = callback;
+        }
+
+        // Return a combined unsubscribe that also prevents firing if called before emit
+        return function() {
+            fired = true;
+            unsub();
+        };
     };
 
     /**
      * Remove a listener for an event.
      * @param {string} event - Event name.
-     * @param {Function} callback - Callback to remove (or wrapped function if once).
+     * @param {Function} callback - Callback to remove. Works with both regular and once() callbacks.
      */
     Donkeycraft.EventBus.prototype.off = function(event, callback) {
         var key = this._namespace + event;
         if (!this._listeners[key]) return;
 
         this._listeners[key] = this._listeners[key].filter(function(entry) {
-            return entry.callback !== callback;
+            return entry.callback !== callback && entry._originalCallback !== callback;
         });
 
         // Clean up empty arrays
