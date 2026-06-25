@@ -314,7 +314,7 @@
     // Test sunrise/sunset transitions
     lighting.setTimeOfDay(0.25);
     skyColor = lighting.getSkyColor();
-    assert(skyColor.r > 0.5 || skyColor.g > 0.3, 'Sunrise sky color has warm tones');
+    assert(skyColor.r > 0.4 && skyColor.g > 0.25, 'Sunrise sky color has warm tones (r=' + skyColor.r.toFixed(3) + ', g=' + skyColor.g.toFixed(3) + ')');
 
     // ============================================================
     // TEST 9: Sky — time of day, stars/sun visibility
