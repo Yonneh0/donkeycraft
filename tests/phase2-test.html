@@ -1011,12 +1011,12 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(true, 'GUIRenderer destroy completed without error');
 
     // ============================================================
-    // TEST 17: WebGL — render a simple colored quad (with pixel validation)
+    // TEST 17: WebGL — render a simple colored quad (visual test)
     // ============================================================
     section('17. WebGL — Render Quad Visual Test');
 
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
-    gl.clearColor(0.1, 0.1, 0.2, 1.0);
+    gl.clearColor(0.95, 0.95, 0.95, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // Disable depth test so quad always draws regardless of depth position
@@ -1031,23 +1031,20 @@ canvas { border: 1px solid #333; max-width: 100%; }
     var aPosLoc = shaderMgr.getAttribute('aPosition');
     assert(aPosLoc >= 0, 'aPosition attribute location is valid (got ' + aPosLoc + ')');
 
-    // Set up camera at origin looking down -Z
-    var camera2 = new Donkeycraft.Camera(70, 0.1, 1000);
-    camera2.setPosition(0, 0, 0);
-    camera2.setRotation(0, 0);
-    var mats = camera2.getMatrices();
-    shaderMgr.setMat4('uProjection', mats.projection);
-    shaderMgr.setMat4('uView', mats.view);
+    // Use orthographic projection so the quad fills the viewport predictably.
+    // Ortho: left=-2, right=2, bottom=-1.5, top=1.5, near=-1, far=1
+    var aspect = (canvas.width || 800) / (canvas.height || 400);
+    var orthoW = 2.0 * aspect;
+    var orthoH = 2.0;
+    var orthoMat = Donkeycraft.Matrix4.createOrthographic(-orthoW, orthoW, -orthoH, orthoH, -1, 1);
+    shaderMgr.setMat4('uProjection', orthoMat);
 
-    // Model matrix: rotate quad to face camera (XY plane), translate to z=-3, scale by 2.
-    // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
-    // Order: translate * rotate * scale (applied right-to-left to vertices)
-    var scaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var rotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, new Donkeycraft.Vector3(1, 0, 0));
-    var translateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
-    var temp = Donkeycraft.Matrix4.multiply(rotateMat, scaleMat);
-    var modelMat = Donkeycraft.Matrix4.multiply(translateMat, temp);
-    shaderMgr.setMat4('uModel', modelMat);
+    // Identity view matrix — no camera transform
+    shaderMgr.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
+
+    // Model matrix: scale to fill most of the viewport (xy plane), translate to z=0
+    var modelScale = Donkeycraft.Matrix4.createScale(1.8 * aspect, 1.8, 1);
+    shaderMgr.setMat4('uModel', modelScale);
     shaderMgr.setVec3('uColor', 0.2, 0.8, 0.4);
 
     // Upload quad geometry to GPU and draw
@@ -1140,45 +1137,31 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // ============================================================
     section('20. Integration — Full Render Pipeline');
 
-    // Clear canvas and disable depth test for integration render
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
-    gl.clearColor(0.1, 0.1, 0.2, 1.0);
+    gl.clearColor(0.95, 0.95, 0.95, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
 
-    // Create fresh instances for integration test
-    var intCamera = new Donkeycraft.Camera(70, 0.1, 1000);
-    intCamera.setPosition(0, 0, 0);
-    intCamera.setRotation(0, 0);
-
-    var intLighting = new Donkeycraft.Lighting();
-    intLighting.setTimeOfDay(0.5); // noon
-
-    var intFog2 = new Donkeycraft.Fog();
-    intFog2.setEnabled(true);
-    intFog2.setColor(0.6, 0.7, 0.9);
-    intFog2.setDensity(0.015);
-
-    // Use colored shader for visual integration test (no texture dependency)
+    // Use colored shader (no texture dependency)
     shaderMgr.use('colored');
 
     // Verify attribute locations are valid for this shader
     var aPosLoc2 = shaderMgr.getAttribute('aPosition');
     assert(aPosLoc2 >= 0, 'Integration: aPosition attribute location is valid (got ' + aPosLoc2 + ')');
 
-    // Set up camera at origin looking down -Z
-    var intMats2 = intCamera.getMatrices();
-    shaderMgr.setMat4('uProjection', intMats2.projection);
-    shaderMgr.setMat4('uView', intMats2.view);
+    // Use orthographic projection so the quad fills the viewport predictably.
+    var intAspect = (canvas.width || 800) / (canvas.height || 400);
+    var intOrthoW = 2.0 * intAspect;
+    var intOrthoH = 2.0;
+    var intOrthoMat = Donkeycraft.Matrix4.createOrthographic(-intOrthoW, intOrthoW, -intOrthoH, intOrthoH, -1, 1);
+    shaderMgr.setMat4('uProjection', intOrthoMat);
 
-    // Model matrix: rotate quad to face camera (XY plane), translate to z=-3, scale by 2.
-    // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
-    var intScaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var intRotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, new Donkeycraft.Vector3(1, 0, 0));
-    var intTranslateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
-    var intTemp = Donkeycraft.Matrix4.multiply(intRotateMat, intScaleMat);
-    var intModelMat = Donkeycraft.Matrix4.multiply(intTranslateMat, intTemp);
-    shaderMgr.setMat4('uModel', intModelMat);
+    // Identity view matrix — no camera transform
+    shaderMgr.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
+
+    // Model matrix: scale to fill most of the viewport (xy plane)
+    var intModelScale = Donkeycraft.Matrix4.createScale(1.8 * intAspect, 1.8, 1);
+    shaderMgr.setMat4('uModel', intModelScale);
     shaderMgr.setVec3('uColor', 0.9, 0.3, 0.2);
 
     // Build a quad geometry for integration test
@@ -1198,18 +1181,21 @@ canvas { border: 1px solid #333; max-width: 100%; }
     err = gl.getError();
     assert(err === gl.NO_ERROR, 'No WebGL errors in integration test');
 
-    // Verify rendering worked via structural checks (pixel readback unreliable in some WebGL 1 impls)
+    // Verify rendering worked via structural checks
     assert(intMesh.getVertexCount() === 4, 'Integration mesh has 4 vertices after draw');
     assert(intMesh.getIndexCount() === 6, 'Integration mesh has 6 indices after draw');
 
     intMesh.destroy();
 
     // Test sky rendering pipeline with actual sky geometry
+    var skyTestCam = new Donkeycraft.Camera(70, 0.1, 1000);
     shaderMgr.use('sky');
-    var skyMats = intCamera.getMatrices();
+    var skyMats = skyTestCam.getMatrices();
     shaderMgr.setMat4('uProjection', skyMats.projection);
     shaderMgr.setMat4('uView', skyMats.view);
-    var skyCol = intLighting.getSkyColor();
+    var skyTestLight = new Donkeycraft.Lighting();
+    skyTestLight.setTimeOfDay(0.5);
+    var skyCol = skyTestLight.getSkyColor();
     shaderMgr.setVec3('uTopColor', skyCol.r, skyCol.g, skyCol.b);
     shaderMgr.setVec3('uBottomColor', skyCol.r * 0.8, skyCol.g * 0.8, skyCol.b * 0.8);
     shaderMgr.setFloat('uHorizon', 0.1);
@@ -1217,16 +1203,15 @@ canvas { border: 1px solid #333; max-width: 100%; }
 
     // Test GUI rendering pipeline
     shaderMgr.use('gui');
-    var aspect = 800 / 600;
-    var orthoMat = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
-    shaderMgr.setMat4('uProjection', orthoMat);
+    var guiAspect = 800 / 600;
+    var guiOrthoMat = Donkeycraft.Matrix4.createOrthographic(-guiAspect, guiAspect, -1, 1, -1, 1);
+    shaderMgr.setMat4('uProjection', guiOrthoMat);
     shaderMgr.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
     assert(true, 'GUI shader uniforms set without error');
 
-    // Clean up integration test resources (Camera and Fog have no destroy methods)
-    intMesh.destroy();
-    intCamera = null;
-    intFog2 = null;
+    // Clean up integration test resources
+    skyTestCam = null;
+    skyTestLight = null;
 
     // ============================================================
     // TEST 21: GLSL Shader Files — compile shaders from actual .glsl files
