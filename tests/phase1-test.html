@@ -703,7 +703,8 @@
     assert(!r.equals(q), 'equals() with default epsilon: (0.1,0,0) ≠ (0,0,0)');
 
     // isZero
-    assert(z.isZero(), '(0,0,0).isZero() = true');
+    var zVec = new Donkeycraft.Vector3(0, 0, 0);
+    assert(zVec.isZero(), '(0,0,0).isZero() = true');
     assert(!(new Donkeycraft.Vector3(1, 0, 0)).isZero(), '(1,0,0).isZero() = false');
 
     // ============================================================
@@ -811,10 +812,11 @@
     assertNear(euler.pitch, 0, 0.001, 'toEuler of identity: pitch ≈ 0');
     assertNear(euler.roll, 0, 0.001, 'toEuler of identity: roll ≈ 0');
 
-    // normalize
+    // normalize — magnitude should be 1
     var qUnnorm = new Donkeycraft.Quaternion(3, 4, 0, 0);
     var qNorm = qUnnorm.normalize();
-    assertNear(qNorm.length ? qNorm.x * qNorm.x + qNorm.y * qNorm.y + qNorm.z * qNorm.z + qNorm.w * qNorm.w : 0, 1, 0.001);
+    var qMag = qNorm.x * qNorm.x + qNorm.y * qNorm.y + qNorm.z * qNorm.z + qNorm.w * qNorm.w;
+    assertNear(qMag, 1, 0.001, 'normalize((3,4,0,0)) has magnitude 1');
     // Manual check: magnitude of (3,4,0,0) = sqrt(9+16+0+0) = 5, so normalized = (0.6, 0.8, 0, 0)
     assertNear(qNorm.x, 0.6, 0.001, 'normalize((3,4,0,0)).x = 0.6');
     assertNear(qNorm.y, 0.8, 0.001, 'normalize((3,4,0,0)).y = 0.8');

@@ -342,19 +342,19 @@
             return m;
         }
 
+        // Define the Matrix4 constructor first
+        function DonkeycraftMatrix4(data) {
+            this._data = data || new Float32Array(16);
+        }
+
         // Expose factory functions on the Matrix4 constructor
+        Donkeycraft.Matrix4 = DonkeycraftMatrix4;
         Donkeycraft.Matrix4.createIdentity = createIdentity;
         Donkeycraft.Matrix4.createPerspective = createPerspective;
         Donkeycraft.Matrix4.createOrthographic = createOrthographic;
         Donkeycraft.Matrix4.createLookAt = createLookAt;
         Donkeycraft.Matrix4.createTranslation = createTranslation;
         Donkeycraft.Matrix4.createRotation = createRotation;
-
-        return Donkeycraft.Matrix4;
-
-        function DonkeycraftMatrix4(data) {
-            this._data = data || new Float32Array(16);
-        }
 
         Donkeycraft.Matrix4.prototype = DonkeycraftMatrix4.prototype;
 
