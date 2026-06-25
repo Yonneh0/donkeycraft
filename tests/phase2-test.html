@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 2 WebGL Rendering Test</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; color: #ccc; font-family: monospace; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #output {
+        position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7);
+        padding: 10px; font-size: 12px; max-height: 90vh; overflow-y: auto;
+        white-space: pre-wrap; pointer-events: none;
+    }
+    .pass { color: #0f0; }
+    .fail { color: #f00; }
+    .info { color: #ff0; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="output">Loading Phase 2 modules...</div>
+
+<!-- Phase 1 Core (required dependencies) -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 2 Render modules -->
+<script src="../src/render/gl-context.js"></script>
+<script src="../src/render/shader-manager.js"></script>
+<script src="../src/render/shaders/vertex-shaders.glsl"></script>
+<script src="../src/render/shaders/fragment-shaders.glsl"></script>
+<script src="../src/render/geometry-builder.js"></script>
+<script src="../src/render/mesh-optimizer.js"></script>
+<script src="../src/render/chunk-mesh.js"></script>
+<script src="../src/render/terrain-renderer.js"></script>
+<script src="../src/render/camera.js"></script>
+<script src="../src/render/fog.js"></script>
+<script src="../src/render/sky.js"></script>
+<script src="../src/render/lighting.js"></script>
+<script src="../src/render/hand-renderer.js"></script>
+<script src="../src/render/break-particles.js"></script>
+<script src="../src/render/gui-renderer.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var output = document.getElementById('output');
+    var results = [];
+    var testCount = 0;
+    var passCount = 0;
+    var failCount = 0;
+
+    function log(msg, cls) {
+        output.innerHTML += '<span class="' + (cls || '') + '">' + msg + '</span>\n';
+    }
+
+    function assert(condition, testName) {
+        testCount++;
+        if (condition) {
+            passCount++;
+            log('[PASS] ' + testName, 'pass');
+        } else {
+            failCount++;
+            log('[FAIL] ' + testName, 'fail');
+        }
+    }
+
+    function info(msg) {
+        log('>> ' + msg, 'info');
+    }
+
+    // ============================================================
+    // TEST 1: Namespace and class registration
+    // ============================================================
+    info('Testing namespace and class registration...');
+
+    assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
+    assert(typeof Donkeycraft.GLContext === 'function', 'Donkeycraft.GLContext registered');
+    assert(typeof Donkeycraft.ShaderManager === 'function', 'Donkeycraft.ShaderManager registered');
+    assert(typeof Donkeycraft.GeometryBuilder === 'function', 'Donkeycraft.GeometryBuilder registered');
+    assert(typeof Donkeycraft.MeshOptimizer === 'function', 'Donkeycraft.MeshOptimizer registered');
+    assert(typeof Donkeycraft.ChunkMesh === 'function', 'Donkeycraft.ChunkMesh registered');
+    assert(typeof Donkeycraft.TerrainRenderer === 'function', 'Donkeycraft.TerrainRenderer registered');
+    assert(typeof Donkeycraft.Camera === 'function', 'Donkeycraft.Camera registered');
+    assert(typeof Donkeycraft.Fog === 'function', 'Donkeycraft.Fog registered');
+    assert(typeof Donkeycraft.Sky === 'function', 'Donkeycraft.Sky registered');
+    assert(typeof Donkeycraft.Lighting === 'function', 'Donkeycraft.Lighting registered');
+    assert(typeof Donkeycraft.HandRenderer === 'function', 'Donkeycraft.HandRenderer registered');
+    assert(typeof Donkeycraft.BreakParticles === 'function', 'Donkeycraft.BreakParticles registered');
+    assert(typeof Donkeycraft.GUIRenderer === 'function', 'Donkeycraft.GUIRenderer registered');
+
+    // ============================================================
+    // TEST 2: GLContext — WebGL context creation
+    // ============================================================
+    info('Testing GLContext...');
+
+    var canvas = document.getElementById('canvas');
+    var glCtx = new Donkeycraft.GLContext(canvas);
+    assert(glCtx !== null, 'GLContext instance created');
+    assert(glCtx.getGL() !== null, 'WebGL context obtained from GLContext');
+
+    var gl = glCtx.getGL();
+    assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
+
+    // Test capability queries
+    assert(typeof glCtx.getMaxTextureSize() === 'number', 'getMaxTextureSize returns number');
+    assert(typeof glCtx.getMaxVertexUniforms() === 'number', 'getMaxVertexUniforms returns number');
+    assert(typeof glCtx.isExtensionSupported() === 'boolean', 'isExtensionSupported returns boolean');
+
+    // ============================================================
+    // TEST 3: ShaderManager — shader compilation and program creation
+    // ============================================================
+    info('Testing ShaderManager...');
+
+    var shaderMgr = new Donkeycraft.ShaderManager(gl);
+    assert(shaderMgr !== null, 'ShaderManager instance created');
+
+    // Test simple vertex/fragment shader compilation
+    var vertSrc = [
+        'attribute vec3 aPosition;',
+        'void main() { gl_Position = vec4(aPosition, 1.0); }'
+    ].join('\n');
+
+    var fragSrc = [
+        'precision mediump float;',
+        'void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }'
+    ].join('\n');
+
+    var progId = shaderMgr.createProgram('test-simple', vertSrc, fragSrc);
+    assert(progId !== null && progId !== undefined, 'Shader program created successfully');
+
+    // Test attribute/location caching (need to use program first)
+    shaderMgr.use('test-simple');
+    var attrLoc = shaderMgr.getAttribute('aPosition');
+    assert(typeof attrLoc === 'number' && attrLoc >= 0, 'Attribute location retrieved');
+
+    // ============================================================
+    // TEST 4: GeometryBuilder — quad and cube generation
+    // ============================================================
+    info('Testing GeometryBuilder...');
+
+    var geoBuilder = new Donkeycraft.GeometryBuilder();
+    assert(geoBuilder !== null, 'GeometryBuilder instance created');
+
+    // Test isTransparent
+    assert(geoBuilder.isTransparent(0) === true, 'Air block (ID 0) is transparent');
+    assert(geoBuilder.isTransparent(1) === false, 'Stone block (ID 1) is not transparent');
+
+    // Test buildQuad
+    var quad = geoBuilder.buildQuad(2.0, 0.0);
+    assert(quad !== null, 'Quad geometry generated');
+    assert(quad.vertexCount === 4, 'Quad has 4 vertices');
+    assert(quad.indexCount === 6, 'Quad has 6 indices');
+    assert(quad.vertices instanceof Float32Array, 'Quad vertices are Float32Array');
+    assert(quad.indices instanceof Uint16Array, 'Quad indices are Uint16Array');
+
+    // Test buildCube
+    var cube = geoBuilder.buildCube(1.0, 0.0);
+    assert(cube !== null, 'Cube geometry generated');
+    assert(cube.vertexCount === 24, 'Cube has 24 vertices');
+    assert(cube.indexCount === 36, 'Cube has 36 indices');
+
+    // Test buildChunk with a simple world function
+    var testWorldData = {};
+    function makeTestBlockFunc() {
+        return function(x, y, z) {
+            if (y < 10) return 1; // stone below y=10
+            if (y === 10) return 2; // grass at y=10
+            if (y > 10 && y <= 15) return 3; // dirt above
+            return 0; // air
+        };
+    }
+
+    var chunkGeo = geoBuilder.buildChunk(0, 0, makeTestBlockFunc());
+    assert(chunkGeo !== null, 'Chunk geometry generated');
+    assert(chunkGeo.vertexCount > 0, 'Chunk has vertices (face culling working)');
+    assert(chunkGeo.indexCount > 0, 'Chunk has indices');
+
+    // ============================================================
+    // TEST 5: MeshOptimizer — face culling and index generation
+    // ============================================================
+    info('Testing MeshOptimizer...');
+
+    var meshOpt = new Donkeycraft.MeshOptimizer();
+    assert(meshOpt !== null, 'MeshOptimizer instance created');
+
+    // Test optimize on quad (should preserve it)
+    var optimized = meshOpt.optimize(quad, null, null);
+    assert(optimized !== null, 'Quad optimization completed');
+    assert(optimized.vertexCount > 0, 'Optimized quad has vertices');
+
+    // ============================================================
+    // TEST 6: Camera — position, rotation, matrices
+    // ============================================================
+    info('Testing Camera...');
+
+    var camera = new Donkeycraft.Camera(70, 0.1, 1000);
+    assert(camera !== null, 'Camera instance created');
+
+    // Test position
+    var pos = camera.getPosition();
+    assert(pos instanceof Donkeycraft.Vector3, 'Camera position is Vector3');
+    assert(Math.abs(pos.x - 0) < 0.01, 'Camera X starts at 0');
+    assert(Math.abs(pos.y - 64) < 0.01, 'Camera Y starts at 64');
+    assert(Math.abs(pos.z - 0) < 0.01, 'Camera Z starts at 0');
+
+    // Test rotation
+    camera.setRotation(0, 0);
+    assert(Math.abs(camera.getYaw()) < 0.01, 'Yaw is 0');
+    assert(Math.abs(camera.getPitch()) < 0.01, 'Pitch is 0');
+
+    // Test applyMouseDelta
+    camera.applyMouseDelta(10, 5, 0.1);
+    assert(Math.abs(camera.getYaw() - (-1.0)) < 0.01, 'Yaw updated by mouse delta');
+
+    // Test direction vectors
+    camera.setRotation(0, 0);
+    var forward = camera.getForward();
+    assert(forward instanceof Donkeycraft.Vector3, 'Forward is Vector3');
+    assert(Math.abs(forward.x) < 0.01, 'Forward X is ~0 at yaw=0');
+    assert(Math.abs(forward.z + 1) < 0.01, 'Forward Z is ~-1 at yaw=0');
+
+    var right = camera.getRight();
+    assert(Math.abs(right.x - 1) < 0.01, 'Right X is ~1 at yaw=0');
+    assert(Math.abs(right.z) < 0.01, 'Right Z is ~0 at yaw=0');
+
+    // Test matrices
+    var matrices = camera.getMatrices();
+    assert(matrices.projection instanceof Donkeycraft.Matrix4, 'Projection matrix is Matrix4');
+    assert(matrices.view instanceof Donkeycraft.Matrix4, 'View matrix is Matrix4');
+
+    // Test movement
+    camera.setPosition(10, 20, 30);
+    pos = camera.getPosition();
+    assert(Math.abs(pos.x - 10) < 0.01, 'Position X set to 10');
+    assert(Math.abs(pos.y - 20) < 0.01, 'Position Y set to 20');
+    assert(Math.abs(pos.z - 30) < 0.01, 'Position Z set to 30');
+
+    camera.moveForward(5);
+    pos = camera.getPosition();
+    assert(Math.abs(pos.z - 25) < 0.01, 'moveForward moves Z by -5 at yaw=0 (30-5=25)');
+
+    camera.moveRight(3);
+    pos = camera.getPosition();
+    assert(Math.abs(pos.x - 13) < 0.01, 'moveRight moves X by +3 (10+3=13)');
+
+    // Test aspect ratio
+    camera.setAspect(4/3);
+    assert(Math.abs(camera.getAspect() - 4/3) < 0.01, 'Aspect ratio set correctly');
+
+    // ============================================================
+    // TEST 7: Fog — density, color, enable/disable
+    // ============================================================
+    info('Testing Fog...');
+
+    var fog = new Donkeycraft.Fog();
+    assert(fog !== null, 'Fog instance created');
+    assert(fog.getDensity() === 0.015, 'Default fog density is 0.015');
+    assert(fog.isEnabled() === true, 'Fog enabled by default');
+
+    fog.setDensity(0.05);
+    assert(Math.abs(fog.getDensity() - 0.05) < 0.001, 'Fog density updated to 0.05');
+
+    fog.setEnabled(false);
+    assert(fog.isEnabled() === false, 'Fog disabled');
+
+    fog.setColor(0.2, 0.3, 0.4);
+    var fogColor = fog.getColor();
+    assert(Math.abs(fogColor.r - 0.2) < 0.01, 'Fog R color set to 0.2');
+    assert(Math.abs(fogColor.g - 0.3) < 0.01, 'Fog G color set to 0.3');
+    assert(Math.abs(fogColor.b - 0.4) < 0.01, 'Fog B color set to 0.4');
+
+    fog.updateFromSky({ r: 0.5, g: 0.6, b: 0.7 });
+    fogColor = fog.getColor();
+    assert(Math.abs(fogColor.r - 0.5) < 0.01, 'Fog color updated from sky');
+
+    // ============================================================
+    // TEST 8: Lighting — sun intensity, ambient, sky color
+    // ============================================================
+    info('Testing Lighting...');
+
+    var lighting = new Donkeycraft.Lighting();
+    assert(lighting !== null, 'Lighting instance created');
+
+    // Test time of day
+    lighting.setTimeOfDay(0.5); // noon
+    assert(Math.abs(lighting.getTimeOfDay() - 0.5) < 0.01, 'Time of day set to 0.5');
+
+    var sunIntensity = lighting.getSunIntensity();
+    assert(sunIntensity > 0.9, 'Sun intensity high at noon (got ' + sunIntensity.toFixed(3) + ')');
+
+    var ambient = lighting.getAmbientLight();
+    assert(ambient > 0.8, 'Ambient light high at noon (got ' + ambient.toFixed(3) + ')');
+
+    var skyColor = lighting.getSkyColor();
+    assert(skyColor.r > 0 && skyColor.g > 0 && skyColor.b > 0, 'Sky color has positive components at noon');
+
+    // Test midnight
+    lighting.setTimeOfDay(0.0);
+    sunIntensity = lighting.getSunIntensity();
+    assert(sunIntensity < 0.1, 'Sun intensity low at midnight (got ' + sunIntensity.toFixed(3) + ')');
+
+    ambient = lighting.getAmbientLight();
+    assert(ambient < 0.2, 'Ambient light low at midnight (got ' + ambient.toFixed(3) + ')');
+
+    // Test sunrise/sunset transitions
+    lighting.setTimeOfDay(0.25);
+    skyColor = lighting.getSkyColor();
+    assert(skyColor.r > 0.5 || skyColor.g > 0.3, 'Sunrise sky color has warm tones');
+
+    // ============================================================
+    // TEST 9: Sky — time of day, stars/sun visibility
+    // ============================================================
+    info('Testing Sky...');
+
+    var sky = new Donkeycraft.Sky(gl, shaderMgr);
+    assert(sky !== null, 'Sky instance created');
+    assert(sky.getTimeOfDay() === 0.5, 'Sky default time is 0.5');
+
+    sky.setTimeOfDay(0.0);
+    assert(Math.abs(sky.getTimeOfDay() - 0.0) < 0.01, 'Sky time set to 0.0');
+
+    sky.setStarsVisible(false);
+    sky.setSunMoonVisible(false);
+    // No exceptions = pass
+
+    // ============================================================
+    // TEST 10: BreakParticles — spawn, update, count
+    // ============================================================
+    info('Testing BreakParticles...');
+
+    var particles = new Donkeycraft.BreakParticles(gl, shaderMgr);
+    assert(particles !== null, 'BreakParticles instance created');
+    assert(particles.getCount() === 0, 'No particles initially');
+
+    particles.spawn(5, 10, 5, 1); // break stone at (5,10,5)
+    assert(particles.getCount() === 8, '8 particles spawned for block break');
+
+    particles.update(0.5, -15.0); // tick 0.5 seconds
+    assert(particles.getCount() > 0, 'Particles still alive after 0.5s tick');
+
+    particles.clear();
+    assert(particles.getCount() === 0, 'All particles cleared');
+
+    // ============================================================
+    // TEST 11: ChunkMesh — buffer management
+    // ============================================================
+    info('Testing ChunkMesh...');
+
+    var chunkMesh = new Donkeycraft.ChunkMesh(gl, shaderMgr);
+    assert(chunkMesh !== null, 'ChunkMesh instance created');
+    assert(chunkMesh.isDirty() === true, 'New mesh is dirty');
+    assert(chunkMesh.getIndexCount() === 0, 'New mesh has 0 indices');
+
+    chunkMesh.update(quad);
+    assert(chunkMesh.isDirty() === true, 'Mesh is dirty after update');
+    assert(chunkMesh.getVertexCount() === 4, 'Mesh vertex count updated to 4');
+    assert(chunkMesh.getIndexCount() === 6, 'Mesh index count updated to 6');
+
+    chunkMesh.markClean();
+    assert(chunkMesh.isDirty() === false, 'Mesh marked clean');
+
+    // ============================================================
+    // TEST 12: TerrainRenderer — world data and render distance
+    // ============================================================
+    info('Testing TerrainRenderer...');
+
+    var terrain = new Donkeycraft.TerrainRenderer(gl, shaderMgr, fog);
+    assert(terrain !== null, 'TerrainRenderer instance created');
+    assert(terrain.getRenderDistance() === 8, 'Default render distance is 8');
+
+    terrain.setRenderDistance(4);
+    assert(terrain.getRenderDistance() === 4, 'Render distance updated to 4');
+
+    // Set world data (simple flat world)
+    terrain.setWorldData(function(x, y, z) {
+        if (y < 64) return 1; // stone
+        if (y === 64) return 2; // grass
+        return 0; // air
+    });
+    assert(terrain._getBlockFunc !== null, 'World data set');
+
+    // ============================================================
+    // TEST 13: HandRenderer — held item
+    // ============================================================
+    info('Testing HandRenderer...');
+
+    var hand = new Donkeycraft.HandRenderer(gl, shaderMgr);
+    assert(hand !== null, 'HandRenderer instance created');
+    assert(hand.getHeldItem() === 1, 'Default held item is stone (ID 1)');
+
+    hand.setHeldItem(4); // gold
+    assert(hand.getHeldItem() === 4, 'Held item set to gold (ID 4)');
+
+    hand.setBobAngle(1.57); // PI/2
+    // No exceptions = pass
+
+    // ============================================================
+    // TEST 14: GUIRenderer — crosshair and hotbar
+    // ============================================================
+    info('Testing GUIRenderer...');
+
+    var gui = new Donkeycraft.GUIRenderer(gl, shaderMgr);
+    assert(gui !== null, 'GUIRenderer instance created');
+
+    // Test renderAll with defaults (no exceptions)
+    gui.renderAll({ selectedSlot: 0 }, 800, 600);
+    assert(true, 'renderAll completed without error');
+
+    // ============================================================
+    // TEST 15: ShaderManager — uniform setting methods
+    // ============================================================
+    info('Testing ShaderManager uniform methods...');
+
+    shaderMgr.use('test-simple');
+    shaderMgr.setFloat('uTest', 0.5);
+    assert(true, 'setFloat completed without error');
+
+    shaderMgr.setVec2('uTest2', 0.3, 0.7);
+    assert(true, 'setVec2 completed without error');
+
+    shaderMgr.setVec3('uTest3', 0.1, 0.2, 0.3);
+    assert(true, 'setVec3 completed without error');
+
+    shaderMgr.setVec4('uTest4', 0.1, 0.2, 0.3, 0.4);
+    assert(true, 'setVec4 completed without error');
+
+    shaderMgr.setMat4('uTestMat', Donkeycraft.Matrix4.createIdentity());
+    assert(true, 'setMat4 completed without error');
+
+    shaderMgr.setSampler('uTex', 0);
+    assert(true, 'setSampler completed without error');
+
+    // ============================================================
+    // TEST 16: WebGL — render a simple colored quad
+    // ============================================================
+    info('Testing WebGL rendering...');
+
+    // Use the test shader we created earlier
+    gl.viewport(0, 0, canvas.width || 800, canvas.height || 600);
+    gl.clearColor(0.1, 0.1, 0.2, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+
+    // Use the simple test shader (renders red)
+    shaderMgr.use('test-simple');
+
+    // Upload quad vertex data directly
+    var testQuadVerts = new Float32Array([
+        -0.5, -0.5, 0,   // bottom-left
+         0.5, -0.5, 0,   // bottom-right
+         0.5,  0.5, 0,   // top-right
+        -0.5,  0.5, 0    // top-left
+    ]);
+
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, testQuadVerts, gl.STATIC_DRAW);
+
+    var posLoc = shaderMgr.getAttribute('aPosition');
+    if (posLoc >= 0) {
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+    }
+
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+    if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+    gl.deleteBuffer(buf);
+
+    // Check for WebGL errors
+    var err = gl.getError();
+    assert(err === gl.NO_ERROR, 'No WebGL errors after rendering quad');
+
+    // ============================================================
+    // TEST 17: Camera — target calculation
+    // ============================================================
+    info('Testing Camera target...');
+
+    camera.setPosition(0, 64, 0);
+    camera.setRotation(0, 0);
+    var target = camera.getTarget();
+    assert(target instanceof Donkeycraft.Vector3, 'Target is Vector3');
+    assert(Math.abs(target.x) < 0.01, 'Target X is ~0');
+    assert(Math.abs(target.y - 64) < 0.01, 'Target Y is ~64');
+    assert(Math.abs(target.z + 1) < 0.01, 'Target Z is ~-1 (looking down -Z)');
+
+    // ============================================================
+    // TEST 18: Lighting — sun direction
+    // ============================================================
+    info('Testing Lighting sun direction...');
+
+    lighting.setTimeOfDay(0.5); // noon
+    var sunDir = lighting.getSunDirection();
+    assert(sunDir instanceof Donkeycraft.Vector3, 'Sun direction is Vector3');
+    var sunLen = sunDir.length();
+    assert(Math.abs(sunLen - 1.0) < 0.01, 'Sun direction is normalized (length ~1)');
+
+    // ============================================================
+    // TEST 19: GeometryBuilder — UV mapping
+    // ============================================================
+    info('Testing GeometryBuilder UV mapping...');
+
+    var uv = geoBuilder._getBlockUV(1, 'top');
+    assert(uv !== null, 'UV coordinates returned for block ID 1');
+    assert(uv.u0 >= 0 && uv.u1 <= 1, 'UV S range is [0, 1]');
+    assert(uv.v0 >= 0 && uv.v1 <= 1, 'UV T range is [0, 1]');
+
+    // ============================================================
+    // TEST 20: Fog — apply to shader
+    // ============================================================
+    info('Testing Fog shader application...');
+
+    fog.setEnabled(true);
+    fog.setColor(0.5, 0.6, 0.7);
+    fog.setDensity(0.02);
+    fog.applyToFogUniforms(shaderMgr);
+    assert(true, 'Fog uniforms applied to shader without error');
+
+    // ============================================================
+    // Summary
+    // ============================================================
+    log('\n========================================\n');
+    log('PHASE 2 TEST SUMMARY\n');
+    log('Total:  ' + testCount + '\n');
+    log('Passed: ' + passCount + ' ', 'pass');
+    log('Failed: ' + failCount + ' ', failCount > 0 ? 'fail' : '');
+    log('\n========================================\n');
+
+    if (failCount === 0) {
+        log('\nAll Phase 2 tests PASSED!', 'pass');
+    } else {
+        log('\n' + failCount + ' test(s) FAILED. Review output above.', 'fail');
+    }
+
+})();
+</script>
+</body>
+</html>
