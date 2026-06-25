@@ -215,217 +215,199 @@
 
     /**
      * Matrix4 — 4×4 column-major matrix.
+     * @param {Float32Array} [data=null]
      */
-    Donkeycraft.Matrix4 = (function() {
+    Donkeycraft.Matrix4 = function(data) {
+        this._data = data || new Float32Array(16);
+    };
 
-        /**
-         * Create identity matrix.
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createIdentity() {
-            var data = new Float32Array(16);
-            data[0] = 1;  data[1] = 0;  data[2] = 0;  data[3] = 0;
-            data[4] = 0;  data[5] = 1;  data[6] = 0;  data[7] = 0;
-            data[8] = 0;  data[9] = 0;  data[10] = 1; data[11] = 0;
-            data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
-            return new Donkeycraft.Matrix4(data);
-        }
+    /**
+     * Create identity matrix.
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createIdentity = function() {
+        var data = new Float32Array(16);
+        data[0] = 1;  data[1] = 0;  data[2] = 0;  data[3] = 0;
+        data[4] = 0;  data[5] = 1;  data[6] = 0;  data[7] = 0;
+        data[8] = 0;  data[9] = 0;  data[10] = 1; data[11] = 0;
+        data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
+        return new Donkeycraft.Matrix4(data);
+    };
 
-        /**
-         * Create perspective projection matrix.
-         * @param {number} fovRadians
-         * @param {number} aspect
-         * @param {number} near
-         * @param {number} far
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createPerspective(fovRadians, aspect, near, far) {
-            var f = 1.0 / Math.tan(fovRadians / 2);
-            var nf = 1 / (near - far);
-            var data = new Float32Array(16);
-            data[0]  = f / aspect;    data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
-            data[4]  = 0;             data[5]  = f;             data[6]  = 0;              data[7]  = 0;
-            data[8]  = 0;             data[9]  = 0;             data[10] = (far + near) * nf; data[11] = -1;
-            data[12] = 0;             data[13] = 0;             data[14] = 2 * far * near * nf; data[15] = 0;
-            return new Donkeycraft.Matrix4(data);
-        }
+    /**
+     * Create perspective projection matrix.
+     * @param {number} fovRadians
+     * @param {number} aspect
+     * @param {number} near
+     * @param {number} far
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createPerspective = function(fovRadians, aspect, near, far) {
+        var f = 1.0 / Math.tan(fovRadians / 2);
+        var nf = 1 / (near - far);
+        var data = new Float32Array(16);
+        data[0]  = f / aspect;    data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
+        data[4]  = 0;             data[5]  = f;             data[6]  = 0;              data[7]  = 0;
+        data[8]  = 0;             data[9]  = 0;             data[10] = (far + near) * nf; data[11] = -1;
+        data[12] = 0;             data[13] = 0;             data[14] = 2 * far * near * nf; data[15] = 0;
+        return new Donkeycraft.Matrix4(data);
+    };
 
-        /**
-         * Create orthographic projection matrix.
-         * @param {number} left
-         * @param {number} right
-         * @param {number} bottom
-         * @param {number} top
-         * @param {number} near
-         * @param {number} far
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createOrthographic(left, right, bottom, top, near, far) {
-            var dx = right - left, dy = top - bottom, dz = far - near;
-            var data = new Float32Array(16);
-            data[0]  = 2 / dx;        data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
-            data[4]  = 0;             data[5]  = 2 / dy;      data[6]  = 0;              data[7]  = 0;
-            data[8]  = 0;             data[9]  = 0;             data[10] = -2 / dz;        data[11] = 0;
-            data[12] = -(right + left) / dx;
-            data[13] = -(top + bottom) / dy;
-            data[14] = -(far + near) / dz;
-            data[15] = 1;
-            return new Donkeycraft.Matrix4(data);
-        }
+    /**
+     * Create orthographic projection matrix.
+     * @param {number} left
+     * @param {number} right
+     * @param {number} bottom
+     * @param {number} top
+     * @param {number} near
+     * @param {number} far
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createOrthographic = function(left, right, bottom, top, near, far) {
+        var dx = right - left, dy = top - bottom, dz = far - near;
+        var data = new Float32Array(16);
+        data[0]  = 2 / dx;        data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
+        data[4]  = 0;             data[5]  = 2 / dy;      data[6]  = 0;              data[7]  = 0;
+        data[8]  = 0;             data[9]  = 0;             data[10] = -2 / dz;        data[11] = 0;
+        data[12] = -(right + left) / dx;
+        data[13] = -(top + bottom) / dy;
+        data[14] = -(far + near) / dz;
+        data[15] = 1;
+        return new Donkeycraft.Matrix4(data);
+    };
 
-        /**
-         * Create a look-at view matrix.
-         * @param {Donkeycraft.Vector3} eye
-         * @param {Donkeycraft.Vector3} target
-         * @param {Donkeycraft.Vector3} up
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createLookAt(eye, target, up) {
-            var zAxis = Donkeycraft.Vector3.copy(eye).sub(target).normalize();
-            var xAxis = Donkeycraft.Vector3.copy(up).cross(zAxis).normalize();
-            var yAxis = Donkeycraft.Vector3.copy(zAxis).cross(xAxis);
+    /**
+     * Create a look-at view matrix.
+     * @param {Donkeycraft.Vector3} eye
+     * @param {Donkeycraft.Vector3} target
+     * @param {Donkeycraft.Vector3} up
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createLookAt = function(eye, target, up) {
+        var zAxis = Donkeycraft.Vector3.copy(eye).sub(target).normalize();
+        var xAxis = Donkeycraft.Vector3.copy(up).cross(zAxis).normalize();
+        var yAxis = Donkeycraft.Vector3.copy(zAxis).cross(xAxis);
 
-            var data = new Float32Array(16);
-            data[0]  = xAxis.x;       data[1]  = yAxis.x;       data[2]  = zAxis.x;      data[3]  = 0;
-            data[4]  = xAxis.y;       data[5]  = yAxis.y;       data[6]  = zAxis.y;      data[7]  = 0;
-            data[8]  = xAxis.z;       data[9]  = yAxis.z;       data[10] = zAxis.z;      data[11] = 0;
-            data[12] = -xAxis.dot(eye);
-            data[13] = -yAxis.dot(eye);
-            data[14] = -zAxis.dot(eye);
-            data[15] = 1;
-            return new Donkeycraft.Matrix4(data);
-        }
+        var data = new Float32Array(16);
+        data[0]  = xAxis.x;       data[1]  = yAxis.x;       data[2]  = zAxis.x;      data[3]  = 0;
+        data[4]  = xAxis.y;       data[5]  = yAxis.y;       data[6]  = zAxis.y;      data[7]  = 0;
+        data[8]  = xAxis.z;       data[9]  = yAxis.z;       data[10] = zAxis.z;      data[11] = 0;
+        data[12] = -xAxis.dot(eye);
+        data[13] = -yAxis.dot(eye);
+        data[14] = -zAxis.dot(eye);
+        data[15] = 1;
+        return new Donkeycraft.Matrix4(data);
+    };
 
-        /**
-         * Create a translation matrix.
-         * @param {number} x
-         * @param {number} y
-         * @param {number} z
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createTranslation(x, y, z) {
-            var m = createIdentity();
-            m._data[12] = x;
-            m._data[13] = y;
-            m._data[14] = z;
-            return m;
-        }
+    /**
+     * Create a translation matrix.
+     * @param {number} x
+     * @param {number} y
+     * @param {number} z
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createTranslation = function(x, y, z) {
+        var m = Donkeycraft.Matrix4.createIdentity();
+        m._data[12] = x;
+        m._data[13] = y;
+        m._data[14] = z;
+        return m;
+    };
 
-        /**
-         * Create a rotation matrix around axis.
-         * @param {number} angleRadians
-         * @param {Donkeycraft.Vector3} axis
-         * @returns {Donkeycraft.Matrix4}
-         */
-        function createRotation(angle, axis) {
-            var c = Math.cos(angle), s = Math.sin(angle);
-            var x = axis.x, y = axis.y, z = axis.z;
-            var t = 1 - c;
+    /**
+     * Create a rotation matrix around axis.
+     * @param {number} angleRadians
+     * @param {Donkeycraft.Vector3} axis
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.createRotation = function(angle, axis) {
+        var c = Math.cos(angle), s = Math.sin(angle);
+        var x = axis.x, y = axis.y, z = axis.z;
+        var t = 1 - c;
 
-            var m = new Donkeycraft.Matrix4();
-            m._data[0] = t * x * x + c;
-            m._data[1] = t * x * y + s * z;
-            m._data[2] = t * x * z - s * y;
-            m._data[3] = 0;
-            m._data[4] = t * x * y - s * z;
-            m._data[5] = t * y * y + c;
-            m._data[6] = t * y * z + s * x;
-            m._data[7] = 0;
-            m._data[8] = t * x * z + s * y;
-            m._data[9] = t * y * z - s * x;
-            m._data[10] = t * z * z + c;
-            m._data[11] = 0;
-            m._data[12] = 0;
-            m._data[13] = 0;
-            m._data[14] = 0;
-            m._data[15] = 1;
-            return m;
-        }
+        var m = new Donkeycraft.Matrix4();
+        m._data[0] = t * x * x + c;
+        m._data[1] = t * x * y + s * z;
+        m._data[2] = t * x * z - s * y;
+        m._data[3] = 0;
+        m._data[4] = t * x * y - s * z;
+        m._data[5] = t * y * y + c;
+        m._data[6] = t * y * z + s * x;
+        m._data[7] = 0;
+        m._data[8] = t * x * z + s * y;
+        m._data[9] = t * y * z - s * x;
+        m._data[10] = t * z * z + c;
+        m._data[11] = 0;
+        m._data[12] = 0;
+        m._data[13] = 0;
+        m._data[14] = 0;
+        m._data[15] = 1;
+        return m;
+    };
 
-        // Define the Matrix4 constructor first
-        function DonkeycraftMatrix4(data) {
-            this._data = data || new Float32Array(16);
-        }
-
-        // Expose factory functions on the Matrix4 constructor
-        Donkeycraft.Matrix4 = DonkeycraftMatrix4;
-        Donkeycraft.Matrix4.createIdentity = createIdentity;
-        Donkeycraft.Matrix4.createPerspective = createPerspective;
-        Donkeycraft.Matrix4.createOrthographic = createOrthographic;
-        Donkeycraft.Matrix4.createLookAt = createLookAt;
-        Donkeycraft.Matrix4.createTranslation = createTranslation;
-        Donkeycraft.Matrix4.createRotation = createRotation;
-
-        Donkeycraft.Matrix4.prototype = DonkeycraftMatrix4.prototype;
-
-        // Return the Matrix4 constructor so the outer assignment works correctly
-        return Donkeycraft.Matrix4;
-
-        /**
-         * Multiply by another matrix.
-         * @param {Donkeycraft.Matrix4} m
-         * @returns {Donkeycraft.Matrix4}
-         */
-        DonkeycraftMatrix4.prototype.multiply = function(m) {
-            var a = this._data, b = m._data;
-            var r = new Float32Array(16);
-            // Column-major multiplication: R = A × B
-            // R[i*4+j] = Σ(k=0..3) A[i*4+k] × B[k*4+j]
-            for (var i = 0; i < 4; i++) {
-                for (var j = 0; j < 4; j++) {
-                    r[i * 4 + j] = a[i * 4]     * b[j]       +
-                                   a[i * 4 + 1] * b[4 + j] +
-                                   a[i * 4 + 2] * b[8 + j]  +
-                                   a[i * 4 + 3] * b[12 + j];
-                }
+    /**
+     * Multiply by another matrix.
+     * @param {Donkeycraft.Matrix4} m
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.prototype.multiply = function(m) {
+        var a = this._data, b = m._data;
+        var r = new Float32Array(16);
+        // Column-major multiplication: R = A × B
+        // R[i*4+j] = Σ(k=0..3) A[i*4+k] × B[k*4+j]
+        for (var i = 0; i < 4; i++) {
+            for (var j = 0; j < 4; j++) {
+                r[i * 4 + j] = a[i * 4]     * b[j]       +
+                               a[i * 4 + 1] * b[4 + j] +
+                               a[i * 4 + 2] * b[8 + j]  +
+                               a[i * 4 + 3] * b[12 + j];
             }
-            return new Donkeycraft.Matrix4(r);
-        };
+        }
+        return new Donkeycraft.Matrix4(r);
+    };
 
-        /**
-         * Multiply by a vector (treating w=0 for direction, w=1 for position).
-         * @param {Donkeycraft.Vector3} v
-         * @param {number} [w=0]
-         * @returns {Donkeycraft.Vector3}
-         */
-        DonkeycraftMatrix4.prototype.transformVector = function(v, w) {
-            var d = this._data;
-            var x = v.x, y = v.y, z = v.z, ww = w || 0;
-            var ox = d[0] * x + d[4] * y + d[8] * z + d[12] * ww;
-            var oy = d[1] * x + d[5] * y + d[9] * z + d[13] * ww;
-            var oz = d[2] * x + d[6] * y + d[10] * z + d[14] * ww;
-            var ow = d[3] * x + d[7] * y + d[11] * z + d[15] * ww;
-            if (ow !== 1 && ow !== 0) {
-                ox /= ow; oy /= ow; oz /= ow;
-            }
-            return new Donkeycraft.Vector3(ox, oy, oz);
-        };
+    /**
+     * Multiply by a vector (treating w=0 for direction, w=1 for position).
+     * @param {Donkeycraft.Vector3} v
+     * @param {number} [w=0]
+     * @returns {Donkeycraft.Vector3}
+     */
+    Donkeycraft.Matrix4.prototype.transformVector = function(v, w) {
+        var d = this._data;
+        var x = v.x, y = v.y, z = v.z, ww = w || 0;
+        var ox = d[0] * x + d[4] * y + d[8] * z + d[12] * ww;
+        var oy = d[1] * x + d[5] * y + d[9] * z + d[13] * ww;
+        var oz = d[2] * x + d[6] * y + d[10] * z + d[14] * ww;
+        var ow = d[3] * x + d[7] * y + d[11] * z + d[15] * ww;
+        if (ow !== 1 && ow !== 0) {
+            ox /= ow; oy /= ow; oz /= ow;
+        }
+        return new Donkeycraft.Vector3(ox, oy, oz);
+    };
 
-        /**
-         * Get the Float32Array data.
-         * @returns {Float32Array}
-         */
-        DonkeycraftMatrix4.prototype.getData = function() {
-            return this._data;
-        };
+    /**
+     * Get the Float32Array data.
+     * @returns {Float32Array}
+     */
+    Donkeycraft.Matrix4.prototype.getData = function() {
+        return this._data;
+    };
 
-        /**
-         * Transpose the matrix in place.
-         * @returns {Donkeycraft.Matrix4} this
-         */
-        DonkeycraftMatrix4.prototype.transpose = function() {
-            var d = this._data;
-            var tmp;
-            tmp = d[1];  d[1] = d[4];  d[4] = tmp;
-            tmp = d[2];  d[2] = d[8];  d[8] = tmp;
-            tmp = d[3];  d[3] = d[12]; d[12] = tmp;
-            tmp = d[6];  d[6] = d[9];  d[9] = tmp;
-            tmp = d[7];  d[7] = d[13]; d[13] = tmp;
-            tmp = d[11]; d[11] = d[14]; d[14] = tmp;
-            return this;
-        };
-
-    })();
+    /**
+     * Transpose the matrix in place.
+     * @returns {Donkeycraft.Matrix4} this
+     */
+    Donkeycraft.Matrix4.prototype.transpose = function() {
+        var d = this._data;
+        var tmp;
+        tmp = d[1];  d[1] = d[4];  d[4] = tmp;
+        tmp = d[2];  d[2] = d[8];  d[8] = tmp;
+        tmp = d[3];  d[3] = d[12]; d[12] = tmp;
+        tmp = d[6];  d[6] = d[9];  d[9] = tmp;
+        tmp = d[7];  d[7] = d[13]; d[13] = tmp;
+        tmp = d[11]; d[11] = d[14]; d[14] = tmp;
+        return this;
+    };
 
     // ============================================================
     // Quaternion
