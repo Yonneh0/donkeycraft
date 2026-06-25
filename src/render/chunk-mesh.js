@@ -31,6 +31,9 @@
         // Destroyed flag — prevents drawing after destruction
         this._destroyed = false;
 
+        // Context lost flag — prevents rendering after context loss
+        this._contextLost = false;
+
         // Whether Uint32 indices are supported (OES_element_index_uint extension)
         this._supportsUint32Indices = false;
         if (gl) {
@@ -43,6 +46,26 @@
 
         // Track whether this mesh uses Uint32 indices
         this._geometryUsesUint32 = false;
+
+        // Listen for context loss/restore on the source canvas
+        if (gl) {
+            var self = this;
+            var srcEl = gl.canvas || (gl._dcCanvas);
+            if (srcEl && typeof srcEl.addEventListener === 'function') {
+                srcEl.addEventListener('webglcontextlost', function(e) {
+                    e.preventDefault();
+                    self._contextLost = true;
+                    self._vertexBuffer = null;
+                    self._indexBuffer = null;
+                });
+                srcEl.addEventListener('webglcontextrestored', function() {
+                    self._contextLost = false;
+                    self._vertexBuffer = null;
+                    self._indexBuffer = null;
+                    self._dirty = true;
+                });
+            }
+        }
     };
 
     /**
@@ -92,8 +115,8 @@
         var gl = this._gl;
         if (!gl || !this._indexBuffer || this._indexCount === 0) return false;
 
-        // Guard: don't draw destroyed meshes
-        if (this._destroyed) return false;
+        // Guard: don't draw destroyed or context-lost meshes
+        if (this._destroyed || this._contextLost) return false;
 
         // Upload if dirty
         if (this._dirty && this._geometry) {
@@ -121,7 +144,7 @@
         var normLoc = this._shaderManager.getAttribute('aNormal');
         var lightLoc = this._shaderManager.getAttribute('aLight');
 
-        var vertexSize = 9; // position(3) + UV(2) + normal(3) + light(1)
+        var vertexSize = 9;
 
         // Position attribute (floats, stride 9*4, offset 0)
         if (posLoc >= 0) {

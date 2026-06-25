@@ -14,12 +14,8 @@
 
     /**
      * Cull hidden faces from raw vertex data.
-     * Removes faces that are between two solid (opaque) blocks.
      * Note: Face culling is already performed during geometry build by GeometryBuilder.
-     * GeometryBuilder.isTransparent() only renders a face if the adjacent block
-     * is transparent, so all hidden faces are already excluded from the geometry.
-     * This method returns geometry unchanged as a no-op placeholder for future
-     * post-build optimization (e.g., interior face culling of large solid structures).
+     * This method returns geometry unchanged as a no-op for future post-build optimization.
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Function} isBlockSolid - Function(blockId) returning true if block is fully opaque.
      * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
@@ -31,7 +27,7 @@
 
     /**
      * Generate an optimized index buffer from unindexed vertex data.
-     * Merges identical adjacent vertices to reduce draw call overhead.
+     * Merges identical vertices to reduce draw call overhead.
      * @param {Object} geometry - Geometry with unindexed vertex data.
      * @param {number} [epsilon=0.001] - Float comparison tolerance.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
@@ -42,7 +38,6 @@
         var vertexCount = geometry.vertexCount;
         var faceDataSize = this._faceDataSize;
 
-        // Build vertex uniqueness map using numeric hashing for performance.
         // Key: position(3) + normal(3) + light(1) — UV is excluded as it varies per face.
         var vertexKeys = {};
         var uniqueVertices = [];
@@ -51,7 +46,6 @@
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            // Hash: combine floats into a string key with fixed precision
             var key = [
                 vertices[base],
                 vertices[base + 1],
@@ -108,7 +102,6 @@
 
     /**
      * Remove back-facing faces from a chunk mesh.
-     * Optimizes rendering by not sending invisible geometry to GPU.
      * Preserves the original index type (Uint16 or Uint32) from the input geometry.
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Donkeycraft.Vector3} cameraPos - Camera position for face culling.

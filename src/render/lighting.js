@@ -103,6 +103,9 @@
 
     /**
      * Apply lighting uniforms to a shader program via the shader manager.
+     * Note: The terrain shader currently uses fog-based lighting (uFogColor, uFogDensity)
+     * set by Fog.applyToFogUniforms() instead of per-light uniforms.
+     * This method is provided for potential future shader programs that use directional lighting.
      * @param {ShaderManager} shaderManager - The shader manager instance.
      */
     Donkeycraft.Lighting.prototype.applyToShader = function(shaderManager) {

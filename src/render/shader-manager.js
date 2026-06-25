@@ -95,8 +95,11 @@
             return null;
         }
 
-        // Cache uniform and attribute locations
-        this._cacheLocations(program);
+        // Validate the program before returning
+        var valid = gl.getProgramParameter(program, gl.VALIDATE_STATUS);
+        if (!valid) {
+            Donkeycraft.Logger.warn('ShaderManager', 'Program linked but failed validation:\n' + gl.getProgramInfoLog(program));
+        }
 
         this._programCount++;
         return program;
@@ -256,6 +259,10 @@
         var loc = gl.getUniformLocation(prog, name);
 
         if (loc !== null && cacheKey) {
+            // Ensure cache entry exists for this program
+            if (!this._cachedLocations[cacheKey]) {
+                this._cachedLocations[cacheKey] = { uniforms: {}, attributes: {} };
+            }
             this._cachedLocations[cacheKey].uniforms[name] = loc;
         }
 

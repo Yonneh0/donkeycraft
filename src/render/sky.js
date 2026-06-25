@@ -102,6 +102,7 @@
 
     /**
      * Render the sky dome using the sky shader program.
+     * Depth write is disabled so the sky doesn't occlude terrain.
      * @param {Camera} camera - The camera instance.
      * @param {Lighting} lighting - The lighting system instance.
      */
@@ -110,6 +111,9 @@
         if (!gl || !this._shaderManager || !this._skyDomeVertBuf) return;
 
         if (!this._shaderManager.use('sky')) return;
+
+        // Disable depth writing so sky renders behind terrain
+        gl.depthMask(false);
 
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
@@ -153,6 +157,9 @@
         gl.drawElements(gl.TRIANGLES, this._skyDomeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+
+        // Re-enable depth writing
+        gl.depthMask(true);
     };
 
     /**

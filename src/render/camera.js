@@ -7,7 +7,7 @@
     var FOV = Donkeycraft.Config.FOV; // 70 degrees
 
     /**
-     * Camera — First-person camera with position, rotation, and projection matrix, FOV.
+     * Camera — First-person camera with position, rotation, projection matrix, and FOV.
      * @param {number} [fov] - Field of view in degrees (default: 70).
      * @param {number} [near=0.1] - Near clipping plane.
      * @param {number} [far=1000] - Far clipping plane.

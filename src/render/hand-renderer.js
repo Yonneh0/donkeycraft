@@ -120,13 +120,13 @@
         // Rotation angle for slight sway
         var itemAngle = -0.3 + Math.sin(this._bobAngle * 0.3) * 0.05;
 
-        // Build model matrix: translate → scale → rotate around Y axis
+        // Build model matrix: scale → rotate → translate (screen-space overlay)
         var translateMatrix = Donkeycraft.Matrix4.createTranslation(itemX, itemY, 0);
         var scaleMatrix = Donkeycraft.Matrix4.createScale(scaleX, scaleY, 1);
         var rotMatrix = Donkeycraft.Matrix4.createRotation(itemAngle, new Donkeycraft.Vector3(0, 1, 0));
 
-        var modelMatrix = Donkeycraft.Matrix4.multiply(rotMatrix,
-            Donkeycraft.Matrix4.multiply(scaleMatrix, translateMatrix)
+        var modelMatrix = Donkeycraft.Matrix4.multiply(translateMatrix,
+            Donkeycraft.Matrix4.multiply(rotMatrix, scaleMatrix)
         );
         this._shaderManager.setMat4('uModel', modelMatrix);
 
@@ -134,7 +134,7 @@
         var itemColor = this._getItemColor(this._heldItemId);
         var vertices = new Float32Array(this._itemGeometry.vertices);
         for (var v = 0; v < 4; v++) {
-            var ci = v * 9 + 5; // Color starts at index 5 in each 9-float vertex (pos:0-2, UV:3-4, color:5-8)
+            var ci = v * 9 + 5;
             vertices[ci]     = itemColor.r;
             vertices[ci + 1] = itemColor.g;
             vertices[ci + 2] = itemColor.b;

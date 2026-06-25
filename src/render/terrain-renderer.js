@@ -4,8 +4,9 @@
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE; // 16
-    var RENDER_DISTANCE = Donkeycraft.Config.RENDER_DISTANCE; // 8
+    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    var RENDER_DISTANCE = Donkeycraft.Config.RENDER_DISTANCE;
 
     /**
      * TerrainRenderer — Manages rendering of the chunk-based terrain.
@@ -35,8 +36,12 @@
         // Render state
         this._renderDistance = RENDER_DISTANCE;
 
-        // Frustum planes (extracted from view-projection matrix each frame)
+        // Frustum planes (extracted from view-projection matrix when matrices change)
         this._frustumPlanes = null;
+        this._lastFrustumKey = null;
+
+        // Cache for chunk coordinates to avoid parsing on every render
+        this._chunkCoordsCache = {};
     };
 
     /**
@@ -139,6 +144,8 @@
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
         chunkMesh.update(geometry);
+        chunkMesh._chunkX = chunkX;
+        chunkMesh._chunkZ = chunkZ;
 
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
@@ -172,40 +179,40 @@
         );
 
         this._frustumPlanes = [
-            // Left  (column 3 + column 0, with signs)
-            this._extractPlane(vp, -1, 0, 0, 1),
-            // Right (column 3 - column 0)
-            this._extractPlane(vp, 1, 0, 0, 1),
-            // Bottom (column 3 + column 1)
-            this._extractPlane(vp, 0, -1, 0, 1),
-            // Top (column 3 - column 1)
-            this._extractPlane(vp, 0, 1, 0, 1),
-            // Near (column 3 + column 2)
-            this._extractPlane(vp, 0, 0, -1, 1),
-            // Far (column 3 - column 2)
-            this._extractPlane(vp, 0, 0, 1, 1)
+            this._extractPlane(vp, -1, 0, 0),   // Left
+            this._extractPlane(vp, 1, 0, 0),    // Right
+            this._extractPlane(vp, 0, -1, 0),   // Bottom
+            this._extractPlane(vp, 0, 1, 0),    // Top
+            this._extractPlane(vp, 0, 0, -1),   // Near
+            this._extractPlane(vp, 0, 0, 1)     // Far
         ];
     };
 
     /**
      * Extract a single frustum plane from the view-projection matrix.
-     * Uses the standard algorithm: plane = col3 ± sign(col_i) * col_i
-     * The resulting plane equation is: dot(point, normal) + dist <= 0 for inside.
+     * Uses the standard OpenGL frustum extraction algorithm:
+     * plane = col3 + sign * col_i where sign is +1 for left/bottom/near
+     * and -1 for right/top/far. The resulting plane equation is:
+     * dot(point, normal) + dist <= 0 means the point is inside (or on) the plane.
      * @private
      * @param {Float32Array} vp - View-projection matrix (column-major).
-     * @param {number} i - Column index to add/subtract (-1, 0, or 1 for left/right, top/bottom, near/far).
-     * @param {number} j - Unused (reserved for future extensions).
-     * @param {number} k - Unused (reserved for future extensions).
-     * @param {number} l - Sign indicator (+1 = add column, -1 = subtract column).
+     * @param {number} i - Non-zero for left/right planes (-1=left, 1=right).
+     * @param {number} j - Non-zero for bottom/top planes (-1=bottom, 1=top).
+     * @param {number} k - Non-zero for near/far planes (-1=near, 1=far).
      * @returns {{axis: Donkeycraft.Vector3, dist: number}}
      */
-    Donkeycraft.TerrainRenderer.prototype._extractPlane = function(vp, i, j, k, l) {
-        // Column-major indexing: vp[row + col*4]
-        // Extract plane coefficients (ex, ey, ez, ew) from VP matrix columns
-        var px = vp[3] - (i >= 0 ? vp[0] : -vp[0]);
-        var py = vp[7] - (j >= 0 ? vp[4] : -vp[4]);
-        var pz = vp[11] - (k >= 0 ? vp[8] : -vp[8]);
-        var pw = vp[15] - (l >= 0 ? vp[12] : -vp[12]);
+    Donkeycraft.TerrainRenderer.prototype._extractPlane = function(vp, i, j, k) {
+        // Determine which matrix column to extract (0=left/right, 1=top/bottom, 2=near/far)
+        var col, sign;
+        if (i !== 0) { col = 0; sign = i < 0 ? 1 : -1; }
+        else if (j !== 0) { col = 1; sign = j < 0 ? 1 : -1; }
+        else { col = 2; sign = k < 0 ? 1 : -1; }
+
+        // Column-major: column `col` elements are at indices col, col+4, col+8, col+12
+        var px = vp[3] + sign * vp[col];
+        var py = vp[7] + sign * vp[col + 4];
+        var pz = vp[11] + sign * vp[col + 8];
+        var pw = vp[15] + sign * vp[col + 12];
 
         var length = Math.sqrt(px * px + py * py + pz * pz);
         if (length > 0.0001) {
@@ -215,7 +222,6 @@
             };
         }
 
-        // Fallback: infinite plane facing away from camera
         return { axis: new Donkeycraft.Vector3(0, 0, -1), dist: 0 };
     };
 
@@ -229,7 +235,7 @@
     Donkeycraft.TerrainRenderer.prototype._isBoxInFrustum = function(
         minX, minY, minZ, maxX, maxY, maxZ
     ) {
-        if (!this._frustumPlanes) return true; // No frustum = visible
+        if (!this._frustumPlanes) return true;
 
         var corners = [
             minX, minY, minZ,  maxX, minY, minZ,
@@ -238,35 +244,40 @@
             minX, maxY, maxZ,  maxX, maxY, maxZ
         ];
 
-        for (var i = 0; i < this._frustumPlanes.length; i++) {
-            var plane = this._frustumPlanes[i];
+        for (var p = 0; p < this._frustumPlanes.length; p++) {
+            var plane = this._frustumPlanes[p];
             var allBehind = true;
-            for (var j = 0; j < 8; j += 2) {
-                var dot = corners[j] * plane.axis.x +
-                          corners[j+1] * plane.axis.y +
-                          corners[j+2] * plane.axis.z + plane.dist;
-                if (dot > 0) allBehind = false;
+            for (var c = 0; c < 8; c++) {
+                var base = c * 3;
+                var dot = corners[base] * plane.axis.x +
+                          corners[base + 1] * plane.axis.y +
+                          corners[base + 2] * plane.axis.z + plane.dist;
+                if (dot > 0) {
+                    allBehind = false;
+                    break;
+                }
             }
-            if (allBehind) return false; // Entire box is outside this plane
+            if (allBehind) return false;
         }
         return true;
     };
 
     /**
-     * Get projection matrix data as Float32Array.
+     * Check if frustum planes need recomputation.
+     * Returns a cache key based on current view+projection matrix data,
+     * or null if matrices are uninitialized.
      * @private
+     * @returns {string|null}
      */
-    Donkeycraft.TerrainRenderer.prototype._getProjectionData = function() {
-        // Will be set from camera each render call
-        return this._cachedProjData || new Float32Array(16);
-    };
+    Donkeycraft.TerrainRenderer.prototype._getFrustumCacheKey = function() {
+        var projData = this._cachedProjData;
+        var viewData = this._cachedViewData;
+        if (!projData || !viewData) return null;
 
-    /**
-     * Get view matrix data as Float32Array.
-     * @private
-     */
-    Donkeycraft.TerrainRenderer.prototype._getViewData = function() {
-        return this._cachedViewData || new Float32Array(16);
+        // Build a simple hash from matrix values for comparison
+        var key = 'p' + projData[0] + projData[5] + projData[10] + projData[15] +
+                  'v' + viewData[0] + viewData[5] + viewData[10] + viewData[15];
+        return key;
     };
 
     /**
@@ -304,8 +315,12 @@
         this._cachedProjData = matrices.projection.getData();
         this._cachedViewData = matrices.view.getData();
 
-        // Extract frustum planes for culling
-        this._extractFrustumPlanes();
+        // Extract frustum planes only when matrices change
+        var cacheKey = this._getFrustumCacheKey();
+        if (cacheKey !== this._lastFrustumKey) {
+            this._extractFrustumPlanes();
+            this._lastFrustumKey = cacheKey;
+        }
 
         // Set model matrix (identity for world-space rendering)
         var identity = Donkeycraft.Matrix4.createIdentity();
@@ -326,14 +341,13 @@
         }
 
         // Draw each chunk, skipping those outside the frustum
-        var cs = CHUNK_SIZE; // block units per chunk
+        var cs = CHUNK_SIZE;
         for (var key in this._chunks) {
             if (!this._chunks.hasOwnProperty(key)) continue;
 
-            // Parse chunk coordinates from key "cx,cz"
-            var parts = key.split(',');
-            var cx = parseInt(parts[0], 10);
-            var cz = parseInt(parts[1], 10);
+            var chunkMesh = this._chunks[key];
+            var cx = chunkMesh._chunkX;
+            var cz = chunkMesh._chunkZ;
 
             // AABB of chunk in world space (block coordinates)
             var chunkMinX = cx * cs, chunkMaxX = (cx + 1) * cs;
@@ -346,7 +360,7 @@
                 continue;
             }
 
-            this._drawChunk(this._chunks[key]);
+            this._drawChunk(chunkMesh);
         }
     };
 

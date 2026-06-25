@@ -158,15 +158,17 @@
      * @returns {{u0: number, v0: number, u1: number, v1: number}} UV range.
      */
     Donkeycraft.GeometryBuilder.prototype._getBlockUV = function(blockId, faceName) {
-        // For Phase 2, use a simple placeholder UV mapping
-        // In Phase 3, this will reference the texture atlas
-        // Default: full atlas (0-1 UV range) for all blocks
-        var atlasSize = 16; // 16x16 texture atlas tiles
+        // For Phase 2, use a simple placeholder UV mapping.
+        // In Phase 3, this will reference the texture atlas.
+        var atlasSize = 16;
         var tileU = blockId % atlasSize;
         var tileV = Math.floor(blockId / atlasSize);
 
+        // Clamp tileV to atlas bounds to prevent UV overflow for blockId >= 256
+        if (tileV >= atlasSize) tileV = atlasSize - 1;
+
         var tileU0 = tileU / atlasSize;
-        var tileV0 = 1.0 - (tileV + 1) / atlasSize; // flip vertically
+        var tileV0 = 1.0 - (tileV + 1) / atlasSize;
         var tileU1 = (tileU + 1) / atlasSize;
         var tileV1 = 1.0 - tileV / atlasSize;
 

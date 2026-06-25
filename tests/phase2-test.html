@@ -226,60 +226,8 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // ============================================================
 
     function createTerrainShaderProgram() {
-        // Matches src/render/shaders/vertex-shaders.glsl TERRAIN_VERTEX_SHADER
-        // and src/render/shaders/fragment-shaders.glsl TERRAIN_FRAGMENT_SHADER
-        var vertSrc = [
-            'attribute vec3 aPosition;',
-            'attribute vec2 aUV;',
-            'attribute vec3 aNormal;',
-            'attribute float aLight;',
-            'uniform mat4 uProjection;',
-            'uniform mat4 uView;',
-            'uniform mat4 uModel;',
-            'uniform float uSunIntensity;',
-            'uniform float uAmbient;',
-            'uniform vec3 uSkyColor;',
-            'uniform vec3 uSunDirection;',
-            'varying vec2 vUV;',
-            'varying vec3 vNormal;',
-            'varying float vLight;',
-            'varying float vDepth;',
-            'void main() {',
-            '    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);',
-            '    vUV = aUV;',
-            '    vNormal = mat3(uModel) * aNormal;',
-            '    vNormal = normalize(vNormal);',
-            '    float sunDot = max(dot(normalize(uSunDirection), vNormal), 0.0);',
-            '    vLight = uAmbient + aLight * uSunIntensity * sunDot;',
-            '    // Use sky color to prevent WebGL stripping',
-            '    vLight += length(uSkyColor) * 0.01;',
-            '    vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);',
-            '    vDepth = -viewPos.z;',
-            '}'
-        ].join('\n');
-
-        var fragSrc = [
-            'precision mediump float;',
-            'varying vec2 vUV;',
-            'varying vec3 vNormal;',
-            'varying float vLight;',
-            'varying float vDepth;',
-            'uniform sampler2D uTexture;',
-            'uniform vec3 uFogColor;',
-            'uniform float uFogDensity;',
-            'void main() {',
-            '    vec4 texColor = texture2D(uTexture, vUV);',
-            '    vec3 finalColor = texColor.rgb * vLight;',
-            '    if (texColor.a < 0.5) discard;',
-            '    float fogDist = vDepth;',
-            '    float fogFactor = 1.0 - exp(-fogDist * uFogDensity);',
-            '    fogFactor = clamp(fogFactor, 0.0, 1.0);',
-            '    finalColor = mix(finalColor, uFogColor, fogFactor);',
-            '    gl_FragColor = vec4(finalColor, texColor.a);',
-            '}'
-        ].join('\n');
-
-        return shaderMgr.createProgram('terrain', vertSrc, fragSrc);
+        // Use the actual terrain shader definitions from our GLSL files
+        return shaderMgr.createProgram('terrain', TERRAIN_VERTEX_SHADER, TERRAIN_FRAGMENT_SHADER);
     }
 
     function createGuiShaderProgram() {

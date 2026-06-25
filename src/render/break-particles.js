@@ -34,14 +34,12 @@
 
         // Persistent vertex buffer (avoids per-frame WebGL allocation)
         this._vertexBuffer = null;
-
-        // Context lost flag — prevents rendering after context loss
         this._contextLost = false;
 
         // Register context loss/restore listeners on the source canvas.
         if (gl) {
             var self = this;
-            var srcEl = gl.canvas || (gl._dcCanvas);
+            var srcEl = gl.canvas || gl._dcCanvas;
             if (srcEl && typeof srcEl.addEventListener === 'function') {
                 srcEl.addEventListener('webglcontextlost', function(e) {
                     e.preventDefault();
@@ -71,7 +69,7 @@
             var vz = (Math.random() - 0.5) * 2;
 
             var color = this._getBlockParticleColor(blockId);
-            var lifetime = 0.5 + Math.random() * 0.5; // 0.5 to 1.0 seconds
+            var lifetime = 0.5 + Math.random() * 0.5;
 
             this._particles.push(new BreakParticle(
                 x + (Math.random() - 0.5) * 0.5,
@@ -139,7 +137,6 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager || this._particles.length === 0) return;
 
-        // Skip rendering if context was lost
         if (this._contextLost) return;
 
         // Use GUI shader (particles share attributes: aPosition, aUV, aColor)
@@ -150,19 +147,16 @@
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
 
-        // Get camera right and up vectors for billboard orientation
         var right = camera.getRight();
         var up = camera.getUp();
 
-        // Build particle vertex data with billboard quads
         var vertices = [];
-        var particleSize = 0.1; // Each particle is a small quad
+        var particleSize = 0.1;
 
         for (var i = 0; i < this._particles.length; i++) {
             var p = this._particles[i];
-            var alpha = p.lifetime / p.maxLifetime; // Fade out
+            var alpha = p.lifetime / p.maxLifetime;
 
-            // Billboard: offset from center by right and up vectors
             var halfSize = particleSize;
             var cx = p.x, cy = p.y, cz = p.z;
             var rx = right.x * halfSize, ry = right.y * halfSize, rz = right.z * halfSize;

@@ -16,8 +16,8 @@
 
         // Crosshair geometry (center screen marker)
         this._crosshairGeometry = null;
-        this._crosshairVertBuf = null;  // Persistent vertex buffer
-        this._crosshairIndexBuf = null; // Index buffer
+        this._crosshairVertBuf = null;
+        this._crosshairIndexBuf = null;
 
         // Hotbar geometry
         this._hotbarGeometry = null;
