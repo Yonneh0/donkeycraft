@@ -35,9 +35,8 @@
          * @private
          */
         function _getBlockLightOpacity(blockId) {
-            if (!Donkeycraft.Block.getBlock(blockId)) return 0; // Air = no opacity
-
-            var block = Donkeycraft.Block.getBlock(blockId);
+            var block = Donkeycraft.BlockRegistry.getBlockById(blockId);
+            if (!block) return 0; // Air = no opacity
 
             // Direct light opacity property if available
             if (block.lightOpacity !== undefined) {
@@ -45,10 +44,10 @@
             }
 
             // Default opacity based on block type
-            if (Donkeycraft.Block.isTransparent(blockId)) return 1;
-            if (Donkeycraft.Block.isSolid(blockId)) return 15;
-            if (Donkeycraft.Block.isLiquid(blockId)) return 0;
-            if (Donkeycraft.Block.isReplaceable(blockId)) return 0;
+            if (Donkeycraft.BlockRegistry.isTransparent(blockId)) return 1;
+            if (Donkeycraft.BlockRegistry.isSolid(blockId)) return 15;
+            if (Donkeycraft.BlockRegistry.isLiquid(blockId)) return 0;
+            if (Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
 
             return 2; // Default
         }
@@ -132,9 +131,9 @@
          * @private
          */
         function _getLightEmission(blockId) {
-            var block = Donkeycraft.Block.getBlock(blockId);
-            if (!block || block.lightEmission === undefined) return 0;
-            return Math.min(block.lightEmission, 15);
+            var block = Donkeycraft.BlockRegistry.getBlockById(blockId);
+            if (!block || block.lightLevel === undefined) return 0;
+            return Math.min(block.lightLevel, 15);
         }
 
         /**

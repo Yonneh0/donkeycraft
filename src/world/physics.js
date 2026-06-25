@@ -23,15 +23,17 @@
 
         // Initialize gravity and liquid block sets from Block registry
         function init() {
+            // Hardcoded gravity-affected blocks (Minecraft behavior)
+            var gravityBlockIds = [12, 9]; // sand, gravel
+
             for (var id = 0; id < 256; id++) {
-                var block = Donkeycraft.Block.getBlock(id);
-                if (block) {
-                    if (block.isGravityAffected) {
-                        _gravityBlocks[id] = true;
-                    }
-                    if (Donkeycraft.Block.isLiquid(id)) {
-                        _liquidBlocks[id] = true;
-                    }
+                // Check gravity-affected
+                if (gravityBlockIds.indexOf(id) !== -1) {
+                    _gravityBlocks[id] = true;
+                }
+                // Check liquid via BlockRegistry
+                if (Donkeycraft.BlockRegistry.isLiquid(id)) {
+                    _liquidBlocks[id] = true;
                 }
             }
         }
