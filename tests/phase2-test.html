@@ -4,82 +4,34 @@
 <meta charset="UTF-8">
 <title>Donkeycraft — Phase 2 WebGL Rendering Test</title>
 <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-        background: #1a1a1a;
-        color: #ccc;
-        font-family: 'Consolas', 'Monaco', monospace;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        overflow: hidden;
-    }
-    #canvas-container {
-        flex: 1;
-        position: relative;
-        min-height: 200px;
-    }
-    canvas {
-        display: block;
-        width: 100%;
-        height: 100%;
-    }
-    #output-container {
-        height: 35vh;
-        min-height: 200px;
-        background: #0a0a0a;
-        border-top: 2px solid #444;
-        display: flex;
-        flex-direction: column;
-    }
-    #output-header {
-        padding: 8px 12px;
-        background: #222;
-        font-weight: bold;
-        font-size: 13px;
-        color: #fff;
-        border-bottom: 1px solid #444;
-    }
-    #output {
-        flex: 1;
-        overflow-y: auto;
-        padding: 10px 12px;
-        font-size: 12px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        color: #ccc;
-        user-select: text;
-        -webkit-user-select: text;
-        -moz-user-select: text;
-    }
-    .pass { color: #0f0; font-weight: bold; }
-    .fail { color: #f44; font-weight: bold; }
-    .info { color: #ff0; }
-    #summary {
-        margin-top: 10px;
-        padding: 8px;
-        background: #1a1a2e;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    /* Scrollbar styling */
-    #output::-webkit-scrollbar { width: 8px; }
-    #output::-webkit-scrollbar-track { background: #111; }
-    #output::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-    #output::-webkit-scrollbar-thumb:hover { background: #777; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
+.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
+.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
+.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
+.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
+.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
+.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
+.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
+.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
+.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
+#canvas-container { margin: 16px 0; padding: 12px; background: #0a0a0a; border-radius: 6px; text-align: center; }
+canvas { border: 1px solid #333; max-width: 100%; }
 </style>
 </head>
 <body>
+<h1>Donkeycraft — Phase 2 WebGL Rendering Test</h1>
+<div class="subtitle">Testing: GLContext, ShaderManager, GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer, BreakParticles, GUIRenderer</div>
+<div id="results"></div>
+
 <div id="canvas-container">
-    <canvas id="canvas"></canvas>
-</div>
-<div id="output-container">
-    <div id="output-header">📋 Test Results</div>
-    <div id="output">Loading Phase 2 modules...</div>
+    <canvas id="canvas" width="800" height="400"></canvas>
 </div>
 
-<!-- Phase 1 Core (required dependencies) -->
+<!-- Phase 1 Core -->
 <script src="../src/core/namespace.js"></script>
 <script src="../src/core/eventbus.js"></script>
 <script src="../src/core/config.js"></script>
@@ -110,35 +62,142 @@
 (function() {
     'use strict';
 
-    var output = document.getElementById('output');
-    var results = [];
-    var testCount = 0;
-    var passCount = 0;
-    var failCount = 0;
+    var results = document.getElementById('results');
+    var totalTests = 0;
+    var passedTests = 0;
+    var failedTests = 0;
+    var currentSection = null;
 
-    function log(msg, cls) {
-        output.innerHTML += '<span class="' + (cls || '') + '">' + msg + '</span>\n';
+    // ============================================================
+    // Test Framework (uniform across all tests)
+    // ============================================================
+
+    function section(name) {
+        var div = document.createElement('div');
+        div.className = 'section';
+        var heading = document.createElement('h2');
+        heading.textContent = name;
+        div.appendChild(heading);
+        results.appendChild(div);
+        currentSection = div;
     }
 
-    function assert(condition, testName) {
-        testCount++;
+    function assert(condition, message) {
+        totalTests++;
+        var div = document.createElement('div');
         if (condition) {
-            passCount++;
-            log('[PASS] ' + testName, 'pass');
+            passedTests++;
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
         } else {
-            failCount++;
-            log('[FAIL] ' + testName, 'fail');
+            failedTests++;
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
+        }
+        currentSection.appendChild(div);
+    }
+
+    function assertEq(actual, expected, message) {
+        totalTests++;
+        if (actual === expected) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
+            currentSection.appendChild(div);
         }
     }
 
+    function assertNear(actual, expected, epsilon, message) {
+        totalTests++;
+        if (Math.abs(actual - expected) < epsilon) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
+            currentSection.appendChild(div);
+        }
+    }
+
+    function assertType(val, type, message) {
+        totalTests++;
+        if (typeof val === type) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
+            currentSection.appendChild(div);
+        }
+    }
+
+    function assertArrEq(actual, expected, message) {
+        totalTests++;
+        if (actual.length !== expected.length) {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
+            currentSection.appendChild(div);
+            return;
+        }
+        for (var i = 0; i < actual.length; i++) {
+            if (actual[i] !== expected[i]) {
+                failedTests++;
+                var div3 = document.createElement('div');
+                div3.className = 'test fail';
+                div3.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
+                currentSection.appendChild(div3);
+                return;
+            }
+        }
+        passedTests++;
+        var div2 = document.createElement('div');
+        div2.className = 'test pass';
+        div2.textContent = '\u2713 PASS: ' + message;
+        currentSection.appendChild(div2);
+    }
+
     function info(msg) {
-        log('>> ' + msg, 'info');
+        var div = document.createElement('div');
+        div.className = 'info-msg';
+        div.textContent = '>> ' + msg;
+        currentSection.appendChild(div);
+    }
+
+    function finishTests() {
+        var summary = document.createElement('div');
+        if (failedTests === 0) {
+            summary.className = 'summary pass';
+            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
+        } else {
+            summary.className = 'summary fail';
+            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
+        }
+        results.appendChild(summary);
     }
 
     // ============================================================
     // TEST 1: Namespace and class registration
     // ============================================================
-    info('Testing namespace and class registration...');
+    section('1. Namespace & Class Registration');
 
     assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
     assert(typeof Donkeycraft.GLContext === 'function', 'Donkeycraft.GLContext registered');
@@ -158,7 +217,7 @@
     // ============================================================
     // TEST 2: GLContext — WebGL context creation
     // ============================================================
-    info('Testing GLContext...');
+    section('2. GLContext (gl-context.js)');
 
     var canvas = document.getElementById('canvas');
     var glCtx = new Donkeycraft.GLContext(canvas);
@@ -168,7 +227,6 @@
     var gl = glCtx.getGL();
     assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
 
-    // Test capability queries
     assert(typeof glCtx.getMaxTextureSize() === 'number', 'getMaxTextureSize returns number');
     assert(typeof glCtx.getMaxVertexUniforms() === 'number', 'getMaxVertexUniforms returns number');
     assert(typeof glCtx.isExtensionSupported() === 'boolean', 'isExtensionSupported returns boolean');
@@ -176,12 +234,11 @@
     // ============================================================
     // TEST 3: ShaderManager — shader compilation and program creation
     // ============================================================
-    info('Testing ShaderManager...');
+    section('3. ShaderManager (shader-manager.js)');
 
     var shaderMgr = new Donkeycraft.ShaderManager(gl);
     assert(shaderMgr !== null, 'ShaderManager instance created');
 
-    // Test simple vertex/fragment shader compilation
     var vertSrc = [
         'attribute vec3 aPosition;',
         'void main() { gl_Position = vec4(aPosition, 1.0); }'
@@ -195,7 +252,6 @@
     var progId = shaderMgr.createProgram('test-simple', vertSrc, fragSrc);
     assert(progId !== null && progId !== undefined, 'Shader program created successfully');
 
-    // Test attribute/location caching (need to use program first)
     shaderMgr.use('test-simple');
     var attrLoc = shaderMgr.getAttribute('aPosition');
     assert(typeof attrLoc === 'number' && attrLoc >= 0, 'Attribute location retrieved');
@@ -203,16 +259,14 @@
     // ============================================================
     // TEST 4: GeometryBuilder — quad and cube generation
     // ============================================================
-    info('Testing GeometryBuilder...');
+    section('4. GeometryBuilder (geometry-builder.js)');
 
     var geoBuilder = new Donkeycraft.GeometryBuilder();
     assert(geoBuilder !== null, 'GeometryBuilder instance created');
 
-    // Test isTransparent
     assert(geoBuilder.isTransparent(0) === true, 'Air block (ID 0) is transparent');
     assert(geoBuilder.isTransparent(1) === false, 'Stone block (ID 1) is not transparent');
 
-    // Test buildQuad
     var quad = geoBuilder.buildQuad(2.0, 0.0);
     assert(quad !== null, 'Quad geometry generated');
     assert(quad.vertexCount === 4, 'Quad has 4 vertices');
@@ -220,20 +274,18 @@
     assert(quad.vertices instanceof Float32Array, 'Quad vertices are Float32Array');
     assert(quad.indices instanceof Uint16Array, 'Quad indices are Uint16Array');
 
-    // Test buildCube
     var cube = geoBuilder.buildCube(1.0, 0.0);
     assert(cube !== null, 'Cube geometry generated');
     assert(cube.vertexCount === 24, 'Cube has 24 vertices');
     assert(cube.indexCount === 36, 'Cube has 36 indices');
 
-    // Test buildChunk with a simple world function
     var testWorldData = {};
     function makeTestBlockFunc() {
         return function(x, y, z) {
-            if (y < 10) return 1; // stone below y=10
-            if (y === 10) return 2; // grass at y=10
-            if (y > 10 && y <= 15) return 3; // dirt above
-            return 0; // air
+            if (y < 10) return 1;
+            if (y === 10) return 2;
+            if (y > 10 && y <= 15) return 3;
+            return 0;
         };
     }
 
@@ -245,12 +297,11 @@
     // ============================================================
     // TEST 5: MeshOptimizer — face culling and index generation
     // ============================================================
-    info('Testing MeshOptimizer...');
+    section('5. MeshOptimizer (mesh-optimizer.js)');
 
     var meshOpt = new Donkeycraft.MeshOptimizer();
     assert(meshOpt !== null, 'MeshOptimizer instance created');
 
-    // Test optimize on quad (should preserve it)
     var optimized = meshOpt.optimize(quad, null, null);
     assert(optimized !== null, 'Quad optimization completed');
     assert(optimized.vertexCount > 0, 'Optimized quad has vertices');
@@ -258,28 +309,24 @@
     // ============================================================
     // TEST 6: Camera — position, rotation, matrices
     // ============================================================
-    info('Testing Camera...');
+    section('6. Camera (camera.js)');
 
     var camera = new Donkeycraft.Camera(70, 0.1, 1000);
     assert(camera !== null, 'Camera instance created');
 
-    // Test position
     var pos = camera.getPosition();
     assert(pos instanceof Donkeycraft.Vector3, 'Camera position is Vector3');
     assert(Math.abs(pos.x - 0) < 0.01, 'Camera X starts at 0');
     assert(Math.abs(pos.y - 64) < 0.01, 'Camera Y starts at 64');
     assert(Math.abs(pos.z - 0) < 0.01, 'Camera Z starts at 0');
 
-    // Test rotation
     camera.setRotation(0, 0);
     assert(Math.abs(camera.getYaw()) < 0.01, 'Yaw is 0');
     assert(Math.abs(camera.getPitch()) < 0.01, 'Pitch is 0');
 
-    // Test applyMouseDelta
     camera.applyMouseDelta(10, 5, 0.1);
     assert(Math.abs(camera.getYaw() - (-1.0)) < 0.01, 'Yaw updated by mouse delta');
 
-    // Test direction vectors
     camera.setRotation(0, 0);
     var forward = camera.getForward();
     assert(forward instanceof Donkeycraft.Vector3, 'Forward is Vector3');
@@ -290,12 +337,10 @@
     assert(Math.abs(right.x - 1) < 0.01, 'Right X is ~1 at yaw=0');
     assert(Math.abs(right.z) < 0.01, 'Right Z is ~0 at yaw=0');
 
-    // Test matrices
     var matrices = camera.getMatrices();
     assert(matrices.projection instanceof Donkeycraft.Matrix4, 'Projection matrix is Matrix4');
     assert(matrices.view instanceof Donkeycraft.Matrix4, 'View matrix is Matrix4');
 
-    // Test movement
     camera.setPosition(10, 20, 30);
     pos = camera.getPosition();
     assert(Math.abs(pos.x - 10) < 0.01, 'Position X set to 10');
@@ -310,14 +355,13 @@
     pos = camera.getPosition();
     assert(Math.abs(pos.x - 13) < 0.01, 'moveRight moves X by +3 (10+3=13)');
 
-    // Test aspect ratio
     camera.setAspect(4/3);
     assert(Math.abs(camera.getAspect() - 4/3) < 0.01, 'Aspect ratio set correctly');
 
     // ============================================================
     // TEST 7: Fog — density, color, enable/disable
     // ============================================================
-    info('Testing Fog...');
+    section('7. Fog (fog.js)');
 
     var fog = new Donkeycraft.Fog();
     assert(fog !== null, 'Fog instance created');
@@ -343,13 +387,12 @@
     // ============================================================
     // TEST 8: Lighting — sun intensity, ambient, sky color
     // ============================================================
-    info('Testing Lighting...');
+    section('8. Lighting (lighting.js)');
 
     var lighting = new Donkeycraft.Lighting();
     assert(lighting !== null, 'Lighting instance created');
 
-    // Test time of day
-    lighting.setTimeOfDay(0.5); // noon
+    lighting.setTimeOfDay(0.5);
     assert(Math.abs(lighting.getTimeOfDay() - 0.5) < 0.01, 'Time of day set to 0.5');
 
     var sunIntensity = lighting.getSunIntensity();
@@ -361,7 +404,6 @@
     var skyColor = lighting.getSkyColor();
     assert(skyColor.r > 0 && skyColor.g > 0 && skyColor.b > 0, 'Sky color has positive components at noon');
 
-    // Test midnight
     lighting.setTimeOfDay(0.0);
     sunIntensity = lighting.getSunIntensity();
     assert(sunIntensity < 0.1, 'Sun intensity low at midnight (got ' + sunIntensity.toFixed(3) + ')');
@@ -369,15 +411,14 @@
     ambient = lighting.getAmbientLight();
     assert(ambient < 0.2, 'Ambient light low at midnight (got ' + ambient.toFixed(3) + ')');
 
-    // Test sunrise/sunset transitions
     lighting.setTimeOfDay(0.25);
     skyColor = lighting.getSkyColor();
-    assert(skyColor.r > 0.4 && skyColor.g > 0.25, 'Sunrise sky color has warm tones (r=' + skyColor.r.toFixed(3) + ', g=' + skyColor.g.toFixed(3) + ')');
+    assert(skyColor.r > 0.4 && skyColor.g > 0.25, 'Sunrise sky color has warm tones');
 
     // ============================================================
     // TEST 9: Sky — time of day, stars/sun visibility
     // ============================================================
-    info('Testing Sky...');
+    section('9. Sky (sky.js)');
 
     var sky = new Donkeycraft.Sky(gl, shaderMgr);
     assert(sky !== null, 'Sky instance created');
@@ -388,21 +429,21 @@
 
     sky.setStarsVisible(false);
     sky.setSunMoonVisible(false);
-    // No exceptions = pass
+    assert(true, 'setStarsVisible/setSunMoonVisible execute without error');
 
     // ============================================================
     // TEST 10: BreakParticles — spawn, update, count
     // ============================================================
-    info('Testing BreakParticles...');
+    section('10. BreakParticles (break-particles.js)');
 
     var particles = new Donkeycraft.BreakParticles(gl, shaderMgr);
     assert(particles !== null, 'BreakParticles instance created');
     assert(particles.getCount() === 0, 'No particles initially');
 
-    particles.spawn(5, 10, 5, 1); // break stone at (5,10,5)
+    particles.spawn(5, 10, 5, 1);
     assert(particles.getCount() === 8, '8 particles spawned for block break');
 
-    particles.update(0.5, -15.0); // tick 0.5 seconds
+    particles.update(0.5, -15.0);
     assert(particles.getCount() > 0, 'Particles still alive after 0.5s tick');
 
     particles.clear();
@@ -411,7 +452,7 @@
     // ============================================================
     // TEST 11: ChunkMesh — buffer management
     // ============================================================
-    info('Testing ChunkMesh...');
+    section('11. ChunkMesh (chunk-mesh.js)');
 
     var chunkMesh = new Donkeycraft.ChunkMesh(gl, shaderMgr);
     assert(chunkMesh !== null, 'ChunkMesh instance created');
@@ -429,7 +470,7 @@
     // ============================================================
     // TEST 12: TerrainRenderer — world data and render distance
     // ============================================================
-    info('Testing TerrainRenderer...');
+    section('12. TerrainRenderer (terrain-renderer.js)');
 
     var terrain = new Donkeycraft.TerrainRenderer(gl, shaderMgr, fog);
     assert(terrain !== null, 'TerrainRenderer instance created');
@@ -438,45 +479,43 @@
     terrain.setRenderDistance(4);
     assert(terrain.getRenderDistance() === 4, 'Render distance updated to 4');
 
-    // Set world data (simple flat world)
     terrain.setWorldData(function(x, y, z) {
-        if (y < 64) return 1; // stone
-        if (y === 64) return 2; // grass
-        return 0; // air
+        if (y < 64) return 1;
+        if (y === 64) return 2;
+        return 0;
     });
     assert(terrain._getBlockFunc !== null, 'World data set');
 
     // ============================================================
     // TEST 13: HandRenderer — held item
     // ============================================================
-    info('Testing HandRenderer...');
+    section('13. HandRenderer (hand-renderer.js)');
 
     var hand = new Donkeycraft.HandRenderer(gl, shaderMgr);
     assert(hand !== null, 'HandRenderer instance created');
     assert(hand.getHeldItem() === 1, 'Default held item is stone (ID 1)');
 
-    hand.setHeldItem(4); // gold
+    hand.setHeldItem(4);
     assert(hand.getHeldItem() === 4, 'Held item set to gold (ID 4)');
 
-    hand.setBobAngle(1.57); // PI/2
-    // No exceptions = pass
+    hand.setBobAngle(1.57);
+    assert(true, 'setBobAngle executes without error');
 
     // ============================================================
     // TEST 14: GUIRenderer — crosshair and hotbar
     // ============================================================
-    info('Testing GUIRenderer...');
+    section('14. GUIRenderer (gui-renderer.js)');
 
     var gui = new Donkeycraft.GUIRenderer(gl, shaderMgr);
     assert(gui !== null, 'GUIRenderer instance created');
 
-    // Test renderAll with defaults (no exceptions)
     gui.renderAll({ selectedSlot: 0 }, 800, 600);
     assert(true, 'renderAll completed without error');
 
     // ============================================================
     // TEST 15: ShaderManager — uniform setting methods
     // ============================================================
-    info('Testing ShaderManager uniform methods...');
+    section('15. ShaderManager — Uniform Methods');
 
     shaderMgr.use('test-simple');
     shaderMgr.setFloat('uTest', 0.5);
@@ -500,23 +539,20 @@
     // ============================================================
     // TEST 16: WebGL — render a simple colored quad
     // ============================================================
-    info('Testing WebGL rendering...');
+    section('16. WebGL — Render Quad Visual Test');
 
-    // Use the test shader we created earlier
-    gl.viewport(0, 0, canvas.width || 800, canvas.height || 600);
+    gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
     gl.clearColor(0.1, 0.1, 0.2, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST);
 
-    // Use the simple test shader (renders red)
     shaderMgr.use('test-simple');
 
-    // Upload quad vertex data directly
     var testQuadVerts = new Float32Array([
-        -0.5, -0.5, 0,   // bottom-left
-         0.5, -0.5, 0,   // bottom-right
-         0.5,  0.5, 0,   // top-right
-        -0.5,  0.5, 0    // top-left
+        -0.5, -0.5, 0,
+         0.5, -0.5, 0,
+         0.5,  0.5, 0,
+        -0.5,  0.5, 0
     ]);
 
     var buf = gl.createBuffer();
@@ -534,14 +570,13 @@
     if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
     gl.deleteBuffer(buf);
 
-    // Check for WebGL errors
     var err = gl.getError();
     assert(err === gl.NO_ERROR, 'No WebGL errors after rendering quad');
 
     // ============================================================
     // TEST 17: Camera — target calculation
     // ============================================================
-    info('Testing Camera target...');
+    section('17. Camera — Target Calculation');
 
     camera.setPosition(0, 64, 0);
     camera.setRotation(0, 0);
@@ -554,9 +589,9 @@
     // ============================================================
     // TEST 18: Lighting — sun direction
     // ============================================================
-    info('Testing Lighting sun direction...');
+    section('18. Lighting — Sun Direction');
 
-    lighting.setTimeOfDay(0.5); // noon
+    lighting.setTimeOfDay(0.5);
     var sunDir = lighting.getSunDirection();
     assert(sunDir instanceof Donkeycraft.Vector3, 'Sun direction is Vector3');
     var sunLen = sunDir.length();
@@ -565,7 +600,7 @@
     // ============================================================
     // TEST 19: GeometryBuilder — UV mapping
     // ============================================================
-    info('Testing GeometryBuilder UV mapping...');
+    section('19. GeometryBuilder — UV Mapping');
 
     var uv = geoBuilder._getBlockUV(1, 'top');
     assert(uv !== null, 'UV coordinates returned for block ID 1');
@@ -575,7 +610,7 @@
     // ============================================================
     // TEST 20: Fog — apply to shader
     // ============================================================
-    info('Testing Fog shader application...');
+    section('20. Fog — Shader Application');
 
     fog.setEnabled(true);
     fog.setColor(0.5, 0.6, 0.7);
@@ -583,21 +618,7 @@
     fog.applyToFogUniforms(shaderMgr);
     assert(true, 'Fog uniforms applied to shader without error');
 
-    // ============================================================
-    // Summary
-    // ============================================================
-    log('\n========================================\n');
-    log('PHASE 2 TEST SUMMARY\n');
-    log('Total:  ' + testCount + '\n');
-    log('Passed: ' + passCount + ' ', 'pass');
-    log('Failed: ' + failCount + ' ', failCount > 0 ? 'fail' : '');
-    log('\n========================================\n');
-
-    if (failCount === 0) {
-        log('\nAll Phase 2 tests PASSED!', 'pass');
-    } else {
-        log('\n' + failCount + ' test(s) FAILED. Review output above.', 'fail');
-    }
+    finishTests();
 
 })();
 </script>

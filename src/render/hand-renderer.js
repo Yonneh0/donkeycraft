@@ -23,6 +23,9 @@
         this._bobAngle = 0;
 
         this._buildItemGeometry();
+
+        // Initialize buffers immediately
+        this._initBuffers();
     };
 
     /**

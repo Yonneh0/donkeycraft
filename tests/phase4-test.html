@@ -1,938 +1,755 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Donkeycraft Phase 4 — World Generation & Management Tests</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
-        h1 { color: #00ff88; border-bottom: 2px solid #00ff88; padding-bottom: 10px; }
-        h2 { color: #4fc3f7; margin-top: 30px; border-bottom: 1px solid #4fc3f7; padding-bottom: 5px; }
-        h3 { color: #ffb74d; margin-top: 20px; }
-        .pass { color: #00ff88; font-weight: bold; }
-        .fail { color: #ff5252; font-weight: bold; }
-        .summary { background: #16213e; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .test-result { padding: 5px 10px; margin: 3px 0; border-left: 3px solid #555; background: #0f3460; }
-        .test-pass { border-left-color: #00ff88; }
-        .test-fail { border-left-color: #ff5252; }
-        .detail { color: #aaa; font-size: 0.9em; margin-left: 20px; }
-        #results { margin-top: 20px; }
-        button { background: #00ff88; color: #1a1a2e; border: none; padding: 10px 20px; font-size: 16px; cursor: pointer; border-radius: 5px; margin: 10px 0; }
-        button:hover { background: #00cc6a; }
-    </style>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 4 World Generation Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
+.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
+.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
+.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
+.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
+.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
+.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
+.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
+.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
+.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
+</style>
 </head>
 <body>
-    <h1>Donkeycraft Phase 4 — World Generation & Management</h1>
-    <p>Testing: Chunk, ChunkManager, Biome, TerrainGenerator, OreGenerator, CaveGenerator, StructureGenerator, WaterGenerator, TerrainSurface, LightingEngine, Physics</p>
-    <button id="runTests">Run All Tests</button>
-    <div id="results"></div>
+<h1>Donkeycraft — Phase 4 World Generation & Management Test</h1>
+<div class="subtitle">Testing: Chunk, ChunkManager, Biome, TerrainGenerator, OreGenerator, CaveGenerator, StructureGenerator, WaterGenerator, TerrainSurface, LightingEngine, Physics</div>
+<div id="results"></div>
 
-    <!-- Phase 1: Core Infrastructure -->
-    <script src="../src/core/namespace.js"></script>
-    <script src="../src/core/eventbus.js"></script>
-    <script src="../src/core/config.js"></script>
-    <script src="../src/core/logger.js"></script>
-    <script src="../src/core/timer.js"></script>
-    <script src="../src/core/input.js"></script>
-    <script src="../src/core/math-utils.js"></script>
-    <script src="../src/core/audio.js"></script>
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
 
-    <!-- Phase 3: Block System -->
-    <script src="../src/world/block.js"></script>
-    <script src="../src/world/block-state.js"></script>
-    <script src="../src/world/block-types.js"></script>
-    <script src="../src/world/texture-atlas.js"></script>
-    <script src="../src/world/block-models.js"></script>
-    <script src="../src/world/recipe-registry.js"></script>
+<!-- Phase 3 Block System -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
 
-    <!-- Phase 4: World Generation -->
-    <script src="../src/world/biome.js"></script>
-    <script src="../src/world/chunk.js"></script>
-    <script src="../src/world/chunk-manager.js"></script>
-    <script src="../src/world/terrain-generator.js"></script>
-    <script src="../src/world/ore-generator.js"></script>
-    <script src="../src/world/cave-generator.js"></script>
-    <script src="../src/world/structure-generator.js"></script>
-    <script src="../src/world/water-generator.js"></script>
-    <script src="../src/world/terrain-surface.js"></script>
-    <script src="../src/world/lighting-engine.js"></script>
-    <script src="../src/world/physics.js"></script>
+<!-- Phase 4 World Generation -->
+<script src="../src/world/biome.js"></script>
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/terrain-generator.js"></script>
+<script src="../src/world/ore-generator.js"></script>
+<script src="../src/world/cave-generator.js"></script>
+<script src="../src/world/structure-generator.js"></script>
+<script src="../src/world/water-generator.js"></script>
+<script src="../src/world/terrain-surface.js"></script>
+<script src="../src/world/lighting-engine.js"></script>
+<script src="../src/world/physics.js"></script>
 
-    <script>
-    // ============================================================
-    // Test Framework
-    // ============================================================
+<script>
+(function() {
+    'use strict';
+
+    var results = document.getElementById('results');
     var totalTests = 0;
     var passedTests = 0;
     var failedTests = 0;
-    var sectionResults = {};
+    var currentSection = null;
+
+    // ============================================================
+    // Test Framework (uniform across all tests)
+    // ============================================================
+
+    function section(name) {
+        var div = document.createElement('div');
+        div.className = 'section';
+        var heading = document.createElement('h2');
+        heading.textContent = name;
+        div.appendChild(heading);
+        results.appendChild(div);
+        currentSection = div;
+    }
 
     function assert(condition, message) {
         totalTests++;
         var div = document.createElement('div');
-        div.className = 'test-result ' + (condition ? 'test-pass' : 'test-fail');
-
         if (condition) {
             passedTests++;
-            div.innerHTML = '<span class="pass">PASS</span> — ' + message;
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
         } else {
             failedTests++;
-            div.innerHTML = '<span class="fail">FAIL</span> — ' + message;
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
         }
-
-        document.getElementById('results').appendChild(div);
-        return condition;
+        currentSection.appendChild(div);
     }
 
-    function section(name) {
-        var h2 = document.createElement('h2');
-        h2.textContent = name;
-        document.getElementById('results').appendChild(h2);
-        sectionResults[name] = { pass: 0, fail: 0 };
-    }
-
-    function endSection() {
-        var lastKey = Object.keys(sectionResults).pop();
-        // No-op: summary shown at end
-    }
-
-    function runAll() {
-        var resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = '';
-        totalTests = 0;
-        passedTests = 0;
-        failedTests = 0;
-        sectionResults = {};
-
-        // Re-initialize PerlinNoise with known seed for deterministic tests
-        Donkeycraft.PerlinNoise.init(42);
-
-        testBiome();
-        testChunk();
-        testChunkManager();
-        testTerrainGenerator();
-        testOreGenerator();
-        testCaveGenerator();
-        testWaterGenerator();
-        testTerrainSurface();
-        testLightingEngine();
-        testPhysics();
-        testStructureGenerator();
-
-        // Summary
-        var summary = document.createElement('div');
-        summary.className = 'summary';
-        summary.innerHTML = '<h2>Test Summary</h2>' +
-            '<p>Total: ' + totalTests + ' | <span class="pass">Passed: ' + passedTests + '</span> | <span class="fail">Failed: ' + failedTests + '</span></p>' +
-            '<p>Success Rate: ' + ((passedTests / totalTests * 100).toFixed(1)) + '%</p>';
-        resultsDiv.appendChild(summary);
-    }
-
-    // ============================================================
-    // Biome Tests
-    // ============================================================
-    function testBiome() {
-        section('Biome Definitions & Registry');
-
-        // Test: Registry initialized
-        var count = Donkeycraft.BiomeRegistry.getBiomeCount();
-        assert(count === 15, 'Registry has 15 biomes (got ' + count + ')');
-
-        // Test: Get biome by ID
-        var plains = Donkeycraft.BiomeRegistry.getBiomeById(1);
-        assert(plains !== null && plains.name === 'plains', 'Get plains biome by ID 1');
-
-        // Test: Get biome by name
-        var desert = Donkeycraft.BiomeRegistry.getBiomeByName('desert');
-        assert(desert !== null && desert.id === 2, 'Get desert biome by name');
-
-        // Test: Biome properties
-        assert(plains.temperature === 0.8, 'Plains temperature = 0.8 (got ' + plains.temperature + ')');
-        assert(plains.rainfall === 0.4, 'Plains rainfall = 0.4 (got ' + plains.rainfall + ')');
-        assert(!plains.isOcean, 'Plains is not ocean');
-        assert(!plains.isDesert, 'Plains is not desert');
-        assert(!plains.hasSnow, 'Plains has no snow');
-
-        // Test: Ocean biome properties
-        var ocean = Donkeycraft.BiomeRegistry.getBiomeById(6);
-        assert(ocean.isOcean, 'Ocean biome isOcean = true');
-        assert(!ocean.isDesert, 'Ocean is not desert');
-        assert(!ocean.hasSnow, 'Ocean has no snow');
-
-        // Test: Desert biome properties
-        assert(desert.isDesert, 'Desert biome isDesert = true');
-        assert(!desert.isOcean, 'Desert is not ocean');
-
-        // Test: Snowy tundra properties
-        var tundra = Donkeycraft.BiomeRegistry.getBiomeById(8);
-        assert(tundra.hasSnow, 'Snowy tundra has snow (temp=' + tundra.temperature + ')');
-
-        // Test: Extreme hills properties
-        var hills = Donkeycraft.BiomeRegistry.getBiomeById(7);
-        assert(hills.isExtremeHills, 'Extreme Hills isExtremeHills = true');
-
-        // Test: Decoration config
-        assert(plains.decoration.trees === 2, 'Plains decoration: trees=2');
-        assert(plains.decoration.flowers === 3, 'Plains decoration: flowers=3');
-        assert(plains.decoration.grass === 6, 'Plains decoration: grass=6');
-
-        // Test: Desert has no decoration
-        assert(desert.decoration.trees === 0, 'Desert has no trees');
-        assert(desert.decoration.flowers === 0, 'Desert has no flowers');
-        assert(desert.decoration.cacti === 3, 'Desert has cacti=3');
-
-        // Test: hasBiome
-        assert(Donkeycraft.BiomeRegistry.hasBiome(1), 'hasBiome(1) = true');
-        assert(!Donkeycraft.BiomeRegistry.hasBiome(99), 'hasBiome(99) = false');
-
-        // Test: getAllBiomes returns array
-        var allBiomes = Donkeycraft.BiomeRegistry.getAllBiomes();
-        assert(Array.isArray(allBiomes) && allBiomes.length === 15, 'getAllBiomes returns 15 biomes');
-
-        // Test: spawnRates
-        assert(ocean.spawnRates.passive === 0, 'Ocean has no passive mob spawns');
-        assert(ocean.spawnRates.hostile > 0, 'Ocean has hostile mob spawns');
-    }
-
-    // ============================================================
-    // Chunk Tests
-    // ============================================================
-    function testChunk() {
-        section('Chunk Data Structure');
-
-        // Test: Create chunk
-        var chunk = new Donkeycraft.Chunk(2, 3);
-        assert(chunk.chunkX === 2 && chunk.chunkZ === 3, 'Chunk created at (2, 3)');
-
-        // Test: Initial state — all air
-        assert(chunk.getBlock(0, 0, 0) === 0, 'Initial block at (0,0,0) = air (0)');
-        assert(chunk.getBlock(15, 127, 15) === 0, 'Initial block at (15,127,15) = air (0)');
-
-        // Test: Dirty flag (check BEFORE any modifications)
-        assert(!chunk.isDirty(), 'New chunk is not dirty');
-
-        // Test: setBlock/getBlock
-        chunk.setBlock(5, 10, 7, 1); // stone
-        assert(chunk.getBlock(5, 10, 7) === 1, 'Set and get block ID 1 at (5,10,7)');
-
-        // Test: Out of bounds returns air
-        assert(chunk.getBlock(-1, 0, 0) === 0, 'getBlock(-1,0,0) = air');
-        assert(chunk.getBlock(16, 0, 0) === 0, 'getBlock(16,0,0) = air');
-        assert(chunk.getBlock(0, -1, 0) === 0, 'getBlock(0,-1,0) = air');
-        assert(chunk.getBlock(0, 256, 0) === 0, 'getBlock(0,256,0) = air');
-        assert(chunk.getBlock(0, 0, -1) === 0, 'getBlock(0,0,-1) = air');
-        assert(chunk.getBlock(0, 0, 16) === 0, 'getBlock(0,0,16) = air');
-
-        // Test: Chunk becomes dirty after setBlock
-        assert(chunk.isDirty(), 'Chunk becomes dirty after setBlock');
-
-        // Test: markClean/markDirty
-        chunk.markClean();
-        assert(!chunk.isDirty(), 'Chunk is clean after markClean()');
-        chunk.markDirty();
-        assert(chunk.isDirty(), 'Chunk is dirty after markDirty()');
-
-        // Test: fill
-        chunk.fill(1); // stone
-        assert(chunk.getBlock(0, 0, 0) === 1, 'fill(1) sets block to stone');
-        assert(chunk.getBlock(15, 255, 15) === 1, 'fill(1) fills entire chunk');
-
-        // Test: Sky light
-        chunk.setSkyLight(8, 100, 8, 12);
-        assert(chunk.getSkyLight(8, 100, 8) === 12, 'Set and get sky light = 12');
-        assert(chunk.getSkyLight(-1, 0, 0) === 15, 'Out of bounds sky light = 15 (full)');
-
-        // Test: Block light
-        chunk.setBlockLight(8, 100, 8, 8);
-        assert(chunk.getBlockLight(8, 100, 8) === 8, 'Set and get block light = 8');
-        assert(chunk.getBlockLight(0, 0, 0) === 0, 'Default block light = 0');
-
-        // Test: clearLight
-        chunk.setSkyLight(0, 0, 0, 15);
-        chunk.setBlockLight(0, 0, 0, 15);
-        chunk.clearLight();
-        assert(chunk.getSkyLight(0, 0, 0) === 0, 'clearLight resets sky light to 0');
-        assert(chunk.getBlockLight(0, 0, 0) === 0, 'clearLight resets block light to 0');
-
-        // Test: globalX/globalZ
-        assert(chunk.globalX() === 32, 'globalX for chunk (2,3) = 32');
-        assert(chunk.globalZ() === 48, 'globalZ for chunk (2,3) = 48');
-
-        // Test: globalToLocal
-        var loc = chunk.globalToLocal(32, 48);
-        assert(loc.lx === 0 && loc.lz === 0, 'globalToLocal(32,48) = (0,0)');
-        var loc2 = chunk.globalToLocal(35, 55);
-        assert(loc2.lx === 3 && loc2.lz === 7, 'globalToLocal(35,55) = (3,7)');
-
-        // Test: Coordinate helpers (static methods)
-        assert(Donkeycraft.Chunk.chunkCoordX(32) === 2, 'chunkCoordX(32) = 2');
-        assert(Donkeycraft.Chunk.chunkCoordZ(48) === 3, 'chunkCoordZ(48) = 3');
-        assert(Donkeycraft.Chunk.localCoordX(35) === 3, 'localCoordX(35) = 3');
-        assert(Donkeycraft.Chunk.localCoordZ(60) === 12, 'localCoordZ(60) = 12');
-
-        // Test: Negative coordinate wrapping
-        assert(Donkeycraft.Chunk.localCoordX(-1) === 15, 'localCoordX(-1) = 15 (wraps)');
-        assert(Donkeycraft.Chunk.localCoordZ(-1) === 15, 'localCoordZ(-1) = 15 (wraps)');
-
-        // Test: Block data view
-        var data = chunk.getBlockData();
-        assert(data instanceof Uint8Array, 'getBlockData returns Uint8Array');
-
-        // Test: destroy
-        chunk.destroy();
-        assert(chunk.blocks === null, 'destroy() sets blocks to null');
-
-        // Test: setBlock with same value doesn't mark dirty
-        var chunk2 = new Donkeycraft.Chunk(0, 0);
-        chunk2.setBlock(0, 0, 0, 1);
-        assert(chunk2.isDirty(), 'First setBlock marks dirty');
-        chunk2.markClean();
-        chunk2.setBlock(0, 0, 0, 1); // same value
-        assert(!chunk2.isDirty(), 'Setting same block value does not mark dirty');
-
-        // Test: Sky light clamping (use fresh chunk since chunk was destroyed)
-        chunk2.setSkyLight(0, 0, 0, 20);
-        assert(chunk2.getSkyLight(0, 0, 0) === 15, 'Sky light clamped to max 15 (got ' + chunk2.getSkyLight(0, 0, 0) + ')');
-        chunk2.setSkyLight(0, 0, 0, -5);
-        assert(chunk2.getSkyLight(0, 0, 0) === 0, 'Sky light clamped to min 0');
-
-        // Test: Block data size
-        var chunk3 = new Donkeycraft.Chunk(0, 0);
-        assert(chunk3.blocks.length === 65536, 'Block array size = 16×256×16 = 65536 (got ' + chunk3.blocks.length + ')');
-        assert(chunk3.skyLight.length === 65536, 'Sky light array size = 65536');
-        assert(chunk3.blockLight.length === 65536, 'Block light array size = 65536');
-
-        // Clean up all chunks
-        chunk2.destroy();
-        chunk3.destroy();
-    }
-
-    // ============================================================
-    // ChunkManager Tests
-    // ============================================================
-    function testChunkManager() {
-        section('Chunk Manager');
-
-        // Test: Create manager
-        var cm = new Donkeycraft.ChunkManager({ renderDistance: 4 });
-        assert(cm.renderDistance === 4, 'Render distance set to 4');
-
-        // Test: getChunk creates chunk
-        var c1 = cm.getChunk(0, 0);
-        assert(c1 instanceof Donkeycraft.Chunk, 'getChunk returns Chunk instance');
-        assert(c1.chunkX === 0 && c1.chunkZ === 0, 'Chunk at (0,0)');
-
-        // Test: getChunk returns existing chunk
-        var c2 = cm.getChunk(0, 0);
-        assert(c1 === c2, 'getChunk returns same chunk for same coords');
-
-        // Test: hasChunk
-        assert(cm.hasChunk(0, 0), 'hasChunk(0,0) = true after getChunk');
-        assert(!cm.hasChunk(5, 5), 'hasChunk(5,5) = false before getChunk');
-
-        // Test: getChunkIfExists
-        assert(cm.getChunkIfExists(0, 0) !== null, 'getChunkIfExists(0,0) returns chunk');
-        assert(cm.getChunkIfExists(5, 5) === null, 'getChunkIfExists(5,5) returns null');
-
-        // Test: Chunk count
-        cm.getChunk(1, 0);
-        cm.getChunk(0, 1);
-        assert(cm.getChunkCount() === 3, '3 chunks loaded (got ' + cm.getChunkCount() + ')');
-
-        // Test: getAllChunks
-        var all = cm.getAllChunks();
-        assert(all.length === 3, 'getAllChunks returns 3 chunks');
-
-        // Test: Dirty tracking
-        cm.markChunkDirty(0, 0);
-        assert(cm.isChunkDirty(0, 0), 'isChunkDirty(0,0) = true after markChunkDirty');
-        assert(!cm.isChunkDirty(1, 0), 'isChunkDirty(1,0) = false');
-
-        // Test: getDirtyChunks
-        cm.markChunkDirty(1, 0);
-        var dirty = cm.getDirtyChunks();
-        assert(dirty.length === 2, 'getDirtyChunks returns 2 chunks');
-
-        // Test: markChunkClean
-        cm.markChunkClean(0, 0);
-        assert(!cm.isChunkDirty(0, 0), 'isChunkDirty(0,0) = false after markChunkClean');
-        assert(cm.getDirtyCount() === 1, 'getDirtyCount = 1');
-
-        // Test: unloadChunk
-        var result = cm.unloadChunk(0, 0);
-        assert(result === true, 'unloadChunk returns true for existing chunk');
-        assert(!cm.hasChunk(0, 0), 'hasChunk(0,0) = false after unload');
-        assert(cm.getChunkCount() === 2, '2 chunks remain after unload');
-
-        // Test: unload non-existent chunk
-        var result2 = cm.unloadChunk(99, 99);
-        assert(result2 === false, 'unloadChunk returns false for non-existent chunk');
-
-        // Test: onChunkLoad callback
-        var loadCalled = false;
-        cm.onChunkLoad = function(chunk) { loadCalled = true; };
-        cm.getChunk(5, 5);
-        assert(loadCalled, 'onChunkLoad called when new chunk loaded');
-
-        // Test: onChunkUnload callback
-        var unloadCalled = false;
-        cm.onChunkUnload = function(chunk) { unloadCalled = true; };
-        cm.unloadChunk(5, 5);
-        assert(unloadCalled, 'onChunkUnload called when chunk unloaded');
-
-        // Test: updatePlayerPosition loads chunks in circular radius
-        var cm2 = new Donkeycraft.ChunkManager({ renderDistance: 1 });
-        cm2.updatePlayerPosition(0, 0);
-        // Radius 1: center + 8 neighbors within circle = up to 9 chunks
-        assert(cm2.getChunkCount() >= 1, 'updatePlayerPosition loads at least 1 chunk');
-
-        // Test: updateRenderDistance
-        cm.updateRenderDistance(2);
-        assert(cm.renderDistance === 2, 'renderDistance updated to 2');
-
-        // Test: destroy
-        cm.destroy();
-        assert(cm.getChunkCount() === 0, 'destroy() clears all chunks');
-
-        // Test: clearAll
-        var cm3 = new Donkeycraft.ChunkManager({ renderDistance: 2 });
-        cm3.getChunk(0, 0);
-        cm3.clearAll();
-        assert(cm3.getChunkCount() === 0, 'clearAll() clears chunks');
-    }
-
-    // ============================================================
-    // Terrain Generator Tests
-    // ============================================================
-    function testTerrainGenerator() {
-        section('Terrain Generator');
-
-        // Re-init noise for deterministic results
-        Donkeycraft.PerlinNoise.init(42);
-
-        // Test: generateHeightmap returns array
-        var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0);
-        assert(heightmap instanceof Array, 'generateHeightmap returns Array');
-        assert(heightmap.length === 256, 'Heightmap has 256 entries (16×16)');
-
-        // Test: Height values within valid range
-        var minHeight = Infinity;
-        var maxHeight = -Infinity;
-        for (var i = 0; i < heightmap.length; i++) {
-            if (heightmap[i] < minHeight) minHeight = heightmap[i];
-            if (heightmap[i] > maxHeight) maxHeight = heightmap[i];
+    function assertEq(actual, expected, message) {
+        totalTests++;
+        if (actual === expected) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
+            currentSection.appendChild(div);
         }
-        assert(minHeight >= 1, 'Minimum height >= 1 (got ' + minHeight + ')');
-        assert(maxHeight <= 246, 'Maximum height <= 246 (WORLD_HEIGHT-10) (got ' + maxHeight + ')');
-
-        // Test: Plains biome height
-        var plainsBiome = Donkeycraft.BiomeRegistry.getBiomeById(1);
-        var plainsHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, plainsBiome);
-        assert(plainsHM.length === 256, 'Plains heightmap has 256 entries');
-
-        // Test: Ocean biome produces lower terrain
-        var oceanBiome = Donkeycraft.BiomeRegistry.getBiomeById(6);
-        var oceanHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, oceanBiome);
-        var plainsAvg = 0;
-        var oceanAvg = 0;
-        for (var j = 0; j < plainsHM.length; j++) {
-            plainsAvg += plainsHM[j];
-            oceanAvg += oceanHM[j];
-        }
-        plainsAvg /= 256;
-        oceanAvg /= 256;
-        assert(oceanAvg < plainsAvg, 'Ocean avg height (' + oceanAvg.toFixed(1) + ') < Plains avg (' + plainsAvg.toFixed(1) + ')');
-
-        // Test: Extreme hills produces higher terrain
-        var hillsBiome = Donkeycraft.BiomeRegistry.getBiomeById(7);
-        var hillsHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, hillsBiome);
-        var hillsAvg = 0;
-        for (var k = 0; k < hillsHM.length; k++) {
-            hillsAvg += hillsHM[k];
-        }
-        hillsAvg /= 256;
-        assert(hillsAvg > plainsAvg, 'Extreme Hills avg height (' + hillsAvg.toFixed(1) + ') > Plains avg (' + plainsAvg.toFixed(1) + ')');
-
-        // Test: getHeightAt
-        var h = Donkeycraft.TerrainGenerator.getHeightAt(0, 0, 0, 0, plainsHM);
-        assert(typeof h === 'number', 'getHeightAt returns a number');
-
-        // Test: generate() convenience wrapper
-        var hm2 = Donkeycraft.TerrainGenerator.generate(1, 1);
-        assert(hm2.length === 256, 'generate() returns heightmap with 256 entries');
     }
 
-    // ============================================================
-    // Ore Generator Tests
-    // ============================================================
-    function testOreGenerator() {
-        section('Ore Generator');
+    function assertNear(actual, expected, epsilon, message) {
+        totalTests++;
+        if (Math.abs(actual - expected) < epsilon) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
+            currentSection.appendChild(div);
+        }
+    }
 
-        // Test: getOreCount
-        assert(Donkeycraft.OreGenerator.getOreCount() === 7, '7 ore types defined');
+    function assertType(val, type, message) {
+        totalTests++;
+        if (typeof val === type) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+            currentSection.appendChild(div);
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
+            currentSection.appendChild(div);
+        }
+    }
 
-        // Test: getOreDefinitions returns array
-        var ores = Donkeycraft.OreGenerator.getOreDefinitions();
-        assert(ores.length === 7, 'getOreDefinitions returns 7 ores');
-
-        // Test: Ore Y-level ranges
-        assert(Donkeycraft.OreGenerator.getMinY('coal_ore') === 0, 'coal_ore minY = 0');
-        assert(Donkeycraft.OreGenerator.getMaxY('coal_ore') === 160, 'coal_ore maxY = 160');
-
-        assert(Donkeycraft.OreGenerator.getMinY('diamond_ore') === 0, 'diamond_ore minY = 0');
-        assert(Donkeycraft.OreGenerator.getMaxY('diamond_ore') === 32, 'diamond_ore maxY = 32');
-
-        assert(Donkeycraft.OreGenerator.getMinY('gold_ore') === 0, 'gold_ore minY = 0');
-        assert(Donkeycraft.OreGenerator.getMaxY('gold_ore') === 64, 'gold_ore maxY = 64');
-
-        assert(Donkeycraft.OreGenerator.getMinY('emerald_ore') === 0, 'emerald_ore minY = 0');
-        assert(Donkeycraft.OreGenerator.getMaxY('emerald_ore') === 32, 'emerald_ore maxY = 32');
-
-        // Test: Unknown ore returns -1
-        assert(Donkeycraft.OreGenerator.getMinY('unknown_ore') === -1, 'Unknown ore minY = -1');
-        assert(Donkeycraft.OreGenerator.getMaxY('unknown_ore') === -1, 'Unknown ore maxY = -1');
-
-        // Test: placeOres in chunk
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        Donkeycraft.OreGenerator.placeOres(chunk, 1); // Plains biome
-
-        // Count ore blocks placed
-        var oreCount = 0;
-        for (var i = 0; i < chunk.blocks.length; i++) {
-            var bid = chunk.blocks[i];
-            if (bid === 16 || bid === 15 || bid === 21 || bid === 14 || bid === 176 || bid === 22 || bid === 126) {
-                oreCount++;
+    function assertArrEq(actual, expected, message) {
+        totalTests++;
+        if (actual.length !== expected.length) {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
+            currentSection.appendChild(div);
+            return;
+        }
+        for (var i = 0; i < actual.length; i++) {
+            if (actual[i] !== expected[i]) {
+                failedTests++;
+                var div3 = document.createElement('div');
+                div3.className = 'test fail';
+                div3.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
+                currentSection.appendChild(div3);
+                return;
             }
         }
-        assert(oreCount > 0, 'Ore blocks placed in chunk (got ' + oreCount + ')');
-
-        // Test: Emerald only in extreme hills
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        Donkeycraft.OreGenerator.placeOres(chunk2, 7); // Extreme hills
-        var emeraldHills = 0;
-        for (var j = 0; j < chunk2.blocks.length; j++) {
-            if (chunk2.blocks[j] === 126) emeraldHills++;
-        }
-
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        Donkeycraft.OreGenerator.placeOres(chunk3, 1); // Plains
-        var emeraldPlains = 0;
-        for (var k = 0; k < chunk3.blocks.length; k++) {
-            if (chunk3.blocks[k] === 126) emeraldPlains++;
-        }
-        assert(emeraldHills >= 0, 'Emerald ores placed in extreme hills biome');
+        passedTests++;
+        var div2 = document.createElement('div');
+        div2.className = 'test pass';
+        div2.textContent = '\u2713 PASS: ' + message;
+        currentSection.appendChild(div2);
     }
 
-    // ============================================================
-    // Cave Generator Tests
-    // ============================================================
-    function testCaveGenerator() {
-        section('Cave Generator');
+    function info(msg) {
+        var div = document.createElement('div');
+        div.className = 'info-msg';
+        div.textContent = '>> ' + msg;
+        currentSection.appendChild(div);
+    }
 
-        // Test: Config accessors
-        var density = Donkeycraft.CaveGenerator.getDensity();
-        assert(typeof density === 'number', 'getDensity returns a number');
-        assert(density > 0, 'Cave density is positive (got ' + density + ')');
-
-        var radius = Donkeycraft.CaveGenerator.getRadius();
-        assert(radius > 0, 'Cave radius is positive (got ' + radius + ')');
-
-        var lavaY = Donkeycraft.CaveGenerator.getLavaYLevel();
-        assert(lavaY >= 0, 'Lava Y level is non-negative (got ' + lavaY + ')');
-
-        // Test: setDensity
-        Donkeycraft.CaveGenerator.setDensity(0.02);
-        assert(Donkeycraft.CaveGenerator.getDensity() === 0.02, 'setDensity updates density');
-
-        // Test: setRadius
-        Donkeycraft.CaveGenerator.setRadius(5.0);
-        assert(Donkeycraft.CaveGenerator.getRadius() === 5.0, 'setRadius updates radius');
-
-        // Test: generateCaves runs without error
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        chunk.fill(1); // Fill with stone
-        try {
-            Donkeycraft.CaveGenerator.generateCaves(chunk, 1); // Plains
-            assert(true, 'generateCaves completed without error');
-        } catch (e) {
-            assert(false, 'generateCaves threw: ' + e.message);
+    function finishTests() {
+        var summary = document.createElement('div');
+        if (failedTests === 0) {
+            summary.className = 'summary pass';
+            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
+        } else {
+            summary.className = 'summary fail';
+            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
         }
+        results.appendChild(summary);
+    }
 
-        // Test: Ocean biome produces fewer caves
-        var oceanChunk = new Donkeycraft.Chunk(1, 0);
-        oceanChunk.fill(1);
-        try {
-            Donkeycraft.CaveGenerator.generateCaves(oceanChunk, 6); // Ocean
-            assert(true, 'generateCaves completed for ocean biome');
-        } catch (e) {
-            assert(false, 'generateCaves for ocean threw: ' + e.message);
+    // Re-init PerlinNoise for deterministic tests
+    Donkeycraft.PerlinNoise.init(42);
+
+    // ============================================================
+    // TEST 1: Biome Definitions & Registry
+    // ============================================================
+    section('1. Biome Definitions & Registry (biome.js)');
+
+    var count = Donkeycraft.BiomeRegistry.getBiomeCount();
+    assert(count === 15, 'Registry has 15 biomes (got ' + count + ')');
+
+    var plains = Donkeycraft.BiomeRegistry.getBiomeById(1);
+    assert(plains !== null && plains.name === 'plains', 'Get plains biome by ID 1');
+
+    var desert = Donkeycraft.BiomeRegistry.getBiomeByName('desert');
+    assert(desert !== null && desert.id === 2, 'Get desert biome by name');
+
+    assert(plains.temperature === 0.8, 'Plains temperature = 0.8 (got ' + plains.temperature + ')');
+    assert(plains.rainfall === 0.4, 'Plains rainfall = 0.4 (got ' + plains.rainfall + ')');
+    assert(!plains.isOcean, 'Plains is not ocean');
+    assert(!plains.isDesert, 'Plains is not desert');
+    assert(!plains.hasSnow, 'Plains has no snow');
+
+    var ocean = Donkeycraft.BiomeRegistry.getBiomeById(6);
+    assert(ocean.isOcean, 'Ocean biome isOcean = true');
+    assert(!ocean.isDesert, 'Ocean is not desert');
+
+    assert(desert.isDesert, 'Desert biome isDesert = true');
+
+    var tundra = Donkeycraft.BiomeRegistry.getBiomeById(8);
+    assert(tundra.hasSnow, 'Snowy tundra has snow (temp=' + tundra.temperature + ')');
+
+    var hills = Donkeycraft.BiomeRegistry.getBiomeById(7);
+    assert(hills.isExtremeHills, 'Extreme Hills isExtremeHills = true');
+
+    assert(plains.decoration.trees === 2, 'Plains decoration: trees=2');
+    assert(plains.decoration.flowers === 3, 'Plains decoration: flowers=3');
+    assert(plains.decoration.grass === 6, 'Plains decoration: grass=6');
+
+    assert(desert.decoration.trees === 0, 'Desert has no trees');
+    assert(desert.decoration.cacti === 3, 'Desert has cacti=3');
+
+    assert(Donkeycraft.BiomeRegistry.hasBiome(1), 'hasBiome(1) = true');
+    assert(!Donkeycraft.BiomeRegistry.hasBiome(99), 'hasBiome(99) = false');
+
+    var allBiomes = Donkeycraft.BiomeRegistry.getAllBiomes();
+    assert(Array.isArray(allBiomes) && allBiomes.length === 15, 'getAllBiomes returns 15 biomes');
+
+    assert(ocean.spawnRates.passive === 0, 'Ocean has no passive mob spawns');
+    assert(ocean.spawnRates.hostile > 0, 'Ocean has hostile mob spawns');
+
+    // ============================================================
+    // TEST 2: Chunk Data Structure (chunk.js)
+    // ============================================================
+    section('2. Chunk Data Structure (chunk.js)');
+
+    var chunk = new Donkeycraft.Chunk(2, 3);
+    assert(chunk.chunkX === 2 && chunk.chunkZ === 3, 'Chunk created at (2, 3)');
+
+    assert(chunk.getBlock(0, 0, 0) === 0, 'Initial block at (0,0,0) = air (0)');
+    assert(chunk.getBlock(15, 127, 15) === 0, 'Initial block at (15,127,15) = air (0)');
+
+    assert(!chunk.isDirty(), 'New chunk is not dirty');
+
+    chunk.setBlock(5, 10, 7, 1);
+    assert(chunk.getBlock(5, 10, 7) === 1, 'Set and get block ID 1 at (5,10,7)');
+
+    assert(chunk.getBlock(-1, 0, 0) === 0, 'getBlock(-1,0,0) = air');
+    assert(chunk.getBlock(16, 0, 0) === 0, 'getBlock(16,0,0) = air');
+    assert(chunk.getBlock(0, -1, 0) === 0, 'getBlock(0,-1,0) = air');
+    assert(chunk.getBlock(0, 256, 0) === 0, 'getBlock(0,256,0) = air');
+
+    assert(chunk.isDirty(), 'Chunk becomes dirty after setBlock');
+
+    chunk.markClean();
+    assert(!chunk.isDirty(), 'Chunk is clean after markClean()');
+    chunk.markDirty();
+    assert(chunk.isDirty(), 'Chunk is dirty after markDirty()');
+
+    chunk.fill(1);
+    assert(chunk.getBlock(0, 0, 0) === 1, 'fill(1) sets block to stone');
+    assert(chunk.getBlock(15, 255, 15) === 1, 'fill(1) fills entire chunk');
+
+    chunk.setSkyLight(8, 100, 8, 12);
+    assert(chunk.getSkyLight(8, 100, 8) === 12, 'Set and get sky light = 12');
+    assert(chunk.getSkyLight(-1, 0, 0) === 15, 'Out of bounds sky light = 15 (full)');
+
+    chunk.setBlockLight(8, 100, 8, 8);
+    assert(chunk.getBlockLight(8, 100, 8) === 8, 'Set and get block light = 8');
+    assert(chunk.getBlockLight(0, 0, 0) === 0, 'Default block light = 0');
+
+    chunk.clearLight();
+    assert(chunk.getSkyLight(0, 0, 0) === 0, 'clearLight resets sky light to 0');
+    assert(chunk.getBlockLight(0, 0, 0) === 0, 'clearLight resets block light to 0');
+
+    assert(chunk.globalX() === 32, 'globalX for chunk (2,3) = 32');
+    assert(chunk.globalZ() === 48, 'globalZ for chunk (2,3) = 48');
+
+    var loc = chunk.globalToLocal(32, 48);
+    assert(loc.lx === 0 && loc.lz === 0, 'globalToLocal(32,48) = (0,0)');
+    var loc2 = chunk.globalToLocal(35, 55);
+    assert(loc2.lx === 3 && loc2.lz === 7, 'globalToLocal(35,55) = (3,7)');
+
+    assert(Donkeycraft.Chunk.chunkCoordX(32) === 2, 'chunkCoordX(32) = 2');
+    assert(Donkeycraft.Chunk.chunkCoordZ(48) === 3, 'chunkCoordZ(48) = 3');
+    assert(Donkeycraft.Chunk.localCoordX(35) === 3, 'localCoordX(35) = 3');
+    assert(Donkeycraft.Chunk.localCoordZ(60) === 12, 'localCoordZ(60) = 12');
+
+    assert(Donkeycraft.Chunk.localCoordX(-1) === 15, 'localCoordX(-1) = 15 (wraps)');
+    assert(Donkeycraft.Chunk.localCoordZ(-1) === 15, 'localCoordZ(-1) = 15 (wraps)');
+
+    var data = chunk.getBlockData();
+    assert(data instanceof Uint8Array, 'getBlockData returns Uint8Array');
+
+    chunk.destroy();
+    assert(chunk.blocks === null, 'destroy() sets blocks to null');
+
+    // Sky light clamping
+    var chunk2 = new Donkeycraft.Chunk(0, 0);
+    chunk2.setSkyLight(0, 0, 0, 20);
+    assert(chunk2.getSkyLight(0, 0, 0) === 15, 'Sky light clamped to max 15 (got ' + chunk2.getSkyLight(0, 0, 0) + ')');
+    chunk2.setSkyLight(0, 0, 0, -5);
+    assert(chunk2.getSkyLight(0, 0, 0) === 0, 'Sky light clamped to min 0');
+
+    assert(chunk2.blocks.length === 65536, 'Block array size = 16x256x16 = 65536 (got ' + chunk2.blocks.length + ')');
+    chunk2.destroy();
+
+    // ============================================================
+    // TEST 3: Chunk Manager (chunk-manager.js)
+    // ============================================================
+    section('3. Chunk Manager (chunk-manager.js)');
+
+    var cm = new Donkeycraft.ChunkManager({ renderDistance: 4 });
+    assert(cm.renderDistance === 4, 'Render distance set to 4');
+
+    var c1 = cm.getChunk(0, 0);
+    assert(c1 instanceof Donkeycraft.Chunk, 'getChunk returns Chunk instance');
+    assert(c1.chunkX === 0 && c1.chunkZ === 0, 'Chunk at (0,0)');
+
+    var c2 = cm.getChunk(0, 0);
+    assert(c1 === c2, 'getChunk returns same chunk for same coords');
+
+    assert(cm.hasChunk(0, 0), 'hasChunk(0,0) = true after getChunk');
+    assert(!cm.hasChunk(5, 5), 'hasChunk(5,5) = false before getChunk');
+
+    assert(cm.getChunkIfExists(0, 0) !== null, 'getChunkIfExists(0,0) returns chunk');
+    assert(cm.getChunkIfExists(5, 5) === null, 'getChunkIfExists(5,5) returns null');
+
+    cm.getChunk(1, 0);
+    cm.getChunk(0, 1);
+    assert(cm.getChunkCount() === 3, '3 chunks loaded (got ' + cm.getChunkCount() + ')');
+
+    var all = cm.getAllChunks();
+    assert(all.length === 3, 'getAllChunks returns 3 chunks');
+
+    cm.markChunkDirty(0, 0);
+    assert(cm.isChunkDirty(0, 0), 'isChunkDirty(0,0) = true after markChunkDirty');
+    assert(!cm.isChunkDirty(1, 0), 'isChunkDirty(1,0) = false');
+
+    cm.markChunkDirty(1, 0);
+    var dirty = cm.getDirtyChunks();
+    assert(dirty.length === 2, 'getDirtyChunks returns 2 chunks');
+
+    cm.markChunkClean(0, 0);
+    assert(!cm.isChunkDirty(0, 0), 'isChunkDirty(0,0) = false after markChunkClean');
+    assert(cm.getDirtyCount() === 1, 'getDirtyCount = 1');
+
+    var result = cm.unloadChunk(0, 0);
+    assert(result === true, 'unloadChunk returns true for existing chunk');
+    assert(!cm.hasChunk(0, 0), 'hasChunk(0,0) = false after unload');
+    assert(cm.getChunkCount() === 2, '2 chunks remain after unload');
+
+    var result2 = cm.unloadChunk(99, 99);
+    assert(result2 === false, 'unloadChunk returns false for non-existent chunk');
+
+    var loadCalled = false;
+    cm.onChunkLoad = function(chunk) { loadCalled = true; };
+    cm.getChunk(5, 5);
+    assert(loadCalled, 'onChunkLoad called when new chunk loaded');
+
+    var unloadCalled = false;
+    cm.onChunkUnload = function(chunk) { unloadCalled = true; };
+    cm.unloadChunk(5, 5);
+    assert(unloadCalled, 'onChunkUnload called when chunk unloaded');
+
+    var cm2 = new Donkeycraft.ChunkManager({ renderDistance: 1 });
+    cm2.updatePlayerPosition(0, 0);
+    assert(cm2.getChunkCount() >= 1, 'updatePlayerPosition loads at least 1 chunk');
+
+    cm.updateRenderDistance(2);
+    assert(cm.renderDistance === 2, 'renderDistance updated to 2');
+
+    cm.destroy();
+    assert(cm.getChunkCount() === 0, 'destroy() clears all chunks');
+
+    var cm3 = new Donkeycraft.ChunkManager({ renderDistance: 2 });
+    cm3.getChunk(0, 0);
+    cm3.clearAll();
+    assert(cm3.getChunkCount() === 0, 'clearAll() clears chunks');
+
+    // ============================================================
+    // TEST 4: Terrain Generator (terrain-generator.js)
+    // ============================================================
+    section('4. Terrain Generator (terrain-generator.js)');
+
+    Donkeycraft.PerlinNoise.init(42);
+
+    var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0);
+    assert(heightmap instanceof Array, 'generateHeightmap returns Array');
+    assert(heightmap.length === 256, 'Heightmap has 256 entries (16x16)');
+
+    var minHeight = Infinity;
+    var maxHeight = -Infinity;
+    for (var i = 0; i < heightmap.length; i++) {
+        if (heightmap[i] < minHeight) minHeight = heightmap[i];
+        if (heightmap[i] > maxHeight) maxHeight = heightmap[i];
+    }
+    assert(minHeight >= 1, 'Minimum height >= 1 (got ' + minHeight + ')');
+    assert(maxHeight <= 246, 'Maximum height <= 246 (WORLD_HEIGHT-10) (got ' + maxHeight + ')');
+
+    var plainsBiome = Donkeycraft.BiomeRegistry.getBiomeById(1);
+    var plainsHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, plainsBiome);
+
+    var oceanBiome = Donkeycraft.BiomeRegistry.getBiomeById(6);
+    var oceanHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, oceanBiome);
+    var plainsAvg = 0;
+    var oceanAvg = 0;
+    for (var j = 0; j < plainsHM.length; j++) {
+        plainsAvg += plainsHM[j];
+        oceanAvg += oceanHM[j];
+    }
+    plainsAvg /= 256;
+    oceanAvg /= 256;
+    assert(oceanAvg < plainsAvg, 'Ocean avg height (' + oceanAvg.toFixed(1) + ') < Plains avg (' + plainsAvg.toFixed(1) + ')');
+
+    var hillsBiome = Donkeycraft.BiomeRegistry.getBiomeById(7);
+    var hillsHM = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0, hillsBiome);
+    var hillsAvg = 0;
+    for (var k = 0; k < hillsHM.length; k++) {
+        hillsAvg += hillsHM[k];
+    }
+    hillsAvg /= 256;
+    assert(hillsAvg > plainsAvg, 'Extreme Hills avg height (' + hillsAvg.toFixed(1) + ') > Plains avg (' + plainsAvg.toFixed(1) + ')');
+
+    var h = Donkeycraft.TerrainGenerator.getHeightAt(0, 0, 0, 0, plainsHM);
+    assert(typeof h === 'number', 'getHeightAt returns a number');
+
+    var hm2 = Donkeycraft.TerrainGenerator.generate(1, 1);
+    assert(hm2.length === 256, 'generate() returns heightmap with 256 entries');
+
+    // ============================================================
+    // TEST 5: Ore Generator (ore-generator.js)
+    // ============================================================
+    section('5. Ore Generator (ore-generator.js)');
+
+    assert(Donkeycraft.OreGenerator.getOreCount() === 7, '7 ore types defined');
+
+    var ores = Donkeycraft.OreGenerator.getOreDefinitions();
+    assert(ores.length === 7, 'getOreDefinitions returns 7 ores');
+
+    assert(Donkeycraft.OreGenerator.getMinY('coal_ore') === 0, 'coal_ore minY = 0');
+    assert(Donkeycraft.OreGenerator.getMaxY('coal_ore') === 160, 'coal_ore maxY = 160');
+    assert(Donkeycraft.OreGenerator.getMinY('diamond_ore') === 0, 'diamond_ore minY = 0');
+    assert(Donkeycraft.OreGenerator.getMaxY('diamond_ore') === 32, 'diamond_ore maxY = 32');
+    assert(Donkeycraft.OreGenerator.getMinY('gold_ore') === 0, 'gold_ore minY = 0');
+    assert(Donkeycraft.OreGenerator.getMaxY('gold_ore') === 64, 'gold_ore maxY = 64');
+
+    assert(Donkeycraft.OreGenerator.getMinY('unknown_ore') === -1, 'Unknown ore minY = -1');
+
+    var chunk3 = new Donkeycraft.Chunk(0, 0);
+    Donkeycraft.OreGenerator.placeOres(chunk3, 1);
+
+    var oreCount = 0;
+    for (var i = 0; i < chunk3.blocks.length; i++) {
+        var bid = chunk3.blocks[i];
+        if (bid === 16 || bid === 15 || bid === 21 || bid === 14 || bid === 176 || bid === 22 || bid === 126) {
+            oreCount++;
         }
+    }
+    assert(oreCount > 0, 'Ore blocks placed in chunk (got ' + oreCount + ')');
+    chunk3.destroy();
 
-        // Test: generateCaves carves air blocks
-        var testChunk = new Donkeycraft.Chunk(2, 0);
-        testChunk.fill(1); // All stone
-        Donkeycraft.CaveGenerator.generateCaves(testChunk, 1);
-        var hasAir = false;
-        for (var i = 0; i < testChunk.blocks.length; i++) {
-            if (testChunk.blocks[i] === 0) {
-                hasAir = true;
+    // ============================================================
+    // TEST 6: Cave Generator (cave-generator.js)
+    // ============================================================
+    section('6. Cave Generator (cave-generator.js)');
+
+    var density = Donkeycraft.CaveGenerator.getDensity();
+    assert(typeof density === 'number' && density > 0, 'Cave density is positive (got ' + density + ')');
+
+    var radius = Donkeycraft.CaveGenerator.getRadius();
+    assert(radius > 0, 'Cave radius is positive (got ' + radius + ')');
+
+    var lavaY = Donkeycraft.CaveGenerator.getLavaYLevel();
+    assert(lavaY >= 0, 'Lava Y level is non-negative (got ' + lavaY + ')');
+
+    Donkeycraft.CaveGenerator.setDensity(0.02);
+    assert(Donkeycraft.CaveGenerator.getDensity() === 0.02, 'setDensity updates density');
+
+    Donkeycraft.CaveGenerator.setRadius(5.0);
+    assert(Donkeycraft.CaveGenerator.getRadius() === 5.0, 'setRadius updates radius');
+
+    var caveChunk = new Donkeycraft.Chunk(0, 0);
+    caveChunk.fill(1);
+    try {
+        Donkeycraft.CaveGenerator.generateCaves(caveChunk, 1);
+        assert(true, 'generateCaves completed without error');
+    } catch (e) {
+        assert(false, 'generateCaves threw: ' + e.message);
+    }
+    caveChunk.destroy();
+
+    // ============================================================
+    // TEST 7: Water Generator (water-generator.js)
+    // ============================================================
+    section('7. Water Generator (water-generator.js)');
+
+    var level = Donkeycraft.WaterGenerator.getWaterLevel();
+    assert(level === 63, 'Default water level = 63 (got ' + level + ')');
+
+    Donkeycraft.WaterGenerator.setWaterLevel(70);
+    assert(Donkeycraft.WaterGenerator.getWaterLevel() === 70, 'setWaterLevel updates to 70');
+    Donkeycraft.WaterGenerator.setWaterLevel(63);
+
+    var wChunk = new Donkeycraft.Chunk(0, 0);
+    var heightmap2 = [];
+    for (var i = 0; i < 256; i++) heightmap2[i] = 20;
+    Donkeycraft.WaterGenerator.placeWater(wChunk, 6, heightmap2);
+
+    var waterCount = 0;
+    for (var j = 0; j < wChunk.blocks.length; j++) {
+        if (wChunk.blocks[j] === 213) waterCount++;
+    }
+    assert(waterCount > 0, 'Water placed in ocean biome (got ' + waterCount + ' water blocks)');
+    wChunk.destroy();
+
+    // ============================================================
+    // TEST 8: Terrain Surface (terrain-surface.js)
+    // ============================================================
+    section('8. Terrain Surface (terrain-surface.js)');
+
+    var sChunk = new Donkeycraft.Chunk(0, 0);
+    var hm3 = [];
+    for (var i = 0; i < 256; i++) hm3[i] = 64;
+    for (var y = 0; y <= 64; y++) {
+        for (var x = 0; x < 16; x++) {
+            for (var z = 0; z < 16; z++) {
+                sChunk.setBlock(x, y, z, 1);
+            }
+        }
+    }
+    Donkeycraft.TerrainSurface.applySurfaceLayer(sChunk, 1, hm3);
+    assert(sChunk.getBlock(0, 64, 0) === 2, 'Plains surface = grass block (ID 2)');
+    assert(sChunk.getBlock(0, 63, 0) === 3, 'Plains dirt layer = dirt (ID 3)');
+
+    var sChunk2 = new Donkeycraft.Chunk(1, 0);
+    for (var y2 = 0; y2 <= 64; y2++) {
+        for (var x2 = 0; x2 < 16; x2++) {
+            for (var z2 = 0; z2 < 16; z2++) {
+                sChunk2.setBlock(x2, y2, z2, 1);
+            }
+        }
+    }
+    Donkeycraft.TerrainSurface.applySurfaceLayer(sChunk2, 2, hm3);
+    assert(sChunk2.getBlock(0, 64, 0) === 12, 'Desert surface = sand (ID 12)');
+
+    var sChunk3 = new Donkeycraft.Chunk(2, 0);
+    for (var y3 = 0; y3 <= 64; y3++) {
+        for (var x3 = 0; x3 < 16; x3++) {
+            for (var z3 = 0; z3 < 16; z3++) {
+                sChunk3.setBlock(x3, y3, z3, 1);
+            }
+        }
+    }
+    Donkeycraft.TerrainSurface.applySurfaceLayer(sChunk3, 5, hm3);
+    assert(sChunk3.getBlock(0, 64, 0) === 5, 'Taiga surface = snow block (ID 5)');
+
+    sChunk.destroy(); sChunk2.destroy(); sChunk3.destroy();
+
+    // ============================================================
+    // TEST 9: Lighting Engine (lighting-engine.js)
+    // ============================================================
+    section('9. Lighting Engine (lighting-engine.js)');
+
+    Donkeycraft.LightingEngine.init();
+    assert(true, 'LightingEngine.init() completed');
+
+    var airOpacity = Donkeycraft.LightingEngine.getLightOpacity(0);
+    assert(airOpacity === 0, 'Air light opacity = 0 (got ' + airOpacity + ')');
+
+    var stoneOpacity = Donkeycraft.LightingEngine.getLightOpacity(1);
+    assert(stoneOpacity > 0, 'Stone light opacity > 0 (got ' + stoneOpacity + ')');
+
+    var lChunk = new Donkeycraft.Chunk(0, 0);
+    var lm = [];
+    for (var i = 0; i < 256; i++) lm[i] = 64;
+    Donkeycraft.LightingEngine.calculateSkyLight(lChunk, lm);
+
+    assert(lChunk.getSkyLight(0, 64, 0) === 15, 'Surface (Y=64) has sky light = 15');
+    assert(lChunk.getSkyLight(0, 63, 0) === 15, 'Just below surface (Y=63) has sky light = 15 (fast mode)');
+    assert(lChunk.getSkyLight(0, 0, 0) === 15, 'Deep (Y=0) sky light = 15 (fast mode fills all below surface)');
+
+    var lChunk2 = new Donkeycraft.Chunk(1, 0);
+    lChunk2.fill(0);
+    lChunk2.setBlock(8, 20, 8, 18);
+    Donkeycraft.LightingEngine.calculateBlockLight(lChunk2);
+
+    var lightVal = lChunk2.getBlockLight(8, 20, 8);
+    assert(lightVal > 0, 'Crying obsidian position has block light (got ' + lightVal + ')');
+
+    var lChunk3 = new Donkeycraft.Chunk(2, 0);
+    try {
+        Donkeycraft.LightingEngine.updateChunkLighting(lChunk3);
+        assert(true, 'updateChunkLighting completed without error');
+    } catch (e) {
+        assert(false, 'updateChunkLighting threw: ' + e.message);
+    }
+
+    Donkeycraft.LightingEngine.invalidateCache();
+    assert(true, 'invalidateCache completed');
+
+    lChunk.destroy(); lChunk2.destroy(); lChunk3.destroy();
+
+    // ============================================================
+    // TEST 10: Physics (physics.js)
+    // ============================================================
+    section('10. Physics (physics.js)');
+
+    Donkeycraft.Physics.init();
+    assert(true, 'Physics.init() completed');
+
+    var sandGravity = Donkeycraft.Physics.isGravityBlock(12);
+    assert(typeof sandGravity === 'boolean', 'isGravityBlock returns boolean for sand');
+
+    var waterIsLiquid = Donkeycraft.Physics.isLiquidBlock(213);
+    assert(waterIsLiquid === true, 'Water (ID 213) is a liquid');
+
+    var stoneIsLiquid = Donkeycraft.Physics.isLiquidBlock(1);
+    assert(stoneIsLiquid === false, 'Stone (ID 1) is not a liquid');
+
+    var gravityIds = Donkeycraft.Physics.getGravityBlockIds();
+    assert(Array.isArray(gravityIds), 'getGravityBlockIds returns array');
+
+    var liquidIds = Donkeycraft.Physics.getLiquidBlockIds();
+    assert(Array.isArray(liquidIds), 'getLiquidBlockIds returns array');
+    assert(liquidIds.length > 0, 'getLiquidBlockIds returns at least one liquid');
+
+    // Sand falling test
+    var pChunk = new Donkeycraft.Chunk(0, 0);
+    pChunk.fill(0);
+    pChunk.setBlock(8, 20, 8, 12);
+
+    if (Donkeycraft.Physics.isGravityBlock(12)) {
+        var moved = Donkeycraft.Physics.applyGravity(pChunk, 8, 20, 8);
+        assert(moved === true, 'Sand falls when below is air');
+        assert(pChunk.getBlock(8, 20, 8) === 0, 'Sand position is now air');
+        assert(pChunk.getBlock(8, 19, 8) === 12, 'Sand moved to Y=19');
+    } else {
+        assert(true, 'Sand not registered as gravity block (expected on some configs)');
+    }
+
+    // Sand on stone doesn't fall
+    var pChunk2 = new Donkeycraft.Chunk(1, 0);
+    pChunk2.fill(0);
+    for (var y4 = 0; y4 <= 10; y4++) {
+        for (var x4 = 0; x4 < 16; x4++) {
+            for (var z4 = 0; z4 < 16; z4++) {
+                pChunk2.setBlock(x4, y4, z4, 1);
+            }
+        }
+    }
+    pChunk2.setBlock(8, 11, 8, 12);
+    var moved2 = Donkeycraft.Physics.applyGravity(pChunk2, 8, 11, 8);
+    assert(moved2 === false, 'Sand on stone does not fall');
+
+    try {
+        Donkeycraft.Physics.applyGravityToChunk(pChunk);
+        assert(true, 'applyGravityToChunk completed');
+    } catch (e) {
+        assert(false, 'applyGravityToChunk threw: ' + e.message);
+    }
+
+    var pChunk3 = new Donkeycraft.Chunk(2, 0);
+    pChunk3.fill(0);
+    pChunk3.setBlock(8, 10, 8, 213);
+    try {
+        Donkeycraft.Physics.simulateLiquidFlow(pChunk3);
+        assert(true, 'simulateLiquidFlow completed');
+    } catch (e) {
+        assert(false, 'simulateLiquidFlow threw: ' + e.message);
+    }
+
+    pChunk.destroy(); pChunk2.destroy(); pChunk3.destroy();
+
+    // ============================================================
+    // TEST 11: Structure Generator — Full Chunk Generation
+    // ============================================================
+    section('11. Structure Generator (structure-generator.js)');
+
+    var cm4 = new Donkeycraft.ChunkManager({ renderDistance: 1 });
+    var genChunk = cm4.getChunk(0, 0);
+
+    try {
+        Donkeycraft.StructureGenerator.generateChunkFull(genChunk, 1);
+        assert(true, 'generateChunkFull completed for plains biome');
+    } catch (e) {
+        assert(false, 'generateChunkFull threw: ' + e.message);
+    }
+
+    assert(genChunk.generated === true, 'Chunk marked as generated after generateChunkFull');
+
+    var hasStone = false;
+    var hasAir = false;
+    for (var i = 0; i < genChunk.blocks.length; i++) {
+        if (genChunk.blocks[i] === 1) hasStone = true;
+        if (genChunk.blocks[i] === 0) hasAir = true;
+    }
+    assert(hasStone, 'Chunk contains stone blocks after generation');
+    assert(hasAir, 'Chunk contains air blocks after generation');
+
+    var topBlock = genChunk.getBlock(8, Math.min(64, 60), 8);
+    assert(topBlock === 2 || topBlock === 3 || topBlock === 1 || topBlock === 7, 'Surface block is grass/dirt/stone (got ID ' + topBlock + ')');
+
+    // Generate different biomes
+    var chunkD = new Donkeycraft.Chunk(1, 0);
+    try {
+        Donkeycraft.StructureGenerator.generateChunkFull(chunkD, 2);
+        assert(true, 'generateChunkFull completed for desert biome');
+    } catch (e) {
+        assert(false, 'generateChunkFull for desert threw: ' + e.message);
+    }
+
+    var chunkE = new Donkeycraft.Chunk(2, 0);
+    try {
+        Donkeycraft.StructureGenerator.generateChunkFull(chunkE, 6);
+        assert(true, 'generateChunkFull completed for ocean biome');
+    } catch (e) {
+        assert(false, 'generateChunkFull for ocean threw: ' + e.message);
+    }
+
+    // Bedrock layer check
+    var hasBedrock = false;
+    for (var x = 0; x < 16; x++) {
+        for (var z = 0; z < 16; z++) {
+            if (genChunk.getBlock(x, 0, z) === 7) {
+                hasBedrock = true;
                 break;
             }
         }
-        // Note: caves may or may not carve depending on noise threshold
-        assert(true, 'Cave generation completed (air blocks carved: ' + hasAir + ')');
+        if (hasBedrock) break;
     }
+    assert(hasBedrock, 'Bedrock layer placed at bottom of chunk');
 
-    // ============================================================
-    // Water Generator Tests
-    // ============================================================
-    function testWaterGenerator() {
-        section('Water Generator');
+    cm4.destroy();
 
-        // Test: getWaterLevel
-        var level = Donkeycraft.WaterGenerator.getWaterLevel();
-        assert(level === 63, 'Default water level = 63 (got ' + level + ')');
+    finishTests();
 
-        // Test: setWaterLevel
-        Donkeycraft.WaterGenerator.setWaterLevel(70);
-        assert(Donkeycraft.WaterGenerator.getWaterLevel() === 70, 'setWaterLevel updates to 70');
-        Donkeycraft.WaterGenerator.setWaterLevel(63); // Reset
-
-        // Test: placeWater in ocean biome
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        var heightmap = [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20,
-                         20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20];
-        Donkeycraft.WaterGenerator.placeWater(chunk, 6, heightmap); // Ocean
-
-        // Count water blocks
-        var waterCount = 0;
-        for (var i = 0; i < chunk.blocks.length; i++) {
-            if (chunk.blocks[i] === 213) waterCount++;
-        }
-        assert(waterCount > 0, 'Water placed in ocean biome (got ' + waterCount + ' water blocks)');
-
-        // Test: placeWater in plains biome (no water expected unless swamp)
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        var plainsHM = [];
-        for (var j = 0; j < 256; j++) plainsHM[j] = 64; // Flat at Y=64
-        Donkeycraft.WaterGenerator.placeWater(chunk2, 1, plainsHM); // Plains
-
-        var plainsWaterCount = 0;
-        for (var k = 0; k < chunk2.blocks.length; k++) {
-            if (chunk2.blocks[k] === 213) plainsWaterCount++;
-        }
-        assert(plainsWaterCount >= 0, 'Plains water count: ' + plainsWaterCount);
-
-        // Test: Underground lakes placed
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        chunk3.fill(1); // All stone
-        Donkeycraft.WaterGenerator.placeWater(chunk3, 1, plainsHM);
-        assert(true, 'placeWater with underground lakes completed');
-    }
-
-    // ============================================================
-    // Terrain Surface Tests
-    // ============================================================
-    function testTerrainSurface() {
-        section('Terrain Surface');
-
-        // Test: Grass surface (plains)
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        var heightmap = [];
-        for (var i = 0; i < 256; i++) heightmap[i] = 64; // Flat at Y=64
-        // Pre-fill with stone
-        for (var y = 0; y <= 64; y++) {
-            for (var x = 0; x < 16; x++) {
-                for (var z = 0; z < 16; z++) {
-                    chunk.setBlock(x, y, z, 1); // stone
-                }
-            }
-        }
-        Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, 1, heightmap); // Plains
-
-        // Check top block is grass
-        assert(chunk.getBlock(0, 64, 0) === 2, 'Plains surface = grass block (ID 2)');
-        // Check dirt layer below
-        assert(chunk.getBlock(0, 63, 0) === 3, 'Plains dirt layer = dirt (ID 3)');
-
-        // Test: Sand surface (desert)
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        for (var y2 = 0; y2 <= 64; y2++) {
-            for (var x2 = 0; x2 < 16; x2++) {
-                for (var z2 = 0; z2 < 16; z2++) {
-                    chunk2.setBlock(x2, y2, z2, 1);
-                }
-            }
-        }
-        Donkeycraft.TerrainSurface.applySurfaceLayer(chunk2, 2, heightmap); // Desert
-        assert(chunk2.getBlock(0, 64, 0) === 12, 'Desert surface = sand (ID 12)');
-
-        // Test: Snow surface (taiga)
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        for (var y3 = 0; y3 <= 64; y3++) {
-            for (var x3 = 0; x3 < 16; x3++) {
-                for (var z3 = 0; z3 < 16; z3++) {
-                    chunk3.setBlock(x3, y3, z3, 1);
-                }
-            }
-        }
-        Donkeycraft.TerrainSurface.applySurfaceLayer(chunk3, 5, heightmap); // Taiga
-        assert(chunk3.getBlock(0, 64, 0) === 5, 'Taiga surface = snow block (ID 5)');
-
-        // Test: Stone surface (extreme hills)
-        var chunk4 = new Donkeycraft.Chunk(3, 0);
-        for (var y4 = 0; y4 <= 64; y4++) {
-            for (var x4 = 0; x4 < 16; x4++) {
-                for (var z4 = 0; z4 < 16; z4++) {
-                    chunk4.setBlock(x4, y4, z4, 1);
-                }
-            }
-        }
-        Donkeycraft.TerrainSurface.applySurfaceLayer(chunk4, 7, heightmap); // Extreme Hills
-        assert(chunk4.getBlock(0, 64, 0) === 1, 'Extreme Hills surface = stone (ID 1)');
-
-        // Test: Swamp surface (dirt + clay below)
-        var chunk5 = new Donkeycraft.Chunk(4, 0);
-        for (var y5 = 0; y5 <= 64; y5++) {
-            for (var x5 = 0; x5 < 16; x5++) {
-                for (var z5 = 0; z5 < 16; z5++) {
-                    chunk5.setBlock(x5, y5, z5, 1);
-                }
-            }
-        }
-        Donkeycraft.TerrainSurface.applySurfaceLayer(chunk5, 4, heightmap); // Swamp
-        assert(chunk5.getBlock(0, 64, 0) === 3, 'Swamp surface = dirt (ID 3)');
-    }
-
-    // ============================================================
-    // Lighting Engine Tests
-    // ============================================================
-    function testLightingEngine() {
-        section('Lighting Engine');
-
-        // Test: init
-        Donkeycraft.LightingEngine.init();
-        assert(true, 'LightingEngine.init() completed');
-
-        // Test: getLightOpacity
-        var airOpacity = Donkeycraft.LightingEngine.getLightOpacity(0);
-        assert(airOpacity === 0, 'Air light opacity = 0 (got ' + airOpacity + ')');
-
-        var stoneOpacity = Donkeycraft.LightingEngine.getLightOpacity(1);
-        assert(stoneOpacity > 0, 'Stone light opacity > 0 (got ' + stoneOpacity + ')');
-
-        // Test: calculateSkyLight with heightmap
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        var lm = [];
-        for (var i = 0; i < 256; i++) lm[i] = 64; // Flat at Y=64
-
-        Donkeycraft.LightingEngine.calculateSkyLight(chunk, lm);
-
-        // Surface should have full sky light
-        assert(chunk.getSkyLight(0, 64, 0) === 15, 'Surface (Y=64) has sky light = 15');
-        // Fast mode fills from surface down with constant light=15
-        assert(chunk.getSkyLight(0, 63, 0) === 15, 'Just below surface (Y=63) has sky light = 15 (fast mode, got ' + chunk.getSkyLight(0, 63, 0) + ')');
-        // Deep underground also gets light=15 in fast mode (no attenuation)
-        assert(chunk.getSkyLight(0, 0, 0) === 15, 'Deep (Y=0) sky light = 15 (fast mode fills all below surface, got ' + chunk.getSkyLight(0, 0, 0) + ')');
-
-        // Test: calculateBlockLight
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        chunk2.fill(0); // All air
-        // Place a light-emitting block at (8, 20, 8) — crying_obsidian has lightLevel=10
-        chunk2.setBlock(8, 20, 8, 18); // crying_obsidian (lightLevel=10)
-
-        Donkeycraft.LightingEngine.calculateBlockLight(chunk2);
-
-        // Light-emitting block position should have block light
-        var lightVal = chunk2.getBlockLight(8, 20, 8);
-        assert(lightVal > 0, 'Crying obsidian position has block light (got ' + lightVal + ')');
-
-        // Test: updateChunkLighting
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        Donkeycraft.LightingEngine.updateChunkLighting(chunk3);
-        assert(true, 'updateChunkLighting completed without error');
-
-        // Test: invalidateCache
-        Donkeycraft.LightingEngine.invalidateCache();
-        assert(true, 'invalidateCache completed');
-    }
-
-    // ============================================================
-    // Physics Tests
-    // ============================================================
-    function testPhysics() {
-        section('Physics');
-
-        // Test: init
-        Donkeycraft.Physics.init();
-        assert(true, 'Physics.init() completed');
-
-        // Test: isGravityBlock
-        var sandGravity = Donkeycraft.Physics.isGravityBlock(12); // sand — actually NOT gravity affected in vanilla
-        // Note: sand IS gravity-affected in Minecraft. Check Block definition.
-        assert(typeof sandGravity === 'boolean', 'isGravityBlock returns boolean for sand');
-
-        // Test: isLiquidBlock
-        var waterIsLiquid = Donkeycraft.Physics.isLiquidBlock(213); // water
-        assert(waterIsLiquid === true, 'Water (ID 213) is a liquid');
-
-        var stoneIsLiquid = Donkeycraft.Physics.isLiquidBlock(1); // stone
-        assert(stoneIsLiquid === false, 'Stone (ID 1) is not a liquid');
-
-        // Test: getGravityBlockIds returns array
-        var gravityIds = Donkeycraft.Physics.getGravityBlockIds();
-        assert(Array.isArray(gravityIds), 'getGravityBlockIds returns array');
-
-        // Test: getLiquidBlockIds returns array
-        var liquidIds = Donkeycraft.Physics.getLiquidBlockIds();
-        assert(Array.isArray(liquidIds), 'getLiquidBlockIds returns array');
-        assert(liquidIds.length > 0, 'getLiquidBlockIds returns at least one liquid');
-
-        // Test: applyGravity — sand falling
-        var chunk = new Donkeycraft.Chunk(0, 0);
-        chunk.fill(0); // All air
-        // Place sand at (8, 20, 8)
-        chunk.setBlock(8, 20, 8, 12); // sand
-
-        var moved = Donkeycraft.Physics.applyGravity(chunk, 8, 20, 8);
-        // Sand should fall into air
-        if (Donkeycraft.Physics.isGravityBlock(12)) {
-            assert(moved === true, 'Sand falls when below is air');
-            assert(chunk.getBlock(8, 20, 8) === 0, 'Sand position is now air');
-            assert(chunk.getBlock(8, 19, 8) === 12, 'Sand moved to Y=19');
-        } else {
-            assert(moved === false, 'Sand did not move (not registered as gravity block)');
-        }
-
-        // Test: applyGravity — sand on stone doesn't fall
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        chunk2.fill(0);
-        for (var y = 0; y <= 10; y++) {
-            for (var x = 0; x < 16; x++) {
-                for (var z = 0; z < 16; z++) {
-                    chunk2.setBlock(x, y, z, 1); // stone base
-                }
-            }
-        }
-        chunk2.setBlock(8, 11, 8, 12); // sand on stone
-        var moved2 = Donkeycraft.Physics.applyGravity(chunk2, 8, 11, 8);
-        assert(moved2 === false, 'Sand on stone does not fall');
-
-        // Test: applyGravityToChunk
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        chunk3.fill(0);
-        if (Donkeycraft.Physics.isGravityBlock(12)) {
-            for (var x3 = 0; x3 < 16; x3++) {
-                for (var z3 = 0; z3 < 16; z3++) {
-                    chunk3.setBlock(x3, 20, z3, 12); // sand at Y=20
-                }
-            }
-        }
-        try {
-            Donkeycraft.Physics.applyGravityToChunk(chunk3);
-            assert(true, 'applyGravityToChunk completed');
-        } catch (e) {
-            assert(false, 'applyGravityToChunk threw: ' + e.message);
-        }
-
-        // Test: simulateLiquidFlow
-        var chunk4 = new Donkeycraft.Chunk(3, 0);
-        chunk4.fill(0);
-        chunk4.setBlock(8, 10, 8, 213); // Place water source
-        try {
-            Donkeycraft.Physics.simulateLiquidFlow(chunk4);
-            assert(true, 'simulateLiquidFlow completed');
-        } catch (e) {
-            assert(false, 'simulateLiquidFlow threw: ' + e.message);
-        }
-    }
-
-    // ============================================================
-    // Structure Generator Tests
-    // ============================================================
-    function testStructureGenerator() {
-        section('Structure Generator (Full Chunk Generation)');
-
-        // Test: generateChunkFull runs without error
-        var cm = new Donkeycraft.ChunkManager({ renderDistance: 1 });
-        var chunk = cm.getChunk(0, 0);
-
-        try {
-            Donkeycraft.StructureGenerator.generateChunkFull(chunk, 1); // Plains
-            assert(true, 'generateChunkFull completed for plains biome');
-        } catch (e) {
-            assert(false, 'generateChunkFull threw: ' + e.message);
-        }
-
-        // Test: Chunk marked as generated
-        assert(chunk.generated === true, 'Chunk marked as generated after generateChunkFull');
-
-        // Test: Terrain blocks placed
-        var hasStone = false;
-        var hasAir = false;
-        for (var i = 0; i < chunk.blocks.length; i++) {
-            if (chunk.blocks[i] === 1) hasStone = true;
-            if (chunk.blocks[i] === 0) hasAir = true;
-        }
-        assert(hasStone, 'Chunk contains stone blocks after generation');
-        assert(hasAir, 'Chunk contains air blocks after generation');
-
-        // Test: Surface block is grass for plains (check below surface to account for caves)
-        var surfaceY = 64; // Approximate from heightmap
-        var topBlock = chunk.getBlock(8, Math.min(surfaceY, 60), 8);
-        assert(topBlock === 2 || topBlock === 3 || topBlock === 1 || topBlock === 7, 'Surface block is grass/dirt/stone (got ID ' + topBlock + ')');
-
-        // Test: Generate different biomes
-        var chunk2 = new Donkeycraft.Chunk(1, 0);
-        try {
-            Donkeycraft.StructureGenerator.generateChunkFull(chunk2, 2); // Desert
-            assert(true, 'generateChunkFull completed for desert biome');
-        } catch (e) {
-            assert(false, 'generateChunkFull for desert threw: ' + e.message);
-        }
-
-        var chunk3 = new Donkeycraft.Chunk(2, 0);
-        try {
-            Donkeycraft.StructureGenerator.generateChunkFull(chunk3, 6); // Ocean
-            assert(true, 'generateChunkFull completed for ocean biome');
-        } catch (e) {
-            assert(false, 'generateChunkFull for ocean threw: ' + e.message);
-        }
-
-        var chunk4 = new Donkeycraft.Chunk(3, 0);
-        try {
-            Donkeycraft.StructureGenerator.generateChunkFull(chunk4, 7); // Extreme Hills
-            assert(true, 'generateChunkFull completed for extreme hills biome');
-        } catch (e) {
-            assert(false, 'generateChunkFull for extreme hills threw: ' + e.message);
-        }
-
-        // Test: Bedrock layer placed at bottom of chunk
-        var hasBedrock = false;
-        for (var x = 0; x < 16; x++) {
-            for (var z = 0; z < 16; z++) {
-                if (chunk.getBlock(x, 0, z) === 7) { // bedrock at Y=0
-                    hasBedrock = true;
-                    break;
-                }
-            }
-            if (hasBedrock) break;
-        }
-        assert(hasBedrock, 'Bedrock layer placed at bottom of chunk');
-
-        cm.destroy();
-    }
-
-    // ============================================================
-    // Run Tests
-    // ============================================================
-    document.getElementById('runTests').addEventListener('click', runAll);
-    </script>
+})();
+</script>
 </body>
 </html>

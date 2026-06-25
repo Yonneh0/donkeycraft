@@ -21,9 +21,7 @@
      * GeometryBuilder — Builds vertex data arrays for chunk mesh rendering.
      */
     Donkeycraft.GeometryBuilder = function() {
-        this._vertexSize = 8; // position(3) + UV(2) + normal(3) is wrong, let me recalculate
-        // Actually: position(3) + UV(2) + normal(3) + light(1) = 9 floats per vertex
-        this._vertexSize = 9;
+        this._vertexSize = 9; // position(3) + UV(2) + normal(3) + light(1)
     };
 
     /**

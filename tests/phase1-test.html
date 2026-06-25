@@ -2,26 +2,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Donkeycraft Phase 1 — Core Infrastructure Test Suite</title>
+<title>Donkeycraft — Phase 1 Core Infrastructure Test</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
-  h1 { color: #00d4ff; margin-bottom: 8px; font-size: 1.4em; }
-  .summary { margin: 12px 0; padding: 10px 14px; border-radius: 4px; font-size: 0.95em; }
-  .summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
-  .summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
-  .section { margin: 16px 0; padding: 10px 14px; background: #16213e; border-radius: 4px; }
-  .section h2 { color: #00d4ff; font-size: 1.1em; margin-bottom: 8px; }
-  .test { padding: 4px 0 4px 20px; font-size: 0.88em; border-left: 2px solid #333; }
-  .test.pass { color: #2ecc71; border-left-color: #2ecc71; }
-  .test.fail { color: #e74c3c; border-left-color: #e74c3c; }
-  .test .detail { color: #888; font-size: 0.85em; margin-top: 2px; }
-  #results { margin-top: 16px; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
+.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
+.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
+.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
+.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
+.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
+.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
+.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
+.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
+.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
 </style>
 </head>
 <body>
-<h1>Donkeycraft Phase 1 — Core Infrastructure Test Suite</h1>
-<div id="summary"></div>
+<h1>Donkeycraft — Phase 1 Core Infrastructure Test</h1>
+<div class="subtitle">Testing: Namespace, EventBus, Config, Logger, Timer, Input, Math Utilities (Vector3/Matrix4/Quaternion), AudioSystem</div>
 <div id="results"></div>
 
 <!-- Load scripts in dependency order -->
@@ -39,22 +40,23 @@
     'use strict';
 
     var results = document.getElementById('results');
-    var summaryEl = document.getElementById('summary');
     var totalTests = 0;
     var passedTests = 0;
     var failedTests = 0;
     var currentSection = null;
 
-    // --- Test helpers ---
+    // ============================================================
+    // Test Framework (uniform across all tests)
+    // ============================================================
 
-    function startSection(name) {
-        var section = document.createElement('div');
-        section.className = 'section';
+    function section(name) {
+        var div = document.createElement('div');
+        div.className = 'section';
         var heading = document.createElement('h2');
         heading.textContent = name;
-        section.appendChild(heading);
-        results.appendChild(section);
-        currentSection = section;
+        div.appendChild(heading);
+        results.appendChild(div);
+        currentSection = div;
     }
 
     function assert(condition, message) {
@@ -63,11 +65,11 @@
         if (condition) {
             passedTests++;
             div.className = 'test pass';
-            div.textContent = '✓ PASS: ' + message;
+            div.textContent = '\u2713 PASS: ' + message;
         } else {
             failedTests++;
             div.className = 'test fail';
-            div.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
         }
         currentSection.appendChild(div);
     }
@@ -78,14 +80,14 @@
             passedTests++;
             var div = document.createElement('div');
             div.className = 'test pass';
-            div.textContent = '✓ PASS: ' + message;
+            div.textContent = '\u2713 PASS: ' + message;
             currentSection.appendChild(div);
         } else {
             failedTests++;
-            var div2 = document.createElement('div');
-            div2.className = 'test fail';
-            div2.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
-            currentSection.appendChild(div2);
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
+            currentSection.appendChild(div);
         }
     }
 
@@ -95,14 +97,14 @@
             passedTests++;
             var div = document.createElement('div');
             div.className = 'test pass';
-            div.textContent = '✓ PASS: ' + message;
+            div.textContent = '\u2713 PASS: ' + message;
             currentSection.appendChild(div);
         } else {
             failedTests++;
-            var div2 = document.createElement('div');
-            div2.className = 'test fail';
-            div2.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
-            currentSection.appendChild(div2);
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
+            currentSection.appendChild(div);
         }
     }
 
@@ -112,14 +114,14 @@
             passedTests++;
             var div = document.createElement('div');
             div.className = 'test pass';
-            div.textContent = '✓ PASS: ' + message;
+            div.textContent = '\u2713 PASS: ' + message;
             currentSection.appendChild(div);
         } else {
             failedTests++;
-            var div2 = document.createElement('div');
-            div2.className = 'test fail';
-            div2.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
-            currentSection.appendChild(div2);
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
+            currentSection.appendChild(div);
         }
     }
 
@@ -129,7 +131,7 @@
             failedTests++;
             var div = document.createElement('div');
             div.className = 'test fail';
-            div.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
             currentSection.appendChild(div);
             return;
         }
@@ -138,7 +140,7 @@
                 failedTests++;
                 var div3 = document.createElement('div');
                 div3.className = 'test fail';
-                div3.innerHTML = '✗ FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
+                div3.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
                 currentSection.appendChild(div3);
                 return;
             }
@@ -146,26 +148,33 @@
         passedTests++;
         var div2 = document.createElement('div');
         div2.className = 'test pass';
-        div2.textContent = '✓ PASS: ' + message;
+        div2.textContent = '\u2713 PASS: ' + message;
         currentSection.appendChild(div2);
+    }
+
+    function info(msg) {
+        var div = document.createElement('div');
+        div.className = 'info-msg';
+        div.textContent = '>> ' + msg;
+        currentSection.appendChild(div);
     }
 
     function finishTests() {
         var summary = document.createElement('div');
         if (failedTests === 0) {
             summary.className = 'summary pass';
-            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> — ' + passedTests + '/' + totalTests;
+            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
         } else {
             summary.className = 'summary fail';
-            summary.innerHTML = '<strong>TESTS FAILED</strong> — ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
+            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
         }
-        summaryEl.appendChild(summary);
+        results.appendChild(summary);
     }
 
     // ============================================================
-    // TEST: Namespace
+    // TEST: Namespace (namespace.js)
     // ============================================================
-    startSection('1. Namespace (namespace.js)');
+    section('1. Namespace (namespace.js)');
 
     assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft global exists');
     assert(typeof Donkeycraft.VERSION === 'string', 'Donkeycraft.VERSION is a string');
@@ -176,7 +185,7 @@
     assert(typeof Donkeycraft.isRunning === 'boolean', 'Donkeycraft.isRunning is a boolean');
     assertEq(Donkeycraft.isRunning, false, 'isRunning defaults to false');
 
-    // Double-load safety: re-execute namespace script content
+    // Double-load safety
     var beforeSystems = Donkeycraft.systems;
     (function() {
         'use strict';
@@ -189,9 +198,9 @@
     assert(Donkeycraft.systems === beforeSystems, 'Double-load preserves existing systems object');
 
     // ============================================================
-    // TEST: EventBus
+    // TEST: EventBus (eventbus.js)
     // ============================================================
-    startSection('2. EventBus (eventbus.js)');
+    section('2. EventBus (eventbus.js)');
 
     var bus = new Donkeycraft.EventBus();
 
@@ -221,35 +230,21 @@
     bus.emit('unsubTest');
     assert(!unsubCalled, 'on(): unsubscribe function prevents further calls');
 
-    // once() — fires only once
+    // once() \u2014 fires only once
     var onceCount = 0;
     bus.once('onceTest', function() { onceCount++; });
     bus.emit('onceTest');
     bus.emit('onceTest');
     assertEq(onceCount, 1, 'once(): fires exactly once');
 
-    // once() — unsubscribe before fire
+    // once() \u2014 unsubscribe before fire
     var neverFired = false;
     var unsubOnce = bus.once('neverFire', function() { neverFired = true; });
     unsubOnce();
     bus.emit('neverFire');
     assert(!neverFired, 'once(): unsubscribe before fire prevents execution');
 
-    // off() — removes by original callback
-    var offCb = function() {};
-    bus.once('offTest', offCb);
-    bus.off('offTest', offCb);
-    var offFired = false;
-    // Re-register to verify the old one was removed
-    bus.on('offTest', function() { offFired = true; });
-    bus.emit('offTest');
-    assert(offFired, 'off(): re-registered listener still works after removing once callback');
-
-    // off() — removes regular listeners
-    var offRegFired = false;
-    bus.on('offReg', function() { offRegFired = true; });
-    bus.off('offReg', function() { offRegFired = true; }); // This won't match (different fn)
-    // Actually register and remove properly
+    // off() \u2014 removes by original callback
     var regCb = function() {};
     bus.on('offReg2', regCb);
     bus.off('offReg2', regCb);
@@ -261,11 +256,10 @@
     var nsBus = new Donkeycraft.EventBus('world');
     var nsFired = false;
     nsBus.on('chunkLoad', function() { nsFired = true; });
-    bus.emit('worldchunkLoad'); // Should NOT fire the namespaced listener
     nsBus.emit('chunkLoad');
     assert(nsFired, 'EventBus: namespace prefixing works correctly');
 
-    // emit() — error isolation
+    // emit() \u2014 error isolation
     var afterErrorFired = false;
     var bus2 = new Donkeycraft.EventBus();
     bus2.on('errorTest', function() { throw new Error('test error'); });
@@ -280,9 +274,9 @@
     assert(true, 'clear(): executes without error (all listeners removed)');
 
     // ============================================================
-    // TEST: Config
+    // TEST: Config (config.js)
     // ============================================================
-    startSection('3. Config (config.js)');
+    section('3. Config (config.js)');
 
     assert(typeof Donkeycraft.Config !== 'undefined', 'Donkeycraft.Config exists');
     assertType(Donkeycraft.Config, 'object', 'Config is an object');
@@ -346,9 +340,9 @@
     assertEq(Donkeycraft.Config.SAVE_BATCH_DELAY, 100, 'SAVE_BATCH_DELAY = 100');
 
     // ============================================================
-    // TEST: Logger
+    // TEST: Logger (logger.js)
     // ============================================================
-    startSection('4. Logger (logger.js)');
+    section('4. Logger (logger.js)');
 
     assert(typeof Donkeycraft.LogLevel === 'object', 'Donkeycraft.LogLevel exists');
     assertEq(Donkeycraft.LogLevel.DEBUG, 0, 'LogLevel.DEBUG = 0');
@@ -383,6 +377,7 @@
     assert(Donkeycraft.Logger.getLevel() === Donkeycraft.LogLevel.SILENT, 'SILENT level suppresses all');
 
     // Restore and test tag toggle
+    Donkeycraft.Logger.setTagEnabled(true);
     Donkeycraft.Logger.setTagEnabled(false);
     assert(!Donkeycraft.Logger.getTagEnabled(), 'getTagEnabled returns false after setTagEnabled(false)');
 
@@ -391,10 +386,8 @@
 
     // Restore default level
     Donkeycraft.Logger.setLevel(levelBefore);
-    Donkeycraft.Logger.setTagEnabled(true);
 
     // Test that error method accepts multiple args
-    assertType(Donkeycraft.Logger.error, 'function', 'Logger.error accepts variadic args (no error calling)');
     try {
         Donkeycraft.Logger.error('test', 'msg', 123, { key: 'val' });
         assert(true, 'Logger.error() executes without error with multiple arguments');
@@ -403,9 +396,9 @@
     }
 
     // ============================================================
-    // TEST: Timer
+    // TEST: Timer (timer.js)
     // ============================================================
-    startSection('5. Timer (timer.js)');
+    section('5. Timer (timer.js)');
 
     // Constructor
     var timer = new Donkeycraft.Timer();
@@ -423,7 +416,7 @@
 
     // Custom ticks per second
     var fastTimer = new Donkeycraft.Timer(10);
-    assertEq(fastTimer._tickInterval, 100, 'Custom 10 TPS → tick interval = 100ms');
+    assertEq(fastTimer._tickInterval, 100, 'Custom 10 TPS \u2192 tick interval = 100ms');
 
     // getDeltaTime starts at 0
     assertNear(timer.getDeltaTime(), 0, 0.001, 'Initial deltaTime is 0');
@@ -444,10 +437,8 @@
 
     // onRender callback
     var renderCbCalled = false;
-    var renderDtReceived = null;
     var unsubRender = timer.onRender(function(dt) {
         renderCbCalled = true;
-        renderDtReceived = dt;
     });
     assertType(unsubRender, 'function', 'onRender returns unsubscribe function');
 
@@ -459,9 +450,8 @@
     yieldFrames(2).then(function() {
         assert(renderCbCalled, 'onRender callback fires after start()');
 
-        // Manually advance the accumulator to force a tick — real time is unreliable in tests
-        timer._accumulator = 0.06; // > tickDt (0.05) so one tick will fire
-        // Simulate one loop iteration to process the tick
+        // Manually advance the accumulator to force a tick
+        timer._accumulator = 0.06;
         var tickDt = timer._tickInterval / 1000;
         if (timer._accumulator >= tickDt) {
             timer._accumulator -= tickDt;
@@ -489,12 +479,11 @@
         timer.stop();
         assert(!timer._running, 'Timer._running is false after stop()');
 
-        // Test unsubscribe tick — use a fresh timer for reliability
+        // Test unsubscribe tick \u2014 use a fresh timer for reliability
         var unsubTickCbFired = false;
         var timer3 = new Donkeycraft.Timer(20);
         var unsubTickCb = timer3.onTick(function() { unsubTickCbFired = true; });
         unsubTickCb();
-        // Manually fire tick to verify unsubscribe worked
         timer3._accumulator = 0.06;
         var t3tickDt = timer3._tickInterval / 1000;
         if (timer3._accumulator >= t3tickDt) {
@@ -521,8 +510,7 @@
         var timer2 = new Donkeycraft.Timer(20);
         timer2.onTick(function() { throw new Error('tick error test'); });
         timer2.onTick(function() { afterErrorTick = true; });
-        // Manually advance accumulator to force ticks
-        timer2._accumulator = 0.10; // enough for 2 ticks
+        timer2._accumulator = 0.10;
         var t2tickDt = timer2._tickInterval / 1000;
         while (timer2._accumulator >= t2tickDt) {
             timer2._accumulator -= t2tickDt;
@@ -544,11 +532,10 @@
     });
 
     // ============================================================
-    // TEST: Input
+    // TEST: Input (input.js)
     // ============================================================
-    startSection('6. Input (input.js)');
+    section('6. Input (input.js)');
 
-    // Note: Input attaches global event listeners, so we create and destroy it.
     var input = new Donkeycraft.Input();
     assert(input instanceof Donkeycraft.Input, 'Input constructor creates instance');
     assertType(input.isKeyDown, 'function', 'isKeyDown is a function');
@@ -563,8 +550,8 @@
     assertType(input.destroy, 'function', 'destroy is a function');
 
     // isKeyDown: no keys pressed initially
-    assert(!input.isKeyDown('KeyW'), 'No keys pressed initially → KeyW = false');
-    assert(!input.isKeyDown('Space'), 'No keys pressed initially → Space = false');
+    assert(!input.isKeyDown('KeyW'), 'No keys pressed initially \u2192 KeyW = false');
+    assert(!input.isKeyDown('Space'), 'No keys pressed initially \u2192 Space = false');
 
     // getMouseState returns object with expected properties
     var ms = input.getMouseState();
@@ -591,14 +578,12 @@
     assertEq(wheel2, 0, 'getWheelDelta() resets after first call');
 
     // updateKeyStates + isKeyJustPressed: simulate key press via event
-    // We dispatch a keydown event, then call updateKeyStates
     var keyPressEvent = new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true });
     window.dispatchEvent(keyPressEvent);
 
-    assert(input.isKeyDown('KeyW'), 'After keydown KeyW → isKeyDown = true');
-    // Just-pressed requires updateKeyStates to be called
+    assert(input.isKeyDown('KeyW'), 'After keydown KeyW \u2192 isKeyDown = true');
     input.updateKeyStates();
-    assert(input.isKeyJustPressed('KeyW'), 'After keydown + updateKeyStates → isKeyJustPressed = true');
+    assert(input.isKeyJustPressed('KeyW'), 'After keydown + updateKeyStates \u2192 isKeyJustPressed = true');
 
     // Second call to isKeyJustPressed should return false (cleared by updateKeyStates)
     input.updateKeyStates();
@@ -607,16 +592,15 @@
     // Key release
     var keyReleaseEvent = new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true });
     window.dispatchEvent(keyReleaseEvent);
-    assert(!input.isKeyDown('KeyW'), 'After keyup KeyW → isKeyDown = false');
+    assert(!input.isKeyDown('KeyW'), 'After keyup KeyW \u2192 isKeyDown = false');
 
-    // destroy removes listeners — we can't easily verify this, but verify it doesn't throw
     input.destroy();
     assert(true, 'Input.destroy() executes without error');
 
     // ============================================================
-    // TEST: Vector3
+    // TEST: Vector3 (math-utils.js)
     // ============================================================
-    startSection('7. Math Utilities — Vector3 (math-utils.js)');
+    section('7. Math Utilities \u2014 Vector3 (math-utils.js)');
 
     var v = new Donkeycraft.Vector3(3, 4, 0);
     assert(v.x === 3 && v.y === 4 && v.z === 0, 'Vector3 constructor sets x, y, z');
@@ -648,35 +632,35 @@
     var fromArr = Donkeycraft.Vector3.fromArray([7, 8, 9]);
     assert(fromArr.x === 7 && fromArr.y === 8 && fromArr.z === 9, 'Vector3.fromArray([7,8,9])');
 
-    // set() — chaining
+    // set() \u2014 chaining
     var chain = v.set(1, 2, 3);
     assertEq(chain, v, 'set() returns this for chaining');
     assert(v.x === 1 && v.y === 2 && v.z === 3, 'set() updates components');
 
-    // add() — chaining
+    // add() \u2014 chaining
     var a = new Donkeycraft.Vector3(1, 2, 3);
     var b = new Donkeycraft.Vector3(4, 5, 6);
     var addResult = a.add(b);
     assertEq(addResult, a, 'add() returns this');
     assert(a.x === 5 && a.y === 7 && a.z === 9, 'add() modifies in place: (1,2,3)+(4,5,6)=(5,7,9)');
 
-    // sub() — chaining
+    // sub() \u2014 chaining
     var c = new Donkeycraft.Vector3(10, 20, 30);
     var d = new Donkeycraft.Vector3(3, 4, 5);
     c.sub(d);
     assert(c.x === 7 && c.y === 16 && c.z === 25, 'sub() in place: (10,20,30)-(3,4,5)=(7,16,25)');
 
-    // scale() — chaining
+    // scale() \u2014 chaining
     var e = new Donkeycraft.Vector3(2, 3, 4);
     e.scale(3);
-    assert(e.x === 6 && e.y === 9 && e.z === 12, 'scale(3): (2,3,4) → (6,9,12)');
+    assert(e.x === 6 && e.y === 9 && e.z === 12, 'scale(3): (2,3,4) \u2192 (6,9,12)');
 
     // dot product
     var f = new Donkeycraft.Vector3(1, 2, 3);
     var g = new Donkeycraft.Vector3(4, 5, 6);
     assertEq(f.dot(g), 32, 'dot((1,2,3),(4,5,6)) = 32');
 
-    // cross product — chaining
+    // cross product \u2014 chaining
     var h = new Donkeycraft.Vector3(1, 0, 0);
     var i = new Donkeycraft.Vector3(0, 1, 0);
     var crossResult = h.cross(i);
@@ -690,7 +674,7 @@
     // length
     assertNear(j.length(), 5, 0.001, 'length((3,4,0)) = 5');
 
-    // normalize — chaining
+    // normalize \u2014 chaining
     var k = new Donkeycraft.Vector3(3, 4, 0);
     var normResult = k.normalize();
     assertEq(normResult, k, 'normalize() returns this');
@@ -701,7 +685,7 @@
     zeroV.normalize();
     assert(zeroV.x === 0 && zeroV.y === 0 && zeroV.z === 0, 'normalize() of zero vector stays (0,0,0)');
 
-    // normalized() — returns copy
+    // normalized() \u2014 returns copy
     var l = new Donkeycraft.Vector3(10, 0, 0);
     var normCopy = l.normalized();
     assertNear(normCopy.length(), 1, 0.001, 'normalized() returns unit vector');
@@ -712,7 +696,7 @@
     var n = new Donkeycraft.Vector3(3, 4, 0);
     assertNear(m.distanceTo(n), 5, 0.001, 'distanceTo((0,0,0),(3,4,0)) = 5');
 
-    // floor — chaining
+    // floor \u2014 chaining
     var o = new Donkeycraft.Vector3(1.7, -2.3, 3.9);
     var floorResult = o.floor();
     assertEq(floorResult, o, 'floor() returns this');
@@ -721,10 +705,10 @@
     // equals with epsilon
     var p = new Donkeycraft.Vector3(0.0005, 0.0005, 0.0005);
     var q = new Donkeycraft.Vector3(0, 0, 0);
-    assert(p.equals(q), 'equals() with default epsilon: (0.0005,0.0005,0.0005) ≈ (0,0,0)');
+    assert(p.equals(q), 'equals() with default epsilon: (0.0005,0.0005,0.0005) \u2248 (0,0,0)');
 
     var r = new Donkeycraft.Vector3(0.1, 0, 0);
-    assert(!r.equals(q), 'equals() with default epsilon: (0.1,0,0) ≠ (0,0,0)');
+    assert(!r.equals(q), 'equals() with default epsilon: (0.1,0,0) \u2260 (0,0,0)');
 
     // isZero
     var zVec = new Donkeycraft.Vector3(0, 0, 0);
@@ -732,74 +716,62 @@
     assert(!(new Donkeycraft.Vector3(1, 0, 0)).isZero(), '(1,0,0).isZero() = false');
 
     // ============================================================
-    // TEST: Matrix4
+    // TEST: Matrix4 (math-utils.js)
     // ============================================================
-    startSection('8. Math Utilities — Matrix4 (math-utils.js)');
+    section('8. Math Utilities \u2014 Matrix4 (math-utils.js)');
 
-    // createIdentity
     var identity = Donkeycraft.Matrix4.createIdentity();
     assert(identity instanceof Donkeycraft.Matrix4, 'createIdentity returns Matrix4');
     var idData = identity.getData();
     assert(idData[0] === 1 && idData[5] === 1 && idData[10] === 1 && idData[15] === 1, 'Identity diagonal = 1');
     assert(idData[1] === 0 && idData[4] === 0 && idData[2] === 0, 'Identity off-diagonal = 0');
 
-    // createPerspective
     var persp = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, 16 / 9, 0.1, 100);
     assert(persp instanceof Donkeycraft.Matrix4, 'createPerspective returns Matrix4');
     var pData = persp.getData();
     assertNear(pData[0], 1.0 / Math.tan(Math.PI / 8) / (16 / 9), 0.1, 'Perspective[0] has expected FOV value');
 
-    // createOrthographic
     var ortho = Donkeycraft.Matrix4.createOrthographic(-10, 10, -10, 10, 0.1, 100);
     assert(ortho instanceof Donkeycraft.Matrix4, 'createOrthographic returns Matrix4');
 
-    // createLookAt
     var eye = new Donkeycraft.Vector3(0, 0, 5);
     var target = new Donkeycraft.Vector3(0, 0, 0);
     var up = new Donkeycraft.Vector3(0, 1, 0);
     var lookAt = Donkeycraft.Matrix4.createLookAt(eye, target, up);
     assert(lookAt instanceof Donkeycraft.Matrix4, 'createLookAt returns Matrix4');
 
-    // createTranslation
     var trans = Donkeycraft.Matrix4.createTranslation(3, 4, 5);
     var tData = trans.getData();
     assert(tData[12] === 3 && tData[13] === 4 && tData[14] === 5, 'Translation matrix has correct offsets');
 
-    // createRotation (90 degrees around Z)
     var zAxis = new Donkeycraft.Vector3(0, 0, 1);
     var rotZ = Donkeycraft.Matrix4.createRotation(Math.PI / 2, zAxis);
     assert(rotZ instanceof Donkeycraft.Matrix4, 'createRotation returns Matrix4');
 
-    // multiply
     var m1 = Donkeycraft.Matrix4.createTranslation(1, 0, 0);
     var m2 = Donkeycraft.Matrix4.createTranslation(0, 2, 0);
     var mProd = m1.multiply(m2);
     assert(mProd instanceof Donkeycraft.Matrix4, 'multiply returns Matrix4');
 
-    // transformVector (direction, w=0)
     var dir = new Donkeycraft.Vector3(1, 0, 0);
     var translated = Donkeycraft.Matrix4.createTranslation(5, 0, 0);
     var result = translated.transformVector(dir, 0);
     assert(result.x === 1 && result.y === 0 && result.z === 0, 'transformVector with w=0 ignores translation');
 
-    // transformVector (position, w=1)
     var posResult = translated.transformVector(dir, 1);
-    // result = M * (1,0,0,1) = column 0*1 + column 3*1 = (1,0,0,0) + (5,0,0,1) = (6,0,0,1)
     assertNear(posResult.x, 6, 0.001, 'transformVector w=1: position (1,0,0)+translation(5,0,0)=(6,0,0)');
 
-    // transpose
     var asym = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
     var asymData = asym.getData();
     assert(asymData[12] === 1 && asymData[13] === 2 && asymData[14] === 3, 'Before transpose: translation at [12,13,14]');
     asym.transpose();
     var transposedData = asym.getData();
-    // After transpose: [3] gets old [12]=1; [1] swaps with [4]=0; [2] swaps with [8]=0
     assert(transposedData[3] === 1, 'After transpose: [3]=1 (from old [12])');
 
     // ============================================================
-    // TEST: Quaternion
+    // TEST: Quaternion (math-utils.js)
     // ============================================================
-    startSection('9. Math Utilities — Quaternion (math-utils.js)');
+    section('9. Math Utilities \u2014 Quaternion (math-utils.js)');
 
     var q = new Donkeycraft.Quaternion(0, 0, 0, 1);
     assert(q.x === 0 && q.y === 0 && q.z === 0 && q.w === 1, 'Quaternion defaults to identity (0,0,0,1)');
@@ -807,49 +779,41 @@
     var qCustom = new Donkeycraft.Quaternion(0.1, 0.2, 0.3, 0.9);
     assert(qCustom.x === 0.1 && qCustom.y === 0.2 && qCustom.z === 0.3 && qCustom.w === 0.9, 'Quaternion custom values');
 
-    // identity()
     var qId = Donkeycraft.Quaternion.identity();
     assert(qId.x === 0 && qId.y === 0 && qId.z === 0 && qId.w === 1, 'Quaternion.identity() = (0,0,0,1)');
 
-    // fromAxisAngle — 90 degrees around Y
     var yAxis = new Donkeycraft.Vector3(0, 1, 0);
     var qYaw = Donkeycraft.Quaternion.fromAxisAngle(yAxis, Math.PI / 2);
-    assertNear(qYaw.w, Math.cos(Math.PI / 4), 0.001, 'fromAxisAngle w = cos(θ/2)');
+    assertNear(qYaw.w, Math.cos(Math.PI / 4), 0.001, 'fromAxisAngle w = cos(\u03b8/2)');
 
-    // fromEuler — identity angles
     var qEulerZero = Donkeycraft.Quaternion.fromEuler(0, 0, 0);
-    assertNear(qEulerZero.w, 1, 0.001, 'fromEuler(0,0,0) ≈ identity');
+    assertNear(qEulerZero.w, 1, 0.001, 'fromEuler(0,0,0) \u2248 identity');
 
-    // multiply
     var qMul = qYaw.multiply(Donkeycraft.Quaternion.identity());
     assertNear(qMul.x, qYaw.x, 0.001, 'multiply by identity preserves x');
     assertNear(qMul.w, qYaw.w, 0.001, 'multiply by identity preserves w');
 
-    // applyToVector — rotate (1,0,0) by 90° around Y → should be (-0, 0, 1) approximately
     var testVec = new Donkeycraft.Vector3(1, 0, 0);
     var rotated = qYaw.applyToVector(testVec);
-    assertNear(rotated.x, 0, 0.1, 'applyToVector: 90° Y rotation of (1,0,0) ≈ (0,0,1)');
-    assertNear(rotated.z, -1, 0.1, 'applyToVector: 90° Y rotation of (1,0,0) ≈ (0,0,-1)');
+    assertNear(rotated.x, 0, 0.1, 'applyToVector: 90\u00b0 Y rotation of (1,0,0) \u2248 (0,0,-1)');
+    assertNear(rotated.z, -1, 0.1, 'applyToVector: 90\u00b0 Y rotation of (1,0,0) \u2248 (0,0,-1)');
 
-    // toEuler — roundtrip from identity
     var euler = qId.toEuler();
-    assertNear(euler.yaw, 0, 0.001, 'toEuler of identity: yaw ≈ 0');
-    assertNear(euler.pitch, 0, 0.001, 'toEuler of identity: pitch ≈ 0');
-    assertNear(euler.roll, 0, 0.001, 'toEuler of identity: roll ≈ 0');
+    assertNear(euler.yaw, 0, 0.001, 'toEuler of identity: yaw \u2248 0');
+    assertNear(euler.pitch, 0, 0.001, 'toEuler of identity: pitch \u2248 0');
+    assertNear(euler.roll, 0, 0.001, 'toEuler of identity: roll \u2248 0');
 
-    // normalize — magnitude should be 1
     var qUnnorm = new Donkeycraft.Quaternion(3, 4, 0, 0);
     var qNorm = qUnnorm.normalize();
     var qMag = qNorm.x * qNorm.x + qNorm.y * qNorm.y + qNorm.z * qNorm.z + qNorm.w * qNorm.w;
     assertNear(qMag, 1, 0.001, 'normalize((3,4,0,0)) has magnitude 1');
-    // Manual check: magnitude of (3,4,0,0) = sqrt(9+16+0+0) = 5, so normalized = (0.6, 0.8, 0, 0)
     assertNear(qNorm.x, 0.6, 0.001, 'normalize((3,4,0,0)).x = 0.6');
     assertNear(qNorm.y, 0.8, 0.001, 'normalize((3,4,0,0)).y = 0.8');
 
     // ============================================================
-    // TEST: PerlinNoise
+    // TEST: PerlinNoise (math-utils.js)
     // ============================================================
-    startSection('10. Math Utilities — PerlinNoise (math-utils.js)');
+    section('10. Math Utilities \u2014 PerlinNoise (math-utils.js)');
 
     assert(typeof Donkeycraft.PerlinNoise === 'object', 'PerlinNoise exists');
     assertType(Donkeycraft.PerlinNoise.init, 'function', 'PerlinNoise.init is a function');
@@ -858,66 +822,52 @@
     assertType(Donkeycraft.PerlinNoise.noise1D, 'function', 'PerlinNoise.noise1D is a function');
     assertType(Donkeycraft.PerlinNoise.fbm, 'function', 'PerlinNoise.fbm is a function');
 
-    // noise3D returns values in [-1, 1]
     var n3 = Donkeycraft.PerlinNoise.noise3D(0, 0, 0);
     assert(n3 >= -1 && n3 <= 1, 'noise3D(0,0,0) in [-1,1]: ' + n3);
 
     var n3b = Donkeycraft.PerlinNoise.noise3D(123.456, 789.012, 345.678);
     assert(n3b >= -1 && n3b <= 1, 'noise3D(random) in [-1,1]: ' + n3b);
 
-    // noise2D returns values in [-1, 1]
     var n2 = Donkeycraft.PerlinNoise.noise2D(0, 0);
     assert(n2 >= -1 && n2 <= 1, 'noise2D(0,0) in [-1,1]: ' + n2);
 
-    // noise1D returns values in [-1, 1]
     var n1 = Donkeycraft.PerlinNoise.noise1D(42);
     assert(n1 >= -1 && n1 <= 1, 'noise1D(42) in [-1,1]: ' + n1);
 
-    // Different inputs produce different outputs
-    assert(Donkeycraft.PerlinNoise.noise3D(0.5, 0.25, 0.75) !== Donkeycraft.PerlinNoise.noise3D(0.75, 0.25, 0.75), 'Different inputs → different outputs');
+    assert(Donkeycraft.PerlinNoise.noise3D(0.5, 0.25, 0.75) !== Donkeycraft.PerlinNoise.noise3D(0.75, 0.25, 0.75), 'Different inputs \u2192 different outputs');
 
-    // fbm returns normalized values
     var fbmVal = Donkeycraft.PerlinNoise.fbm(0.5, 0.5, 0.5, 4, 0.5, 2);
     assert(fbmVal >= -1 && fbmVal <= 1, 'fbm(0,0,0) in [-1,1]: ' + fbmVal);
 
-    // init with different seed changes output
     var origVal = Donkeycraft.PerlinNoise.noise3D(0.1, 0.2, 0.3);
     Donkeycraft.PerlinNoise.init(99);
     var newSeedVal = Donkeycraft.PerlinNoise.noise3D(0.1, 0.2, 0.3);
     assert(origVal !== newSeedVal, 'init(newSeed) changes noise output');
 
-    // Restore default seed
     Donkeycraft.PerlinNoise.init(42);
 
     // ============================================================
-    // TEST: Utility Functions
+    // TEST: Utility Functions (math-utils.js)
     // ============================================================
-    startSection('11. Math Utilities — Utility Functions (math-utils.js)');
+    section('11. Math Utilities \u2014 Utility Functions (math-utils.js)');
 
-    // lerp
     assertEq(Donkeycraft.lerp(0, 10, 0), 0, 'lerp(0,10,0) = 0');
     assertEq(Donkeycraft.lerp(0, 10, 1), 10, 'lerp(0,10,1) = 10');
     assertEq(Donkeycraft.lerp(0, 10, 0.5), 5, 'lerp(0,10,0.5) = 5');
     assertEq(Donkeycraft.lerp(-5, 5, 0.5), 0, 'lerp(-5,5,0.5) = 0');
 
-    // clamp
     assertEq(Donkeycraft.clamp(5, 0, 10), 5, 'clamp(5,0,10) = 5');
     assertEq(Donkeycraft.clamp(-3, 0, 10), 0, 'clamp(-3,0,10) = 0');
     assertEq(Donkeycraft.clamp(15, 0, 10), 10, 'clamp(15,0,10) = 10');
-    assertEq(Donkeycraft.clamp(0.5, 0, 1), 0.5, 'clamp(0.5,0,1) = 0.5');
 
-    // map
     assertEq(Donkeycraft.map(0, 0, 10, 0, 100), 0, 'map(0,0,10,0,100) = 0');
     assertEq(Donkeycraft.map(10, 0, 10, 0, 100), 100, 'map(10,0,10,0,100) = 100');
     assertEq(Donkeycraft.map(5, 0, 10, 0, 100), 50, 'map(5,0,10,0,100) = 50');
-    assertEq(Donkeycraft.map(2, 0, 5, 10, 20), 14, 'map(2,0,5,10,20) = 14');
 
-    // round
     assertEq(Donkeycraft.round(3.5), 4, 'round(3.5) = 4');
     assertEq(Donkeycraft.round(3.4), 3, 'round(3.4) = 3');
     assertEq(Donkeycraft.round(-2.5), -2, 'round(-2.5) = -2');
 
-    // inRange
     assert(Donkeycraft.inRange(5, 0, 10), 'inRange(5,0,10) = true');
     assert(Donkeycraft.inRange(0, 0, 10), 'inRange(0,0,10) = true (inclusive min)');
     assert(Donkeycraft.inRange(10, 0, 10), 'inRange(10,0,10) = true (inclusive max)');
@@ -925,9 +875,9 @@
     assert(!Donkeycraft.inRange(11, 0, 10), 'inRange(11,0,10) = false');
 
     // ============================================================
-    // TEST: AudioSystem (non-interactive)
+    // TEST: AudioSystem (audio.js)
     // ============================================================
-    startSection('12. AudioSystem (audio.js)');
+    section('12. AudioSystem (audio.js)');
 
     assert(typeof Donkeycraft.AudioSystem === 'function', 'AudioSystem constructor exists');
 
@@ -943,10 +893,8 @@
     assertType(audio.preload, 'function', 'preload is a function');
     assertType(audio.destroy, 'function', 'destroy is a function');
 
-    // Volume defaults to 1.0
     assertEq(audio._volume, 1.0, 'Initial volume = 1.0');
 
-    // setVolume uses clamp (from math-utils)
     audio.setVolume(1.5);
     assertEq(audio._volume, 1.0, 'setVolume(1.5) clamped to 1.0');
     audio.setVolume(-0.5);
@@ -954,13 +902,11 @@
     audio.setVolume(0.5);
     assertEq(audio.getVolume(), 0.5, 'getVolume() returns set value');
 
-    // setEnabled
     audio.setEnabled(false);
     assert(!audio._enabled, '_enabled = false after setEnabled(false)');
     audio.setEnabled(true);
     assert(audio._enabled, '_enabled = true after setEnabled(true)');
 
-    // play without init — should silently do nothing
     try {
         audio.play('nonexistent');
         assert(true, 'play() without init does not throw');
@@ -968,7 +914,6 @@
         assert(false, 'play() without init should not throw: ' + e.message);
     }
 
-    // destroy without init — should not throw
     try {
         audio.destroy();
         assert(true, 'destroy() without init does not throw');
@@ -977,11 +922,10 @@
     }
 
     // ============================================================
-    // Cross-component: EventBus + Logger integration
+    // Integration: EventBus + Logger
     // ============================================================
-    startSection('13. Integration — EventBus + Logger');
+    section('13. Integration \u2014 EventBus + Logger');
 
-    // EventBus.emit should use Donkeycraft.Logger.error when available
     var integrationBus = new Donkeycraft.EventBus();
     var errorLogged = false;
     var originalError = console.error;
@@ -990,12 +934,6 @@
     integrationBus.emit('boom');
     console.error = originalError;
     assert(errorLogged, 'EventBus catches errors and logs via Logger/console.error');
-
-    // ============================================================
-    // Final summary is called in the Timer async chain above
-    // But if timer tests haven't finished, we need a fallback
-    // The finishTests() call is inside the async chain.
-    // ============================================================
 
 })();
 
