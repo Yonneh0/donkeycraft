@@ -54,6 +54,26 @@ Skipping the audit step is a critical error. An unaudited file may:
 - Introduce subtle bugs in math utilities that cascade through rendering and physics
 - Violate the IIFE pattern and pollute the global namespace
 
+### 1.5 User Review Before Committing or Updating PLAN.md
+
+**Before committing any changes to git and before updating `PLAN.md`, you MUST present the test results to the user and wait for confirmation.**
+
+The required workflow is:
+
+1. **Run all functional tests** for the phase as defined in Section 4 (Testing & Validation).
+2. **Present a summary to the user** that includes:
+   - Which files were created or modified
+   - Which functional tests were executed
+   - The results of each test (pass/fail with details)
+   - Any errors, warnings, or unexpected behavior observed
+   - Confirmation that coding standards were met (IIFE, strict mode, docblocks, naming)
+3. **Wait for the user's approval** before proceeding with:
+   - Git commits (`git add` / `git commit`)
+   - Updating `PLAN.md` (changing `[ ]` or `[PARTIAL]` to `[FULLY OPERATIONAL]`, adding verification notes)
+4. **Do not proceed** until the user explicitly confirms or provides feedback.
+
+**Exception:** Routine per-file commits during implementation (Section 1.3) that are not tied to phase completion do not require user review. However, the final commit that marks a phase as complete and the corresponding `PLAN.md` update **always** requires user review first.
+
 ---
 
 ## 2. Project Architecture
