@@ -125,9 +125,9 @@
          * @type {{passive: number, hostile: number, aqua: number}}
          */
         this.spawnRates = {
-            passive: (config.spawnRates && config.spawnRates.passive) || 0.01,
-            hostile: (config.spawnRates && config.spawnRates.hostile) || 0.025,
-            aqua: (config.spawnRates && config.spawnRates.aqua) || 0.005
+            passive: (config.spawnRates && config.spawnRates.passive !== undefined) ? config.spawnRates.passive : 0.01,
+            hostile: (config.spawnRates && config.spawnRates.hostile !== undefined) ? config.spawnRates.hostile : 0.025,
+            aqua: (config.spawnRates && config.spawnRates.aqua !== undefined) ? config.spawnRates.aqua : 0.005
         };
 
         /**

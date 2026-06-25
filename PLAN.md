@@ -382,6 +382,42 @@ Main game class and script loader.
 
 ---
 
+## Milestones & Integration Testing
+
+Milestones are critical integration points where multiple phases are combined and tested as a cohesive system. These tests ensure that the interfaces between phases function correctly before proceeding to complex subsystems.
+
+### Milestone 1: "Hello World" [After Phase 2]
+**Goal:** Verify rendering pipeline works with core infrastructure.
+- **Test:** Create a WebGL canvas, compile shaders, draw a rotating colored cube.
+- **Validation:** Cube rotates smoothly at 60 FPS. Camera matrix updates correctly. Shader errors are caught and logged.
+
+### Milestone 2: "Voxel World" [After Phase 4]
+**Goal:** Verify world generation and rendering integration.
+- **Test:** Generate a chunk with terrain, ores, and caves. Render it in the WebGL viewport.
+- **Validation:** Terrain height matches noise output. Ores appear at correct Y-levels. Caves are visible as empty space. Chunk mesh updates when blocks change.
+
+### Milestone 3: "Survival Loop" [After Phase 6]
+**Goal:** Verify player interaction with the world.
+- **Test:** Walk around generated terrain. Break and place blocks. Use raycasting to target blocks.
+- **Validation:** Player moves with WASD. Mouse look works. Left-click breaks blocks with correct particle effects. Right-click places blocks with correct orientation. Inventory updates.
+
+### Milestone 4: "Crafting & Survival" [After Phase 8]
+**Goal:** Verify crafting and inventory systems work together.
+- **Test:** Gather resources, open crafting table, craft items, equip tools.
+- **Validation:** Recipes match correctly. Items appear in inventory. Tools break blocks faster. Hunger decreases over time.
+
+### Milestone 5: "Living World" [After Phase 10]
+**Goal:** Verify entities and redstone interact with the world.
+- **Test:** Spawn mobs, build redstone contraptions, observe mob AI.
+- **Validation:** Mobs spawn in dark areas. Redstone signals propagate correctly. Pistons move blocks. Mobs attack player or flee.
+
+### Milestone 6: "Complete Game" [After Phase 21]
+**Goal:** Verify full game loop and persistence.
+- **Test:** Start new world, play for 10 minutes, save, quit, reload.
+- **Validation:** World loads exactly as saved. Player stats persist. All systems (rendering, input, audio, logic) run simultaneously without conflicts.
+
+---
+
 ## Grand Totals
 
 | Category | Files | Estimated Lines |

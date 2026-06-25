@@ -68,8 +68,8 @@
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         var surfaceY = heightmap[x + z * CHUNK_SIZE] || 0;
 
-                        // Fill sky light from surface down, decreasing by opacity
-                        for (var y = surfaceY; y >= 0 && y < WORLD_HEIGHT; y++) {
+                        // Fill sky light from surface down with constant light=15
+                        for (var y = surfaceY; y >= 0 && y < WORLD_HEIGHT; y--) {
                             var light = 15;
                             chunk.setSkyLight(x, y, z, light);
                         }
