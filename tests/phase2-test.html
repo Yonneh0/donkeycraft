@@ -1039,11 +1039,14 @@ canvas { border: 1px solid #333; max-width: 100%; }
     shaderMgr.setMat4('uProjection', mats.projection);
     shaderMgr.setMat4('uView', mats.view);
 
-    // Model matrix: translate quad to z=-3 and scale by 2 (using proper Matrix4 API).
-    // Direct index assignment (modelMat[0] *= 2) does NOT modify _data — must use createScale + multiply.
-    var translateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
+    // Model matrix: rotate quad to face camera (XY plane), translate to z=-3, scale by 2.
+    // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
+    // Order: translate * rotate * scale (applied right-to-left to vertices)
     var scaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var modelMat = Donkeycraft.Matrix4.multiply(scaleMat, translateMat);
+    var rotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, [1, 0, 0]);
+    var translateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
+    var temp = Donkeycraft.Matrix4.multiply(rotateMat, scaleMat);
+    var modelMat = Donkeycraft.Matrix4.multiply(translateMat, temp);
     shaderMgr.setMat4('uModel', modelMat);
     shaderMgr.setVec3('uColor', 0.2, 0.8, 0.4);
 
@@ -1210,10 +1213,13 @@ canvas { border: 1px solid #333; max-width: 100%; }
     shaderMgr.setMat4('uProjection', intMats2.projection);
     shaderMgr.setMat4('uView', intMats2.view);
 
-    // Model matrix: translate quad to z=-3 and scale by 2 (using proper Matrix4 API).
-    var intTranslateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
+    // Model matrix: rotate quad to face camera (XY plane), translate to z=-3, scale by 2.
+    // buildQuad creates a quad in the XZ plane (facing up). We rotate -90° around X to make it face -Z.
     var intScaleMat = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var intModelMat = Donkeycraft.Matrix4.multiply(intScaleMat, intTranslateMat);
+    var intRotateMat = Donkeycraft.Matrix4.createRotation(-Math.PI / 2, [1, 0, 0]);
+    var intTranslateMat = Donkeycraft.Matrix4.createTranslation(0, 0, -3);
+    var intTemp = Donkeycraft.Matrix4.multiply(intRotateMat, intScaleMat);
+    var intModelMat = Donkeycraft.Matrix4.multiply(intTranslateMat, intTemp);
     shaderMgr.setMat4('uModel', intModelMat);
     shaderMgr.setVec3('uColor', 0.9, 0.3, 0.2);
 
