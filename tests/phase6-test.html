@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 6 Interaction Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
+.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
+.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
+.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
+.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
+.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
+.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
+.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
+.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
+.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<h1>Donkeycraft — Phase 6 Interaction Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: Raycasting, Block Breaking, Block Placement, Interactable Blocks</div>
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 3 Block System -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
+
+<!-- Phase 4 World Generation -->
+<script src="../src/world/biome.js"></script>
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/terrain-generator.js"></script>
+<script src="../src/world/ore-generator.js"></script>
+<script src="../src/world/cave-generator.js"></script>
+<script src="../src/world/structure-generator.js"></script>
+<script src="../src/world/water-generator.js"></script>
+<script src="../src/world/terrain-surface.js"></script>
+<script src="../src/world/lighting-engine.js"></script>
+<script src="../src/world/physics.js"></script>
+
+<!-- Phase 5 Player & Movement -->
+<script src="../src/player/player.js"></script>
+<script src="../src/player/movement.js"></script>
+<script src="../src/player/collision.js"></script>
+<script src="../src/player/jumping.js"></script>
+<script src="../src/player/flying.js"></script>
+<script src="../src/player/hurt-box.js"></script>
+
+<!-- Phase 6 Interaction -->
+<script src="../src/interaction/raycast.js"></script>
+<script src="../src/interaction/block-action.js"></script>
+<script src="../src/interaction/block-placement.js"></script>
+<script src="../src/interaction/interactable-blocks.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var results = document.getElementById('results');
+    var totalTests = 0;
+    var passedTests = 0;
+    var failedTests = 0;
+    var currentSection = null;
+
+    // ============================================================
+    // Test infrastructure
+    // ============================================================
+
+    function startSection(name) {
+        var section = document.createElement('div');
+        section.className = 'section';
+        section.innerHTML = '<h2>' + name + '</h2>';
+        results.appendChild(section);
+        currentSection = section;
+    }
+
+    function addTest(name, passed, detail) {
+        totalTests++;
+        var div = document.createElement('div');
+        div.className = 'test ' + (passed ? 'pass' : 'fail');
+        div.innerHTML = name + (detail ? '<div class="detail">' + detail + '</div>' : '');
+        if (currentSection) {
+            currentSection.appendChild(div);
+        } else {
+            results.appendChild(div);
+        }
+        if (passed) {
+            passedTests++;
+        } else {
+            failedTests++;
+        }
+    }
+
+    function assert(condition, message) {
+        addTest('Assert: ' + message, condition, condition ? 'PASS' : 'FAIL');
+    }
+
+    function assertEq(actual, expected, message) {
+        var pass = actual === expected;
+        addTest('Equals: ' + message, pass, 'Expected ' + expected + ', got ' + actual);
+    }
+
+    function assertNear(actual, expected, epsilon, message) {
+        var pass = Math.abs(actual - expected) < epsilon;
+        addTest('Near: ' + message, pass, 'Expected ~' + expected + ', got ' + actual + ' (±' + epsilon + ')');
+    }
+
+    function assertNotNull(value, message) {
+        addTest('Not null: ' + message, value !== null && value !== undefined,
+            value === null || value === undefined ? 'NULL/UNDEFINED' : 'OK');
+    }
+
+    function finishTests() {
+        var summary = document.createElement('div');
+        summary.className = 'summary ' + (failedTests === 0 ? 'pass' : 'fail');
+        summary.innerHTML = '<strong>RESULTS:</strong> ' + passedTests + '/' + totalTests + ' tests passed' +
+            (failedTests > 0 ? ', ' + failedTests + ' FAILED' : '') +
+            (failedTests === 0 ? ' — ALL TESTS PASSED ✓' : '');
+        results.appendChild(summary);
+    }
+
+    // ============================================================
+    // Helper: create a test chunk filled with stone
+    // ============================================================
+
+    function createStoneChunk() {
+        var chunk = new Donkeycraft.Chunk(0, 0);
+        // Fill with stone (block ID 1)
+        for (var y = 0; y < 64; y++) {
+            for (var x = 0; x < 16; x++) {
+                for (var z = 0; z < 16; z++) {
+                    chunk.blocks[x + y * 16 + z * 16 * 256] = 1; // stone
+                }
+            }
+        }
+        return chunk;
+    }
+
+    // ============================================================
+    // Helper: create a chunk with a known pattern
+    // ============================================================
+
+    function createPatternChunk() {
+        var chunk = new Donkeycraft.Chunk(0, 0);
+        // Fill with air (0) except for a wall of stone at x=8
+        for (var y = 0; y < 64; y++) {
+            for (var x = 0; x < 16; x++) {
+                for (var z = 0; z < 16; z++) {
+                    chunk.blocks[x + y * 16 + z * 16 * 256] = (x === 8) ? 1 : 0; // stone wall at x=8
+                }
+            }
+        }
+        return chunk;
+    }
+
+    // ============================================================
+    // Helper: create a chunk with grass on top
+    // ============================================================
+
+    function createGrassChunk() {
+        var chunk = new Donkeycraft.Chunk(0, 0);
+        for (var y = 0; y < 64; y++) {
+            for (var x = 0; x < 16; x++) {
+                for (var z = 0; z < 16; z++) {
+                    var idx = x + y * 16 + z * 16 * 256;
+                    if (y === 32) {
+                        chunk.blocks[idx] = 2; // grass
+                    } else if (y > 32) {
+                        chunk.blocks[idx] = 1; // stone below grass
+                    } else {
+                        chunk.blocks[idx] = 0; // air below
+                    }
+                }
+            }
+        }
+        return chunk;
+    }
+
+    // ============================================================
+    // SECTION 1: Raycaster Tests
+    // ============================================================
+
+    (function() {
+        startSection('Raycaster Tests');
+
+        // Test 1: Basic raycast hits a block directly in front
+        try {
+            var chunk1 = createStoneChunk();
+            var raycaster = new Donkeycraft.Raycaster();
+
+            // Player at x=4, y=32, z=8 looking in +Z direction
+            var start = new Donkeycraft.Vector3(4, 32, 8);
+            var dir = new Donkeycraft.Vector3(0, 0, 1);
+            dir = dir.normalize();
+
+            var result = raycaster.cast(start, dir, 10.0, function(x, y, z) {
+                return chunk1.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(result, 'Raycast should hit stone block');
+            if (result) {
+                assertEq(result.x, -1, 'Hit X should be -1 (wrapped to chunk coord) or valid local coord, got ' + result.x);
+                // The ray hits at x=4, z=9 (one step forward from z=8)
+                // Actually DDA finds the first non-air block along the ray
+                // At start (4,32,8), next is (4,32,9) which is stone
+                assert(result.y === 32, 'Hit Y should be 32, got ' + result.y);
+                assert(result.faceY === 0 || result.faceZ === 0, 'Face normal should indicate Z face');
+            }
+        } catch (e) {
+            addTest('Basic raycast', false, 'Exception: ' + e.message);
+        }
+
+        // Test 2: Raycast in direction with no blocks (air path)
+        try {
+            var chunk2 = new Donkeycraft.Chunk(0, 0);
+            // All air
+            for (var i = 0; i < chunk2.blocks.length; i++) {
+                chunk2.blocks[i] = 0;
+            }
+
+            var raycaster2 = new Donkeycraft.Raycaster();
+            var start2 = new Donkeycraft.Vector3(8, 32, 8);
+            var dir2 = new Donkeycraft.Vector3(1, 0, 0).normalize();
+
+            var result2 = raycaster2.cast(start2, dir2, 10.0, function(x, y, z) {
+                return 0; // Always air
+            });
+
+            assert(result2 === null, 'Raycast through all-air should return null');
+        } catch (e) {
+            addTest('Air path raycast', false, 'Exception: ' + e.message);
+        }
+
+        // Test 3: Face normal for each of 6 faces
+        try {
+            var chunk3 = createStoneChunk();
+            var raycaster3 = new Donkeycraft.Raycaster();
+
+            // Test hitting top face (looking down from above)
+            var startTop = new Donkeycraft.Vector3(8, 50, 8);
+            var dirDown = new Donkeycraft.Vector3(0, -1, 0).normalize();
+            var resultTop = raycaster3.cast(startTop, dirDown, 20.0, function(x, y, z) {
+                return chunk3.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(resultTop, 'Raycast from above should hit top face');
+            if (resultTop) {
+                addTest('Top face normal', resultTop.faceY === -1 || resultTop.faceZ === -1,
+                    'Face: (' + resultTop.faceX + ',' + resultTop.faceY + ',' + resultTop.faceZ + ')');
+            }
+
+            // Test hitting bottom face (looking up from below)
+            var startBot = new Donkeycraft.Vector3(8, 10, 8);
+            var dirUp = new Donkeycraft.Vector3(0, 1, 0).normalize();
+            var resultBot = raycaster3.cast(startBot, dirUp, 20.0, function(x, y, z) {
+                return chunk3.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(resultBot, 'Raycast from below should hit bottom face');
+            if (resultBot) {
+                addTest('Bottom face normal', resultBot.faceY === 1 || resultBot.faceZ === 1,
+                    'Face: (' + resultBot.faceX + ',' + resultBot.faceY + ',' + resultBot.faceZ + ')');
+            }
+        } catch (e) {
+            addTest('Face normals', false, 'Exception: ' + e.message);
+        }
+
+        // Test 4: Reach distance enforcement
+        try {
+            var chunk4 = createStoneChunk();
+            var raycaster4 = new Donkeycraft.Raycaster();
+
+            // Player very far from the block — start inside air, cast at a distant stone block
+            var startFar = new Donkeycraft.Vector3(0, 32, 0);
+            var dirFar = new Donkeycraft.Vector3(1, 0, 0).normalize();
+
+            // Create a chunk with stone only at x=15 (far edge)
+            var sparseChunk = new Donkeycraft.Chunk(0, 0);
+            for (var y = 0; y < 64; y++) {
+                for (var z = 0; z < 16; z++) {
+                    sparseChunk.blocks[15 + y * 16 + z * 16 * 256] = 1; // stone at x=15
+                }
+            }
+
+            var resultFar = raycaster4.cast(startFar, dirFar, 5.0, function(x, y, z) {
+                return sparseChunk.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            // With reach=5, starting at x=0, we should hit the stone wall at x=5 (within chunk)
+            assertNotNull(resultFar, 'Raycast with reach=5 should hit stone at x=5');
+            if (resultFar) {
+                addTest('Reach distance', resultFar.distance <= 5.01, 'Distance: ' + resultFar.distance.toFixed(2) + ' (max 5.0)');
+            }
+        } catch (e) {
+            addTest('Reach enforcement', false, 'Exception: ' + e.message);
+        }
+
+        // Test 5: Static utility methods
+        try {
+            var raycaster5 = new Donkeycraft.Raycaster();
+            var mockResult = { faceX: 1, faceY: 0, faceZ: -1, hitPos: new Donkeycraft.Vector3(1, 2, 3) };
+
+            var normal = Donkeycraft.Raycaster.getFaceNormal(mockResult);
+            assertEq(normal.x, 1, 'getFaceNormal X component');
+            assertEq(normal.z, -1, 'getFaceNormal Z component');
+
+            var hitPos = Donkeycraft.Raycaster.getHitPosition(mockResult);
+            assertEq(hitPos.x, 1, 'getHitPosition X');
+            assertEq(hitPos.y, 2, 'getHitPosition Y');
+            assertEq(hitPos.z, 3, 'getHitPosition Z');
+
+            var opposite = Donkeycraft.Raycaster.getOppositeFace(mockResult);
+            assertEq(opposite.x, -1, 'getOppositeFace X');
+            assertEq(opposite.y, 0, 'getOppositeFace Y');
+            assertEq(opposite.z, 1, 'getOppositeFace Z');
+        } catch (e) {
+            addTest('Static utilities', false, 'Exception: ' + e.message);
+        }
+
+        // Test 6: Diagonal raycast
+        try {
+            var chunk6 = createStoneChunk();
+            var raycaster6 = new Donkeycraft.Raycaster();
+
+            var startDiag = new Donkeycraft.Vector3(0, 32, 0);
+            var dirDiag = new Donkeycraft.Vector3(1, 0, 1).normalize();
+
+            var resultDiag = raycaster6.cast(startDiag, dirDiag, 15.0, function(x, y, z) {
+                return chunk6.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(resultDiag, 'Diagonal raycast should hit a block');
+            if (resultDiag) {
+                addTest('Diagonal hit position', resultDiag.distance > 0 && resultDiag.distance <= 15.01,
+                    'Distance: ' + resultDiag.distance.toFixed(2));
+            }
+        } catch (e) {
+            addTest('Diagonal raycast', false, 'Exception: ' + e.message);
+        }
+
+    })();
+
+    // ============================================================
+    // SECTION 2: BlockAction Tests
+    // ============================================================
+
+    (function() {
+        startSection('BlockAction Tests');
+
+        // Test 1: Start breaking a stone block
+        try {
+            var chunk = createStoneChunk();
+            var events = new Donkeycraft.EventBus();
+            var blockAction = new Donkeycraft.BlockAction({ events: events });
+
+            var breakState = blockAction.startBreak(4, 32, 8, chunk);
+            assertNotNull(breakState, 'Should return break state for stone block');
+            if (breakState) {
+                assertEq(breakState.x, 4, 'Break state X');
+                assertEq(breakState.y, 32, 'Break state Y');
+                assertEq(breakState.z, 8, 'Break state Z');
+                assert(breakState.hardness > 0, 'Stone hardness should be > 0, got ' + breakState.hardness);
+            }
+        } catch (e) {
+            addTest('Start breaking stone', false, 'Exception: ' + e.message);
+        }
+
+        // Test 2: Cannot break air
+        try {
+            var airChunk = new Donkeycraft.Chunk(0, 0);
+            for (var i = 0; i < airChunk.blocks.length; i++) {
+                airChunk.blocks[i] = 0;
+            }
+
+            var blockAction2 = new Donkeycraft.BlockAction({});
+            var result = blockAction2.startBreak(4, 32, 8, airChunk);
+            assert(result === null, 'Cannot break air — should return null');
+        } catch (e) {
+            addTest('Cannot break air', false, 'Exception: ' + e.message);
+        }
+
+        // Test 3: Update break progress
+        try {
+            var chunk3 = createStoneChunk();
+            var blockAction3 = new Donkeycraft.BlockAction({});
+
+            blockAction3.startBreak(4, 32, 8, chunk3);
+            assert(blockAction3.isBreaking(), 'Should be breaking after startBreak');
+
+            // Simulate small time step — should not break immediately (stone hardness = 1.5)
+            var result = blockAction3.updateBreak(0.05, null);
+            assert(result === null, 'Stone should not break in 50ms with bare hands');
+            addTest('Break progress', blockAction3.getProgress() > 0 && blockAction3.getProgress() < 1.0,
+                'Progress: ' + (blockAction3.getProgress() * 100).toFixed(1) + '%');
+        } catch (e) {
+            addTest('Break progress update', false, 'Exception: ' + e.message);
+        }
+
+        // Test 4: Break with fast tool (simulated by large deltaTime)
+        try {
+            var chunk4 = createStoneChunk();
+            var blockAction4 = new Donkeycraft.BlockAction({ breakSpeedMultiplier: 1.0 });
+
+            blockAction4.startBreak(4, 32, 8, chunk4);
+
+            // Stone hardness is 1.5 — send enough time to break it
+            // progress += deltaTime / hardness, so need deltaTime >= 1.5 to break
+            var result = blockAction4.updateBreak(2.0, null);
+            assert(result !== null, 'Stone should break after sufficient time');
+            if (result) {
+                assertEq(result, 1, 'Broken block ID should be stone (1), got ' + result);
+            }
+            assert(!blockAction4.isBreaking(), 'Should not be breaking after completion');
+        } catch (e) {
+            addTest('Fast break simulation', false, 'Exception: ' + e.message);
+        }
+
+        // Test 5: Cancel break
+        try {
+            var chunk5 = createStoneChunk();
+            var blockAction5 = new Donkeycraft.BlockAction({});
+
+            blockAction5.startBreak(4, 32, 8, chunk5);
+            blockAction5.cancelBreak();
+            assert(!blockAction5.isBreaking(), 'Should not be breaking after cancel');
+            assertEq(blockAction5.getProgress(), 0, 'Progress should reset to 0 after cancel');
+        } catch (e) {
+            addTest('Cancel break', false, 'Exception: ' + e.message);
+        }
+
+        // Test 6: Tool speed multiplier — pickaxe on stone
+        try {
+            var chunk6 = createStoneChunk();
+            var blockAction6 = new Donkeycraft.BlockAction({ breakSpeedMultiplier: 1.0 });
+
+            blockAction6.startBreak(4, 32, 8, chunk6);
+
+            // With pickaxe on stone — should be much faster
+            var resultPickaxe = blockAction6.updateBreak(0.5, 'pickaxe');
+            var progressWithTool = blockAction6.getProgress();
+
+            // Reset and try without tool
+            var chunk6b = createStoneChunk();
+            var blockAction6b = new Donkeycraft.BlockAction({ breakSpeedMultiplier: 1.0 });
+            blockAction6b.startBreak(4, 32, 8, chunk6b);
+            var resultHand = blockAction6b.updateBreak(0.5, null);
+            var progressWithoutTool = blockAction6b.getProgress();
+
+            assert(progressWithTool > progressWithoutTool,
+                'Pickaxe should break faster: ' + (progressWithTool * 100).toFixed(1) + '% vs ' + (progressWithoutTool * 100).toFixed(1) + '%');
+        } catch (e) {
+            addTest('Tool speed multiplier', false, 'Exception: ' + e.message);
+        }
+
+        // Test 7: Get drops for stone
+        try {
+            var blockAction7 = new Donkeycraft.BlockAction({});
+            var drops = blockAction7.getDrops(1, 1); // stone ID
+            assert(drops.length > 0, 'Stone should have drops');
+            if (drops.length > 0) {
+                addTest('Stone drop', drops[0].blockId === 1, 'Drop block ID: ' + drops[0].blockId + ' (expected 1)');
+            }
+        } catch (e) {
+            addTest('Get drops', false, 'Exception: ' + e.message);
+        }
+
+        // Test 8: Get drops for block with no drop (e.g., bedrock with hardness < 0)
+        try {
+            var blockAction8 = new Donkeycraft.BlockAction({});
+            var drops = blockAction8.getDrops(7, 1); // bedrock ID
+            // Bedrock has hardness < 0 but still has dropBlockId >= 0 in some configs
+            // Just check it doesn't throw
+            addTest('No-drop handling', true, 'No exception thrown');
+        } catch (e) {
+            addTest('No-drop handling', false, 'Exception: ' + e.message);
+        }
+
+    })();
+
+    // ============================================================
+    // SECTION 3: BlockPlacer Tests
+    // ============================================================
+
+    (function() {
+        startSection('BlockPlacer Tests');
+
+        // Test 1: Calculate placement position from face normal
+        try {
+            var placer = new Donkeycraft.BlockPlacer({});
+
+            var pos = placer.calculatePlacementPos(5, 10, 5, 1, 0, 0);
+            assertEq(pos.x, 6, 'Placement X with +X face');
+            assertEq(pos.y, 10, 'Placement Y with +X face');
+            assertEq(pos.z, 5, 'Placement Z with +X face');
+
+            var pos2 = placer.calculatePlacementPos(5, 10, 5, 0, 1, 0);
+            assertEq(pos2.y, 11, 'Placement Y with +Y face');
+
+            var pos3 = placer.calculatePlacementPos(5, 10, 5, 0, 0, -1);
+            assertEq(pos3.z, 4, 'Placement Z with -Z face');
+        } catch (e) {
+            addTest('Calculate placement pos', false, 'Exception: ' + e.message);
+        }
+
+        // Test 2: Can place at — target is air
+        try {
+            var placer2 = new Donkeycraft.BlockPlacer({});
+
+            var canPlace = placer2.canPlaceAt(10, 40, 10, function(x, y, z) {
+                return 0; // Air everywhere
+            }, null);
+
+            assert(canPlace, 'Can place at air position with no player');
+        } catch (e) {
+            addTest('Place at air', false, 'Exception: ' + e.message);
+        }
+
+        // Test 3: Cannot place at — target is not air
+        try {
+            var placer3 = new Donkeycraft.BlockPlacer({});
+
+            var canPlace3 = placer3.canPlaceAt(10, 40, 10, function(x, y, z) {
+                return 1; // Stone everywhere
+            }, null);
+
+            assert(!canPlace3, 'Cannot place at non-air position');
+        } catch (e) {
+            addTest('Cannot place at stone', false, 'Exception: ' + e.message);
+        }
+
+        // Test 4: Cannot place — overlaps player AABB
+        try {
+            var placer4 = new Donkeycraft.BlockPlacer({});
+
+            var playerAABB = {
+                minX: 5.0, minY: 30.0, minZ: 5.0,
+                maxX: 5.6, maxY: 31.8, maxZ: 5.6
+            };
+
+            var canPlace4 = placer4.canPlaceAt(5, 30, 5, function(x, y, z) {
+                return 0; // Air
+            }, playerAABB);
+
+            assert(!canPlace4, 'Cannot place inside player body');
+        } catch (e) {
+            addTest('AABB collision check', false, 'Exception: ' + e.message);
+        }
+
+        // Test 5: Can place — adjacent to player (not overlapping)
+        try {
+            var placer5 = new Donkeycraft.BlockPlacer({});
+
+            var playerAABB5 = {
+                minX: 5.0, minY: 30.0, minZ: 5.0,
+                maxX: 5.6, maxY: 31.8, maxZ: 5.6
+            };
+
+            // Place at (7, 30, 5) — adjacent to player, not overlapping
+            var canPlace5 = placer5.canPlaceAt(7, 30, 5, function(x, y, z) {
+                return 0;
+            }, playerAABB5);
+
+            assert(canPlace5, 'Can place adjacent to player');
+        } catch (e) {
+            addTest('Place adjacent to player', false, 'Exception: ' + e.message);
+        }
+
+        // Test 6: Place block in chunk
+        try {
+            var chunk6 = createStoneChunk();
+            // Set a position to air first
+            var idx6 = 4 + 32 * 16 + 8 * 16 * 256;
+            chunk6.blocks[idx6] = 0;
+
+            var placer6 = new Donkeycraft.BlockPlacer({});
+            var success = placer6.placeBlock(4, 32, 8, 1, chunk6);
+
+            assert(success, 'Place block succeeded');
+            // Verify block was placed
+            var placedBlock = chunk6.blocks[idx6];
+            assertEq(placedBlock, 1, 'Block was placed in chunk (got ' + placedBlock + ')');
+        } catch (e) {
+            addTest('Place block in chunk', false, 'Exception: ' + e.message);
+        }
+
+    })();
+
+    // ============================================================
+    // SECTION 4: InteractableBlocks Tests
+    // ============================================================
+
+    (function() {
+        startSection('InteractableBlocks Tests');
+
+        // Test 1: Lever toggle
+        try {
+            var chunk = new Donkeycraft.Chunk(0, 0);
+            // Place lever (ID 146) at (5, 10, 5)
+            chunk.blocks[5 + 10 * 16 + 5 * 16 * 256] = 146;
+
+            var events = new Donkeycraft.EventBus();
+            var interactables = new Donkeycraft.InteractableBlocks({ events: events });
+
+            var result = interactables.toggleLever(5, 10, 5, chunk);
+            assert(result !== null, 'Lever toggle returned result');
+            if (result) {
+                assertEq(result.type, 'lever', 'Result type is lever');
+                assert(result.powered === true || result.powered === false, 'Lever has boolean powered state');
+            }
+
+            // Toggle again — should flip
+            var result2 = interactables.toggleLever(5, 10, 5, chunk);
+            if (result && result2) {
+                assert(result.powered !== result2.powered, 'Second toggle flips lever state');
+            }
+        } catch (e) {
+            addTest('Lever toggle', false, 'Exception: ' + e.message);
+        }
+
+        // Test 2: Button press
+        try {
+            var chunk2 = new Donkeycraft.Chunk(0, 0);
+            chunk2.blocks[5 + 10 * 16 + 5 * 16 * 256] = 23; // stone_button
+
+            var events2 = new Donkeycraft.EventBus();
+            var interactables2 = new Donkeycraft.InteractableBlocks({ events: events2 });
+
+            var result = interactables2.pressButton(5, 10, 5, chunk2);
+            assert(result !== null, 'Button press returned result');
+            if (result) {
+                assertEq(result.type, 'button', 'Result type is button');
+                assertEq(result.powered, true, 'Button powered on press');
+                assertEq(result.duration, 10, 'Button duration is 10 ticks');
+            }
+        } catch (e) {
+            addTest('Button press', false, 'Exception: ' + e.message);
+        }
+
+        // Test 3: Button state update
+        try {
+            var interactables3 = new Donkeycraft.InteractableBlocks({});
+
+            // Manually set a button state
+            interactables3._buttonStates['1,2,3'] = { powered: true, remainingTicks: 5 };
+
+            // Call updateButtons once — should decrement to 4
+            interactables3.updateButtons();
+
+            var state = interactables3._buttonStates['1,2,3'];
+            if (state) {
+                assertEq(state.remainingTicks, 4, 'Button ticks decremented from 5 to 4');
+            } else {
+                addTest('Button update', false, 'Button state disappeared after one tick');
+            }
+        } catch (e) {
+            addTest('Button state update', false, 'Exception: ' + e.message);
+        }
+
+        // Test 4: Chest open
+        try {
+            var chunk4 = new Donkeycraft.Chunk(0, 0);
+            chunk4.blocks[5 + 10 * 16 + 5 * 16 * 256] = 54; // chest
+
+            var events4 = new Donkeycraft.EventBus();
+            var interactables4 = new Donkeycraft.InteractableBlocks({ events: events4 });
+
+            var result = interactables4.openChest(5, 10, 5, chunk4);
+            assert(result !== null, 'Open chest returned result');
+            if (result) {
+                assertEq(result.type, 'chest', 'Result type is chest');
+                assertEq(result.slots, 27, 'Chest has 27 slots');
+            }
+        } catch (e) {
+            addTest('Open chest', false, 'Exception: ' + e.message);
+        }
+
+        // Test 5: Furnace open
+        try {
+            var chunk5 = new Donkeycraft.Chunk(0, 0);
+            chunk5.blocks[5 + 10 * 16 + 5 * 16 * 256] = 61; // furnace
+
+            var events5 = new Donkeycraft.EventBus();
+            var interactables5 = new Donkeycraft.InteractableBlocks({ events: events5 });
+
+            var result = interactables5.openFurnace(5, 10, 5, chunk5);
+            assert(result !== null, 'Open furnace returned result');
+            if (result) {
+                assertEq(result.type, 'furnace', 'Result type is furnace');
+                assertEq(result.slots, 3, 'Furnace has 3 slots');
+            }
+        } catch (e) {
+            addTest('Open furnace', false, 'Exception: ' + e.message);
+        }
+
+        // Test 6: Door toggle
+        try {
+            var chunk6 = new Donkeycraft.Chunk(0, 0);
+            chunk6.blocks[5 + 10 * 16 + 5 * 16 * 256] = 64; // oak_door
+
+            var events6 = new Donkeycraft.EventBus();
+            var interactables6 = new Donkeycraft.InteractableBlocks({ events: events6 });
+
+            var result = interactables6.toggleDoor(5, 10, 5, chunk6);
+            assert(result !== null, 'Toggle door returned result');
+            if (result) {
+                assertEq(result.type, 'door', 'Result type is door');
+                assert(typeof result.open === 'boolean', 'Door has boolean open state');
+            }
+        } catch (e) {
+            addTest('Door toggle', false, 'Exception: ' + e.message);
+        }
+
+        // Test 7: Dispenser activate
+        try {
+            var chunk7 = new Donkeycraft.Chunk(0, 0);
+            chunk7.blocks[5 + 10 * 16 + 5 * 16 * 256] = 144; // dispenser
+
+            var events7 = new Donkeycraft.EventBus();
+            var interactables7 = new Donkeycraft.InteractableBlocks({ events: events7 });
+
+            var result = interactables7.activateDispenser(5, 10, 5, chunk7);
+            assert(result !== null, 'Activate dispenser returned result');
+            if (result) {
+                assertEq(result.type, 'dispenser', 'Result type is dispenser');
+            }
+        } catch (e) {
+            addTest('Dispenser activate', false, 'Exception: ' + e.message);
+        }
+
+        // Test 8: getInteractableBlockIds
+        try {
+            var interactables8 = new Donkeycraft.InteractableBlocks({});
+            var ids = interactables8.getInteractableBlockIds();
+
+            assert(ids.length >= 6, 'Should have at least 6 interactable block IDs, got ' + ids.length);
+
+            // Check that known IDs are present
+            var hasLever = ids.indexOf(146) !== -1;
+            var hasChest = ids.indexOf(54) !== -1;
+            assert(hasLever && hasChest, 'Contains lever (146) and chest (54) IDs');
+        } catch (e) {
+            addTest('Get interactable IDs', false, 'Exception: ' + e.message);
+        }
+
+        // Test 9: isInteractable
+        try {
+            var interactables9 = new Donkeycraft.InteractableBlocks({});
+
+            var leverType = interactables9.isInteractable(146);
+            assertEq(leverType, 'lever', 'Lever (146) is interactable');
+
+            var stoneType = interactables9.isInteractable(1);
+            assert(stoneType === null, 'Stone (1) is not interactable');
+        } catch (e) {
+            addTest('isInteractable check', false, 'Exception: ' + e.message);
+        }
+
+        // Test 10: General interact method dispatches correctly
+        try {
+            var chunk10 = new Donkeycraft.Chunk(0, 0);
+            chunk10.blocks[5 + 10 * 16 + 5 * 16 * 256] = 146; // lever
+
+            var events10 = new Donkeycraft.EventBus();
+            var interactables10 = new Donkeycraft.InteractableBlocks({ events: events10 });
+
+            var result = interactables10.interact(5, 10, 5, chunk10, null);
+            assert(result !== null, 'Interact method dispatched to lever handler');
+            if (result) {
+                assertEq(result.type, 'lever', 'Interact returned lever type');
+            }
+        } catch (e) {
+            addTest('Interact dispatch', false, 'Exception: ' + e.message);
+        }
+
+        // Test 11: Interact with non-interactable block returns null
+        try {
+            var chunk11 = new Donkeycraft.Chunk(0, 0);
+            chunk11.blocks[5 + 10 * 16 + 5 * 16 * 256] = 1; // stone
+
+            var interactables11 = new Donkeycraft.InteractableBlocks({});
+            var result = interactables11.interact(5, 10, 5, chunk11, null);
+            assert(result === null, 'Interact with stone returns null');
+        } catch (e) {
+            addTest('Non-interactable block', false, 'Exception: ' + e.message);
+        }
+
+    })();
+
+    // ============================================================
+    // SECTION 5: Integration Tests
+    // ============================================================
+
+    (function() {
+        startSection('Integration Tests');
+
+        // Test 1: Full break-and-place cycle
+        try {
+            var chunk = createStoneChunk();
+            var raycaster = new Donkeycraft.Raycaster();
+            var blockAction = new Donkeycraft.BlockAction({});
+            var placer = new Donkeycraft.BlockPlacer({});
+
+            // Raycast to find stone block
+            var start = new Donkeycraft.Vector3(4, 32, 8);
+            var dir = new Donkeycraft.Vector3(0, 0, 1).normalize();
+
+            var hitResult = raycaster.cast(start, dir, 10.0, function(x, y, z) {
+                return chunk.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(hitResult, 'Integration: raycast found a block');
+
+            if (hitResult) {
+                // Start breaking
+                blockAction.startBreak(hitResult.x, hitResult.y, hitResult.z, chunk);
+
+                // Fast break
+                var brokenBlock = blockAction.updateBreak(2.0, null);
+                assert(brokenBlock !== null, 'Integration: block was broken');
+
+                // Calculate placement position using opposite face
+                var placePos = placer.calculatePlacementPos(
+                    hitResult.x, hitResult.y, hitResult.z,
+                    -hitResult.faceX, -hitResult.faceY, -hitResult.faceZ
+                );
+
+                // Place a different block (grass = 2) at the placement position
+                var placed = placer.placeBlock(placePos.x, placePos.y, placePos.z, 2, chunk);
+                addTest('Integration: break-and-place', placed, 'Placed grass at ' + placePos.x + ',' + placePos.y + ',' + placePos.z);
+            }
+        } catch (e) {
+            addTest('Integration: break-and-place', false, 'Exception: ' + e.message);
+        }
+
+        // Test 2: Raycast → interact cycle
+        try {
+            var chunk2 = new Donkeycraft.Chunk(0, 0);
+            chunk2.blocks[5 + 10 * 16 + 5 * 16 * 256] = 146; // lever
+
+            var raycaster2 = new Donkeycraft.Raycaster();
+            var interactables2 = new Donkeycraft.InteractableBlocks({});
+
+            // Raycast from (5, 10, 0) in +Z direction to hit the lever at z=5
+            var start2 = new Donkeycraft.Vector3(5, 10, 0);
+            var dir2 = new Donkeycraft.Vector3(0, 0, 1).normalize();
+
+            var hitResult2 = raycaster2.cast(start2, dir2, 10.0, function(x, y, z) {
+                return chunk2.blocks[((x % 16 + 16) % 16) + (y % 256) * 16 + ((z % 16 + 16) % 16) * 16 * 256];
+            });
+
+            assertNotNull(hitResult2, 'Integration: raycast found lever');
+
+            if (hitResult2) {
+                var interactResult = interactables2.interact(
+                    hitResult2.x, hitResult2.y, hitResult2.z, chunk2, null
+                );
+                assert(interactResult !== null, 'Integration: interact returned result for lever');
+                if (interactResult) {
+                    assertEq(interactResult.type, 'lever', 'Integration: interact type is lever');
+                }
+            }
+        } catch (e) {
+            addTest('Integration: raycast-interact', false, 'Exception: ' + e.message);
+        }
+
+        // Test 3: Destroy methods free resources
+        try {
+            var blockAction3 = new Donkeycraft.BlockAction({});
+            var placer3 = new Donkeycraft.BlockPlacer({});
+            var interactables3 = new Donkeycraft.InteractableBlocks({});
+
+            blockAction3.destroy();
+            placer3.destroy();
+            interactables3.destroy();
+
+            addTest('Integration: destroy methods', true, 'All destroy() calls completed without error');
+        } catch (e) {
+            addTest('Integration: destroy methods', false, 'Exception: ' + e.message);
+        }
+
+    })();
+
+    // ============================================================
+    // Run all tests and show summary
+    // ============================================================
+
+    finishTests();
+
+})();
+</script>
+</body>
+</html>
