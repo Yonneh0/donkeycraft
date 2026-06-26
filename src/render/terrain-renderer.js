@@ -132,8 +132,19 @@
         var gl = this._gl;
         if (!gl || !this._getBlockFunc) return;
 
+        // Wrap world-coordinate getter into local chunk coordinates.
+        // _getBlockFunc receives WORLD coordinates (set via setWorldData).
+        // GeometryBuilder.buildChunk expects a getter that takes LOCAL chunk coordinates.
+        var self = this;
+        var localGetBlock = function(localX, y, localZ) {
+            var worldX = chunkX * CHUNK_SIZE + localX;
+            var worldY = y;
+            var worldZ = chunkZ * CHUNK_SIZE + localZ;
+            return self._getBlockFunc(worldX, worldY, worldZ);
+        };
+
         // Build geometry
-        var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, this._getBlockFunc);
+        var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
 
         // Optimize geometry
         var isBlockSolid = function(blockId) {
@@ -173,10 +184,11 @@
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._extractFrustumPlanes = function() {
-        var vp = this._multiplyMatrices(
-            this._getProjectionData(),
-            this._getViewData()
-        );
+        var projData = this._cachedProjData;
+        var viewData = this._cachedViewData;
+        if (!projData || !viewData) return;
+
+        var vp = this._multiplyMatrices(projData, viewData);
 
         this._frustumPlanes = [
             this._extractPlane(vp, -1, 0, 0),   // Left

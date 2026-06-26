@@ -85,6 +85,10 @@ void main() {
 
 // ============================================================
 // Sky Vertex Shader (Large sphere for skybox)
+// NOTE: The view matrix passed here must already have translation
+// zeroed out (row 3 = [0, 0, 0, 1]). Do NOT try to modify the
+// matrix inside the shader — GLSL ES 1.00 does not support
+// matrix column indexing (skyView[3] = ...) is invalid.
 // ============================================================
 var SKY_VERTEX_SHADER = `
 attribute vec3 aPosition;
@@ -97,11 +101,8 @@ varying vec2 vUV;
 varying vec3 vWorldPos;
 
 void main() {
-    // Remove translation from view matrix for sky (keep rotation only)
-    mat4 skyView = uView;
-    skyView[3] = vec4(0.0, 0.0, 0.0, 1.0);
-
-    gl_Position = uProjection * skyView * vec4(aPosition, 1.0);
+    // uView is already rotation-only (translation zeroed in JavaScript)
+    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
     vUV = aUV;
     vWorldPos = aPosition;
 }

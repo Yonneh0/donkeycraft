@@ -95,11 +95,12 @@
             return null;
         }
 
-        // Validate the program before returning
-        var valid = gl.getProgramParameter(program, gl.VALIDATE_STATUS);
-        if (!valid) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Program linked but failed validation:\n' + gl.getProgramInfoLog(program));
-        }
+        // NOTE: Do NOT check VALIDATE_STATUS here. In WebGL 1, VALIDATE_STATUS can
+        // return false when required runtime state is missing (uniforms not set,
+        // textures not bound, no active vertex attributes). This is a known Safari/WebKit
+        // behavior where validation fails silently with an empty info log even for
+        // perfectly valid programs. Validation is only meaningful after a draw call
+        // has been attempted, so we skip it at link time and rely on LINK_STATUS only.
 
         this._programCount++;
         return program;

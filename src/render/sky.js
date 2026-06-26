@@ -112,20 +112,26 @@
 
         if (!this._shaderManager.use('sky')) return;
 
-        // Disable depth writing so sky renders behind terrain
+        // Disable depth writing so sky doesn't occlude terrain
         gl.depthMask(false);
 
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
 
-        // Zero out translation from view matrix for sky (keep rotation only)
+        // Zero out translation from view matrix for sky (keep rotation only).
+        // This keeps the sky fixed at world center regardless of camera position.
         if (!this._skyViewTemp) {
             this._skyViewTemp = new Float32Array(16);
         }
         var viewData = matrices.view.getData();
         for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
-        this._skyViewTemp[12] = 0; this._skyViewTemp[13] = 0; this._skyViewTemp[14] = 0; this._skyViewTemp[15] = 1;
+        this._skyViewTemp[12] = 0;
+        this._skyViewTemp[13] = 0;
+        this._skyViewTemp[14] = 0;
+        this._skyViewTemp[15] = 1;
         var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+
+        // Set the rotation-only view matrix (translation already zeroed above)
         this._shaderManager.setMat4('uView', skyViewMatrix);
 
         // Set sky colors from lighting
