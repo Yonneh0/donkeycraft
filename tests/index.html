@@ -14,7 +14,6 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
 .test-link:hover { background: #1a2a4a; border-left-color: #00d4ff; }
 .test-link .title { font-weight: bold; font-size: 0.95em; }
 .test-link .desc { color: #888; font-size: 0.82em; margin-top: 3px; }
-.placeholder { color: #666; font-style: italic; padding: 10px 0; font-size: 0.9em; }
 </style>
 </head>
 <body>
@@ -51,19 +50,17 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
         <div class="title">Phase 4: World Generation</div>
         <div class="desc">Chunk, ChunkManager, Biome, TerrainGenerator, OreGenerator, CaveGenerator, StructureGenerator, WaterGenerator, TerrainSurface, LightingEngine, Physics</div>
     </a>
-</div>
-
-<div class="category">
-    <h2>Future Tests</h2>
-    <div class="placeholder">Phase 5+: Player & Movement, Interaction, Inventory & UI, Crafting, Entities, Redstone, and more — coming soon.</div>
+    <a href="phase5-test.html" class="test-link">
+        <div class="title">Phase 5: Player & Movement</div>
+        <div class="desc">Player entity, movement physics, collision detection, jump mechanics, flying system, hurt box & damage</div>
+    </a>
 </div>
 
 <script>
 (function() {
     'use strict';
-    // Auto-detect which phases have source files and update the index
-    var testFiles = [
-        { file: 'phase5-test.html', name: 'Phase 5: Player & Movement', desc: 'Player position, movement ticks, physics, fly mode toggle' },
+    // Auto-update: add links for any future test files that get created
+    var futureTests = [
         { file: 'phase6-test.html', name: 'Phase 6: Interaction', desc: 'Mining, placing blocks, DDA raycasting, reach distance' },
         { file: 'phase7-test.html', name: 'Phase 7: Inventory & UI', desc: 'Inventories, slots, hotbar, GUI rendering' },
         { file: 'phase8-test.html', name: 'Phase 8: Crafting', desc: '2x2 and 3x3 shaped/shapeless recipe matching' },
@@ -71,22 +68,15 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
         { file: 'phase10-test.html', name: 'Phase 10: Redstone', desc: 'Redstone wires, repeaters, comparators, signal propagation, pistons' }
     ];
 
-    var futureSection = document.querySelector('.category:last-child .placeholder');
-    if (futureSection) {
-        // Remove placeholder text
-        futureSection.parentNode.removeChild(futureSection);
-
-        // Check which test files exist and add links
-        var linkContainer = document.createElement('div');
-        testFiles.forEach(function(t) {
-            var a = document.createElement('a');
-            a.href = t.file;
-            a.className = 'test-link';
-            a.innerHTML = '<div class="title">' + t.name + '</div><div class="desc">' + t.desc + '</div>';
-            linkContainer.appendChild(a);
-        });
-        document.querySelector('.category:last-child').appendChild(linkContainer);
-    }
+    var category = document.querySelector('.category:last-child');
+    futureTests.forEach(function(t) {
+        var a = document.createElement('a');
+        a.href = t.file;
+        a.className = 'test-link';
+        a.style.opacity = '0.5';
+        a.innerHTML = '<div class="title">' + t.name + ' (Coming Soon)</div><div class="desc">' + t.desc + '</div>';
+        category.appendChild(a);
+    });
 })();
 </script>
 </body>
