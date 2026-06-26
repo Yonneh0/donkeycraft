@@ -118,8 +118,9 @@ Chunks, terrain generation, biomes, structures, lighting engine, physics.
 | 38 | `src/world/terrain-surface.js` | Surface layer: top block per biome (grass→dirt→stone), sand beaches, snow | 100 | [FULLY OPERATIONAL] — verified: grass for plains, sand for desert, snow for taiga, stone for extreme hills, dirt for swamp |
 | 39 | `src/world/lighting-engine.js` | Sky light & block light propagation: BFS flood fill, light updates on block change | 250 | [FULLY OPERATIONAL] — verified: sky light fills from surface down (fast mode), block light BFS flood fill with crying_obsidian emission=10, opacity cache, invalidateCache |
 | 40 | `src/world/physics.js` | Block physics: gravity blocks (sand/gravel), liquid flow, redstone signal propagation | 280 | [FULLY OPERATIONAL] — verified: isGravityBlock/isLiquidBlock queries, sand falls into air, sand on stone doesn't fall, liquid flow simulation |
+| 41 | `src/world/world-utils.js` | Shared coordinate and block access utilities: getBlockAt, setBlockAt, isChunkLoaded, getChunkAndLocalCoords, calculateRaycastMaxSteps, makeStateKey, parseStateKey, makeChunkKey | 172 | [FULLY OPERATIONAL] — verified: block lookup/set at global coords, chunk load checks, coordinate conversion, raycast max steps formula ceil(reach*sqrt(3))+2, state/chunk key helpers |
 
-**Subtotal Phase 4: ~1,980 lines, 11 files**
+**Subtotal Phase 4: ~2,152 lines, 12 files**
 
 ---
 
@@ -140,18 +141,18 @@ Player entity, movement physics, collision detection, jumping, flying.
 
 ---
 
-## Phase 6: Interaction (Mining, Placing, Raycasting) [STATUS: PENDING]
+## Phase 6: Interaction (Mining, Placing, Raycasting) [STATUS: FULLY OPERATIONAL]
 
-Raycasting, block breaking/placing, right-click interactions.
+Raycasting, block breaking/placing, right-click interactions. All 191 tests passing.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 47 | `src/interaction/raycast.js` | DDA raycasting through voxels: hit detection, block face normal, reach distance | 150 | [ ] |
-| 48 | `src/interaction/block-action.js` | Block breaking: hardness timer, tool speed multipliers, drop spawning | 150 | [ ] |
-| 49 | `src/interaction/block-placement.js` | Block placement: face normal handling, snap to grid, placement rules | 100 | [ ] |
-| 50 | `src/interaction/interactable-blocks.js` | Right-click interactions: doors, chests, furnaces, levers, buttons, dispensers | 200 | [ ] |
+| 47 | `src/interaction/raycast.js` | DDA raycasting through voxels: hit detection, block face normal, reach distance, ignoreIds, direction-from-rotation | 332 | [FULLY OPERATIONAL] — verified: RaycastResult class, wall hit detection (X/Y/Z axes), reach enforcement (1.0–12.0 clamp), ignoreIds filtering, zero/near-zero direction handling, origin-inside-block DDA stepping, post-step reach clamp, calculateRaycastMaxSteps formula |
+| 48 | `src/interaction/block-action.js` | Block breaking: hardness timer, tool speed multipliers, drop spawning, chunk-index cleanup, break progress pause on unload | 405 | [FULLY OPERATIONAL] — verified: air hardness=0, all tool tiers (naked→netherite), break time calculation, chunk-index O(1) clearChunkBreakStates, debounced progress events with stage field, block re-verification on completion, float coordinate flooring, concurrent break states in different chunks |
+| 49 | `src/interaction/block-placement.js` | Block placement: face normal handling, snap to grid, AABB player collision, WorldUtils integration | 186 | [FULLY OPERATIONAL] — verified: placement against wall via raycast face normal, top/bottom/left/right/front/back positions, player AABB overlap rejection, world bounds (Y<0, Y≥WORLD_HEIGHT), chunk boundary (local X=15), unloaded chunk rejection, float coordinate flooring |
+| 50 | `src/interaction/interactable-blocks.js` | Right-click interactions: doors, chests, furnaces, levers, buttons, dispensers, note blocks — tick-based state management | 534 | [FULLY OPERATIONAL] — verified: isInteractiveBlock O(1) Set lookup, all interaction types, toggleDoor/toggleLever state persistence, pressButton tick-based cooldown with auto-cleanup, clearChunkButtonStates O(K) via chunk index, serializeState/deserializeState, float coordinate flooring in handleRightClick |
 
-**Subtotal Phase 6: ~600 lines, 4 files**
+**Subtotal Phase 6: ~1,457 lines, 4 files**
 
 ---
 
