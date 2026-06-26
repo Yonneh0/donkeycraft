@@ -32,7 +32,7 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
     </a>
 </div>
 
-<div class="category">
+<div class="category" id="phase-tests">
     <h2>Phase Tests (Isolated Subsystems)</h2>
     <a href="phase1-test.html" class="test-link">
         <div class="title">Phase 1: Core Infrastructure</div>
@@ -54,6 +54,10 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
         <div class="title">Phase 5: Player & Movement</div>
         <div class="desc">Player entity, movement physics, collision detection, jump mechanics, flying system, hurt box & damage</div>
     </a>
+    <a href="phase6-test.html" class="test-link">
+        <div class="title">Phase 6: Interaction</div>
+        <div class="desc">Raycasting (DDA voxel traversal), block breaking (hardness timer, tool multipliers), block placement (face normals, AABB collision), interactable blocks (levers, buttons, doors, chests, furnaces, dispensers)</div>
+    </a>
 </div>
 
 <script>
@@ -61,22 +65,24 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
     'use strict';
     // Auto-update: add links for any future test files that get created
     var futureTests = [
-        { file: 'phase6-test.html', name: 'Phase 6: Interaction', desc: 'Mining, placing blocks, DDA raycasting, reach distance' },
         { file: 'phase7-test.html', name: 'Phase 7: Inventory & UI', desc: 'Inventories, slots, hotbar, GUI rendering' },
         { file: 'phase8-test.html', name: 'Phase 8: Crafting', desc: '2x2 and 3x3 shaped/shapeless recipe matching' },
         { file: 'phase9-test.html', name: 'Phase 9: Entities & Mobs', desc: 'Entity spawning, ticking, mob AI pathfinding' },
         { file: 'phase10-test.html', name: 'Phase 10: Redstone', desc: 'Redstone wires, repeaters, comparators, signal propagation, pistons' }
     ];
 
-    var category = document.querySelector('.category:last-child');
-    futureTests.forEach(function(t) {
-        var a = document.createElement('a');
-        a.href = t.file;
-        a.className = 'test-link';
-        a.style.opacity = '0.5';
-        a.innerHTML = '<div class="title">' + t.name + ' (Coming Soon)</div><div class="desc">' + t.desc + '</div>';
-        category.appendChild(a);
-    });
+    var phaseCategory = document.getElementById('phase-tests');
+    if (phaseCategory) {
+        for (var i = 0; i < futureTests.length; i++) {
+            var t = futureTests[i];
+            var a = document.createElement('a');
+            a.href = t.file;
+            a.className = 'test-link';
+            a.style.opacity = '0.5';
+            a.innerHTML = '<div class="title">' + t.name + ' (Coming Soon)</div><div class="desc">' + t.desc + '</div>';
+            phaseCategory.appendChild(a);
+        }
+    }
 })();
 </script>
 </body>
