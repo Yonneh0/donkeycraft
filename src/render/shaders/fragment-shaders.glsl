@@ -1,9 +1,7 @@
 // Donkeycraft — Fragment Shaders
 // All fragment shaders for terrain lighting, fog, sky, and GUI rendering.
 
-// ============================================================
 // Terrain Fragment Shader
-// ============================================================
 var TERRAIN_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -18,29 +16,22 @@ uniform float uFogDensity;
 
 void main() {
     vec4 texColor = texture2D(uTexture, vUV);
-
-    if (texColor.a < 0.5) {
-        discard;
-    }
+    if (texColor.a < 0.5) discard;
 
     vec3 finalColor = texColor.rgb * vLight;
 
-    float fogDist = vDepth;
-    float fogFactor = 1.0 - exp(-fogDist * uFogDensity);
+    // Exponential distance fog
+    float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
-
     finalColor = mix(finalColor, uFogColor, fogFactor);
 
     gl_FragColor = vec4(finalColor, texColor.a);
 }
 `;
 
-// ============================================================
-// Fog Fragment Shader (Solid fog overlay)
-// ============================================================
+// Fog Fragment Shader
 var FOG_FRAGMENT_SHADER = `
 precision mediump float;
-
 uniform vec4 uFogColor;
 
 void main() {
@@ -48,9 +39,7 @@ void main() {
 }
 `;
 
-// ============================================================
-// GUI Fragment Shader (HUD overlay)
-// ============================================================
+// GUI Fragment Shader
 var GUI_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -62,23 +51,15 @@ uniform int uHasTexture;
 
 void main() {
     vec4 color = vColor;
-
     if (uHasTexture == 1) {
-        vec4 texColor = texture2D(uTexture, vUV);
-        color = texColor * color;
+        color = texture2D(uTexture, vUV) * color;
     }
-
-    if (color.a < 0.1) {
-        discard;
-    }
-
+    if (color.a < 0.1) discard;
     gl_FragColor = color;
 }
 `;
 
-// ============================================================
-// Sky Fragment Shader (Gradient sky)
-// ============================================================
+// Sky Fragment Shader
 var SKY_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -90,17 +71,12 @@ uniform vec3 uBottomColor;
 uniform float uHorizon;
 
 void main() {
-    float y = normalize(vWorldPos).y;
-    float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, y);
-    vec3 skyColor = mix(uBottomColor, uTopColor, t);
-
-    gl_FragColor = vec4(skyColor, 1.0);
+    float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);
+    gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);
 }
 `;
 
-// ============================================================
-// Hand/Item Fragment Shader (First-person item)
-// ============================================================
+// Hand/Item Fragment Shader
 var HAND_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -111,19 +87,12 @@ uniform sampler2D uTexture;
 
 void main() {
     vec4 texColor = texture2D(uTexture, vUV);
-    vec3 finalColor = texColor.rgb * vColor.rgb;
-
-    if (texColor.a < 0.1) {
-        discard;
-    }
-
-    gl_FragColor = vec4(finalColor, texColor.a * vColor.a);
+    if (texColor.a < 0.1) discard;
+    gl_FragColor = vec4(texColor.rgb * vColor.rgb, texColor.a * vColor.a);
 }
 `;
 
-// ============================================================
-// Particle Fragment Shader (Block breaking particles)
-// ============================================================
+// Particle Fragment Shader
 var PARTICLE_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -134,12 +103,7 @@ uniform sampler2D uTexture;
 
 void main() {
     vec4 texColor = texture2D(uTexture, vUV);
-    vec4 finalColor = vec4(vColor.rgb, vColor.a * texColor.a);
-
-    if (finalColor.a < 0.1) {
-        discard;
-    }
-
-    gl_FragColor = finalColor;
+    if (vColor.a * texColor.a < 0.1) discard;
+    gl_FragColor = vec4(vColor.rgb, vColor.a * texColor.a);
 }
 `;

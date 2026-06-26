@@ -1,2 +1,4 @@
 - Make your changes with targetted replace_in_file calls
 - Ensure you properly end your reasoning with </think> before attempting to call tools.
+- You must use `</think>`, to end your thinking block. `</thinking>` IS NOT VALID, AND IS AN ERROR.
+- Carefully review all tool replies for errors. If you do not receive a reply from a tool call, the tool was not processed, due to invalid format.

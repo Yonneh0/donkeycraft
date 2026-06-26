@@ -6,14 +6,12 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * Sky — Renders the sky dome with gradients, sun, moon, and stars.
+     * Sky — Renders the sky dome with day/night gradient.
      */
     Donkeycraft.Sky = function(gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._timeOfDay = 0.5;
-        this._showStars = true;
-        this._showSun = true;
 
         // Sky dome geometry and buffers
         this._skyDomeGeometry = null;
@@ -85,22 +83,6 @@
     };
 
     /**
-     * Show or hide stars.
-     * @param {boolean} show - True to show stars.
-     */
-    Donkeycraft.Sky.prototype.setStarsVisible = function(show) {
-        this._showStars = show;
-    };
-
-    /**
-     * Show or hide sun/moon.
-     * @param {boolean} show - True to show sun/moon.
-     */
-    Donkeycraft.Sky.prototype.setSunMoonVisible = function(show) {
-        this._showSun = show;
-    };
-
-    /**
      * Render the sky dome using the sky shader program.
      * Depth write is disabled so the sky doesn't occlude terrain.
      * @param {Camera} camera - The camera instance.
@@ -118,14 +100,12 @@
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
 
-        // Zero out translation from view matrix for sky (keep rotation only).
-        // This keeps the sky fixed at world center regardless of camera position.
+        // Zero out translation from view matrix to keep sky fixed at world center.
         var viewData = matrices.view.getData();
         for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
         this._skyViewTemp[12] = 0;
         this._skyViewTemp[13] = 0;
         this._skyViewTemp[14] = 0;
-        this._skyViewTemp[15] = 1;
         var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
 
         this._shaderManager.setMat4('uView', skyViewMatrix);
@@ -191,6 +171,7 @@
         if (this._skyDomeIndexBuf) { gl.deleteBuffer(this._skyDomeIndexBuf); this._skyDomeIndexBuf = null; }
 
         this._skyDomeGeometry = null;
+        this._skyViewTemp = null;
     };
 
 })();

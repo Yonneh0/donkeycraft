@@ -22,6 +22,13 @@
         this._hotbarIndexBuf = null;
         this._hotbarVertexBuf = null;
 
+        // Cached orthographic projection (avoids per-frame allocation)
+        this._projMatrixCache = null;
+        this._lastAspect = null;
+
+        // Reusable hotbar vertex data for color updates
+        this._hotbarColorBuffer = null;
+
         // Initialize buffers immediately
         this._initBuffers();
     };
@@ -136,6 +143,20 @@
     };
 
     /**
+     * Get or create a cached orthographic projection matrix.
+     * @private
+     */
+    Donkeycraft.GUIRenderer.prototype._getCachedProjMatrix = function(canvasWidth, canvasHeight) {
+        var aspect = canvasWidth / canvasHeight;
+        if (this._projMatrixCache && this._lastAspect === aspect) {
+            return this._projMatrixCache;
+        }
+        this._projMatrixCache = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
+        this._lastAspect = aspect;
+        return this._projMatrixCache;
+    };
+
+    /**
      * Render the crosshair at center of screen.
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
@@ -146,9 +167,8 @@
 
         if (!this._shaderManager.use('gui')) return;
 
-        // Orthographic projection
-        var aspect = canvasWidth / canvasHeight;
-        var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
+        // Orthographic projection (cached)
+        var projMatrix = this._getCachedProjMatrix(canvasWidth, canvasHeight);
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
@@ -199,28 +219,30 @@
 
         if (!this._shaderManager.use('gui')) return;
 
-        // Orthographic projection
-        var aspect = canvasWidth / canvasHeight;
-        var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
+        // Orthographic projection (cached)
+        var projMatrix = this._getCachedProjMatrix(canvasWidth, canvasHeight);
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
-        // Copy base geometry and modify colors for selected slot highlight
-        var vertices = new Float32Array(this._hotbarGeometry.vertices);
-        var colorHighlight = (selectedSlot >= 0 && selectedSlot < 9) ? [0.8, 0.8, 0.8, 1] : [0.5, 0.5, 0.5, 1];
-        var colorDefault = [0.5, 0.5, 0.5, 1];
+        // Reusable color buffer to avoid per-frame allocation
+        if (!this._hotbarColorBuffer || this._hotbarColorBuffer.length !== this._hotbarGeometry.vertices.length) {
+            this._hotbarColorBuffer = new Float32Array(this._hotbarGeometry.vertices.length);
+        }
+        var vertices = this._hotbarColorBuffer;
+        vertices.set(this._hotbarGeometry.vertices);
+
+        var highlightColor = (selectedSlot >= 0 && selectedSlot < 9) ? [0.8, 0.8, 0.8, 1] : [0.5, 0.5, 0.5, 1];
+        var defaultColor = [0.5, 0.5, 0.5, 1];
 
         for (var i = 0; i < 9; i++) {
-            var isHighlighted = (i === selectedSlot);
-            var highlight = isHighlighted ? colorHighlight : colorDefault;
+            var color = (i === selectedSlot) ? highlightColor : defaultColor;
             var baseVertex = i * 4;
-
             for (var v = 0; v < 4; v++) {
                 var ci = (baseVertex + v) * 9 + 5;
-                vertices[ci]     = highlight[0];
-                vertices[ci + 1] = highlight[1];
-                vertices[ci + 2] = highlight[2];
-                vertices[ci + 3] = highlight[3];
+                vertices[ci]     = color[0];
+                vertices[ci + 1] = color[1];
+                vertices[ci + 2] = color[2];
+                vertices[ci + 3] = color[3];
             }
         }
 

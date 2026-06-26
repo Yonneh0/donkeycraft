@@ -136,10 +136,12 @@
         var up = camera.getUp();
 
         var particleSize = 0.1;
-        var totalVertices = this._particles.length * 6;
+        var vertPerParticle = 6;
+        var floatsPerVertex = 9;
+        var totalFloats = this._particles.length * vertPerParticle * floatsPerVertex;
 
-        if (!this._vertexArray || this._vertexArray.length < totalVertices * 9) {
-            this._vertexArray = new Float32Array(totalVertices * 9);
+        if (!this._vertexArray || this._vertexArray.length < totalFloats) {
+            this._vertexArray = new Float32Array(totalFloats);
         }
         var vertices = this._vertexArray;
 
@@ -153,35 +155,38 @@
 
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
-            var trx = cx + rx + ux, try__ = cy + ry + uy, trz = cz + rz + uz;
+            var trx = cx + rx + ux, tryY = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
-            var base = i * 54;
+            var r = p.color.r, g = p.color.g, b = p.color.b;
+            var base = i * vertPerParticle * floatsPerVertex;
+
+            // Quad vertices: position(3) + uv(2) + color(4) for each corner
             vertices[base]     = blx; vertices[base + 1] = bly; vertices[base + 2] = blz;
             vertices[base + 3] = 0; vertices[base + 4] = 0;
-            vertices[base + 5] = p.color.r; vertices[base + 6] = p.color.g; vertices[base + 7] = p.color.b; vertices[base + 8] = alpha;
+            vertices[base + 5] = r; vertices[base + 6] = g; vertices[base + 7] = b; vertices[base + 8] = alpha;
             vertices[base + 9]  = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
             vertices[base + 12] = 1; vertices[base + 13] = 0;
-            vertices[base + 14] = p.color.r; vertices[base + 15] = p.color.g; vertices[base + 16] = p.color.b; vertices[base + 17] = alpha;
-            vertices[base + 18] = trx; vertices[base + 19] = try__; vertices[base + 20] = trz;
+            vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
+            vertices[base + 18] = trx; vertices[base + 19] = tryY; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
-            vertices[base + 23] = p.color.r; vertices[base + 24] = p.color.g; vertices[base + 25] = p.color.b; vertices[base + 26] = alpha;
+            vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
             vertices[base + 30] = 0; vertices[base + 31] = 0;
-            vertices[base + 32] = p.color.r; vertices[base + 33] = p.color.g; vertices[base + 34] = p.color.b; vertices[base + 35] = alpha;
-            vertices[base + 36] = trx; vertices[base + 37] = try__; vertices[base + 38] = trz;
+            vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
+            vertices[base + 36] = trx; vertices[base + 37] = tryY; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
-            vertices[base + 41] = p.color.r; vertices[base + 42] = p.color.g; vertices[base + 43] = p.color.b; vertices[base + 44] = alpha;
+            vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
             vertices[base + 48] = 0; vertices[base + 49] = 1;
-            vertices[base + 50] = p.color.r; vertices[base + 51] = p.color.g; vertices[base + 52] = p.color.b; vertices[base + 53] = alpha;
+            vertices[base + 50] = r; vertices[base + 51] = g; vertices[base + 52] = b; vertices[base + 53] = alpha;
         }
 
         if (!this._vertexBuffer) {
             this._vertexBuffer = gl.createBuffer();
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalVertices * 9), gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
 
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
@@ -200,6 +205,7 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
+        var totalVertices = this._particles.length * vertPerParticle;
         gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);

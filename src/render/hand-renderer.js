@@ -21,6 +21,13 @@
         this._heldItemId = 1; // Default: stone
         this._bobAngle = 0;
 
+        // Cached projection matrix (avoids per-frame allocation)
+        this._projMatrixCache = null;
+        this._lastAspect = null;
+
+        // Reusable vertex buffer for color updates
+        this._itemColorBuffer = null;
+
         this._buildItemGeometry();
         this._initBuffers();
     };
@@ -76,6 +83,20 @@
     };
 
     /**
+     * Get or create a cached orthographic projection matrix.
+     * @private
+     */
+    Donkeycraft.HandRenderer.prototype._getCachedProjMatrix = function(canvasWidth, canvasHeight) {
+        var aspect = canvasWidth / canvasHeight;
+        if (this._projMatrixCache && this._lastAspect === aspect) {
+            return this._projMatrixCache;
+        }
+        this._projMatrixCache = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
+        this._lastAspect = aspect;
+        return this._projMatrixCache;
+    };
+
+    /**
      * Render the held item in the bottom-right corner of the screen.
      * @param {Camera} camera - The camera instance.
      * @param {number} canvasWidth - Current canvas width in pixels.
@@ -87,9 +108,8 @@
 
         if (!this._shaderManager.use('gui')) return;
 
-        // Orthographic projection for screen-space rendering
-        var aspect = canvasWidth / canvasHeight;
-        var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
+        // Orthographic projection for screen-space rendering (cached)
+        var projMatrix = this._getCachedProjMatrix(canvasWidth, canvasHeight);
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
@@ -102,7 +122,7 @@
         var itemY = -0.4 + bobY;
 
         // Scale based on canvas aspect ratio
-        var scaleX = 0.3 / Math.max(aspect, 1);
+        var scaleX = 0.3 / Math.max(canvasWidth / canvasHeight, 1);
         var scaleY = 0.3;
 
         // Slight rotation sway
@@ -118,9 +138,15 @@
         );
         this._shaderManager.setMat4('uModel', modelMatrix);
 
+        // Reusable vertex buffer for color updates
+        if (!this._itemColorBuffer || this._itemColorBuffer.length !== this._itemGeometry.vertices.length) {
+            this._itemColorBuffer = new Float32Array(this._itemGeometry.vertices.length);
+        }
+        var vertices = this._itemColorBuffer;
+        vertices.set(this._itemGeometry.vertices);
+
         // Get item color and modify vertex data for per-vertex color
         var itemColor = this._getItemColor(this._heldItemId);
-        var vertices = new Float32Array(this._itemGeometry.vertices);
         for (var v = 0; v < 4; v++) {
             var ci = v * 9 + 5;
             vertices[ci]     = itemColor.r;

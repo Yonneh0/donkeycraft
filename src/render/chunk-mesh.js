@@ -46,23 +46,20 @@
         this._geometryUsesUint32 = false;
 
         // Listen for context loss/restore on the source canvas
-        if (gl) {
+        if (gl && gl.canvas) {
             var self = this;
-            var srcEl = gl.canvas || (gl._dcCanvas);
-            if (srcEl && typeof srcEl.addEventListener === 'function') {
-                srcEl.addEventListener('webglcontextlost', function(e) {
-                    e.preventDefault();
-                    self._contextLost = true;
-                    self._vertexBuffer = null;
-                    self._indexBuffer = null;
-                });
-                srcEl.addEventListener('webglcontextrestored', function() {
-                    self._contextLost = false;
-                    self._vertexBuffer = null;
-                    self._indexBuffer = null;
-                    self._dirty = true;
-                });
-            }
+            gl.canvas.addEventListener('webglcontextlost', function(e) {
+                e.preventDefault();
+                self._contextLost = true;
+                self._vertexBuffer = null;
+                self._indexBuffer = null;
+            });
+            gl.canvas.addEventListener('webglcontextrestored', function() {
+                self._contextLost = false;
+                self._vertexBuffer = null;
+                self._indexBuffer = null;
+                self._dirty = true;
+            });
         }
     };
 

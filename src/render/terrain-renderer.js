@@ -27,6 +27,9 @@
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
         this._meshOptimizer = new Donkeycraft.MeshOptimizer();
 
+        // Reusable temp buffer for matrix multiplication (avoids per-frame allocation)
+        this._tempMatrixData = new Float32Array(16);
+
         // World data access — set by game loop
         this._getBlockFunc = null;
 
@@ -135,9 +138,8 @@
             return self._getBlockFunc(worldX, worldY, worldZ);
         };
 
-        // Build and optimize geometry
+        // Build geometry (face culling already done during build)
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
-        geometry = this._meshOptimizer.optimize(geometry, this._isBlockSolid);
 
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -186,15 +188,16 @@
         var viewData = this._cachedViewData;
         if (!projData || !viewData) return;
 
-        var vp = this._multiplyMatrices(projData, viewData);
+        // Reuse temp buffer for result to avoid allocation
+        this._multiplyMatrices(projData, viewData, this._tempMatrixData);
 
         this._frustumPlanes = [
-            this._extractPlane(vp, -1, 0, 0),   // Left
-            this._extractPlane(vp, 1, 0, 0),    // Right
-            this._extractPlane(vp, 0, -1, 0),   // Bottom
-            this._extractPlane(vp, 0, 1, 0),    // Top
-            this._extractPlane(vp, 0, 0, -1),   // Near
-            this._extractPlane(vp, 0, 0, 1)     // Far
+            this._extractPlane(this._tempMatrixData, -1, 0, 0),   // Left
+            this._extractPlane(this._tempMatrixData, 1, 0, 0),    // Right
+            this._extractPlane(this._tempMatrixData, 0, -1, 0),   // Bottom
+            this._extractPlane(this._tempMatrixData, 0, 1, 0),    // Top
+            this._extractPlane(this._tempMatrixData, 0, 0, -1),   // Near
+            this._extractPlane(this._tempMatrixData, 0, 0, 1)     // Far
         ];
     };
 
@@ -273,15 +276,17 @@
     };
 
     /**
-     * Multiply two 4×4 matrices (column-major).
+     * Multiply two 4×4 matrices (column-major), storing result in optional target buffer.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function(a, b) {
-        var r = new Float32Array(16);
+    Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function(a, b, target) {
+        var r = target || new Float32Array(16);
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
-                r[i * 4 + j] = a[i]     * b[j*4]    + a[4+i] * b[j*4+1] +
-                               a[8+i] * b[j*4+2] + a[12+i]* b[j*4+3];
+                r[i * 4 + j] = a[i]      * b[j * 4]    +
+                               a[4 + i]  * b[j * 4 + 1] +
+                               a[8 + i]  * b[j * 4 + 2] +
+                               a[12 + i] * b[j * 4 + 3];
             }
         }
         return r;

@@ -13,19 +13,6 @@
     };
 
     /**
-     * Cull hidden faces from raw vertex data.
-     * Note: Face culling is already performed during geometry build by GeometryBuilder.
-     * This method returns geometry unchanged as a no-op for future post-build optimization.
-     * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
-     * @param {Function} isBlockSolid - Function(blockId) returning true if block is fully opaque.
-     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
-     */
-    Donkeycraft.MeshOptimizer.prototype.cullFaces = function(geometry, isBlockSolid) {
-        // No-op: culling already happens during geometry build.
-        return geometry;
-    };
-
-    /**
      * Generate an optimized index buffer from unindexed vertex data.
      * Merges identical vertices to reduce draw call overhead.
      * @param {Object} geometry - Geometry with unindexed vertex data.
@@ -40,21 +27,17 @@
 
         // Key: position(3) + normal(3) + light(1) — UV excluded as it varies per face.
         var vertexKeys = {};
-        var uniqueVertices = [];
-        var vertexToIndex = [];
         var uniqueCount = 0;
+        var vertexToIndex = new Int32Array(vertexCount);
+
+        // Pre-allocate unique vertices array (will be trimmed later)
+        var uniqueVertices = new Float32Array(vertexCount * faceDataSize);
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            var key = [
-                vertices[base],
-                vertices[base + 1],
-                vertices[base + 2],
-                vertices[base + 5],
-                vertices[base + 6],
-                vertices[base + 7],
-                vertices[base + 8]
-            ].join(',');
+            var key = vertices[base] + ',' + vertices[base + 1] + ',' + vertices[base + 2] +
+                      ',' + vertices[base + 5] + ',' + vertices[base + 6] + ',' +
+                      vertices[base + 7] + ',' + vertices[base + 8];
 
             if (vertexKeys[key] !== undefined) {
                 vertexToIndex[i] = vertexKeys[key];
@@ -62,8 +45,9 @@
                 vertexKeys[key] = uniqueCount;
                 vertexToIndex[i] = uniqueCount;
 
+                var destBase = uniqueCount * faceDataSize;
                 for (var d = 0; d < faceDataSize; d++) {
-                    uniqueVertices.push(vertices[base + d]);
+                    uniqueVertices[destBase + d] = vertices[base + d];
                 }
                 uniqueCount++;
             }
@@ -93,7 +77,7 @@
         }
 
         return {
-            vertices: new Float32Array(uniqueVertices),
+            vertices: uniqueVertices.subarray(0, uniqueCount * faceDataSize),
             indices: indices,
             vertexCount: uniqueCount,
             indexCount: indices.length
@@ -175,16 +159,11 @@
     /**
      * Run all optimization passes on geometry.
      * @param {Object} geometry - Geometry object.
-     * @param {Function} [isBlockSolid] - Optional solidity check for face culling.
      * @param {Donkeycraft.Vector3} [cameraPos] - Optional camera position for back-face culling.
-     * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.MeshOptimizer.prototype.optimize = function(geometry, isBlockSolid, cameraPos) {
+    Donkeycraft.MeshOptimizer.prototype.optimize = function(geometry, cameraPos) {
         var result = geometry;
-
-        if (isBlockSolid) {
-            result = this.cullFaces(result, isBlockSolid);
-        }
 
         result = this.generateIndexBuffer(result);
 

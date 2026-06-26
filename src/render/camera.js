@@ -4,7 +4,6 @@
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var FOV = Donkeycraft.Config.FOV; // 70 degrees
 
     /**
      * Camera — First-person camera with position, rotation, projection matrix, and FOV.
@@ -13,7 +12,7 @@
         this._position = new Donkeycraft.Vector3(0, 64, 0);
         this._yaw = 0;
         this._pitch = 0;
-        this._fov = fov || FOV;
+        this._fov = fov || Donkeycraft.Config.FOV;
         this._near = near || 0.1;
         this._far = far || 1000;
         this._aspect = 16 / 9;
@@ -21,7 +20,7 @@
         this._projectionMatrix = null;
         this._viewMatrix = null;
 
-        // Cached direction vectors (avoids allocation each call)
+        // Cached direction vectors (normalized in-place each call)
         this._forward = new Donkeycraft.Vector3();
         this._right = new Donkeycraft.Vector3();
     };
@@ -74,7 +73,7 @@
      * Apply mouse delta to camera rotation.
      * @param {number} deltaX - Mouse X movement delta.
      * @param {number} deltaY - Mouse Y movement delta.
-     * @param {number} [sensitivity=0.15] - Mouse sensitivity multiplier.
+     * @param {number} [sensitivity] - Mouse sensitivity multiplier.
      */
     Donkeycraft.Camera.prototype.applyMouseDelta = function(deltaX, deltaY, sensitivity) {
         sensitivity = sensitivity || Donkeycraft.Config.MOUSE_SENSITIVITY;
@@ -97,7 +96,7 @@
             -sinYaw * cosPitch,
             sinPitch,
             -cosYaw * cosPitch
-        ).normalized();
+        ).normalize();
 
         return this._forward;
     };
@@ -110,7 +109,7 @@
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
 
-        this._right.set(cosYaw, 0, -sinYaw).normalized();
+        this._right.set(cosYaw, 0, -sinYaw).normalize();
 
         return this._right;
     };
