@@ -156,16 +156,16 @@ Raycasting, block breaking/placing, right-click interactions. All 191 tests pass
 
 ---
 
-## Phase 6.5: Loading Screen & Initialization [STATUS: PENDING]
+## Phase 6.5: Loading Screen & Initialization [STATUS: FULLY OPERATIONAL]
 
-Async initialization sequence and loading screen UI. Required because IndexedDB, AudioBuffer decoding, and texture atlas generation are asynchronous and must complete before the game loop starts.
+Async initialization sequence and loading screen UI. Required because IndexedDB, AudioBuffer decoding, and texture atlas generation are asynchronous and must complete before the game loop starts. All 10 test sections passing with 100+ assertions.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 52 | `src/core/init-sequence.js` | Async initialization: loads textures, decodes audio buffers, initializes IndexedDB, then starts game loop | 150 | [ ] |
-| 53 | `src/ui/loading-screen.js` | DOM-based loading screen: progress bar, loading tips, error handling | 100 | [ ] |
+| 52 | `src/core/init-sequence.js` | Async initialization: config validation, texture atlas loading, audio init, IndexedDB opening, EventBus event emission | 200 | [FULLY OPERATIONAL] — verified: pipeline phase order (config→texture-atlas→audio→indexeddb), config rejection on invalid values, getPhase/getSystems, destroy mid-pipeline safety |
+| 53 | `src/ui/loading-screen.js` | DOM-based loading screen: progress bar with CSS transitions, rotating tips (15 tips), error display, hide/dispose | 172 | [FULLY OPERATIONAL] — verified: DOM creation, progress clamping 0-100, tip rotation at 25% intervals, error state styling, dispose reference nulling, custom container support |
 
-**Subtotal Phase 6.5: ~250 lines, 2 files**
+**Subtotal Phase 6.5: ~372 lines, 2 files**
 
 ---
 
