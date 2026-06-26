@@ -123,20 +123,20 @@ Chunks, terrain generation, biomes, structures, lighting engine, physics.
 
 ---
 
-## Phase 5: Player & Movement [STATUS: PENDING]
+## Phase 5: Player & Movement [STATUS: FULLY OPERATIONAL]
 
 Player entity, movement physics, collision detection, jumping, flying.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 41 | `src/player/player.js` | Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode | 150 | [ ] |
-| 42 | `src/player/movement.js` | Movement physics: walking, sprinting, swimming, flying, speed modifiers | 200 | [ ] |
-| 43 | `src/player/collision.js` | AABB collision detection & response against blocks, entity bounds | 200 | [ ] |
-| 44 | `src/player/jumping.js` | Jump mechanics: height, frequency, swing through blocks, water swimming | 80 | [ ] |
-| 45 | `src/player/flying.js` | Creative/spectator flying: up/down, speed boost (shift), collision in creative | 100 | [ ] |
-| 46 | `src/player/hurt-box.js` | Hitbox management, damage reception, knockback, fall damage calculation | 120 | [ ] |
+| 41 | `src/player/player.js` | Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode, knockback, fall distance, eye position | 386 | [FULLY OPERATIONAL] — verified: position/velocity/rotation getters/setters, pitch clamping to π/2, game modes (survival/creative/spectator), AABB hurt box calculation, forward/right direction vectors, knockback application/clearing, fall distance tracking, destroy() |
+| 42 | `src/player/movement.js` | Movement physics: walking, sprinting, swimming, flying, speed modifiers, game-mode-specific horizontal speeds | 407 | [FULLY OPERATIONAL] — verified: survival walking speed 5.0 blocks/s, creative flying speed 5.0 (10.0 with shift), sprint key detection, swimming/slowness modifiers, getGameMode/setGameMode accessors, tick-based velocity application |
+| 43 | `src/player/collision.js` | AABB collision detection & response against blocks, entity bounds, axis-separated resolution for wall sliding | 395 | [FULLY OPERATIONAL] — verified: resolveMovement axis-separated collision (X/Y/Z independent), checkMovement for per-axis overlap, isBlockSolid queries, getOverlappingBlocks returns intersecting block list, onGround flag set when blocked from below |
+| 44 | `src/player/jumping.js` | Jump mechanics: height (0.42 force), frequency, cooldown timer, water swimming (Space key upward movement) | 156 | [FULLY OPERATIONAL] — verified: canJump ground+cooldown check, performJump applies 0.42 upward force, cooldown prevents rapid jumps, isSwimmingUp for water movement, jump force configurable via getJumpForce |
+| 45 | `src/player/flying.js` | Creative/spectator flying: enable/disable toggle, up/down, speed boost (shift = 2x), spectator clipping through blocks | 205 | [FULLY OPERATIONAL] — verified: isFlying/isEnabled state tracking, toggleFlyMode, setEnabled, normal fly speed 5.0, sprint fly speed 10.0, canSpectate for creative/spectator modes, shouldClipThroughBlocks for spectator mode, survival mode cannot enable flying |
+| 46 | `src/player/hurt-box.js` | Hitbox management, damage reception with absorption hearts, knockback, fall damage calculation, healing, death callbacks | 399 | [FULLY OPERATIONAL] — verified: takeDamage returns amount dealt, health tracking with absorption (absorbs first then damages health), heal restores up to max, creative mode immunity (returns 0), fall damage formula (distance-3)/2, knockback application/clearing, death callback with source tracking, reset revives and restores health |
 
-**Subtotal Phase 5: ~850 lines, 6 files**
+**Subtotal Phase 5: ~1,948 lines, 6 files**
 
 ---
 
@@ -426,7 +426,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 2: WebGL Rendering | 14 | ~1,715 |
 | Phase 3: Block System | 6 | ~1,010 |
 | Phase 4: World Generation | 11 | ~1,980 |
-| Phase 5: Player & Movement | 6 | ~850 |
+| Phase 5: Player & Movement | 6 | ~1,948 (actual: 1,948) |
 | Phase 6: Interaction | 4 | ~600 |
 | Phase 7: Inventory & UI | 12 | ~1,550 |
 | Phase 8: Crafting & Recipes | 3 | ~780 |
@@ -443,7 +443,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 19: Assets | — | (external) |
 | Phase 20: UI / HTML/CSS | 4 | ~730 |
 | Phase 21: Main Entry & Loop | 2 | ~300 |
-| **TOTAL** | **~112 files** | **~15,470 lines of JS** |
+| **TOTAL** | **~112 files** | **~16,564 lines of JS** (Phase 5 actual: 1,948 vs estimated 850) |
 
 ---
 
