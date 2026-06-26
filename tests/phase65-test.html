@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 6.5 Loading Screen & Initialization Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
+.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
+.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
+.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
+.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
+.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
+.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
+.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
+.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
+.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
+.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
+.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
+/* Loading screen test container */
+#loading-test-container { width: 100%; height: 300px; background: #0a0a1a; border: 1px solid #333; border-radius: 6px; margin: 10px 0; position: relative; overflow: hidden; }
+</style>
+</head>
+<body>
+<h1>Donkeycraft — Phase 6.5 Loading Screen & Initialization Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: Async initialization sequence, loading screen UI with progress bar, tips rotation, error handling</div>
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 6.5 -->
+<script src="../src/core/init-sequence.js"></script>
+<script src="../src/ui/loading-screen.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var results = document.getElementById('results');
+    var totalTests = 0;
+    var passedTests = 0;
+    var failedTests = 0;
+    var currentSection = null;
+
+    // ============================================================
+    // Test Framework
+    // ============================================================
+
+    function section(name) {
+        var div = document.createElement('div');
+        div.className = 'section';
+        var heading = document.createElement('h2');
+        heading.textContent = name;
+        div.appendChild(heading);
+        results.appendChild(div);
+        currentSection = div;
+    }
+
+    function assert(condition, message) {
+        totalTests++;
+        if (condition) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
+        }
+        currentSection.appendChild(div);
+    }
+
+    function assertEq(actual, expected, message) {
+        totalTests++;
+        if (actual === expected) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
+        }
+        currentSection.appendChild(div);
+    }
+
+    function assertNear(actual, expected, epsilon, message) {
+        totalTests++;
+        if (Math.abs(actual - expected) < epsilon) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
+        }
+        currentSection.appendChild(div);
+    }
+
+    function assertType(val, type, message) {
+        totalTests++;
+        if (typeof val === type) {
+            passedTests++;
+            var div = document.createElement('div');
+            div.className = 'test pass';
+            div.textContent = '\u2713 PASS: ' + message;
+        } else {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
+        }
+        currentSection.appendChild(div);
+    }
+
+    function assertArrEq(actual, expected, message) {
+        totalTests++;
+        if (actual.length !== expected.length) {
+            failedTests++;
+            var div = document.createElement('div');
+            div.className = 'test fail';
+            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
+            currentSection.appendChild(div);
+            return;
+        }
+        for (var i = 0; i < actual.length; i++) {
+            if (actual[i] !== expected[i]) {
+                failedTests++;
+                var div3 = document.createElement('div');
+                div3.className = 'test fail';
+                div3.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
+                currentSection.appendChild(div3);
+                return;
+            }
+        }
+        passedTests++;
+        var div2 = document.createElement('div');
+        div2.className = 'test pass';
+        div2.textContent = '\u2713 PASS: ' + message;
+        currentSection.appendChild(div2);
+    }
+
+    function info(msg) {
+        var div = document.createElement('div');
+        div.className = 'info-msg';
+        div.textContent = '>> ' + msg;
+        currentSection.appendChild(div);
+    }
+
+    function finishTests() {
+        var summary = document.createElement('div');
+        if (failedTests === 0) {
+            summary.className = 'summary pass';
+            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
+        } else {
+            summary.className = 'summary fail';
+            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
+        }
+        results.appendChild(summary);
+    }
+
+    // ============================================================
+    // TEST 1: LoadingScreen — DOM Creation
+    // ============================================================
+    section('1. LoadingScreen — DOM Creation');
+
+    var testContainer = document.createElement('div');
+    testContainer.id = 'loading-test-container';
+    document.body.appendChild(testContainer);
+
+    var ls = new Donkeycraft.LoadingScreen(testContainer);
+
+    assert(ls._element !== null, 'LoadingScreen creates _element');
+    assertEq(ls._element.className, 'dk-loading-screen', '_element has class dk-loading-screen');
+    assertEq(ls._progressBar !== null, true, '_progressBar element created');
+    assertEq(ls._messageEl !== null, true, '_messageEl element created');
+    assertEq(ls._tipEl !== null, true, '_tipEl element created');
+    assertEq(ls._errorEl !== null, true, '_errorEl element created');
+
+    // Verify initial message
+    assertEq(ls._messageEl.textContent, 'Initializing...', 'Initial message is "Initializing..."');
+
+    // Verify initial tip
+    var expectedTip = '[Tip] ' + Donkeycraft.LoadingScreenTips[0];
+    assertEq(ls._tipEl.textContent, expectedTip, 'Initial tip matches LoadingScreenTips[0]');
+
+    // Verify progress bar starts at 0%
+    assertEq(ls._progressBar.style.width, '0%', 'Progress bar starts at 0%');
+
+    // Verify error is hidden initially
+    assertEq(ls._errorEl.style.display, 'none', 'Error display is hidden initially');
+
+    // Verify element is in DOM
+    assert(testContainer.contains(ls._element), 'Loading screen element is in container');
+
+    // Verify CSS styles are applied
+    assert(ls._element.style.position === 'fixed', '_element has position: fixed');
+    assert(ls._element.style.zIndex === '9999', '_element has z-index: 9999');
+
+    ls.dispose();
+    document.body.removeChild(testContainer);
+
+    // ============================================================
+    // TEST 2: LoadingScreen — Progress Updates
+    // ============================================================
+    section('2. LoadingScreen — Progress Updates');
+
+    var testContainer2 = document.createElement('div');
+    testContainer2.id = 'loading-test-container-2';
+    document.body.appendChild(testContainer2);
+
+    var ls2 = new Donkeycraft.LoadingScreen(testContainer2);
+
+    // Test 2a: updateProgress(50)
+    ls2.updateProgress(50);
+    assertEq(ls2._progressBar.style.width, '50%', 'updateProgress(50) sets width to 50%');
+
+    // Test 2b: updateProgress(100)
+    ls2.updateProgress(100);
+    assertEq(ls2._progressBar.style.width, '100%', 'updateProgress(100) sets width to 100%');
+
+    // Test 2c: updateProgress(0) — reset
+    ls2.updateProgress(0);
+    assertEq(ls2._progressBar.style.width, '0%', 'updateProgress(0) resets to 0%');
+
+    // Test 2d: Clamp negative values
+    ls2.updateProgress(-10);
+    assertEq(ls2._progressBar.style.width, '0%', 'updateProgress(-10) clamps to 0%');
+
+    // Test 2e: Clamp above 100
+    ls2.updateProgress(150);
+    assertEq(ls2._progressBar.style.width, '100%', 'updateProgress(150) clamps to 100%');
+
+    // Test 2f: Tip rotation at 25% threshold
+    var testContainer3 = document.createElement('div');
+    testContainer3.id = 'loading-test-container-3';
+    document.body.appendChild(testContainer3);
+    var ls3b = new Donkeycraft.LoadingScreen(testContainer3);
+
+    // Initial tip index is 0
+    assertEq(ls3b._tipIndex, 0, 'Initial tip index is 0');
+
+    // updateProgress(25) should rotate tip (25 % 25 === 0 && 25 > 0)
+    ls3b.updateProgress(25);
+    assertEq(ls3b._tipIndex, 1, 'updateProgress(25) rotates tip to index 1');
+
+    // updateProgress(50) should rotate again
+    ls3b.updateProgress(50);
+    assertEq(ls3b._tipIndex, 2, 'updateProgress(50) rotates tip to index 2');
+
+    // updateProgress(75) should rotate again
+    ls3b.updateProgress(75);
+    assertEq(ls3b._tipIndex, 3, 'updateProgress(75) rotates tip to index 3');
+
+    // updateProgress(100) should rotate again
+    ls3b.updateProgress(100);
+    assertEq(ls3b._tipIndex, 4, 'updateProgress(100) rotates tip to index 4');
+
+    // updateProgress(0) should NOT rotate (0 > 0 is false)
+    var tipBefore = ls3b._tipIndex;
+    ls3b.updateProgress(0);
+    assertEq(ls3b._tipIndex, tipBefore, 'updateProgress(0) does not rotate tip');
+
+    // Test 2g: Tips wrap around
+    var ls4 = new Donkeycraft.LoadingScreen(document.createElement('div'));
+    var testContainer4 = document.createElement('div');
+    testContainer4.id = 'loading-test-container-4';
+    document.body.appendChild(testContainer4);
+    var ls4b = new Donkeycraft.LoadingScreen(testContainer4);
+
+    // Set tip index to last position
+    ls4b._tipIndex = Donkeycraft.LoadingScreenTips.length - 1;
+    ls4b.updateProgress(25);
+    assertEq(ls4b._tipIndex, 0, 'Tip wraps around from last to first (index ' + (Donkeycraft.LoadingScreenTips.length - 1) + ' → 0)');
+
+    // Test 2h: Disposed loading screen does nothing
+    ls4b.dispose();
+    ls4b.updateProgress(50);
+    assertEq(ls4b._progressBar, null, '_progressBar is null after dispose');
+
+    ls2.dispose();
+    ls3b.dispose();
+    ls4b.dispose();
+    document.body.removeChild(testContainer2);
+    document.body.removeChild(testContainer3);
+    document.body.removeChild(testContainer4);
+
+    // ============================================================
+    // TEST 3: LoadingScreen — Messages & Tips
+    // ============================================================
+    section('3. LoadingScreen — Messages & Tips');
+
+    var testContainer5 = document.createElement('div');
+    testContainer5.id = 'loading-test-container-5';
+    document.body.appendChild(testContainer5);
+
+    var ls5 = new Donkeycraft.LoadingScreen(testContainer5);
+
+    // Test 3a: setMessage
+    ls5.setMessage('Loading textures...');
+    assertEq(ls5._messageEl.textContent, 'Loading textures...', 'setMessage updates message text');
+
+    // Test 3b: setMessage with empty string
+    ls5.setMessage('');
+    assertEq(ls5._messageEl.textContent, '', 'setMessage accepts empty string');
+
+    // Test 3c: setMessage with special characters
+    ls5.setMessage('Error: file not found (line 42)');
+    assertEq(ls5._messageEl.textContent, 'Error: file not found (line 42)', 'setMessage handles special characters');
+
+    // Test 3d: Tips are from LoadingScreenTips array
+    var tipText = ls5._tipEl.textContent;
+    var tipContent = tipText.replace('[Tip] ', '');
+    assert(Donkeycraft.LoadingScreenTips.indexOf(tipContent) >= 0, 'Displayed tip is from LoadingScreenTips array');
+
+    // Test 3e: All tips are non-empty strings
+    for (var i = 0; i < Donkeycraft.LoadingScreenTips.length; i++) {
+        assert(typeof Donkeycraft.LoadingScreenTips[i] === 'string', 'LoadingScreenTips[' + i + '] is a string');
+        assert(Donkeycraft.LoadingScreenTips[i].length > 0, 'LoadingScreenTips[' + i + '] is non-empty');
+    }
+
+    // Test 3f: LoadingScreenTips has at least 10 tips
+    assert(Donkeycraft.LoadingScreenTips.length >= 10, 'LoadingScreenTips has at least 10 tips (actual: ' + Donkeycraft.LoadingScreenTips.length + ')');
+
+    ls5.dispose();
+    document.body.removeChild(testContainer5);
+
+    // ============================================================
+    // TEST 4: LoadingScreen — Error State
+    // ============================================================
+    section('4. LoadingScreen — Error State');
+
+    var testContainer6 = document.createElement('div');
+    testContainer6.id = 'loading-test-container-6';
+    document.body.appendChild(testContainer6);
+
+    var ls6 = new Donkeycraft.LoadingScreen(testContainer6);
+
+    // Test 4a: showError displays error
+    ls6.showError('Failed to load texture atlas: ENOENT');
+    assertEq(ls6._errorEl.style.display, 'block', 'showError sets display to block');
+    assert(ls6._errorEl.innerHTML.indexOf('ERROR') >= 0, 'Error display contains ERROR label');
+    assert(ls6._errorEl.innerHTML.indexOf('Failed to load texture atlas: ENOENT') >= 0, 'Error display contains error message');
+
+    // Test 4b: Progress bar is hidden during error
+    assertEq(ls6._progressBar.style.display, 'none', 'Progress bar is hidden during error');
+
+    // Test 4c: Tip is hidden during error
+    assertEq(ls6._tipEl.style.display, 'none', 'Tip is hidden during error');
+
+    // Test 4d: Message changes to "Failed to initialize"
+    assertEq(ls6._messageEl.textContent, 'Failed to initialize', 'Message changes to "Failed to initialize" during error');
+
+    // Test 4e: Error text color is red (check cssText since style.color may normalize to rgb)
+    assert(ls6._errorEl.style.cssText.indexOf('#ff6b6b') >= 0 || ls6._errorEl.style.color === '#ff6b6b' || ls6._errorEl.style.color === 'rgb(255, 107, 107)', 'Error display has red-ish color styling');
+
+    // Test 4f: showError after dispose does nothing
+    var ls7 = new Donkeycraft.LoadingScreen(document.createElement('div'));
+    var testContainer7 = document.createElement('div');
+    testContainer7.id = 'loading-test-container-7';
+    document.body.appendChild(testContainer7);
+    var ls7b = new Donkeycraft.LoadingScreen(testContainer7);
+    ls7b.dispose();
+    ls7b.showError('Should not throw'); // Should not throw
+    assertEq(ls7b._disposed, true, 'Disposed screen stays disposed after showError');
+
+    ls6.dispose();
+    ls7b.dispose();
+    document.body.removeChild(testContainer6);
+    document.body.removeChild(testContainer7);
+
+    // ============================================================
+    // TEST 5: LoadingScreen — Hide/Dispose
+    // ============================================================
+    section('5. LoadingScreen — Hide/Dispose');
+
+    var testContainer8 = document.createElement('div');
+    testContainer8.id = 'loading-test-container-8';
+    document.body.appendChild(testContainer8);
+
+    var ls8 = new Donkeycraft.LoadingScreen(testContainer8);
+
+    // Test 5a: hide removes from DOM
+    assert(testContainer8.contains(ls8._element), 'Element is in container before hide');
+    ls8.hide();
+    assert(!testContainer8.contains(ls8._element), 'Element removed from container after hide');
+
+    // Test 5b: hide again does nothing (no error)
+    ls8.hide(); // Should not throw
+    assertEq(ls8._element, ls8._element, 'Second hide call does not error');
+
+    // Test 5c: dispose removes and nulls references
+    var testContainer9 = document.createElement('div');
+    testContainer9.id = 'loading-test-container-9';
+    document.body.appendChild(testContainer9);
+    var ls9 = new Donkeycraft.LoadingScreen(testContainer9);
+
+    assert(ls9._element !== null, '_element is not null before dispose');
+    ls9.dispose();
+    assertEq(ls9._disposed, true, '_disposed is true after dispose');
+    assertEq(ls9._element, null, '_element is null after dispose');
+    assertEq(ls9._progressBar, null, '_progressBar is null after dispose');
+    assertEq(ls9._messageEl, null, '_messageEl is null after dispose');
+    assertEq(ls9._tipEl, null, '_tipEl is null after dispose');
+    assertEq(ls9._errorEl, null, '_errorEl is null after dispose');
+    assertEq(ls9._container, null, '_container is null after dispose');
+
+    // Test 5d: Operations on disposed screen do nothing
+    var ls10 = new Donkeycraft.LoadingScreen(document.createElement('div'));
+    var testContainer10 = document.createElement('div');
+    testContainer10.id = 'loading-test-container-10';
+    document.body.appendChild(testContainer10);
+    var ls10b = new Donkeycraft.LoadingScreen(testContainer10);
+    ls10b.dispose();
+    ls10b.updateProgress(50); // Should not throw
+    ls10b.setMessage('test'); // Should not throw
+    ls10b.hide(); // Should not throw
+
+    ls8.hide(); // cleanup
+    ls10b.dispose();
+    document.body.removeChild(testContainer8);
+    document.body.removeChild(testContainer9);
+    document.body.removeChild(testContainer10);
+
+    // ============================================================
+    // TEST 6: InitSequence — Construction
+    // ============================================================
+    section('6. InitSequence — Construction');
+
+    // Test 6a: Constructor accepts config
+    var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
+    assert(initSeq !== null, 'InitSequence constructor creates instance');
+    assertType(initSeq.getPhase, 'function', 'getPhase is a function');
+    assertType(initSeq.initialize, 'function', 'initialize is a function');
+    assertType(initSeq.destroy, 'function', 'destroy is a function');
+    assertType(initSeq.on, 'function', 'on is a function');
+
+    // Test 6b: Initial phase is 'none'
+    assertEq(initSeq.getPhase(), 'none', 'Initial phase is "none"');
+
+    // Test 6c: getSystems returns null before initialize
+    assertEq(initSeq.getSystems(), null, 'getSystems returns null before initialize()');
+
+    // Test 6d: Constructor with no config uses default
+    var initSeq2 = new Donkeycraft.InitSequence();
+    assert(initSeq2 !== null, 'InitSequence constructor works without config (uses Donkeycraft.Config default)');
+
+    // Test 6e: EventBus is created internally
+    // Subscribe to an event to verify
+    var eventFired = false;
+    initSeq.on('init:test', function(data) { eventFired = true; });
+    initSeq._emit('init:test', { test: true });
+    assert(eventFired, 'EventBus is created and emits events correctly');
+
+    initSeq.destroy();
+    initSeq2.destroy();
+
+    // ============================================================
+    // TEST 7: InitSequence — Pipeline Execution
+    // ============================================================
+    section('7. InitSequence — Pipeline Execution');
+
+    var testContainer11 = document.createElement('div');
+    testContainer11.id = 'loading-test-container-11';
+    document.body.appendChild(testContainer11);
+
+    var ls11 = new Donkeycraft.LoadingScreen(testContainer11);
+    var phasesObserved = [];
+    var eventsObserved = [];
+
+    var initSeq3 = new Donkeycraft.InitSequence(Donkeycraft.Config);
+
+    // Subscribe to all init events
+    initSeq3.on('init:phase:start', function(data) {
+        phasesObserved.push('start:' + data.phase);
+    });
+    initSeq3.on('init:phase:end', function(data) {
+        phasesObserved.push('end:' + data.phase);
+    });
+    initSeq3.on('init:complete', function(data) {
+        eventsObserved.push('complete');
+    });
+
+    // Test 7a: initialize returns a Promise
+    var result = initSeq3.initialize();
+    assertType(result, 'object', 'initialize() returns an object (Promise)');
+    assertType(result.then, 'function', 'Returned object has .then() method (is Promise-like)');
+
+    // Test 7b: Phases execute in correct order
+    return result.then(function(systems) {
+        // Verify phase order
+        var expectedOrder = [
+            'start:config', 'end:config',
+            'start:texture-atlas', 'end:texture-atlas',
+            'start:audio', 'end:audio',
+            'start:indexeddb', 'end:indexeddb'
+        ];
+
+        assertArrEq(phasesObserved, expectedOrder, 'Phases execute in correct order');
+
+        // Test 7c: init:complete event fires
+        assert(eventsObserved.indexOf('complete') >= 0, 'init:complete event fired');
+
+        // Test 7d: Systems object contains config and eventBus
+        assert(systems.config !== null, 'Systems object has config');
+        assert(systems.eventBus !== null, 'Systems object has eventBus');
+
+        // Test 7e: getPhase reflects final phase after completion
+        // After pipeline completes, phase should be 'indexeddb' (last phase)
+        assertEq(initSeq3.getPhase(), 'indexeddb', 'getPhase returns last completed phase ("indexeddb")');
+
+        // Test 7f: getSystems returns systems object after completion
+        assert(initSeq3.getSystems() !== null, 'getSystems returns non-null after completion');
+        assertEq(Object.keys(initSeq3.getSystems()).length, 2, 'getSystems has 2 keys (config, eventBus)');
+
+        // Test 7g: Loading screen integration — progress updates through phases
+        ls11.updateProgress(0);
+        ls11.setMessage('Validating configuration...');
+
+        return new Promise(function(resolve) {
+            setTimeout(function() {
+                ls11.updateProgress(25);
+                ls11.setMessage('Generating texture atlas...');
+
+                setTimeout(function() {
+                    ls11.updateProgress(50);
+                    ls11.setMessage('Initializing audio system...');
+
+                    setTimeout(function() {
+                        ls11.updateProgress(75);
+                        ls11.setMessage('Opening world storage...');
+
+                        setTimeout(function() {
+                            ls11.updateProgress(100);
+                            ls11.setMessage('Ready!');
+                            resolve();
+                        }, 100);
+                    }, 100);
+                }, 100);
+            }, 100);
+        });
+
+    }).then(function() {
+        // Test 7h: Verify loading screen final state
+        assertEq(ls11._progressBar.style.width, '100%', 'Loading screen progress bar at 100%');
+        assertEq(ls11._messageEl.textContent, 'Ready!', 'Loading screen message shows "Ready!"');
+
+        // Cleanup
+        ls11.dispose();
+        initSeq3.destroy();
+        document.body.removeChild(testContainer11);
+
+        // Test 7i: Second initialize call after destroy — should be safe (no-op)
+        var initSeq4 = new Donkeycraft.InitSequence(Donkeycraft.Config);
+        initSeq4.destroy();
+        // Calling initialize on destroyed instance should not throw
+        var result2 = initSeq4.initialize();
+        assertType(result2, 'object', 'initialize() on fresh instance returns Promise even after destroy');
+
+        return result2.then(function() {
+            initSeq4.destroy();
+        }).catch(function() {
+            // Pipeline may fail since instance was destroyed mid-execution — that's acceptable
+            initSeq4.destroy();
+        });
+
+    }).then(function() {
+        // Test 7j: Invalid config causes rejection
+        var badConfig = { CHUNK_SIZE: -1 }; // invalid: negative chunk size
+        var initSeq5 = new Donkeycraft.InitSequence(badConfig);
+
+        return initSeq5.initialize().then(
+            function() {
+                // Should not reach here — bad config should reject
+                assert(false, 'Bad config should cause initialize() to reject');
+                initSeq5.destroy();
+            },
+            function(err) {
+                // Expected: promise rejected due to invalid config
+                assert(err instanceof Error, 'initialize() rejects with Error on bad config');
+                assert(err.message.indexOf('configuration') >= 0, 'Error message mentions configuration');
+                info('Correctly rejected for invalid config: ' + err.message);
+                initSeq5.destroy();
+            }
+        );
+
+    }).catch(function(err) {
+        // Catch any unexpected errors from the chain
+        info('Unexpected error in pipeline test: ' + err.message);
+        assert(false, 'Unexpected error in pipeline test: ' + err.message);
+    });
+
+    // ============================================================
+    // TEST 8: InitSequence — Error Handling
+    // ============================================================
+    section('8. InitSequence — Error Handling');
+
+    var testContainer12 = document.createElement('div');
+    testContainer12.id = 'loading-test-container-12';
+    document.body.appendChild(testContainer12);
+
+    var ls12 = new Donkeycraft.LoadingScreen(testContainer12);
+
+    // Test 8a: Error event is emitted on failure
+    var errorEventFired = false;
+    var errorEventData = null;
+
+    var initSeq6 = new Donkeycraft.InitSequence({ CHUNK_SIZE: -5 }); // invalid config
+    initSeq6.on('init:error', function(data) {
+        errorEventFired = true;
+        errorEventData = data;
+    });
+
+    return initSeq6.initialize().then(
+        function() {
+            assert(false, 'Should have rejected for invalid config');
+        },
+        function(err) {
+            // Error event should have fired
+            assert(errorEventFired, 'init:error event fired on failure');
+            if (errorEventData) {
+                assert(errorEventData.error instanceof Error, 'Error event data contains error object');
+                assertType(errorEventData.phase, 'string', 'Error event data contains phase string');
+                info('Error event: phase=' + errorEventData.phase + ', message=' + errorEventData.error.message);
+            }
+
+            // Test 8b: Loading screen shows error
+            ls12.showError('Initialization failed: Invalid configuration');
+            assertEq(ls12._errorEl.style.display, 'block', 'Loading screen shows error after init failure');
+            assert(ls12._errorEl.innerHTML.indexOf('Invalid configuration') >= 0, 'Error message displayed in loading screen');
+
+            initSeq6.destroy();
+            ls12.dispose();
+            document.body.removeChild(testContainer12);
+        }
+    );
+
+    // ============================================================
+    // TEST 9: Integration — InitSequence + LoadingScreen
+    // ============================================================
+    section('9. Integration — InitSequence + LoadingScreen');
+
+    var testContainer13 = document.createElement('div');
+    testContainer13.id = 'loading-test-container-13';
+    document.body.appendChild(testContainer13);
+
+    var ls13 = new Donkeycraft.LoadingScreen(testContainer13);
+    var initSeq7 = new Donkeycraft.InitSequence(Donkeycraft.Config);
+
+    // Wire loading screen to init sequence events
+    var integrationProgress = 0;
+    var integrationMessages = [];
+
+    initSeq7.on('init:phase:start', function(data) {
+        var phaseNames = {
+            'config': 'Validating configuration...',
+            'texture-atlas': 'Generating texture atlas...',
+            'audio': 'Initializing audio system...',
+            'indexeddb': 'Opening world storage...'
+        };
+        ls13.setMessage(phaseNames[data.phase] || ('Phase: ' + data.phase));
+
+        // Map phases to progress percentages
+        var progressMap = {
+            'config': 0,
+            'texture-atlas': 25,
+            'audio': 50,
+            'indexeddb': 75
+        };
+        if (progressMap[data.phase] !== undefined) {
+            ls13.updateProgress(progressMap[data.phase]);
+        }
+    });
+
+    initSeq7.on('init:complete', function() {
+        ls13.updateProgress(100);
+        ls13.setMessage('Ready!');
+        integrationMessages.push('complete');
+    });
+
+    // Test 9a: Full pipeline with loading screen updates
+    return initSeq7.initialize().then(function(systems) {
+        assertEq(ls13._progressBar.style.width, '100%', 'Loading screen progress at 100% after completion');
+        assertEq(ls13._messageEl.textContent, 'Ready!', 'Loading screen message shows "Ready!"');
+        assert(integrationMessages.indexOf('complete') >= 0, 'Integration: complete event received');
+
+        // Test 9b: Loading screen hides on completion
+        ls13.hide();
+        assert(!testContainer13.contains(ls13._element), 'Loading screen removed from DOM after hide()');
+
+        initSeq7.destroy();
+        ls13.dispose();
+        document.body.removeChild(testContainer13);
+
+        // Test 9c: Create loading screen without container (uses document.body)
+        var ls14 = new Donkeycraft.LoadingScreen();
+        assert(ls14._element !== null, 'LoadingScreen without container uses document.body');
+        assert(document.body.contains(ls14._element), 'LoadingScreen appended to document.body when no container given');
+        ls14.dispose();
+
+        // Test 9d: LoadingScreenTips is accessible on namespace
+        assert(Donkeycraft.LoadingScreenTips !== undefined, 'LoadingScreenTips accessible on Donkeycraft namespace');
+        assert(Donkeycraft.LoadingScreenTips.length >= 10, 'LoadingScreenTips has at least 10 tips (actual: ' + Donkeycraft.LoadingScreenTips.length + ')');
+
+        return Promise.resolve();
+
+    }).catch(function(err) {
+        info('Integration test error: ' + err.message);
+        assert(false, 'Integration test failed: ' + err.message);
+
+        // Cleanup on error
+        try { ls13.dispose(); } catch(e) {}
+        try { initSeq7.destroy(); } catch(e) {}
+        try { document.body.removeChild(testContainer13); } catch(e) {}
+    });
+
+    // ============================================================
+    // TEST 10: Edge Cases & Stress Tests
+    // ============================================================
+    section('10. Edge Cases & Stress Tests');
+
+    // Test 10a: Rapid progress updates don't crash
+    var testContainer14 = document.createElement('div');
+    testContainer14.id = 'loading-test-container-14';
+    document.body.appendChild(testContainer14);
+
+    var ls15 = new Donkeycraft.LoadingScreen(testContainer14);
+    for (var r = 0; r < 100; r++) {
+        ls15.updateProgress(r % 101);
+    }
+    // Last value: 99 % 101 = 99, so width should be '99%'
+    assertEq(ls15._progressBar.style.width, '99%', '100 rapid updates do not crash (final value at 99%)');
+
+    // Test 10b: setMessage with very long string
+    var longMsg = '';
+    for (var l = 0; l < 1000; l++) {
+        longMsg += 'a';
+    }
+    ls15.setMessage(longMsg);
+    assertEq(ls15._messageEl.textContent.length, 1000, 'setMessage handles 1000-char string');
+
+    // Test 10c: InitSequence destroy during active initialize
+    var initSeq8 = new Donkeycraft.InitSequence(Donkeycraft.Config);
+    var initPromise = initSeq8.initialize();
+    initSeq8.destroy(); // Destroy mid-pipeline
+    // Should not throw — destroy sets _destroyed flag
+    assertEq(initSeq8.getSystems(), null, 'getSystems returns null after destroy');
+
+    // Test 10d: LoadingScreen with custom container
+    var customContainer = document.createElement('div');
+    customContainer.style.cssText = 'width:500px;height:400px;border:1px solid red;';
+    document.body.appendChild(customContainer);
+
+    var ls16 = new Donkeycraft.LoadingScreen(customContainer);
+    assert(customContainer.contains(ls16._element), 'LoadingScreen appended to custom container');
+    assertEq(ls16._container, customContainer, '_container references custom container');
+
+    ls15.dispose();
+    ls16.dispose();
+    initSeq8.destroy();
+    document.body.removeChild(testContainer14);
+    document.body.removeChild(customContainer);
+
+    // ============================================================
+    // Final Summary
+    // ============================================================
+    finishTests();
+
+})();
+</script>
+</body>
+</html>
