@@ -9,7 +9,7 @@
      * MeshOptimizer — Optimizes chunk mesh data by culling hidden faces.
      */
     Donkeycraft.MeshOptimizer = function() {
-        this._faceDataSize = 9; // position(3) + UV(2) + normal(3) + light(1)
+        this._faceDataSize = 9; // position(3) + light(1) + UV(2) + normal(3)
     };
 
     /**
@@ -38,8 +38,8 @@
             var hx = Math.round(vertices[base] / epsilon);
             var hy = Math.round(vertices[base + 1] / epsilon);
             var hz = Math.round(vertices[base + 2] / epsilon);
-            var hn = Math.round((vertices[base + 5] + vertices[base + 6] + vertices[base + 7]) / epsilon);
-            var hl = Math.round(vertices[base + 8] / epsilon);
+            var hl = Math.round(vertices[base + 3] / epsilon);
+            var hn = Math.round((vertices[base + 6] + vertices[base + 7] + vertices[base + 8]) / epsilon);
             var key = hx ^ (hy << 10) ^ (hz << 20) ^ (hn << 30) ^ (hl << 5);
 
             if (hashTable[key] !== undefined) {
@@ -57,9 +57,14 @@
         }
 
         // Build index buffer from existing indices or generate quad indices.
+        // Preserve the original index type from the input geometry.
         var indices;
         if (geometry.indices && geometry.indexCount > 0) {
-            indices = new Uint16Array(geometry.indexCount);
+            if (geometry.indices instanceof Uint32Array) {
+                indices = new Uint32Array(geometry.indexCount);
+            } else {
+                indices = new Uint16Array(geometry.indexCount);
+            }
             for (var i = 0; i < geometry.indexCount; i++) {
                 indices[i] = vertexToIndex[geometry.indices[i]];
             }

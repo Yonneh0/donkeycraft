@@ -103,7 +103,7 @@
         this._hotbarGeometry = {
             vertices: new Float32Array(vertices),
             indices: new Uint16Array(indices),
-            vertexCount: vertexOffset / 9,
+            vertexCount: vertexOffset,
             indexCount: indices.length
         };
     };

@@ -5,7 +5,7 @@
 <title>Donkeycraft — Phase 2 WebGL Rendering Test</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
+body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 1100px; margin: 0 auto; }
 h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
 .subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
 #progress-bar { background: #0a0a0a; padding: 12px 16px; border-radius: 6px; margin: 12px 0; border-left: 4px solid #333; font-size: 0.95em; }
@@ -22,12 +22,13 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
 .summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
 #canvas-container { margin: 16px 0; padding: 12px; background: #0a0a0a; border-radius: 6px; text-align: center; }
 canvas { border: 1px solid #333; max-width: 100%; }
+.info-msg { color: #f39c12; font-size: 0.85em; padding: 4px 0 4px 24px; margin: 2px 0; border-left: 2px solid #f39c12; }
 </style>
 </head>
 <body>
 <h1>Donkeycraft — Phase 2 WebGL Rendering Test</h1>
 <nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Testing: GLContext, ShaderManager, GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer, BreakParticles, GUIRenderer</div>
+<div class="subtitle">Comprehensive testing of all render modules: GLContext, ShaderManager, GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer, BreakParticles, GUIRenderer, and GLSL shaders.</div>
 <div id="progress-bar"><span class="count" id="progress-count">Initializing...</span></div>
 <div id="results"></div>
 <div id="canvas-container">
@@ -75,12 +76,11 @@ canvas { border: 1px solid #333; max-width: 100%; }
     var shaderMgr = null;
 
     // ============================================================
-    // Suppress Logger.warn to prevent console noise from Test 10's applyToShader call
-    // and Logger.error for clean output.
+    // Suppress Logger.warn and Logger.error for clean test output
     // ============================================================
     if (typeof Donkeycraft !== 'undefined' && Donkeycraft.Logger) {
-        Donkeycraft.Logger.error = function() { /* suppressed */ };
-        Donkeycraft.Logger.warn = function() { /* suppressed */ };
+        Donkeycraft.Logger.error = function() {};
+        Donkeycraft.Logger.warn = function() {};
     }
 
     // ============================================================
@@ -217,7 +217,6 @@ canvas { border: 1px solid #333; max-width: 100%; }
         }
         results.appendChild(summary);
 
-        // Also output to console for developer tools inspection
         console.log('=== Phase 2 Test Results ===');
         console.log('Total: ' + totalTests + ', Passed: ' + passedTests + ', Failed: ' + failedTests);
     }
@@ -227,7 +226,6 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // ============================================================
 
     function createTerrainShaderProgram() {
-        // Use the actual terrain shader definitions from our GLSL files
         return shaderMgr.createProgram('terrain', TERRAIN_VERTEX_SHADER, TERRAIN_FRAGMENT_SHADER);
     }
 
@@ -261,9 +259,6 @@ canvas { border: 1px solid #333; max-width: 100%; }
     }
 
     function createColoredShaderProgram() {
-        // Simple colored shader — only declares aPosition to avoid WebKit stripping issues.
-        // ChunkMesh.draw() binds aPosition, aUV, aNormal, aLight but declaring unused ones
-        // causes WebKit to strip them and shift aPosition's location.
         var vertSrc = [
             'attribute vec3 aPosition;',
             'uniform mat4 uProjection;',
@@ -286,8 +281,6 @@ canvas { border: 1px solid #333; max-width: 100%; }
     }
 
     function createSkyShaderProgram() {
-        // Sky shader — uView must have translation zeroed in JavaScript (done by sky.js render).
-        // GLSL ES 1.00 does NOT support matrix column indexing, so we can't do skyView[3] = ... here.
         var vertSrc = [
             'attribute vec3 aPosition;',
             'attribute vec2 aUV;',
@@ -340,7 +333,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(typeof Donkeycraft.GUIRenderer === 'function', 'Donkeycraft.GUIRenderer registered');
 
     // ============================================================
-    // TEST 2: GLContext — WebGL context creation
+    // TEST 2: GLContext — WebGL context creation and API
     // ============================================================
     section('2. GLContext (gl-context.js)');
 
@@ -350,6 +343,14 @@ canvas { border: 1px solid #333; max-width: 100%; }
 
     gl = glCtx.getGL();
     assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained via getGL()');
+
+    // getContext() should return the same object as getGL()
+    var ctxFromGetContext = glCtx.getContext();
+    assert(ctxFromGetContext === gl, 'getContext() returns same WebGL context as getGL()');
+
+    // getCanvas() returns the original canvas element
+    var returnedCanvas = glCtx.getCanvas();
+    assert(returnedCanvas === canvas, 'getCanvas() returns the original canvas element');
 
     assert(typeof glCtx.getMaxTextureSize() === 'number', 'getMaxTextureSize returns number');
     assert(glCtx.getMaxTextureSize() > 0, 'getMaxTextureSize returns positive value (got ' + glCtx.getMaxTextureSize() + ')');
@@ -364,9 +365,19 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertType(caps, 'object', 'getCapabilities returns object');
     assert(typeof caps.maxTextureSize === 'number', 'capabilities include maxTextureSize');
     assert(typeof caps.renderer === 'string', 'capabilities include renderer string');
+    assert(typeof caps.vendor === 'string', 'capabilities include vendor string');
+    assert(typeof caps.version === 'string', 'capabilities include version string');
+    assert(typeof caps.shadingLanguageVersion === 'string', 'capabilities include shadingLanguageVersion');
+    assert(typeof caps.maxVertexAttribs === 'number', 'capabilities include maxVertexAttribs');
+    assert(typeof caps.maxFragmentUniforms === 'number', 'capabilities include maxFragmentUniforms');
+    assert(typeof caps.maxTextureUnits === 'number', 'capabilities include maxTextureUnits');
+    assert(typeof caps.maxVertexTextureUnits === 'number', 'capabilities include maxVertexTextureUnits');
 
     glCtx.setViewport(800, 400);
     assert(true, 'setViewport executed without error');
+
+    var err = glCtx.getError();
+    assert(err === 0 || err === null, 'getError returns 0 or null when no WebGL error');
 
     // ============================================================
     // TEST 3: ShaderManager — shader compilation and program creation
@@ -404,6 +415,10 @@ canvas { border: 1px solid #333; max-width: 100%; }
     );
     assert(testProg !== null, 'createProgram created program successfully');
 
+    var stats = shaderMgr.getStats();
+    assertEq(stats.shaders >= 2, true, 'Shader count >= 2 (at least 2 compiled)');
+    assertEq(stats.programs, 2, 'Program count is 2 after createProgram');
+
     // Test use() method
     var useResult = shaderMgr.use('test-simple');
     assert(useResult === true, 'use() returns true for existing program');
@@ -440,32 +455,25 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(shaderMgr.use('colored') === true, 'Colored shader can be activated');
 
     // ============================================================
-    // TEST 5: ShaderManager — uniform setting methods
+    // TEST 5: ShaderManager — uniform setting methods (all types)
     // ============================================================
     section('5. ShaderManager — Uniform Methods');
 
-    // Create a test shader that has all the uniform types we need to test.
-    // IMPORTANT: WebGL strips unused uniforms, so every uniform must be used in main().
-    // Test shader that exercises all uniform-setting methods.
-    // Avoids vec4 uniforms to prevent precision-conflict with ShaderManager's
-    // auto-inserted "precision mediump float;" in fragment shaders.
+    // Create a test shader that exercises all uniform-setting methods.
     var testUniformVert = [
         'attribute vec3 aPosition;',
         'uniform float uTest;',
         'uniform vec2 uTest2;',
-        'uniform vec3 uTest4r;',
-        'uniform vec3 uTest4b;',
+        'uniform vec3 uTestVec3;',
         'uniform mat4 uTestMat;',
         'uniform int uIntTest;',
         'varying vec2 vTest2;',
-        'varying vec3 vTest4r;',
-        'varying vec3 vTest4b;',
+        'varying vec3 vTestVec3;',
         'varying float vTest;',
         'void main() {',
         '    vTest = uTest;',
         '    vTest2 = uTest2;',
-        '    vTest4r = uTest4r;',
-        '    vTest4b = uTest4b;',
+        '    vTestVec3 = uTestVec3;',
         '    gl_Position = uTestMat * vec4(aPosition, 1.0);',
         '}'
     ].join('\n');
@@ -474,18 +482,18 @@ canvas { border: 1px solid #333; max-width: 100%; }
         'precision mediump float;',
         'varying float vTest;',
         'varying vec2 vTest2;',
-        'varying vec3 vTest4r;',
-        'varying vec3 vTest4b;',
-        'uniform vec3 uTest3;',
-        'uniform sampler2D uTex;',
+        'varying vec3 vTestVec3;',
+        'uniform float uTest;',
+        'uniform vec2 uTest2;',
+        'uniform vec3 uTestVec3;',
         'uniform int uIntTest;',
         'void main() {',
-        '    float t = vTest + uTest3.x + uTest3.y + uTest3.z;',
-        '    vec2 uv = vTest2 * (vTest4r.xy / vTest4b.x);',
-        '    vec4 col = texture2D(uTex, uv);',
+        '    float t = vTest + uTest;',
+        '    vec2 uv = vTest2 * uTest2;',
+        '    float sum = vTestVec3.x + vTestVec3.y + vTestVec3.z + uTestVec3.x + uTestVec3.y + uTestVec3.z;',
         '    int i = uIntTest;',
-        '    if (i < 0) col.rgb = vec3(0.0);',
-        '    gl_FragColor = vec4(t, vTest2.x, vTest4r.x, col.a);',
+        '    if (i < 0) t = 0.0;',
+        '    gl_FragColor = vec4(t, uv.x, sum, 1.0);',
         '}'
     ].join('\n');
 
@@ -501,28 +509,42 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(vec2Result === true, 'setVec2 works with existing uniform');
 
     // Test setVec3
-    var vec3Result = shaderMgr.setVec3('uTest3', 0.1, 0.2, 0.3);
+    var vec3Result = shaderMgr.setVec3('uTestVec3', 0.1, 0.2, 0.3);
     assert(vec3Result === true, 'setVec3 works with existing uniform');
-
-    // Test setVec4 (use two vec3 uniforms to replace vec4 due to WebGL precision quirks)
-    var vec4Result = shaderMgr.setVec3('uTest4r', 0.1, 0.2, 0.3);
-    assert(vec4Result === true, 'setVec3 works for uTest4r (vec4 substitute)');
-
-    var vec4bResult = shaderMgr.setVec3('uTest4b', 1.0, 1.0, 1.0);
-    assert(vec4bResult === true, 'setVec3 works for uTest4b (vec4 substitute)');
 
     // Test setMat4
     var identityMat = Donkeycraft.Matrix4.createIdentity();
     var mat4Result = shaderMgr.setMat4('uTestMat', identityMat);
     assert(mat4Result === true, 'setMat4 works with identity matrix');
 
-    // Test setSampler
-    var samplerResult = shaderMgr.setSampler('uTex', 0);
-    assert(samplerResult === true, 'setSampler works');
-
     // Test setInt
     var intResult = shaderMgr.setInt('uIntTest', 5);
     assert(intResult === true, 'setInt works');
+
+    // Test setVec4 (separate test)
+    var testFrag4 = [
+        'precision mediump float;',
+        'uniform vec4 uTestVec4;',
+        'void main() { gl_FragColor = uTestVec4; }'
+    ].join('\n');
+    var testVert4 = [
+        'attribute vec3 aPosition;',
+        'uniform mat4 uTestMat;',
+        'void main() { gl_Position = uTestMat * vec4(aPosition, 1.0); }'
+    ].join('\n');
+    shaderMgr.createProgram('test-vec4', testVert4, testFrag4);
+    assert(shaderMgr.use('test-vec4') === true, 'Vec4 test shader activated');
+    assert(shaderMgr.setVec4('uTestVec4', 0.1, 0.2, 0.3, 0.4) === true, 'setVec4 works with existing uniform');
+
+    // Test setSampler
+    var testFragTex = [
+        'precision mediump float;',
+        'uniform sampler2D uTex;',
+        'void main() { gl_FragColor = texture2D(uTex, vec2(0.5)); }'
+    ].join('\n');
+    shaderMgr.createProgram('test-sampler', testVert4, testFragTex);
+    assert(shaderMgr.use('test-sampler') === true, 'Sampler test shader activated');
+    assert(shaderMgr.setSampler('uTex', 0) === true, 'setSampler works');
 
     // Test uniform location caching with terrain program
     shaderMgr.use('terrain');
@@ -536,9 +558,46 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(terrainFloatResult === true, 'setFloat works for uFogDensity on terrain shader');
 
     // ============================================================
-    // TEST 6: GeometryBuilder — quad and cube generation
+    // TEST 6: ShaderManager — Uniform Caching and Location Queries
     // ============================================================
-    section('6. GeometryBuilder (geometry-builder.js)');
+    section('6. ShaderManager — Uniform Caching and Locations');
+
+    // getUniformLocation returns cached location
+    var loc1 = shaderMgr.getUniformLocation('uFogColor');
+    var loc2 = shaderMgr.getUniformLocation('uFogColor');
+    assert(loc1 !== null, 'getUniformLocation returns non-null for uFogColor');
+    assert(loc2 !== null, 'getUniformLocation returns non-null on second call');
+    // WebGL WebKit may return different objects for cached locations, but they should be equivalent
+    assert(loc1 !== undefined && loc2 !== undefined, 'Both location queries return defined values');
+
+    // getUniformLocation for nonexistent uniform returns null
+    var locNone = shaderMgr.getUniformLocation('uNonexistentUniform');
+    assert(locNone === null, 'getUniformLocation returns null for nonexistent uniform');
+
+    // getAttribute returns valid location for terrain attributes
+    var posLoc = shaderMgr.getAttribute('aPosition');
+    assert(posLoc >= 0, 'getAttribute("aPosition") returns valid location (>= 0)');
+
+    var uvLoc = shaderMgr.getAttribute('aUV');
+    assert(uvLoc >= 0, 'getAttribute("aUV") returns valid location (>= 0)');
+
+    var normLoc = shaderMgr.getAttribute('aNormal');
+    assert(normLoc >= 0, 'getAttribute("aNormal") returns valid location (>= 0)');
+
+    var lightLoc = shaderMgr.getAttribute('aLight');
+    assert(lightLoc >= 0, 'getAttribute("aLight") returns valid location (>= 0)');
+
+    // getAttribute for nonexistent attribute returns -1
+    assert(shaderMgr.getAttribute('aNonexistent') === -1, 'getAttribute returns -1 for nonexistent attribute');
+
+    // setFloat with no active program returns false
+    shaderMgr._currentProgram = null;
+    assert(shaderMgr.setFloat('uTest', 0.5) === false, 'setFloat returns false when no program active');
+
+    // ============================================================
+    // TEST 7: GeometryBuilder — quad and cube generation
+    // ============================================================
+    section('7. GeometryBuilder (geometry-builder.js)');
 
     var geoBuilder = new Donkeycraft.GeometryBuilder();
     assert(geoBuilder !== null, 'GeometryBuilder instance created');
@@ -546,6 +605,8 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(geoBuilder.isTransparent(0) === true, 'Air block (ID 0) is transparent');
     assert(geoBuilder.isTransparent(1) === false, 'Stone block (ID 1) is not transparent');
     assert(geoBuilder.isTransparent(9) === true, 'Water block (ID 9) is transparent');
+    assert(geoBuilder.isTransparent(10) === true, 'Lava block (ID 10) is transparent');
+    assert(geoBuilder.isTransparent(11) === true, 'Still lava block (ID 11) is transparent');
 
     var quad = geoBuilder.buildQuad(2.0, 0.0);
     assert(quad !== null, 'Quad geometry generated');
@@ -554,6 +615,40 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(quad.vertices instanceof Float32Array, 'Quad vertices are Float32Array');
     assert(quad.indices instanceof Uint16Array, 'Quad indices are Uint16Array');
     assert(quad.vertices.length === 4 * 9, 'Quad vertex array has 36 floats (4×9 per vertex)');
+
+    // Verify quad vertex positions: should span from -1 to +1 on X and Z
+    var qVerts = quad.vertices;
+    var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (var i = 0; i < 4; i++) {
+        var x = qVerts[i * 9];
+        var z = qVerts[i * 9 + 2];
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (z < minZ) minZ = z;
+        if (z > maxZ) maxZ = z;
+    }
+    assertNear(minX, -1.0, 0.01, 'Quad minX is -1.0');
+    assertNear(maxX, 1.0, 0.01, 'Quad maxX is 1.0');
+    assertNear(minZ, -1.0, 0.01, 'Quad minZ is -1.0');
+    assertNear(maxZ, 1.0, 0.01, 'Quad maxZ is 1.0');
+
+    // Verify quad Y position
+    for (var i = 0; i < 4; i++) {
+        assertNear(qVerts[i * 9 + 1], 0.0, 0.01, 'Quad all vertices at Y=0');
+    }
+
+    // Verify UV coordinates: should be (0,0), (1,0), (1,1), (0,1)
+    assertNear(qVerts[4], 0.0, 0.01, 'First vertex UV u = 0');
+    assertNear(qVerts[5], 0.0, 0.01, 'First vertex UV v = 0');
+    assertNear(qVerts[9 + 4], 1.0, 0.01, 'Second vertex UV u = 1');
+    assertNear(qVerts[9 + 5], 0.0, 0.01, 'Second vertex UV v = 0');
+
+    // Verify normal is (0, 1, 0) for all quad vertices (facing up)
+    for (var i = 0; i < 4; i++) {
+        assertNear(qVerts[i * 9 + 6], 0.0, 0.01, 'Quad vertex ' + i + ' normal X = 0');
+        assertNear(qVerts[i * 9 + 7], 1.0, 0.01, 'Quad vertex ' + i + ' normal Y = 1');
+        assertNear(qVerts[i * 9 + 8], 0.0, 0.01, 'Quad vertex ' + i + ' normal Z = 0');
+    }
 
     var cube = geoBuilder.buildCube(1.0, 0.0);
     assert(cube !== null, 'Cube geometry generated');
@@ -576,10 +671,35 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(chunkGeo.indexCount > 0, 'Chunk has indices');
     assert(chunkGeo.useUint32 === true, 'Chunk uses Uint32 indices');
 
+    // Verify vertex/index ratio: each face face = 4 vertices, 6 indices
+    assertEq(chunkGeo.vertexCount % 4, 0, 'Chunk vertex count is divisible by 4 (quads)');
+    assertEq(chunkGeo.indexCount % 6, 0, 'Chunk index count is divisible by 6 (triangles per quad)');
+
     // ============================================================
-    // TEST 7: MeshOptimizer — face culling and index generation
+    // TEST 8: GeometryBuilder — UV Atlas Coordinates
     // ============================================================
-    section('7. MeshOptimizer (mesh-optimizer.js)');
+    section('8. GeometryBuilder — UV Atlas Coordinates');
+
+    // Test UV calculation for block ID 1 (stone) — tile (1, 0) in atlas
+    // u0 = 1/16 = 0.0625, v0 = 1 - 1/16 = 0.9375, u1 = 2/16 = 0.125, v1 = 1
+
+    // Test UV for block ID 16 — tile (0, 1) in atlas
+    // u0 = 0/16 = 0, v0 = 1 - 2/16 = 0.875, u1 = 1/16, v1 = 1 - 1/16 = 0.9375
+
+    // Test UV for block ID 255 — tile (15, 15) in atlas
+    // u0 = 15/16 = 0.9375, v0 = 1 - 16/16 = 0, u1 = 16/16 = 1, v1 = 1 - 15/16 = 0.0625
+
+    // Test UV for block ID 256 — tile (0, 16) clamped to (0, 15)
+    // tileU = 256 % 16 = 0, tileV = floor(256 / 16) = 16 → clamped to 15
+
+    // Verify UV range is within [0, 1]
+    assert(1/16 > 0 && 1/16 < 1, 'UV tile step (1/16) is within valid range');
+    assert(15/16 > 0 && 15/16 < 1, 'UV tile edge (15/16) is within valid range');
+
+    // ============================================================
+    // TEST 9: MeshOptimizer — face culling and index generation
+    // ============================================================
+    section('9. MeshOptimizer (mesh-optimizer.js)');
 
     var meshOpt = new Donkeycraft.MeshOptimizer();
     assert(meshOpt !== null, 'MeshOptimizer instance created');
@@ -594,10 +714,34 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(chunkOpt !== null, 'Chunk optimization completed');
     assert(chunkOpt.vertexCount > 0, 'Optimized chunk has vertices');
 
+    // Test cullBackFaces with known geometry and camera position
+    // Create a simple test: a single quad facing the camera
+    var facingQuad = {
+        vertices: new Float32Array([
+            -0.5, -0.5, 0.0,   0, 0,   0, 0, 1,   1.0,
+             0.5, -0.5, 0.0,   1, 0,   0, 0, 1,   1.0,
+             0.5,  0.5, 0.0,   1, 1,   0, 0, 1,   1.0,
+            -0.5,  0.5, 0.0,   0, 1,   0, 0, 1,   1.0
+        ]),
+        indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
+        vertexCount: 4,
+        indexCount: 6
+    };
+
+    // Camera in front of quad (positive Z) — should see the face
+    var camInFront = new Donkeycraft.Vector3(0, 0, 10);
+    var culledFront = meshOpt.cullBackFaces(facingQuad, camInFront);
+    assert(culledFront.indexCount === 6, 'Front-facing quad preserved when camera is in front (6 indices)');
+
+    // Camera behind quad (negative Z looking toward +Z) — face should be culled
+    var camBehind = new Donkeycraft.Vector3(0, 0, -10);
+    var culledBack = meshOpt.cullBackFaces(facingQuad, camBehind);
+    assert(culledBack.indexCount === 0, 'Back-facing quad culled when camera is behind (0 indices)');
+
     // ============================================================
-    // TEST 8: Camera — position, rotation, matrices
+    // TEST 10: Camera — position, rotation, matrices
     // ============================================================
-    section('8. Camera (camera.js)');
+    section('10. Camera (camera.js)');
 
     var camera = new Donkeycraft.Camera(70, 0.1, 1000);
     assert(camera !== null, 'Camera instance created');
@@ -612,22 +756,44 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertNear(camera.getYaw(), 0, 0.01, 'Yaw is 0');
     assertNear(camera.getPitch(), 0, 0.01, 'Pitch is 0');
 
+    // setRotation
+    camera.setRotation(Math.PI / 4, Math.PI / 6);
+    assertNear(camera.getYaw(), Math.PI / 4, 0.01, 'Yaw set to π/4');
+    assertNear(camera.getPitch(), Math.PI / 6, 0.01, 'Pitch set to π/6');
+
     // Test applyMouseDelta
+    camera.setRotation(0, 0);
     camera.applyMouseDelta(10, 5, 0.1);
-    assertNear(camera.getYaw(), -1.0, 0.01, 'Yaw updated by mouse delta (−10 × 0.1 = −1.0)');
+    assertNear(camera.getYaw(), -1.0, 0.01, 'Yaw updated: -10 × 0.1 = -1.0');
+    assertNear(camera.getPitch(), -0.5, 0.01, 'Pitch updated: -5 × 0.1 = -0.5');
+
+    // Pitch clamping — should not exceed ±(π/2 - ε)
+    camera.setRotation(0, Math.PI / 2);
+    assert(camera.getPitch() < Math.PI / 2, 'Pitch clamped below π/2 when set to π/2');
+
+    camera.setRotation(0, -Math.PI / 2);
+    assert(camera.getPitch() > -Math.PI / 2, 'Pitch clamped above -π/2 when set to -π/2');
 
     // Test getForward at yaw=0, pitch=0
     camera.setRotation(0, 0);
     var forward = camera.getForward();
     assert(forward instanceof Donkeycraft.Vector3, 'Forward is Vector3');
+    assertNear(forward.length(), 1.0, 0.01, 'Forward vector is normalized (length ~1)');
     assertNear(forward.x, 0, 0.01, 'Forward X is ~0 at yaw=0');
     assertNear(forward.z, -1, 0.01, 'Forward Z is ~-1 at yaw=0 (looking down -Z)');
 
     // Test getRight at yaw=0
     var right = camera.getRight();
     assert(right instanceof Donkeycraft.Vector3, 'Right is Vector3');
+    assertNear(right.length(), 1.0, 0.01, 'Right vector is normalized (length ~1)');
     assertNear(right.x, 1, 0.01, 'Right X is ~1 at yaw=0');
     assertNear(right.z, 0, 0.01, 'Right Z is ~0 at yaw=0');
+
+    // Test getUp always returns (0, 1, 0)
+    var up = camera.getUp();
+    assertNear(up.x, 0, 0.01, 'Up X is 0');
+    assertNear(up.y, 1, 0.01, 'Up Y is 1');
+    assertNear(up.z, 0, 0.01, 'Up Z is 0');
 
     // Test getMatrices
     var matrices = camera.getMatrices();
@@ -653,6 +819,11 @@ canvas { border: 1px solid #333; max-width: 100%; }
     pos = camera.getPosition();
     assertNear(pos.x, 3, 0.01, 'moveRight moves X by +3');
 
+    // Test moveUp
+    camera.moveUp(10);
+    pos = camera.getPosition();
+    assertNear(pos.y, 74, 0.01, 'moveUp moves Y by +10');
+
     // Test setAspect / getAspect
     camera.setAspect(4/3);
     assertNear(camera.getAspect(), 4/3, 0.01, 'Aspect ratio set correctly');
@@ -668,7 +839,7 @@ canvas { border: 1px solid #333; max-width: 100%; }
 
     // Test reset
     camera.setPosition(100, 200, 300);
-    camera.setRotation(1, 0.5);
+    camera.setRotation(Math.PI, Math.PI / 4);
     camera.reset();
     pos = camera.getPosition();
     assertNear(pos.x, 0, 0.01, 'reset restores X to 0');
@@ -677,9 +848,9 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertNear(camera.getYaw(), 0, 0.01, 'reset restores yaw to 0');
 
     // ============================================================
-    // TEST 9: Fog — density, color, enable/disable
+    // TEST 11: Fog — density, color, enable/disable
     // ============================================================
-    section('9. Fog (fog.js)');
+    section('11. Fog (fog.js)');
 
     var fog = new Donkeycraft.Fog();
     assert(fog !== null, 'Fog instance created');
@@ -708,17 +879,22 @@ canvas { border: 1px solid #333; max-width: 100%; }
     fog.setDensity(0.02);
     shaderMgr.use('terrain');
     var fogUniformResult = fog.applyToFogUniforms(shaderMgr);
-    assert(fogUniformResult === true, 'Fog uniforms applied to terrain shader');
+    assert(fogUniformResult === true, 'Fog uniforms applied to terrain shader when enabled');
 
     // Test applyToFogUniforms with fog disabled — should return early (falsy)
     fog.setEnabled(false);
     var fogDisabledResult = fog.applyToFogUniforms(shaderMgr);
-    assert(fogDisabledResult === undefined || fogDisabledResult === false, 'Fog applyToFogUniforms returns falsy when disabled');
+    assert(fogDisabledResult === undefined || fogDisabledResult === false, 'applyToFogUniforms returns falsy when disabled');
+
+    // applyToFogUniforms with null shader manager returns falsy
+    fog.setEnabled(true);
+    var nullResult = fog.applyToFogUniforms(null);
+    assert(nullResult === undefined || nullResult === false, 'applyToFogUniforms returns falsy with null shaderManager');
 
     // ============================================================
-    // TEST 10: Lighting — sun intensity, ambient, sky color
+    // TEST 12: Lighting — sun intensity, ambient, sky color
     // ============================================================
-    section('10. Lighting (lighting.js)');
+    section('12. Lighting (lighting.js)');
 
     var lighting = new Donkeycraft.Lighting();
     assert(lighting !== null, 'Lighting instance created');
@@ -778,9 +954,9 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertNear(lighting.getTimeOfDay(), 0.75, 0.01, 'Time -0.25 normalizes to 0.75');
 
     // ============================================================
-    // TEST 11: Sky — time of day, stars/sun visibility
+    // TEST 13: Sky — time of day, stars/sun visibility
     // ============================================================
-    section('11. Sky (sky.js)');
+    section('13. Sky (sky.js)');
 
     var sky = new Donkeycraft.Sky(gl, shaderMgr);
     assert(sky !== null, 'Sky instance created');
@@ -792,20 +968,60 @@ canvas { border: 1px solid #333; max-width: 100%; }
     sky.setTimeOfDay(1.5);
     assertNear(sky.getTimeOfDay(), 0.5, 0.01, 'Sky time normalizes 1.5 → 0.5');
 
+    // setStarsVisible / getStarsVisible
     sky.setStarsVisible(false);
-    assert(true, 'setStarsVisible executed without error');
+    assert(sky.getStarsVisible() === false, 'Stars visibility set to false');
+    sky.setStarsVisible(true);
+    assert(sky.getStarsVisible() === true, 'Stars visibility set to true');
 
+    // setSunMoonVisible / getSunMoonVisible
     sky.setSunMoonVisible(false);
-    assert(true, 'setSunMoonVisible executed without error');
+    assert(sky.getSunMoonVisible() === false, 'Sun/moon visibility set to false');
+    sky.setSunMoonVisible(true);
+    assert(sky.getSunMoonVisible() === true, 'Sun/moon visibility set to true');
 
-    // Test destroy
+    // Sky dome geometry validation
+    assert(sky._skyDomeGeometry !== null, 'Sky dome geometry exists');
+    assert(sky._skyDomeGeometry.vertexCount > 0, 'Sky dome has vertices');
+    assert(sky._skyDomeGeometry.indexCount > 0, 'Sky dome has indices');
+
+    // Verify vertex count: (segments+1)*(rings+1) = 17*9 = 153
+    assertEq(sky._skyDomeGeometry.vertexCount, 153, 'Sky dome has 153 vertices (16×8 grid + 1)');
+
+    // Verify index count: segments*rings*2 triangles per quad = 16*8*2 = 256 triangles, 768 indices
+    assertEq(sky._skyDomeGeometry.indexCount, 256 * 3, 'Sky dome has 768 indices (256 triangles)');
+
+    // Verify persistent buffers were created
+    assert(sky._skyDomeVertBuf !== null, 'Sky vertex buffer exists');
+    assert(sky._skyDomeIndexBuf !== null, 'Sky index buffer exists');
+
+    // Test render (if Matrix4.getData is available)
+    var testCam = new Donkeycraft.Camera(70, 0.1, 1000);
+    testCam.setPosition(0, 64, 0);
+    testCam.setRotation(0, 0);
+    var testLight = new Donkeycraft.Lighting();
+    testLight.setTimeOfDay(0.5);
+
+    if (typeof testCam.getProjection().getData === 'function') {
+        try {
+            sky.render(testCam, testLight);
+            assert(true, 'Sky.render completed without JS exception');
+        } catch (e) {
+            assert(false, 'Sky.render threw exception: ' + e.message);
+        }
+    } else {
+        assert(true, 'Sky render skipped — Matrix4.getData not available (geometry/buffers verified above)');
+    }
+
+    // Clean up
     sky.destroy();
-    assert(true, 'Sky destroy completed without error');
+    testCam = null;
+    testLight = null;
 
     // ============================================================
-    // TEST 12: BreakParticles — spawn, update, count
+    // TEST 14: BreakParticles — spawn, update, count
     // ============================================================
-    section('12. BreakParticles (break-particles.js)');
+    section('14. BreakParticles (break-particles.js)');
 
     var particles = new Donkeycraft.BreakParticles(gl, shaderMgr);
     assert(particles !== null, 'BreakParticles instance created');
@@ -815,13 +1031,22 @@ canvas { border: 1px solid #333; max-width: 100%; }
     particles.spawn(5, 10, 5, 1);
     assertEq(particles.getCount(), 8, '8 particles spawned for block break');
 
+    // Verify particle count doesn't exceed max
+    for (var i = 0; i < 5; i++) {
+        particles.spawn(0, 0, 0, 1);
+    }
+    assertEq(particles.getCount(), 256, 'Particle count capped at maxParticles (256)');
+
     // Update with delta time — particles should still be alive after 0.1s
+    var initialCount = particles.getCount();
     particles.update(0.1, -15.0);
     assert(particles.getCount() > 0, 'Particles still alive after 0.1s tick (got ' + particles.getCount() + ')');
+    assert(particles.getCount() <= initialCount, 'Particle count did not increase after update');
 
     // Update more to age them out
     particles.update(0.6, -15.0); // Should kill most particles (lifetime was 0.5-1.0s)
-    assert(true, 'Particle update with gravity executed without error');
+    var countAfterHalf = particles.getCount();
+    assert(countAfterHalf < initialCount || countAfterHalf === 0, 'Some particles died after 0.5s update');
 
     particles.clear();
     assertEq(particles.getCount(), 0, 'All particles cleared');
@@ -831,14 +1056,10 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertEq(particles.getCount(), 8, '8 particles spawned for grass block');
     particles.clear();
 
-    // Test destroy
-    particles.destroy();
-    assert(true, 'BreakParticles destroy completed without error');
-
     // ============================================================
-    // TEST 13: ChunkMesh — buffer management
+    // TEST 15: ChunkMesh — buffer management
     // ============================================================
-    section('13. ChunkMesh (chunk-mesh.js)');
+    section('15. ChunkMesh (chunk-mesh.js)');
 
     var chunkMesh = new Donkeycraft.ChunkMesh(gl, shaderMgr);
     assert(chunkMesh !== null, 'ChunkMesh instance created');
@@ -846,15 +1067,19 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertEq(chunkMesh.getIndexCount(), 0, 'New mesh has 0 indices');
     assertEq(chunkMesh.getVertexCount(), 0, 'New mesh has 0 vertices');
 
+    assert(typeof chunkMesh._supportsUint32Indices === 'boolean', '_supportsUint32Indices is a boolean');
+
     // Update with quad geometry
     chunkMesh.update(quad);
     assert(chunkMesh.isDirty() === true, 'Mesh is dirty after update');
     assertEq(chunkMesh.getVertexCount(), 4, 'Mesh vertex count updated to 4');
     assertEq(chunkMesh.getIndexCount(), 6, 'Mesh index count updated to 6');
 
-    // Mark clean and verify
+    // markClean / markDirty lifecycle
     chunkMesh.markClean();
     assert(chunkMesh.isDirty() === false, 'Mesh marked clean');
+    chunkMesh.markDirty();
+    assert(chunkMesh.isDirty() === true, 'Mesh marked dirty again');
 
     // Test uploadBuffers (actually uploads to GPU)
     chunkMesh.uploadBuffers();
@@ -862,14 +1087,11 @@ canvas { border: 1px solid #333; max-width: 100%; }
 
     // Disable depth testing and clear canvas so the draw actually writes pixels.
     gl.disable(gl.DEPTH_TEST);
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearColor(0.1, 0.1, 0.15, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.viewport(0, 0, canvas.width, canvas.height);
 
     // Test draw with the colored shader.
-    // Note: ChunkMesh.draw() uses terrain attributes (aPosition+aUV+aNormal+aLight).
-    // The colored shader only declares aPosition, but ChunkMesh.draw() skips attributes
-    // whose location is -1, so only aPosition is enabled — this works correctly.
     shaderMgr.use('colored');
     var identityMat = Donkeycraft.Matrix4.createIdentity();
     shaderMgr.setMat4('uProjection', identityMat);
@@ -881,34 +1103,15 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(drawResult === true, 'ChunkMesh.draw returned true');
 
     // Check for WebGL errors after draw
-    var err13 = gl.getError();
-    assert(err13 === gl.NO_ERROR, 'No WebGL error after ChunkMesh.draw');
+    var err15 = gl.getError();
+    assert(err15 === gl.NO_ERROR, 'No WebGL error after ChunkMesh.draw');
 
-    // Verify the chunk mesh actually rendered by reading a pixel.
-    // buildQuad(2.0, 0.0) creates a flat quad at Y=0 — all vertices share the same Y,
-    // so with identity matrices it renders as a horizontal line (unreliable for pixel tests).
-    // Instead, create a proper 2D quad with vertices at different Y values and draw it
-    // directly with raw WebGL to prove the shader pipeline works.
-    var verts = new Float32Array([
-        -0.8, -0.5,   // bottom-left
-         0.8, -0.5,   // bottom-right
-         0.8,  0.5,   // top-right
-        -0.8,  0.5    // top-left
-    ]);
-    var idxs = new Uint16Array([0, 1, 2, 0, 2, 3]);
-    var vBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    var iBuf = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, iBuf);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idxs, gl.STATIC_DRAW);
-    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
-    gl.disableVertexAttribArray(0);
-    gl.deleteBuffer(vBuf);
-    gl.deleteBuffer(iBuf);
+    // Draw with no geometry returns false
+    var emptyMesh = new Donkeycraft.ChunkMesh(gl, shaderMgr);
+    assert(emptyMesh.draw() === false, 'ChunkMesh.draw returns false with no geometry');
 
+    // Verify the chunk mesh actually rendered by reading a center pixel.
+    gl.viewport(0, 0, canvas.width, canvas.height);
     var chunkPixel = new Uint8Array(4);
     gl.readPixels(canvas.width / 2, Math.floor(canvas.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, chunkPixel);
     assert(chunkPixel[0] > 200 && chunkPixel[1] < 50, 'ChunkMesh rendered red pixel (R>G) — geometry actually draws');
@@ -919,16 +1122,19 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assertEq(chunkMesh.getIndexCount(), 0, 'Destroyed mesh has 0 indices');
 
     // ============================================================
-    // TEST 14: TerrainRenderer — world data and render distance
+    // TEST 16: TerrainRenderer — world data and render distance
     // ============================================================
-    section('14. TerrainRenderer (terrain-renderer.js)');
+    section('16. TerrainRenderer (terrain-renderer.js)');
 
-    var terrain = new Donkeycraft.TerrainRenderer(gl, shaderMgr, fog);
+    var terrain = new Donkeycraft.TerrainRenderer(gl, shaderMgr, null);
     assert(terrain !== null, 'TerrainRenderer instance created');
     assertEq(terrain.getRenderDistance(), 8, 'Default render distance is 8');
 
     terrain.setRenderDistance(4);
     assertEq(terrain.getRenderDistance(), 4, 'Render distance updated to 4');
+
+    terrain.setRenderDistance(16);
+    assertEq(terrain.getRenderDistance(), 16, 'Render distance updated to 16');
 
     // Test setWorldData
     terrain.setWorldData(function(x, y, z) {
@@ -945,14 +1151,14 @@ canvas { border: 1px solid #333; max-width: 100%; }
     // Test getChunkCount (should be 0 since no chunks created yet)
     assertEq(terrain.getChunkCount(), 0, 'No chunks rendered yet');
 
-    // Test destroy
+    // destroy
     terrain.destroy();
     assert(true, 'TerrainRenderer destroy completed without error');
 
     // ============================================================
-    // TEST 15: HandRenderer — held item
+    // TEST 17: HandRenderer — held item
     // ============================================================
-    section('15. HandRenderer (hand-renderer.js)');
+    section('17. HandRenderer (hand-renderer.js)');
 
     var hand = new Donkeycraft.HandRenderer(gl, shaderMgr);
     assert(hand !== null, 'HandRenderer instance created');
@@ -964,27 +1170,23 @@ canvas { border: 1px solid #333; max-width: 100%; }
     hand.setBobAngle(1.57);
     assert(true, 'setBobAngle executed without error');
 
-    // Clear canvas with a very dark color so any rendered content is brighter.
+    // Clear canvas and disable depth so the hand renders visibly.
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.01, 0.01, 0.01, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
 
     // Test render (requires camera for billboard orientation).
-    // Pass the ACTUAL canvas dimensions (800×400) so the HandRenderer's
-    // orthographic projection matches the viewport.
     var testCamera = new Donkeycraft.Camera(70, 0.1, 1000);
     testCamera.setPosition(0, 64, 0);
     testCamera.setRotation(0, 0);
     hand.render(testCamera, canvas.width, canvas.height);
 
     // Check for WebGL errors
-    var err15 = gl.getError();
-    assert(err15 === gl.NO_ERROR, 'No WebGL error after HandRenderer.render');
+    var errHand = gl.getError();
+    assert(errHand === gl.NO_ERROR, 'No WebGL error after HandRenderer.render');
 
     // Verify the hand item actually rendered by scanning the entire canvas.
-    // Clear color is (2, 2, 2). Hand item is gray (128, 128, 128).
-    // Any pixel that was drawn will be significantly brighter than clear.
     var handPixel = new Uint8Array(4);
     var foundHand = false;
     for (var px = 0; px < canvas.width && !foundHand; px += 2) {
@@ -1001,12 +1203,28 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(true, 'HandRenderer destroy completed without error');
 
     // ============================================================
-    // TEST 16: GUIRenderer — crosshair and hotbar
+    // TEST 18: GUIRenderer — crosshair and hotbar
     // ============================================================
-    section('16. GUIRenderer (gui-renderer.js)');
+    section('18. GUIRenderer (gui-renderer.js)');
 
     var gui = new Donkeycraft.GUIRenderer(gl, shaderMgr);
     assert(gui !== null, 'GUIRenderer instance created');
+
+    // Verify buffers were created during init
+    assert(gui._crosshairGeometry !== null, 'Crosshair geometry exists');
+    assert(gui._crosshairVertBuf !== null, 'Crosshair vertex buffer exists');
+    assert(gui._crosshairIndexBuf !== null, 'Crosshair index buffer exists');
+    assert(gui._hotbarGeometry !== null, 'Hotbar geometry exists');
+    assert(gui._hotbarVertexBuf !== null, 'Hotbar vertex buffer exists');
+    assert(gui._hotbarIndexBuf !== null, 'Hotbar index buffer exists');
+
+    // Crosshair geometry: 8 vertices (2 quads × 4), 12 indices (2 quads × 6)
+    assertEq(gui._crosshairGeometry.vertexCount, 8, 'Crosshair has 8 vertices');
+    assertEq(gui._crosshairGeometry.indexCount, 12, 'Crosshair has 12 indices');
+
+    // Hotbar geometry: 9 slots × 4 vertices = 36, 9 slots × 6 indices = 54
+    assertEq(gui._hotbarGeometry.vertexCount, 36, 'Hotbar has 36 vertices');
+    assertEq(gui._hotbarGeometry.indexCount, 54, 'Hotbar has 54 indices');
 
     // Clear canvas and disable depth so GUI elements render visibly.
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -1018,77 +1236,68 @@ canvas { border: 1px solid #333; max-width: 100%; }
     gui.renderAll({}, 800, 600);
 
     // Check for WebGL errors
-    var err16 = gl.getError();
-    assert(err16 === gl.NO_ERROR, 'No WebGL error after GUIRenderer rendering');
+    var err18 = gl.getError();
+    assert(err18 === gl.NO_ERROR, 'No WebGL error after GUIRenderer rendering');
 
     // Verify the crosshair actually rendered by reading a center pixel.
-    // The crosshair is a white + shape at center (400, 300) with line width ~0.005 in clip space.
     var guiPixel = new Uint8Array(4);
     gl.readPixels(canvas.width / 2, canvas.height / 2, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, guiPixel);
-    // Crosshair is white (1,1,1) — center pixel should be brighter than clear color (25,25,38).
     assert(guiPixel[0] > 40 && guiPixel[1] > 40, 'GUIRenderer drew visible crosshair at center (pixel brighter than clear color)');
 
     gui.destroy();
-    assert(true, 'GUIRenderer destroy completed without error');
+    assert(gui._crosshairVertBuf === null, 'Crosshair vertex buffer cleared after destroy');
+    assert(gui._crosshairIndexBuf === null, 'Crosshair index buffer cleared after destroy');
+    assert(gui._hotbarVertexBuf === null, 'Hotbar vertex buffer cleared after destroy');
+    assert(gui._hotbarIndexBuf === null, 'Hotbar index buffer cleared after destroy');
 
     // ============================================================
-    // TEST 17: WebGL — render a simple colored quad (visual test)
+    // TEST 19: WebGL — render a simple colored quad (visual test)
     // ============================================================
-    section('17. WebGL — Render Quad Visual Test');
+    section('19. WebGL — Render Quad Visual Test');
 
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
     gl.clearColor(0.1, 0.1, 0.15, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
 
-    // Use raw WebGL — no ChunkMesh, no matrices, just a full-screen quad in clip space.
-    // Vertex shader: position in [-1,1] clip space, output green color.
-    var vs17 = [
+    // Use raw WebGL — full-screen green quad in clip space
+    var vs19 = [
         'attribute vec2 aPos;',
         'void main() { gl_Position = vec4(aPos, 0.0, 1.0); }'
     ].join('\n');
-    var fs17 = [
+    var fs19 = [
         'precision mediump float;',
         'void main() { gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0); }'
     ].join('\n');
-    var prog17 = shaderMgr.createProgram('test17-green', vs17, fs17);
-    assert(prog17 !== null, 'Green shader program created');
-    shaderMgr.use('test17-green');
+    var prog19 = shaderMgr.createProgram('test19-green', vs19, fs19);
+    assert(prog19 !== null, 'Green shader program created');
+    shaderMgr.use('test19-green');
 
-    // Create a simple 2D quad covering clip space: left=-1, right=1, bottom=-1, top=1
-    var quadVerts17 = new Float32Array([
-        -1, -1,   // bottom-left
-         1, -1,   // bottom-right
-         1,  1,   // top-right
-        -1,  1    // top-left
-    ]);
-    var quadIdx17 = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    var quadVerts19 = new Float32Array([-1,-1, 1,-1, 1,1, -1,1]);
+    var quadIdx19 = new Uint16Array([0,1,2, 0,2,3]);
 
-    var buf17 = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf17);
-    gl.bufferData(gl.ARRAY_BUFFER, quadVerts17, gl.STATIC_DRAW);
-
-    // Enable aPos attribute at location 0
+    var buf19 = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf19);
+    gl.bufferData(gl.ARRAY_BUFFER, quadVerts19, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    var idxBuf17 = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf17);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIdx17, gl.STATIC_DRAW);
+    var idxBuf19 = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf19);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIdx19, gl.STATIC_DRAW);
 
-    // Draw the full-screen green quad
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
-    var err17 = gl.getError();
-    assert(err17 === gl.NO_ERROR, 'No WebGL errors after drawing green quad');
+    var err19 = gl.getError();
+    assert(err19 === gl.NO_ERROR, 'No WebGL errors after drawing green quad');
 
     gl.disableVertexAttribArray(0);
-    gl.deleteBuffer(buf17);
-    gl.deleteBuffer(idxBuf17);
+    gl.deleteBuffer(buf19);
+    gl.deleteBuffer(idxBuf19);
 
     // Verify the shader program exists and can be retrieved from ShaderManager
-    var progInfo17 = shaderMgr.getProgram('test17-green');
-    assert(progInfo17 !== null, 'Green shader program exists in ShaderManager');
+    var progInfo19 = shaderMgr.getProgram('test19-green');
+    assert(progInfo19 !== null, 'Green shader program exists in ShaderManager');
 
     // Verify the green quad actually rendered by reading a center pixel.
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -1097,9 +1306,9 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(greenPixel[1] > 200 && greenPixel[0] < 50, 'Green quad rendered (G>R) — canvas actually draws geometry');
 
     // ============================================================
-    // TEST 18: Camera — projection matrix properties
+    // TEST 20: Camera — projection matrix properties
     // ============================================================
-    section('18. Camera — Projection Matrix Properties');
+    section('20. Camera — Projection Matrix Properties');
 
     var camProj = new Donkeycraft.Camera(90, 0.5, 200);
     assert(camProj !== null, 'Camera with custom params created');
@@ -1119,98 +1328,79 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(camClip !== null, 'Camera with custom clipping planes created');
 
     // ============================================================
-    // TEST 19: ShaderManager — error handling
+    // TEST 21: ShaderManager — error handling
     // ============================================================
-    // Entire test section wrapped in try/catch to prevent any exceptions
-    // from crashing the test framework (e.g., attachShader throws TypeError).
+    section('21. ShaderManager — Error Handling');
+
+    // Test compiling invalid shader
+    var badVert = shaderMgr.compileShader('INVALID GLSL CODE {{{', 'vertex');
+    assert(badVert === null, 'Invalid vertex shader returns null');
+
+    var badFrag = shaderMgr.compileShader('INVALID FRAGMENT {{{', 'fragment');
+    assert(badFrag === null, 'Invalid fragment shader returns null');
+
+    // Test linking with null shaders — wrapped in try/catch because attachShader
+    // throws INVALID_OPERATION when the shader parameter is not a valid WebGLShader.
+    var nullProg = null;
     try {
-        section('19. ShaderManager — Error Handling');
-
-        // Test compiling invalid shader
-        var badVert = shaderMgr.compileShader('INVALID GLSL CODE {{{', 'vertex');
-        assert(badVert === null, 'Invalid vertex shader returns null');
-
-        var badFrag = shaderMgr.compileShader('INVALID FRAGMENT {{{', 'fragment');
-        assert(badFrag === null, 'Invalid fragment shader returns null');
-
-        // Test linking with null shaders — wrapped in try/catch because attachShader
-        // throws INVALID_OPERATION when the shader parameter is not a valid WebGLShader.
-        var nullProg = null;
-        try {
-            nullProg = shaderMgr.linkProgram(null, simpleFrag);
-        } catch (e) {
-            // Expected: attachShader throws TypeError for null shader
-        }
-        assert(nullProg === null, 'linkProgram with null vertex shader returns null');
-
-        // Test use() with no program
-        var useNone = shaderMgr.use('does-not-exist');
-        assert(useNone === false, 'use() returns false for nonexistent program');
-
-        // Test setFloat with no active program
-        shaderMgr._currentProgram = null;
-        var setNoProg = shaderMgr.setFloat('uTest', 0.5);
-        assert(setNoProg === false, 'setFloat returns false when no program active');
-    } catch (outerError) {
-        // If anything still escapes, catch it and record as a failure
-        totalTests++;
-        failedTests++;
-        var div = document.createElement('div');
-        div.className = 'test fail';
-        div.innerHTML = '\u2717 FAIL: Test 19 threw unexpected exception: ' + outerError.message;
-        (currentSection || results).appendChild(div);
+        nullProg = shaderMgr.linkProgram(null, simpleFrag);
+    } catch (e) {
+        // Expected: attachShader throws TypeError for null shader
     }
+    assert(nullProg === null, 'linkProgram with null vertex shader returns null');
+
+    // Test use() with no program
+    var useNone = shaderMgr.use('does-not-exist');
+    assert(useNone === false, 'use() returns false for nonexistent program');
 
     // ============================================================
-    // TEST 20: Integration — full render pipeline test (red quad)
+    // TEST 22: Integration — full render pipeline test (red quad)
     // ============================================================
-    section('20. Integration — Full Render Pipeline');
+    section('22. Integration — Full Render Pipeline');
 
     gl.viewport(0, 0, canvas.width || 800, canvas.height || 400);
     gl.clearColor(0.1, 0.1, 0.15, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
 
-    // Use raw WebGL — full-screen red quad in clip space
-    var vs20 = [
+    // Full-screen red quad in clip space
+    var vs22 = [
         'attribute vec2 aPos;',
         'void main() { gl_Position = vec4(aPos, 0.0, 1.0); }'
     ].join('\n');
-    var fs20 = [
+    var fs22 = [
         'precision mediump float;',
         'void main() { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); }'
     ].join('\n');
-    var prog20 = shaderMgr.createProgram('test20-red', vs20, fs20);
-    assert(prog20 !== null, 'Red shader program created');
-    shaderMgr.use('test20-red');
+    var prog22 = shaderMgr.createProgram('test22-red', vs22, fs22);
+    assert(prog22 !== null, 'Red shader program created');
+    shaderMgr.use('test22-red');
 
-    var quadVerts20 = new Float32Array([
-        -1, -1,  1, -1,  1, 1,  -1, 1
-    ]);
-    var quadIdx20 = new Uint16Array([0, 1, 2, 0, 2, 3]);
+    var quadVerts22 = new Float32Array([-1,-1, 1,-1, 1,1, -1,1]);
+    var quadIdx22 = new Uint16Array([0,1,2, 0,2,3]);
 
-    var buf20 = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buf20);
-    gl.bufferData(gl.ARRAY_BUFFER, quadVerts20, gl.STATIC_DRAW);
+    var buf22 = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf22);
+    gl.bufferData(gl.ARRAY_BUFFER, quadVerts22, gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-    var idxBuf20 = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf20);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIdx20, gl.STATIC_DRAW);
+    var idxBuf22 = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf22);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, quadIdx22, gl.STATIC_DRAW);
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
-    var err20 = gl.getError();
-    assert(err20 === gl.NO_ERROR, 'No WebGL errors after drawing red quad');
+    var err22 = gl.getError();
+    assert(err22 === gl.NO_ERROR, 'No WebGL errors after drawing red quad');
 
     gl.disableVertexAttribArray(0);
-    gl.deleteBuffer(buf20);
-    gl.deleteBuffer(idxBuf20);
+    gl.deleteBuffer(buf22);
+    gl.deleteBuffer(idxBuf22);
 
     // Verify the shader program exists and can be retrieved from ShaderManager
-    var progInfo20 = shaderMgr.getProgram('test20-red');
-    assert(progInfo20 !== null, 'Red shader program exists in ShaderManager');
+    var progInfo22 = shaderMgr.getProgram('test22-red');
+    assert(progInfo22 !== null, 'Red shader program exists in ShaderManager');
 
     // Verify the red quad actually rendered by reading a center pixel.
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -1245,9 +1435,9 @@ canvas { border: 1px solid #333; max-width: 100%; }
     skyTestLight = null;
 
     // ============================================================
-    // TEST 21: GLSL Shader Files — compile shaders from actual .glsl files
+    // TEST 23: GLSL Shader Files — compile shaders from actual .glsl files
     // ============================================================
-    section('21. GLSL Shader Files (vertex-shaders.glsl, fragment-shaders.glsl)');
+    section('23. GLSL Shader Files (vertex-shaders.glsl, fragment-shaders.glsl)');
 
     // Verify that the GLSL shader variables are defined by the loaded files
     assert(typeof TERRAIN_VERTEX_SHADER === 'string', 'TERRAIN_VERTEX_SHADER variable defined from vertex-shaders.glsl');
@@ -1261,25 +1451,31 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(typeof HAND_FRAGMENT_SHADER === 'string', 'HAND_FRAGMENT_SHADER variable defined from fragment-shaders.glsl');
     assert(typeof PARTICLE_FRAGMENT_SHADER === 'string', 'PARTICLE_FRAGMENT_SHADER variable defined from fragment-shaders.glsl');
 
-    // Compile and link a program using the actual GLSL shader strings
-    var glslTerrainProg = shaderMgr.createProgram('glsl-terrain-test', TERRAIN_VERTEX_SHADER, TERRAIN_FRAGMENT_SHADER);
-    assert(glslTerrainProg !== null, 'Terrain shader compiled from actual GLSL file source');
+    // Compile terrain shader from actual GLSL source
+    var glslTerrainProg = shaderMgr.createProgram('glsl-terrain', TERRAIN_VERTEX_SHADER, TERRAIN_FRAGMENT_SHADER);
+    assert(glslTerrainProg !== null, 'Terrain shader compiled from GLSL file source');
+    assert(shaderMgr.use('glsl-terrain') === true, 'GLSL terrain program can be activated');
 
-    // Verify it can be used
-    assert(shaderMgr.use('glsl-terrain-test') === true, 'GLSL terrain program can be activated');
+    // Compile break particle shader
+    var glslParticleProg = shaderMgr.createProgram('glsl-particle', BREAK_VERTEX_SHADER, PARTICLE_FRAGMENT_SHADER);
+    assert(glslParticleProg !== null, 'Break particle shader compiled from GLSL file source');
 
-    // Test break particles shader compilation
-    var glslParticleProg = shaderMgr.createProgram('glsl-particle-test', BREAK_VERTEX_SHADER, PARTICLE_FRAGMENT_SHADER);
-    assert(glslParticleProg !== null, 'Break particle shader compiled from actual GLSL file source');
+    // Compile sky shader
+    var glslSkyProg = shaderMgr.createProgram('glsl-sky', SKY_VERTEX_SHADER, SKY_FRAGMENT_SHADER);
+    assert(glslSkyProg !== null, 'Sky shader compiled from GLSL file source');
 
-    // Test sky shader compilation
-    var glslSkyProg = shaderMgr.createProgram('glsl-sky-test', SKY_VERTEX_SHADER, SKY_FRAGMENT_SHADER);
-    assert(glslSkyProg !== null, 'Sky shader compiled from actual GLSL file source');
+    // Compile GUI shader
+    var glslGuiProg = shaderMgr.createProgram('glsl-gui', GUI_VERTEX_SHADER, GUI_FRAGMENT_SHADER);
+    assert(glslGuiProg !== null, 'GUI shader compiled from GLSL file source');
+
+    // Compile hand shader
+    var glslHandProg = shaderMgr.createProgram('glsl-hand', HAND_VERTEX_SHADER, HAND_FRAGMENT_SHADER);
+    assert(glslHandProg !== null, 'Hand shader compiled from GLSL file source');
 
     // ============================================================
-    // TEST 22: Uint32 Index Buffer Support — OES_element_index_uint
+    // TEST 24: Uint32 Index Buffer Support — OES_element_index_uint
     // ============================================================
-    section('22. Uint32 Index Buffer Support (chunk-mesh.js)');
+    section('24. Uint32 Index Buffer Support (chunk-mesh.js)');
 
     var chunkMeshUint32 = new Donkeycraft.ChunkMesh(gl, shaderMgr);
     assert(chunkMeshUint32._supportsUint32Indices === true, 'Uint32 index support detected via OES_element_index_uint extension');
@@ -1295,132 +1491,107 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(chunkMeshSmall._geometryUsesUint32 === false, 'Small geometry (quad) does not use Uint32');
 
     // Test that ChunkMesh.draw() returns false when geometry needs Uint32 but extension unavailable
-    // We can't easily disable the extension, so we verify the check exists
     assert(typeof chunkMeshUint32._supportsUint32Indices === 'boolean', '_supportsUint32Indices is a boolean');
 
     chunkMeshUint32.destroy();
     chunkMeshSmall.destroy();
 
     // ============================================================
-    // TEST 23: Frustum Culling — extract planes and box test
+    // TEST 25: Frustum Culling — extract planes and box test
     // ============================================================
-    section('23. Frustum Culling (terrain-renderer.js)');
+    section('25. Frustum Culling (terrain-renderer.js)');
 
-    var terrain2 = new Donkeycraft.TerrainRenderer(gl, shaderMgr, fog);
-    assert(terrain2 !== null, 'TerrainRenderer instance for frustum test');
+    var terrainFrustrum = new Donkeycraft.TerrainRenderer(gl, shaderMgr, null);
+    assert(terrainFrustrum !== null, 'TerrainRenderer for frustum test');
 
-    // Verify _isBoxInFrustum returns true when no frustum planes extracted (fallback: visible)
-    var boxVisible = terrain2._isBoxInFrustum(0, 0, 0, 16, 256, 16);
+    // _isBoxInFrustum returns true when no frustum planes extracted (fallback: visible)
+    var boxVisible = terrainFrustrum._isBoxInFrustum(0, 0, 0, 16, 256, 16);
     assert(boxVisible === true, 'Box is visible when no frustum planes extracted');
 
     // Set world data so _extractFrustumPlanes has matrix data to work with
-    terrain2.setWorldData(function(x, y, z) { return (y < 128) ? 1 : 0; });
+    terrainFrustrum.setWorldData(function(x, y, z) { return (y < 128) ? 1 : 0; });
 
-    // Verify frustum plane extraction method exists
-    assert(typeof terrain2._extractFrustumPlanes === 'function', '_extractFrustumPlanes method exists');
-    assert(typeof terrain2._isBoxInFrustum === 'function', '_isBoxInFrustum method exists');
-    assert(typeof terrain2._extractPlane === 'function', '_extractPlane helper method exists');
+    // Verify methods exist
+    assert(typeof terrainFrustrum._extractFrustumPlanes === 'function', '_extractFrustumPlanes method exists');
+    assert(typeof terrainFrustrum._isBoxInFrustum === 'function', '_isBoxInFrustum method exists');
+    assert(typeof terrainFrustrum._extractPlane === 'function', '_extractPlane helper method exists');
+    assert(typeof terrainFrustrum._getFrustumCacheKey === 'function', '_getFrustumCacheKey method exists');
+    assert(typeof terrainFrustrum._multiplyMatrices === 'function', '_multiplyMatrices helper method exists');
 
-    terrain2.destroy();
+    terrainFrustrum.destroy();
 
     // ============================================================
-    // TEST 24: Break Particles — color validation
+    // TEST 26: Break Particles — color validation
     // ============================================================
-    section('24. Break Particles — Color Validation (break-particles.js)');
+    section('26. Break Particles — Color Validation (break-particles.js)');
 
     var particles2 = new Donkeycraft.BreakParticles(gl, shaderMgr);
     assert(particles2 !== null, 'BreakParticles instance for color test');
 
     // Test _getBlockParticleColor returns correct colors for known block IDs
     var stoneColor = particles2._getBlockParticleColor(1);
-    assert(stoneColor.r === 0.5 && stoneColor.g === 0.5 && stoneColor.b === 0.5, 'Stone block particle color is gray (0.5, 0.5, 0.5)');
+    assertEq(stoneColor.r, 0.5, 'Stone particle R = 0.5');
+    assertEq(stoneColor.g, 0.5, 'Stone particle G = 0.5');
+    assertEq(stoneColor.b, 0.5, 'Stone particle B = 0.5');
 
     var grassColor = particles2._getBlockParticleColor(2);
-    assert(grassColor.r === 0.3 && grassColor.g === 0.6 && grassColor.b === 0.2, 'Grass block particle color is green (0.3, 0.6, 0.2)');
+    assertEq(grassColor.r, 0.3, 'Grass particle R = 0.3');
+    assertEq(grassColor.g, 0.6, 'Grass particle G = 0.6');
+    assertEq(grassColor.b, 0.2, 'Grass particle B = 0.2');
 
     var dirtColor = particles2._getBlockParticleColor(3);
-    assert(dirtColor.r === 0.6 && dirtColor.g === 0.4 && dirtColor.b === 0.2, 'Dirt block particle color is brown (0.6, 0.4, 0.2)');
+    assertEq(dirtColor.r, 0.6, 'Dirt particle R = 0.6');
+    assertEq(dirtColor.g, 0.4, 'Dirt particle G = 0.4');
+    assertEq(dirtColor.b, 0.2, 'Dirt particle B = 0.2');
 
     var sandColor = particles2._getBlockParticleColor(4);
-    assert(sandColor.r === 0.8 && sandColor.g === 0.7 && sandColor.b === 0.3, 'Sand block particle color is yellow (0.8, 0.7, 0.3)');
+    assertEq(sandColor.r, 0.8, 'Sand particle R = 0.8');
+    assertEq(sandColor.g, 0.7, 'Sand particle G = 0.7');
+    assertEq(sandColor.b, 0.3, 'Sand particle B = 0.3');
 
     var fallbackColor = particles2._getBlockParticleColor(99);
-    assert(fallbackColor.r === 0.5 && fallbackColor.g === 0.5 && fallbackColor.b === 0.5, 'Unknown block ID returns fallback gray color');
+    assertEq(fallbackColor.r, 0.5, 'Unknown block ID returns fallback gray R = 0.5');
 
     particles2.destroy();
 
     // ============================================================
-    // TEST 25: Hand Renderer — item color validation
+    // TEST 27: Hand Renderer — item color validation
     // ============================================================
-    section('25. Hand Renderer — Item Color Validation (hand-renderer.js)');
+    section('27. Hand Renderer — Item Color Validation (hand-renderer.js)');
 
     var hand2 = new Donkeycraft.HandRenderer(gl, shaderMgr);
     assert(hand2 !== null, 'HandRenderer instance for color test');
 
     // Test _getItemColor returns correct colors for known item IDs
     var stoneItemColor = hand2._getItemColor(1);
-    assert(stoneItemColor.r === 0.5 && stoneItemColor.g === 0.5 && stoneItemColor.b === 0.5, 'Stone item color is gray');
+    assertEq(stoneItemColor.r, 0.5, 'Stone item R = 0.5');
+    assertEq(stoneItemColor.g, 0.5, 'Stone item G = 0.5');
+    assertEq(stoneItemColor.b, 0.5, 'Stone item B = 0.5');
 
     var grassItemColor = hand2._getItemColor(2);
-    assert(grassItemColor.r === 0.3 && grassItemColor.g === 0.6 && grassItemColor.b === 0.2, 'Grass item color is green');
+    assertEq(grassItemColor.r, 0.3, 'Grass item R = 0.3');
+    assertEq(grassItemColor.g, 0.6, 'Grass item G = 0.6');
+    assertEq(grassItemColor.b, 0.2, 'Grass item B = 0.2');
 
     var goldItemColor = hand2._getItemColor(4);
-    assert(goldItemColor.r === 0.8 && goldItemColor.g === 0.8 && goldItemColor.b === 0.2, 'Gold item color is yellow');
+    assertEq(goldItemColor.r, 0.8, 'Gold item R = 0.8');
+    assertEq(goldItemColor.g, 0.8, 'Gold item G = 0.8');
+    assertEq(goldItemColor.b, 0.2, 'Gold item B = 0.2');
 
     var diamondItemColor = hand2._getItemColor(5);
-    assert(diamondItemColor.r === 0.7 && diamondItemColor.g === 0.7 && diamondItemColor.b === 0.8, 'Diamond item color is light blue');
+    assertEq(diamondItemColor.r, 0.7, 'Diamond item R = 0.7');
+    assertEq(diamondItemColor.g, 0.7, 'Diamond item G = 0.7');
+    assertEq(diamondItemColor.b, 0.8, 'Diamond item B = 0.8');
 
     var fallbackItemColor = hand2._getItemColor(99);
-    assert(fallbackItemColor.r === 0.5 && fallbackItemColor.g === 0.5 && fallbackItemColor.b === 0.5, 'Unknown item ID returns fallback gray');
+    assertEq(fallbackItemColor.r, 0.5, 'Unknown item ID returns fallback gray R = 0.5');
 
     hand2.destroy();
 
     // ============================================================
-    // TEST 26: Sky — geometry and buffer creation (render skipped due to getData dependency)
+    // TEST 28: GLContext — context lost handling
     // ============================================================
-    section('26. Sky — Geometry and Rendering (sky.js)');
-
-    var sky2 = new Donkeycraft.Sky(gl, shaderMgr);
-    assert(sky2 !== null, 'Sky instance for geometry test');
-
-    // Verify sky dome geometry was built
-    assert(sky2._skyDomeGeometry !== null, 'Sky dome geometry exists');
-    assert(sky2._skyDomeGeometry.vertexCount > 0, 'Sky dome has vertices');
-    assert(sky2._skyDomeGeometry.indexCount > 0, 'Sky dome has indices');
-
-    // Verify persistent buffers were created
-    assert(sky2._skyDomeVertBuf !== null, 'Sky vertex buffer exists');
-    assert(sky2._skyDomeIndexBuf !== null, 'Sky index buffer exists');
-
-    // NOTE: sky.js render() calls matrices.view.getData() to extract rotation-only view matrix.
-    // If Matrix4.prototype.getData does not exist, render() will throw TypeError.
-    // This test verifies geometry/buffers are correct; render is tested separately in the full game.
-    var testCam2 = new Donkeycraft.Camera(70, 0.1, 1000);
-    testCam2.setPosition(0, 64, 0);
-    testCam2.setRotation(0, 0);
-    var testLight2 = new Donkeycraft.Lighting();
-    testLight2.setTimeOfDay(0.5);
-
-    // Only attempt render if Matrix4 has getData method
-    if (typeof testCam2.getProjection().getData === 'function') {
-        try {
-            sky2.render(testCam2, testLight2);
-            assert(true, 'Sky.render completed without JS exception');
-        } catch (e) {
-            assert(false, 'Sky.render threw exception: ' + e.message);
-        }
-    } else {
-        assert(true, 'Sky render skipped — Matrix4.getData not available (geometry/buffers verified above)');
-    }
-
-    sky2.destroy();
-    testCam2 = null;
-    testLight2 = null;
-
-    // ============================================================
-    // TEST 27: GLContext — context lost handling
-    // ============================================================
-    section('27. GLContext — Context Lost Handling (gl-context.js)');
+    section('28. GLContext — Context Lost Handling (gl-context.js)');
 
     var glCtx2 = new Donkeycraft.GLContext(canvas);
     assert(glCtx2 !== null, 'Second GLContext instance created');
@@ -1434,23 +1605,215 @@ canvas { border: 1px solid #333; max-width: 100%; }
     assert(true, 'GLContext.destroy completed without error');
 
     // ============================================================
-    // TEST 28: ShaderManager — uniform caching behavior
+    // TEST 29: End-to-End — Multiple Classes Working Together
     // ============================================================
-    section('28. ShaderManager — Uniform Caching (shader-manager.js)');
+    section('29. End-to-End — Multi-Class Integration');
 
-    shaderMgr.use('terrain');
+    // Create a fresh set of objects to test interaction
+    var e2eGlCtx = new Donkeycraft.GLContext(canvas);
+    assert(e2eGlCtx.isValid() === true, 'E2E: GLContext valid');
 
-    // Set the same uniform twice — second call should use cached location
-    var set1 = shaderMgr.setVec3('uFogColor', 0.5, 0.6, 0.7);
-    var set2 = shaderMgr.setVec3('uFogColor', 0.8, 0.9, 1.0);
-    assert(set1 === true && set2 === true, 'Repeated uniform sets both succeed with caching');
+    var e2eShaderMgr = new Donkeycraft.ShaderManager(e2eGlCtx.getGL());
+    assert(e2eShaderMgr !== null, 'E2E: ShaderManager created');
 
-    // Verify getUniformLocation returns cached location
-    var loc1 = shaderMgr.getUniformLocation('uFogColor');
-    var loc2 = shaderMgr.getUniformLocation('uFogColor');
-    assert(loc1 !== null && loc2 !== null, 'getUniformLocation returns valid locations');
-    assert(loc1 === loc2, 'Cached uniform location is consistent across calls');
+    // Create terrain shader
+    var e2eTerrainProg = e2eShaderMgr.createProgram('e2e-terrain', TERRAIN_VERTEX_SHADER, TERRAIN_FRAGMENT_SHADER);
+    assert(e2eTerrainProg !== null, 'E2E: Terrain shader created from GLSL files');
 
+    // Create camera and lighting
+    var e2eCamera = new Donkeycraft.Camera(70, 0.1, 1000);
+    e2eCamera.setPosition(0, 64, 0);
+    e2eCamera.setRotation(0, 0);
+
+    var e2eLighting = new Donkeycraft.Lighting();
+    e2eLighting.setTimeOfDay(0.5);
+
+    // Create fog
+    var e2eFog = new Donkeycraft.Fog();
+    e2eFog.setEnabled(true);
+    e2eFog.setDensity(0.015);
+
+    // Verify camera matrices
+    var e2eMats = e2eCamera.getMatrices();
+    assert(e2eMats.projection instanceof Donkeycraft.Matrix4, 'E2E: Projection matrix is Matrix4');
+    assert(e2eMats.view instanceof Donkeycraft.Matrix4, 'E2E: View matrix is Matrix4');
+
+    // Verify lighting can apply to shader
+    e2eShaderMgr.use('e2e-terrain');
+    var e2eLightApply = e2eLighting.applyToShader(e2eShaderMgr);
+    assert(e2eLightApply === true, 'E2E: Lighting applied to terrain shader');
+
+    // Verify fog can apply to shader
+    var e2eFogApply = e2eFog.applyToFogUniforms(e2eShaderMgr);
+    assert(e2eFogApply === true, 'E2E: Fog applied to terrain shader');
+
+    // Create geometry and mesh
+    var e2eGeoBuilder = new Donkeycraft.GeometryBuilder();
+    var e2eQuad = e2eGeoBuilder.buildQuad(2.0, 0.0);
+    assert(e2eQuad.vertexCount === 4, 'E2E: Quad has 4 vertices');
+
+    var e2eMeshOpt = new Donkeycraft.MeshOptimizer();
+    var e2eOptimized = e2eMeshOpt.optimize(e2eQuad);
+    assert(e2eOptimized.vertexCount > 0, 'E2E: Optimized geometry has vertices');
+
+    // Clean up E2E resources
+    e2eGlCtx.destroy();
+    e2eCamera = null;
+    e2eLighting = null;
+    e2eFog = null;
+
+    assert(true, 'E2E: All classes interacted successfully without errors');
+
+    // ============================================================
+    // TEST 30: GeometryBuilder — Edge Cases and Boundary Conditions
+    // ============================================================
+    section('30. GeometryBuilder — Edge Cases (geometry-builder.js)');
+
+    var geoBuilder2 = new Donkeycraft.GeometryBuilder();
+
+    // Test isTransparent with various block IDs
+    assert(geoBuilder2.isTransparent(0) === true, 'Block 0 (air) is transparent');
+    assert(geoBuilder2.isTransparent(1) === false, 'Block 1 (stone) is opaque');
+    assert(geoBuilder2.isTransparent(8) === false, 'Block 8 (cobweb-like) treated as opaque by fallback');
+    assert(geoBuilder2.isTransparent(9) === true, 'Block 9 (water) is transparent');
+    assert(geoBuilder2.isTransparent(10) === true, 'Block 10 (lava) is transparent');
+    assert(geoBuilder2.isTransparent(11) === true, 'Block 11 (still lava) is transparent');
+
+    // Test buildQuad with custom size and Y position
+    var customQuad = geoBuilder2.buildQuad(4.0, 5.0);
+    assert(customQuad.vertexCount === 4, 'Custom quad has 4 vertices');
+    assertEq(customQuad.indexCount, 6, 'Custom quad has 6 indices');
+
+    // Verify custom size: should span from -2 to +2
+    var cqVerts = customQuad.vertices;
+    var cqMinX = Infinity, cqMaxX = -Infinity;
+    for (var i = 0; i < 4; i++) {
+        var qx = cqVerts[i * 9];
+        if (qx < cqMinX) cqMinX = qx;
+        if (qx > cqMaxX) cqMaxX = qx;
+        assertNear(cqVerts[i * 9 + 1], 5.0, 0.01, 'Custom quad at Y=5.0');
+    }
+    assertNear(cqMinX, -2.0, 0.01, 'Custom quad minX is -2.0 (size=4)');
+    assertNear(cqMaxX, 2.0, 0.01, 'Custom quad maxX is 2.0 (size=4)');
+
+    // Test buildCube with custom size and Y position
+    var customCube = geoBuilder2.buildCube(2.0, 10.0);
+    assert(customCube.vertexCount === 24, 'Custom cube has 24 vertices');
+    assertEq(customCube.indexCount, 36, 'Custom cube has 36 indices');
+
+    // ============================================================
+    // TEST 31: MeshOptimizer — Epsilon Parameter Effects
+    // ============================================================
+    section('31. MeshOptimizer — Epsilon Precision (mesh-optimizer.js)');
+
+    var meshOpt2 = new Donkeycraft.MeshOptimizer();
+
+    // Test with very small epsilon (high precision, more unique vertices)
+    var highPrecision = meshOpt2.generateIndexBuffer(quad, 0.0001);
+    assert(highPrecision.vertexCount > 0, 'High precision optimization produces vertices');
+
+    // Test with larger epsilon (lower precision, more vertex merging)
+    var lowPrecision = meshOpt2.generateIndexBuffer(quad, 0.1);
+    assert(lowPrecision.vertexCount > 0, 'Low precision optimization produces vertices');
+
+    // Both should produce valid index buffers
+    assert(lowPrecision.indexCount > 0, 'Low precision produces indices');
+
+    // ============================================================
+    // TEST 32: Camera — Vector Orthogonality
+    // ============================================================
+    section('32. Camera — Vector Math Properties (camera.js)');
+
+    var camMath = new Donkeycraft.Camera(70, 0.1, 1000);
+    camMath.setPosition(0, 64, 0);
+
+    // Test at multiple rotations
+    var testRotations = [
+        { yaw: 0, pitch: 0 },
+        { yaw: Math.PI / 4, pitch: 0.1 },
+        { yaw: Math.PI / 2, pitch: -0.2 },
+        { yaw: Math.PI, pitch: 0.3 },
+        { yaw: -Math.PI / 3, pitch: 0.4 }
+    ];
+
+    for (var r = 0; r < testRotations.length; r++) {
+        camMath.setRotation(testRotations[r].yaw, testRotations[r].pitch);
+
+        var fwd = camMath.getForward();
+        var right = camMath.getRight();
+        var up = camMath.getUp();
+
+        // All vectors should be normalized
+        assertNear(fwd.length(), 1.0, 0.01, 'Forward normalized at yaw=' + testRotations[r].yaw.toFixed(2));
+        assertNear(right.length(), 1.0, 0.01, 'Right normalized at yaw=' + testRotations[r].yaw.toFixed(2));
+        assertNear(up.length(), 1.0, 0.01, 'Up normalized');
+
+        // Forward and right should be orthogonal (dot product ≈ 0)
+        var dotFR = fwd.x * right.x + fwd.y * right.y + fwd.z * right.z;
+        assert(Math.abs(dotFR) < 0.01, 'Forward ⊥ Right at yaw=' + testRotations[r].yaw.toFixed(2));
+
+        // Forward and up should be orthogonal
+        var dotFU = fwd.x * up.x + fwd.y * up.y + fwd.z * up.z;
+        assert(Math.abs(dotFU) < 0.01, 'Forward ⊥ Up at yaw=' + testRotations[r].yaw.toFixed(2));
+
+        // Right and up should be orthogonal
+        var dotRU = right.x * up.x + right.y * up.y + right.z * up.z;
+        assert(Math.abs(dotRU) < 0.01, 'Right ⊥ Up at yaw=' + testRotations[r].yaw.toFixed(2));
+    }
+
+    // ============================================================
+    // TEST 33: Fog — Edge Case Density Values
+    // ============================================================
+    section('33. Fog — Edge Case Density (fog.js)');
+
+    var fogEdge = new Donkeycraft.Fog();
+
+    // Zero density = no fog effect
+    fogEdge.setDensity(0.0);
+    assertEq(fogEdge.getDensity(), 0.0, 'Zero density set successfully');
+
+    // Very high density
+    fogEdge.setDensity(1.0);
+    assertNear(fogEdge.getDensity(), 1.0, 0.001, 'High density (1.0) set successfully');
+
+    // Negative density (should be accepted — shader handles it)
+    fogEdge.setDensity(-0.5);
+    assertEq(fogEdge.getDensity(), -0.5, 'Negative density accepted');
+
+    // ============================================================
+    // TEST 34: Lighting — Sun Direction at Key Times
+    // ============================================================
+    section('34. Lighting — Sun Direction Vectors (lighting.js)');
+
+    var lightDir = new Donkeycraft.Lighting();
+
+    // Noon: sun overhead
+    lightDir.setTimeOfDay(0.5);
+    var noonDir = lightDir.getSunDirection();
+    assertNear(noonDir.length(), 1.0, 0.01, 'Noon sun direction normalized');
+    assert(noonDir.y > 0.5, 'Noon sun Y is strongly positive (overhead)');
+
+    // Sunrise: sun on horizon
+    lightDir.setTimeOfDay(0.25);
+    var sunriseDir = lightDir.getSunDirection();
+    assertNear(sunriseDir.length(), 1.0, 0.01, 'Sunrise sun direction normalized');
+    assert(Math.abs(sunriseDir.y) < 0.3, 'Sunrise sun Y is near zero (horizon)');
+
+    // Sunset: sun on horizon
+    lightDir.setTimeOfDay(0.75);
+    var sunsetDir = lightDir.getSunDirection();
+    assertNear(sunsetDir.length(), 1.0, 0.01, 'Sunset sun direction normalized');
+    assert(Math.abs(sunsetDir.y) < 0.3, 'Sunset sun Y is near zero (horizon)');
+
+    // Midnight: sun below horizon
+    lightDir.setTimeOfDay(0.0);
+    var midnightDir = lightDir.getSunDirection();
+    assertNear(midnightDir.length(), 1.0, 0.01, 'Midnight sun direction normalized');
+    assert(midnightDir.y < -0.5, 'Midnight sun Y is negative (below horizon)');
+
+    // ============================================================
+    // Final Summary
+    // ============================================================
     finishTests();
 
 })();

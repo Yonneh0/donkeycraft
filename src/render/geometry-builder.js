@@ -21,7 +21,7 @@
      * GeometryBuilder — Builds vertex data arrays for chunk mesh rendering.
      */
     Donkeycraft.GeometryBuilder = function() {
-        this._vertexSize = 9; // position(3) + UV(2) + normal(3) + light(1)
+        this._vertexSize = 9; // position(3) + light(1) + UV(2) + normal(3)
     };
 
     /**
@@ -81,9 +81,10 @@
                                 worldX + corner[0],
                                 worldY + corner[1],
                                 worldZ + corner[2],
+                                light,
                                 uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0),
                                 uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0),
-                                dir[0], dir[1], dir[2], light
+                                dir[0], dir[1], dir[2]
                             );
                         }
 
@@ -156,13 +157,13 @@
         y = (y !== undefined) ? y : 0.0;
         var half = size / 2;
 
-        // 4 vertices: position(3) + UV(2) + normal(3) + light(1) = 9 floats each
+        // 4 vertices: position(3) + light(1) + UV(2) + normal(3) = 9 floats each
         return {
             vertices: new Float32Array([
-                -half, y, -half,  0, 0,   0, 1, 0,   1.0,
-                 half, y, -half,  1, 0,   0, 1, 0,   1.0,
-                 half, y,  half,  1, 1,   0, 1, 0,   1.0,
-                -half, y,  half,  0, 1,   0, 1, 0,   1.0
+                -half, y, -half,  1.0,   0, 0,   0, 1, 0,
+                 half, y, -half,  1.0,   1, 0,   0, 1, 0,
+                 half, y,  half,  1.0,   1, 1,   0, 1, 0,
+                -half, y,  half,  1.0,   0, 1,   0, 1, 0
             ]),
             indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
             vertexCount: 4,
@@ -182,38 +183,39 @@
         var half = size / 2;
 
         // 24 vertices (6 faces × 4 corners)
+        // Layout: position(3) + light(1) + UV(2) + normal(3)
         return {
             vertices: new Float32Array([
                 // +X face
-                 half, y-half, -half,  0.875, 0.75,  1, 0, 0,  0.8,
-                 half, y+half, -half,  0.875, 0.875, 1, 0, 0,  0.8,
-                 half, y+half,  half,  0.875, 1.0,   1, 0, 0,  0.8,
-                 half, y-half,  half,  0.875, 0.75,  1, 0, 0,  0.8,
+                 half, y-half, -half,  0.8,  0.875, 0.75,  1, 0, 0,
+                 half, y+half, -half,  0.8,  0.875, 0.875, 1, 0, 0,
+                 half, y+half,  half,  0.8,  0.875, 1.0,   1, 0, 0,
+                 half, y-half,  half,  0.8,  0.875, 0.75,  1, 0, 0,
                 // -X face
-               -half, y-half,  half,  0.75, 0.75, -1, 0, 0,  0.7,
-               -half, y+half,  half,  0.75, 0.875, -1, 0, 0,  0.7,
-               -half, y+half, -half,  0.75, 1.0,  -1, 0, 0,  0.7,
-               -half, y-half, -half,  0.75, 0.75, -1, 0, 0,  0.7,
+               -half, y-half,  half,  0.7,  0.75, 0.75, -1, 0, 0,
+               -half, y+half,  half,  0.7,  0.75, 0.875, -1, 0, 0,
+               -half, y+half, -half,  0.7,  0.75, 1.0,  -1, 0, 0,
+               -half, y-half, -half,  0.7,  0.75, 0.75, -1, 0, 0,
                 // +Y face (top)
-               -half, y+half, -half,  0.0, 0.0,   0, 1, 0,  1.0,
-                half, y+half, -half,  0.125, 0.0,  0, 1, 0,  1.0,
-                half, y+half,  half,  0.125, 0.125, 0, 1, 0,  1.0,
-               -half, y+half,  half,  0.0, 0.125,  0, 1, 0,  1.0,
+               -half, y+half, -half,  1.0,  0.0, 0.0,   0, 1, 0,
+                half, y+half, -half,  1.0,  0.125, 0.0,  0, 1, 0,
+                half, y+half,  half,  1.0,  0.125, 0.125, 0, 1, 0,
+               -half, y+half,  half,  1.0,  0.0, 0.125,  0, 1, 0,
                 // -Y face (bottom)
-               -half, y-half,  half,  0.0, 0.0,   0, -1, 0,  0.5,
-                half, y-half,  half,  0.125, 0.0,  0, -1, 0,  0.5,
-                half, y-half, -half,  0.125, 0.125, 0, -1, 0,  0.5,
-               -half, y-half, -half,  0.0, 0.125,  0, -1, 0,  0.5,
+               -half, y-half,  half,  0.5,  0.0, 0.0,   0, -1, 0,
+                half, y-half,  half,  0.5,  0.125, 0.0,  0, -1, 0,
+                half, y-half, -half,  0.5,  0.125, 0.125, 0, -1, 0,
+               -half, y-half, -half,  0.5,  0.0, 0.125,  0, -1, 0,
                 // +Z face (front)
-                half, y-half,  half,  0.25, 0.75,  0, 0, 1,  0.9,
-                half, y+half,  half,  0.25, 0.875, 0, 0, 1,  0.9,
-               -half, y+half,  half,  0.375, 0.875, 0, 0, 1,  0.9,
-               -half, y-half,  half,  0.375, 0.75,  0, 0, 1,  0.9,
+                half, y-half,  half,  0.9,  0.25, 0.75,  0, 0, 1,
+                half, y+half,  half,  0.9,  0.25, 0.875, 0, 0, 1,
+               -half, y+half,  half,  0.9,  0.375, 0.875, 0, 0, 1,
+               -half, y-half,  half,  0.9,  0.375, 0.75,  0, 0, 1,
                 // -Z face (back)
-               -half, y-half, -half,  0.25, 0.75,  0, 0, -1,  0.6,
-               -half, y+half, -half,  0.25, 0.875, 0, 0, -1,  0.6,
-                half, y+half, -half,  0.375, 0.875, 0, 0, -1,  0.6,
-                half, y-half, -half,  0.375, 0.75,  0, 0, -1,  0.6
+               -half, y-half, -half,  0.6,  0.25, 0.75,  0, 0, -1,
+               -half, y+half, -half,  0.6,  0.25, 0.875, 0, 0, -1,
+                half, y+half, -half,  0.6,  0.375, 0.875, 0, 0, -1,
+                half, y-half, -half,  0.6,  0.375, 0.75,  0, 0, -1
             ]),
             indices: new Uint16Array([
                 0, 1, 2,  0, 2, 3,       // +X

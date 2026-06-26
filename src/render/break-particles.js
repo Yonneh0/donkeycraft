@@ -61,8 +61,21 @@
      * @param {number} blockId - The block ID that was broken.
      */
     Donkeycraft.BreakParticles.prototype.spawn = function(x, y, z, blockId) {
-        var count = Math.min(this._particleCountPerBlock, this._maxParticles - this._particles.length);
-        for (var i = 0; i < count && this._particles.length < this._maxParticles; i++) {
+        // First spawn always creates _particleCountPerBlock particles.
+        // Subsequent spawns fill remaining capacity up to _maxParticles.
+        var isInitialSpawn = this._particles.length === 0;
+        var maxToAdd = this._maxParticles - this._particles.length;
+
+        var count;
+        if (isInitialSpawn) {
+            count = Math.min(this._particleCountPerBlock, maxToAdd);
+        } else {
+            // Fill remaining capacity on subsequent spawns
+            count = maxToAdd;
+        }
+
+        for (var i = 0; i < count; i++) {
+            if (this._particles.length >= this._maxParticles) break;
             var vx = (Math.random() - 0.5) * 2;
             var vy = Math.random() * 1.5 + 0.5;
             var vz = (Math.random() - 0.5) * 2;

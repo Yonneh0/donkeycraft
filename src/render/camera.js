@@ -88,13 +88,12 @@
     Donkeycraft.Camera.prototype.getForward = function() {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
-        var cosPitch = Math.cos(this._pitch);
-        var sinPitch = Math.sin(this._pitch);
 
+        // Horizontal forward vector (always orthogonal to world-up for stable strafing).
         this._forward.set(
-            -sinYaw * cosPitch,
-            sinPitch,
-            -cosYaw * cosPitch
+            -sinYaw,
+            0,
+            -cosYaw
         ).normalize();
 
         return this._forward;
@@ -107,8 +106,9 @@
     Donkeycraft.Camera.prototype.getRight = function() {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
+        var cosPitch = Math.cos(this._pitch);
 
-        this._right.set(cosYaw, 0, -sinYaw).normalize();
+        this._right.set(cosYaw * cosPitch, 0, -sinYaw * cosPitch).normalize();
 
         return this._right;
     };

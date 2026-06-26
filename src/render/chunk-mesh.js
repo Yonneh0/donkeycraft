@@ -142,22 +142,22 @@
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
 
-        // UV attribute (2 floats at offset 12)
-        if (uvLoc >= 0) {
-            gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
-        }
-
-        // Normal attribute (3 floats at offset 20)
-        if (normLoc >= 0) {
-            gl.enableVertexAttribArray(normLoc);
-            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, 9 * 4, 20);
-        }
-
-        // Light attribute (1 float at offset 32)
+        // Light attribute (1 float at offset 12)
         if (lightLoc >= 0) {
             gl.enableVertexAttribArray(lightLoc);
-            gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, 9 * 4, 32);
+            gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, 9 * 4, 12);
+        }
+
+        // UV attribute (2 floats at offset 16)
+        if (uvLoc >= 0) {
+            gl.enableVertexAttribArray(uvLoc);
+            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 16);
+        }
+
+        // Normal attribute (3 floats at offset 32)
+        if (normLoc >= 0) {
+            gl.enableVertexAttribArray(normLoc);
+            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, 9 * 4, 32);
         }
 
         // Draw using indices.
