@@ -7,8 +7,6 @@
 
     /**
      * ChunkMesh — Manages WebGL buffers for a single chunk's geometry.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.ChunkMesh = function(gl, shaderManager) {
         this._gl = gl;
@@ -184,14 +182,6 @@
     };
 
     /**
-     * Check if the mesh needs buffer upload.
-     * @returns {boolean} True if buffers are dirty and need updating.
-     */
-    Donkeycraft.ChunkMesh.prototype.isDirty = function() {
-        return this._dirty;
-    };
-
-    /**
      * Get the number of indices in this mesh.
      * @returns {number}
      */
@@ -208,28 +198,14 @@
     };
 
     /**
-     * Mark the mesh as clean (buffers are up to date).
-     */
-    Donkeycraft.ChunkMesh.prototype.markClean = function() {
-        this._dirty = false;
-    };
-
-    /**
      * Destroy buffers and free GPU resources.
      */
     Donkeycraft.ChunkMesh.prototype.destroy = function() {
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._vertexBuffer) {
-            gl.deleteBuffer(this._vertexBuffer);
-            this._vertexBuffer = null;
-        }
-
-        if (this._indexBuffer) {
-            gl.deleteBuffer(this._indexBuffer);
-            this._indexBuffer = null;
-        }
+        if (this._vertexBuffer) { gl.deleteBuffer(this._vertexBuffer); this._vertexBuffer = null; }
+        if (this._indexBuffer) { gl.deleteBuffer(this._indexBuffer); this._indexBuffer = null; }
 
         this._geometry = null;
         this._vertexCount = 0;

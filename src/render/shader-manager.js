@@ -18,13 +18,13 @@
         this._cachedLocations = {};
         this._shaderCount = 0;
         this._programCount = 0;
-        this._currentProgram = null; // Track the currently active WebGLProgram
+        this._currentProgram = null;
     };
 
     /**
      * Compile a shader from a source string.
      * @param {string} source - GLSL shader source code.
-     * @param {number} type - Shader type: VERTEX_SHADER or FRAGMENT_SHADER.
+     * @param {number} type - Shader type: 'vertex' or 'fragment'.
      * @returns {WebGLShader|null} The compiled shader, or null on failure.
      */
     Donkeycraft.ShaderManager.prototype.compileShader = function(source, type) {
@@ -45,12 +45,10 @@
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
 
-        var compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-        if (!compiled) {
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             var errorMsg = gl.getShaderInfoLog(shader);
             gl.deleteShader(shader);
-            var typeStr = type === 'vertex' ? 'vertex' : 'fragment';
-            Donkeycraft.Logger.error('ShaderManager', typeStr + ' shader compilation failed:\n' + source + '\nError: ' + errorMsg);
+            Donkeycraft.Logger.error('ShaderManager', type + ' shader compilation failed:\n' + source + '\nError: ' + errorMsg);
             return null;
         }
 
@@ -78,7 +76,6 @@
         gl.attachShader(program, vertShader);
         gl.attachShader(program, fragShader);
 
-        // Bind attribute locations if provided
         if (attribLocations && Array.isArray(attribLocations)) {
             for (var i = 0; i < attribLocations.length; i++) {
                 gl.bindAttribLocation(program, attribLocations[i].location, attribLocations[i].name);
@@ -87,20 +84,12 @@
 
         gl.linkProgram(program);
 
-        var linked = gl.getProgramParameter(program, gl.LINK_STATUS);
-        if (!linked) {
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             var errorMsg = gl.getProgramInfoLog(program);
             gl.deleteProgram(program);
             Donkeycraft.Logger.error('ShaderManager', 'Program linking failed:\nError: ' + errorMsg);
             return null;
         }
-
-        // NOTE: Do NOT check VALIDATE_STATUS here. In WebGL 1, VALIDATE_STATUS can
-        // return false when required runtime state is missing (uniforms not set,
-        // textures not bound, no active vertex attributes). This is a known Safari/WebKit
-        // behavior where validation fails silently with an empty info log even for
-        // perfectly valid programs. Validation is only meaningful after a draw call
-        // has been attempted, so we skip it at link time and rely on LINK_STATUS only.
 
         this._programCount++;
         return program;
@@ -108,20 +97,18 @@
 
     /**
      * Cache uniform and attribute locations for a program.
-     * If locations are already cached (e.g., from a previous link), they are preserved
-     * since WebGLProgram objects maintain stable attribute/uniform layouts across links.
+     * Locations are preserved across re-links since WebGLProgram objects maintain stable layouts.
      * @private
-     * @param {WebGLProgram} program - The linked program to cache locations for.
      */
     Donkeycraft.ShaderManager.prototype._cacheLocations = function(program) {
         var gl = this._gl;
         var cacheKey = this._getProgramKey(program);
 
-        // Only cache if not already present — preserves locations across re-links
         if (this._cachedLocations[cacheKey]) return;
 
         this._cachedLocations[cacheKey] = { uniforms: {}, attributes: {} };
 
+        // Cache uniform locations
         var uniformCount = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
         for (var i = 0; i < uniformCount; i++) {
             var uniformInfo = gl.getActiveUniform(program, i);
@@ -140,13 +127,13 @@
             }
         }
 
-        // Cache attributes
+        // Cache attribute locations
         var attribCount = gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES);
         for (var i = 0; i < attribCount; i++) {
             var attribInfo = gl.getActiveAttrib(program, i);
             if (attribInfo) {
-                var attrLoc = gl.getAttribLocation(program, attribInfo.name);
-                this._cachedLocations[cacheKey].attributes[attribInfo.name] = attrLoc;
+                this._cachedLocations[cacheKey].attributes[attribInfo.name] =
+                    gl.getAttribLocation(program, attribInfo.name);
             }
         }
     };
@@ -154,8 +141,6 @@
     /**
      * Get or assign a permanent key for a WebGLProgram using WeakMap.
      * @private
-     * @param {WebGLProgram} program
-     * @returns {string}
      */
     Donkeycraft.ShaderManager.prototype._getProgramKey = function(program) {
         var key = _programKeys.get(program);
@@ -213,7 +198,11 @@
 
         var program = this._programs[name];
         gl.useProgram(program);
-        this._currentProgram = program; // Track active program
+        this._currentProgram = program;
+
+        // Cache locations on first use
+        this._cacheLocations(program);
+
         return true;
     };
 
@@ -225,15 +214,16 @@
     Donkeycraft.ShaderManager.prototype.useProgram = function(program) {
         var gl = this._gl;
         if (!gl || !program) return false;
+
         gl.useProgram(program);
-        this._currentProgram = program; // Track active program
+        this._currentProgram = program;
+        this._cacheLocations(program);
         return true;
     };
 
     /**
      * Get the active WebGLProgram.
      * @private
-     * @returns {WebGLProgram|null}
      */
     Donkeycraft.ShaderManager.prototype._getActiveProgram = function() {
         if (this._currentProgram) return this._currentProgram;
@@ -244,9 +234,6 @@
     /**
      * Get a cached or queried uniform location for the given program.
      * @private
-     * @param {WebGLProgram} prog - The WebGL program.
-     * @param {string} name - Uniform name.
-     * @returns {WebGLUniformLocation|null}
      */
     Donkeycraft.ShaderManager.prototype._getUniformLocation = function(prog, name) {
         var cacheKey = this._getProgramKey(prog);
@@ -260,7 +247,6 @@
         var loc = gl.getUniformLocation(prog, name);
 
         if (loc !== null && cacheKey) {
-            // Ensure cache entry exists for this program
             if (!this._cachedLocations[cacheKey]) {
                 this._cachedLocations[cacheKey] = { uniforms: {}, attributes: {} };
             }
@@ -273,10 +259,6 @@
     /**
      * Set a uniform by name, delegating to the appropriate WebGL call.
      * @private
-     * @param {string} name - Uniform name.
-     * @param {Function} setter - Function(gl, loc, ...) that writes the uniform value.
-     * @param {...*} args - Arguments to pass to the setter function.
-     * @returns {boolean} True if the uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype._setUniform = function(name, setter) {
         var gl = this._gl;
@@ -312,7 +294,7 @@
     Donkeycraft.ShaderManager.prototype.setMat4 = function(name, value) {
         var self = this;
         return this._setUniform(name, function(gl, loc, val) {
-            loc && gl.uniformMatrix4fv(loc, false, val.getData());
+            if (loc) gl.uniformMatrix4fv(loc, false, val.getData());
         }, value);
     };
 
@@ -403,7 +385,7 @@
     /**
      * Get an attribute location by name.
      * @param {string} name - Attribute name.
-     * @returns {number|null} Attribute location index, or null if not found.
+     * @returns {number} Attribute location index, or -1 if not found.
      */
     Donkeycraft.ShaderManager.prototype.getAttribute = function(name) {
         var currentKey = this._getCurrentProgramKey();
@@ -413,7 +395,7 @@
         }
 
         var gl = this._gl;
-        if (!gl || !gl.currentProgram) return null;
+        if (!gl || !gl.currentProgram) return -1;
         return gl.getAttribLocation(gl.currentProgram, name);
     };
 
@@ -447,7 +429,6 @@
     /**
      * Get the cache key for the active program.
      * @private
-     * @returns {string|null}
      */
     Donkeycraft.ShaderManager.prototype._getCurrentProgramKey = function() {
         var prog = this._getActiveProgram();

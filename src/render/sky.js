@@ -7,8 +7,6 @@
 
     /**
      * Sky — Renders the sky dome with gradients, sun, moon, and stars.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.Sky = function(gl, shaderManager) {
         this._gl = gl;
@@ -17,11 +15,13 @@
         this._showStars = true;
         this._showSun = true;
 
-        // Sky dome geometry (simple hemisphere)
+        // Sky dome geometry and buffers
         this._skyDomeGeometry = null;
-        this._skyDomeVertBuf = null;       // Persistent vertex buffer
-        this._skyDomeIndexBuf = null;      // Index buffer
-        this._skyViewTemp = null;          // Reusable Float32Array for sky view matrix
+        this._skyDomeVertBuf = null;
+        this._skyDomeIndexBuf = null;
+
+        // Reusable Float32Array for sky view matrix (avoids per-frame allocation)
+        this._skyViewTemp = new Float32Array(16);
 
         this._buildSkyDome();
         this._initBuffers();
@@ -120,9 +120,6 @@
 
         // Zero out translation from view matrix for sky (keep rotation only).
         // This keeps the sky fixed at world center regardless of camera position.
-        if (!this._skyViewTemp) {
-            this._skyViewTemp = new Float32Array(16);
-        }
         var viewData = matrices.view.getData();
         for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
         this._skyViewTemp[12] = 0;
@@ -131,7 +128,6 @@
         this._skyViewTemp[15] = 1;
         var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
 
-        // Set the rotation-only view matrix (translation already zeroed above)
         this._shaderManager.setMat4('uView', skyViewMatrix);
 
         // Set sky colors from lighting
@@ -191,15 +187,8 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._skyDomeVertBuf) {
-            gl.deleteBuffer(this._skyDomeVertBuf);
-            this._skyDomeVertBuf = null;
-        }
-
-        if (this._skyDomeIndexBuf) {
-            gl.deleteBuffer(this._skyDomeIndexBuf);
-            this._skyDomeIndexBuf = null;
-        }
+        if (this._skyDomeVertBuf) { gl.deleteBuffer(this._skyDomeVertBuf); this._skyDomeVertBuf = null; }
+        if (this._skyDomeIndexBuf) { gl.deleteBuffer(this._skyDomeIndexBuf); this._skyDomeIndexBuf = null; }
 
         this._skyDomeGeometry = null;
     };

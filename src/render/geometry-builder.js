@@ -9,12 +9,12 @@
 
     // Face definitions: direction, corner order (CCW for front-facing), light intensity
     var FACES = [
-        { dir: [1, 0, 0],  name: 'right', light: 0.8, corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },  // +X
-        { dir: [-1, 0, 0], name: 'left',  light: 0.7, corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]] },  // -X
-        { dir: [0, 1, 0],  name: 'top',   light: 1.0, corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] },  // +Y
-        { dir: [0, -1, 0], name: 'bottom',light: 0.5, corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] },  // -Y
-        { dir: [0, 0, 1],  name: 'front', light: 0.9, corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },  // +Z
-        { dir: [0, 0, -1], name: 'back',  light: 0.6, corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] }   // -Z
+        { dir: [1, 0, 0],  name: 'right',  light: 0.8, corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },   // +X
+        { dir: [-1, 0, 0], name: 'left',   light: 0.7, corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]] },  // -X
+        { dir: [0, 1, 0],  name: 'top',    light: 1.0, corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] },   // +Y
+        { dir: [0, -1, 0], name: 'bottom', light: 0.5, corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] },  // -Y
+        { dir: [0, 0, 1],  name: 'front',  light: 0.9, corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },   // +Z
+        { dir: [0, 0, -1], name: 'back',   light: 0.6, corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] }   // -Z
     ];
 
     /**
@@ -31,7 +31,6 @@
      * @returns {boolean} True if the block is transparent/non-solid.
      */
     Donkeycraft.GeometryBuilder.prototype.isTransparent = function(blockId) {
-        // Use BlockRegistry if available (Phase 3+), otherwise fall back to hardcoded list.
         if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isTransparent === 'function') {
             return Donkeycraft.BlockRegistry.isTransparent(blockId);
         }
@@ -40,20 +39,15 @@
     };
 
     /**
-     * Build geometry data for a single chunk using dynamic arrays to avoid
-     * excessive pre-allocation. Most chunks use only 1-5% of worst-case memory.
+     * Build geometry data for a single chunk using dynamic arrays.
      * @param {number} chunkX - X coordinate of the chunk.
      * @param {number} chunkZ - Z coordinate of the chunk.
      * @param {Function} getBlockFunc - Function(x, y, z) returning block ID at world position.
-     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number, useUint32: boolean}}
+     * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.GeometryBuilder.prototype.buildChunk = function(chunkX, chunkZ, getBlockFunc) {
         var vertices = [];
         var indices = [];
-
-        // Always use Uint32 indices — a full-height chunk can generate up to ~2.3M indices,
-        // far exceeding Uint16Array's 65535 limit.
-        var useUint32 = true;
 
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
@@ -74,13 +68,13 @@
                         var ny = worldY + face.dir[1];
                         var nz = worldZ + face.dir[2];
 
-                        // Get adjacent block — use getBlockFunc for same chunk, or return stone for out-of-bounds
+                        // Get adjacent block — use getBlockFunc for same chunk, or stone for out-of-bounds
                         var adjBlock = this._getBlockAt(nx, ny, nz, getBlockFunc, chunkX, chunkZ);
 
                         // Only render face if adjacent block is transparent
                         if (!this.isTransparent(adjBlock)) continue;
 
-                        // Add UV offset for this block/face
+                        // Get UV offset for this block/face
                         var uvOffset = this._getBlockUV(blockId, face.name);
 
                         // Push 4 vertices (9 floats each): position(3) + UV(2) + normal(3) + light(1)
@@ -113,32 +107,20 @@
         var vertexCount = vertices.length / 9;
         var indexCount = indices.length;
 
-        // Convert to typed arrays
-        var actualVertices = new Float32Array(vertices);
-        var actualIndices = useUint32 ? new Uint32Array(indices) : new Uint16Array(indices);
-
         return {
-            vertices: actualVertices,
-            indices: actualIndices,
+            vertices: new Float32Array(vertices),
+            indices: new Uint32Array(indices),
             vertexCount: vertexCount,
             indexCount: indexCount,
-            useUint32: useUint32
+            useUint32: true
         };
     };
 
     /**
      * Get block at world coordinates, handling chunk boundaries.
      * @private
-     * @param {number} nx - World X coordinate.
-     * @param {number} ny - World Y coordinate.
-     * @param {number} nz - World Z coordinate.
-     * @param {Function} getBlockFunc - Main block getter.
-     * @param {number} chunkX - Current chunk X.
-     * @param {number} chunkZ - Current chunk Z.
-     * @returns {number} Block ID at the given position.
      */
     Donkeycraft.GeometryBuilder.prototype._getBlockAt = function(nx, ny, nz, getBlockFunc, chunkX, chunkZ) {
-        // Check if within current chunk bounds
         var localX = nx - chunkX * CHUNK_SIZE;
         var localZ = nz - chunkZ * CHUNK_SIZE;
 
@@ -153,13 +135,8 @@
     /**
      * Get UV coordinates for a block face.
      * @private
-     * @param {number} blockId - The block ID.
-     * @param {string} faceName - The face name (top, bottom, etc.).
-     * @returns {{u0: number, v0: number, u1: number, v1: number}} UV range.
      */
     Donkeycraft.GeometryBuilder.prototype._getBlockUV = function(blockId, faceName) {
-        // For Phase 2, use a simple placeholder UV mapping.
-        // In Phase 3, this will reference the texture atlas.
         var atlasSize = 16;
         var tileU = blockId % atlasSize;
         var tileV = Math.floor(blockId / atlasSize);
@@ -167,14 +144,13 @@
         // Clamp tileV to atlas bounds to prevent UV overflow for blockId >= 256
         if (tileV >= atlasSize) tileV = atlasSize - 1;
 
-        var tileU0 = tileU / atlasSize;
-        var tileV0 = 1.0 - (tileV + 1) / atlasSize;
-        var tileU1 = (tileU + 1) / atlasSize;
-        var tileV1 = 1.0 - tileV / atlasSize;
-
-        return { u0: tileU0, v0: tileV0, u1: tileU1, v1: tileV1 };
+        return {
+            u0: tileU / atlasSize,
+            v0: 1.0 - (tileV + 1) / atlasSize,
+            u1: (tileU + 1) / atlasSize,
+            v1: 1.0 - tileV / atlasSize
+        };
     };
-
 
     /**
      * Build a simple test quad (for testing shaders).
@@ -188,19 +164,14 @@
         var half = size / 2;
 
         // 4 vertices: position(3) + UV(2) + normal(3) + light(1) = 9 floats each
-        var vertices = new Float32Array([
-            // Position        // UV     // Normal     // Light
-            -half, y, -half,   0, 0,   0, 1, 0,   1.0,
-             half, y, -half,   1, 0,   0, 1, 0,   1.0,
-             half, y,  half,   1, 1,   0, 1, 0,   1.0,
-            -half, y,  half,   0, 1,   0, 1, 0,   1.0
-        ]);
-
-        var indices = new Uint16Array([0, 1, 2, 0, 2, 3]);
-
         return {
-            vertices: vertices,
-            indices: indices,
+            vertices: new Float32Array([
+                -half, y, -half,  0, 0,   0, 1, 0,   1.0,
+                 half, y, -half,  1, 0,   0, 1, 0,   1.0,
+                 half, y,  half,  1, 1,   0, 1, 0,   1.0,
+                -half, y,  half,  0, 1,   0, 1, 0,   1.0
+            ]),
+            indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
             vertexCount: 4,
             indexCount: 6
         };
@@ -218,57 +189,47 @@
         var half = size / 2;
 
         // 24 vertices (6 faces × 4 corners)
-        var vertices = new Float32Array([
-            // +X face
-             half, y-half, -half,  0.875, 0.75,  1, 0, 0,  0.8,
-             half, y+half, -half,  0.875, 0.875, 1, 0, 0,  0.8,
-             half, y+half,  half,  0.875, 1.0,   1, 0, 0,  0.8,
-             half, y-half,  half,  0.875, 0.75,  1, 0, 0,  0.8,
-
-            // -X face
-            -half, y-half,  half,  0.75, 0.75,  -1, 0, 0,  0.7,
-            -half, y+half,  half,  0.75, 0.875, -1, 0, 0,  0.7,
-            -half, y+half, -half,  0.75, 1.0,   -1, 0, 0,  0.7,
-            -half, y-half, -half,  0.75, 0.75,  -1, 0, 0,  0.7,
-
-            // +Y face (top)
-            -half, y+half, -half,  0.0, 0.0,   0, 1, 0,  1.0,
-             half, y+half, -half,  0.125, 0.0,  0, 1, 0,  1.0,
-             half, y+half,  half,  0.125, 0.125, 0, 1, 0,  1.0,
-            -half, y+half,  half,  0.0, 0.125,  0, 1, 0,  1.0,
-
-            // -Y face (bottom)
-            -half, y-half,  half,  0.0, 0.0,   0, -1, 0,  0.5,
-             half, y-half,  half,  0.125, 0.0,  0, -1, 0,  0.5,
-             half, y-half, -half,  0.125, 0.125, 0, -1, 0,  0.5,
-            -half, y-half, -half,  0.0, 0.125,  0, -1, 0,  0.5,
-
-            // +Z face (front)
-             half, y-half,  half,  0.25, 0.75,  0, 0, 1,  0.9,
-             half, y+half,  half,  0.25, 0.875, 0, 0, 1,  0.9,
-            -half, y+half,  half,  0.375, 0.875, 0, 0, 1,  0.9,
-            -half, y-half,  half,  0.375, 0.75,  0, 0, 1,  0.9,
-
-            // -Z face (back)
-            -half, y-half, -half,  0.25, 0.75,  0, 0, -1,  0.6,
-            -half, y+half, -half,  0.25, 0.875, 0, 0, -1,  0.6,
-             half, y+half, -half,  0.375, 0.875, 0, 0, -1,  0.6,
-             half, y-half, -half,  0.375, 0.75,  0, 0, -1,  0.6
-        ]);
-
-        // 36 indices (6 faces × 2 triangles × 3 vertices)
-        var indices = new Uint16Array([
-            0, 1, 2,  0, 2, 3,       // +X
-            4, 5, 6,  4, 6, 7,       // -X
-            8, 9, 10, 8, 10, 11,     // +Y
-            12, 13, 14, 12, 14, 15,  // -Y
-            16, 17, 18, 16, 18, 19,  // +Z
-            20, 21, 22, 20, 22, 23   // -Z
-        ]);
-
         return {
-            vertices: vertices,
-            indices: indices,
+            vertices: new Float32Array([
+                // +X face
+                 half, y-half, -half,  0.875, 0.75,  1, 0, 0,  0.8,
+                 half, y+half, -half,  0.875, 0.875, 1, 0, 0,  0.8,
+                 half, y+half,  half,  0.875, 1.0,   1, 0, 0,  0.8,
+                 half, y-half,  half,  0.875, 0.75,  1, 0, 0,  0.8,
+                // -X face
+               -half, y-half,  half,  0.75, 0.75, -1, 0, 0,  0.7,
+               -half, y+half,  half,  0.75, 0.875, -1, 0, 0,  0.7,
+               -half, y+half, -half,  0.75, 1.0,  -1, 0, 0,  0.7,
+               -half, y-half, -half,  0.75, 0.75, -1, 0, 0,  0.7,
+                // +Y face (top)
+               -half, y+half, -half,  0.0, 0.0,   0, 1, 0,  1.0,
+                half, y+half, -half,  0.125, 0.0,  0, 1, 0,  1.0,
+                half, y+half,  half,  0.125, 0.125, 0, 1, 0,  1.0,
+               -half, y+half,  half,  0.0, 0.125,  0, 1, 0,  1.0,
+                // -Y face (bottom)
+               -half, y-half,  half,  0.0, 0.0,   0, -1, 0,  0.5,
+                half, y-half,  half,  0.125, 0.0,  0, -1, 0,  0.5,
+                half, y-half, -half,  0.125, 0.125, 0, -1, 0,  0.5,
+               -half, y-half, -half,  0.0, 0.125,  0, -1, 0,  0.5,
+                // +Z face (front)
+                half, y-half,  half,  0.25, 0.75,  0, 0, 1,  0.9,
+                half, y+half,  half,  0.25, 0.875, 0, 0, 1,  0.9,
+               -half, y+half,  half,  0.375, 0.875, 0, 0, 1,  0.9,
+               -half, y-half,  half,  0.375, 0.75,  0, 0, 1,  0.9,
+                // -Z face (back)
+               -half, y-half, -half,  0.25, 0.75,  0, 0, -1,  0.6,
+               -half, y+half, -half,  0.25, 0.875, 0, 0, -1,  0.6,
+                half, y+half, -half,  0.375, 0.875, 0, 0, -1,  0.6,
+                half, y-half, -half,  0.375, 0.75,  0, 0, -1,  0.6
+            ]),
+            indices: new Uint16Array([
+                0, 1, 2,  0, 2, 3,       // +X
+                4, 5, 6,  4, 6, 7,       // -X
+                8, 9, 10, 8, 10, 11,     // +Y
+                12, 13, 14, 12, 14, 15,  // -Y
+                16, 17, 18, 16, 18, 19,  // +Z
+                20, 21, 22, 20, 22, 23   // -Z
+            ]),
             vertexCount: 24,
             indexCount: 36
         };

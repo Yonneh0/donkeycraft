@@ -10,9 +10,6 @@
 
     /**
      * TerrainRenderer — Manages rendering of the chunk-based terrain.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
-     * @param {Fog} fog - The fog system instance.
      */
     Donkeycraft.TerrainRenderer = function(gl, shaderManager, fog) {
         this._gl = gl;
@@ -23,7 +20,7 @@
         this._chunks = {};
         this._chunkCount = 0;
 
-        // Dirty flag per chunk — avoids rebuilding unchanged chunks every frame
+        // Dirty chunks needing rebuild
         this._dirtyChunks = {};
 
         // Geometry builder and mesh optimizer
@@ -40,8 +37,9 @@
         this._frustumPlanes = null;
         this._lastFrustumKey = null;
 
-        // Cache for chunk coordinates to avoid parsing on every render
-        this._chunkCoordsCache = {};
+        // Cached matrix data for frustum extraction
+        this._cachedProjData = null;
+        this._cachedViewData = null;
     };
 
     /**
@@ -74,13 +72,11 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      */
     Donkeycraft.TerrainRenderer.prototype.markChunkDirty = function(chunkX, chunkZ) {
-        var key = chunkX + ',' + chunkZ;
-        this._dirtyChunks[key] = true;
+        this._dirtyChunks[chunkX + ',' + chunkZ] = true;
     };
 
     /**
      * Update chunk meshes that need rebuilding.
-     * Called when blocks change or chunks enter render distance.
      * Only rebuilds dirty chunks or newly-visible chunks.
      * @param {number} playerChunkX - Player's chunk X coordinate.
      * @param {number} playerChunkZ - Player's chunk Z coordinate.
@@ -100,11 +96,9 @@
                 var key = cx + ',' + cz;
                 neededChunks[key] = { x: cx, z: cz };
 
-                // Create chunk mesh if it doesn't exist and is dirty
                 if (!this._chunks[key]) {
                     this._createChunkMesh(cx, cz);
                 } else if (this._dirtyChunks[key]) {
-                    // Rebuild only dirty chunks
                     this.rebuildChunk(cx, cz);
                     delete this._dirtyChunks[key];
                 }
@@ -133,8 +127,6 @@
         if (!gl || !this._getBlockFunc) return;
 
         // Wrap world-coordinate getter into local chunk coordinates.
-        // _getBlockFunc receives WORLD coordinates (set via setWorldData).
-        // GeometryBuilder.buildChunk expects a getter that takes LOCAL chunk coordinates.
         var self = this;
         var localGetBlock = function(localX, y, localZ) {
             var worldX = chunkX * CHUNK_SIZE + localX;
@@ -143,14 +135,9 @@
             return self._getBlockFunc(worldX, worldY, worldZ);
         };
 
-        // Build geometry
+        // Build and optimize geometry
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
-
-        // Optimize geometry
-        var isBlockSolid = function(blockId) {
-            return blockId !== 0 && blockId !== 9 && blockId !== 10 && blockId !== 11;
-        };
-        geometry = this._meshOptimizer.optimize(geometry, isBlockSolid);
+        geometry = this._meshOptimizer.optimize(geometry, this._isBlockSolid);
 
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -161,6 +148,18 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
+    };
+
+    /**
+     * Check if a block is fully opaque (no faces should be shown adjacent to it).
+     * @private
+     */
+    Donkeycraft.TerrainRenderer.prototype._isBlockSolid = function(blockId) {
+        // Use BlockRegistry if available (Phase 3+), otherwise fall back to hardcoded list.
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isOpaque === 'function') {
+            return Donkeycraft.BlockRegistry.isOpaque(blockId);
+        }
+        return blockId !== 0 && blockId !== 9 && blockId !== 10 && blockId !== 11;
     };
 
     /**
@@ -179,8 +178,7 @@
 
     /**
      * Extract frustum planes from the view-projection matrix.
-     * Each plane is stored as {axis: Vector3, dist: number} where
-     * dot(point, axis) + dist <= 0 means the point is inside (or on) the plane.
+     * Each plane: dot(point, axis) + dist <= 0 means inside.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._extractFrustumPlanes = function() {
@@ -202,25 +200,15 @@
 
     /**
      * Extract a single frustum plane from the view-projection matrix.
-     * Uses the standard OpenGL frustum extraction algorithm:
-     * plane = col3 + sign * col_i where sign is +1 for left/bottom/near
-     * and -1 for right/top/far. The resulting plane equation is:
-     * dot(point, normal) + dist <= 0 means the point is inside (or on) the plane.
      * @private
-     * @param {Float32Array} vp - View-projection matrix (column-major).
-     * @param {number} i - Non-zero for left/right planes (-1=left, 1=right).
-     * @param {number} j - Non-zero for bottom/top planes (-1=bottom, 1=top).
-     * @param {number} k - Non-zero for near/far planes (-1=near, 1=far).
-     * @returns {{axis: Donkeycraft.Vector3, dist: number}}
      */
     Donkeycraft.TerrainRenderer.prototype._extractPlane = function(vp, i, j, k) {
-        // Determine which matrix column to extract (0=left/right, 1=top/bottom, 2=near/far)
         var col, sign;
         if (i !== 0) { col = 0; sign = i < 0 ? 1 : -1; }
         else if (j !== 0) { col = 1; sign = j < 0 ? 1 : -1; }
         else { col = 2; sign = k < 0 ? 1 : -1; }
 
-        // Column-major: column `col` elements are at indices col, col+4, col+8, col+12
+        // Column-major: column `col` elements at indices col, col+4, col+8, col+12
         var px = vp[3] + sign * vp[col];
         var py = vp[7] + sign * vp[col + 4];
         var pz = vp[11] + sign * vp[col + 8];
@@ -233,16 +221,12 @@
                 dist: pw / length
             };
         }
-
         return { axis: new Donkeycraft.Vector3(0, 0, -1), dist: 0 };
     };
 
     /**
-     * Check if an AABB (axis-aligned bounding box) is visible in the frustum.
+     * Check if an AABB is visible in the frustum.
      * @private
-     * @param {number} minX, minY, minZ - Min corner.
-     * @param {number} maxX, maxY, maxZ - Max corner.
-     * @returns {boolean} True if the box intersects the frustum.
      */
     Donkeycraft.TerrainRenderer.prototype._isBoxInFrustum = function(
         minX, minY, minZ, maxX, maxY, maxZ
@@ -275,21 +259,17 @@
     };
 
     /**
-     * Check if frustum planes need recomputation.
-     * Returns a cache key based on current view+projection matrix data,
-     * or null if matrices are uninitialized.
+     * Get a cache key for current view+projection matrix data.
      * @private
-     * @returns {string|null}
      */
     Donkeycraft.TerrainRenderer.prototype._getFrustumCacheKey = function() {
         var projData = this._cachedProjData;
         var viewData = this._cachedViewData;
         if (!projData || !viewData) return null;
 
-        // Build a simple hash from matrix values for comparison
-        var key = 'p' + projData[0] + projData[5] + projData[10] + projData[15] +
-                  'v' + viewData[0] + viewData[5] + viewData[10] + viewData[15];
-        return key;
+        // Hash key from diagonal elements (most stable across rotations)
+        return 'p' + projData[0] + projData[5] + projData[10] + projData[15] +
+               'v' + viewData[0] + viewData[5] + viewData[10] + viewData[15];
     };
 
     /**
@@ -315,7 +295,6 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager || !this._getBlockFunc || !camera) return;
 
-        // Use terrain shader program
         if (!this._shaderManager.use('terrain')) return;
 
         // Set camera matrices
@@ -335,12 +314,10 @@
         }
 
         // Set model matrix (identity for world-space rendering)
-        var identity = Donkeycraft.Matrix4.createIdentity();
-        this._shaderManager.setMat4('uModel', identity);
+        this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
 
         // Set texture unit (atlas on unit 0)
         gl.activeTexture(gl.TEXTURE0);
-        // In Phase 2, use a placeholder — bind null texture or create one in Phase 3
         var placeholderTex = this._getPlaceholderTexture();
         if (placeholderTex) {
             gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
@@ -361,14 +338,11 @@
             var cx = chunkMesh._chunkX;
             var cz = chunkMesh._chunkZ;
 
-            // AABB of chunk in world space (block coordinates)
-            var chunkMinX = cx * cs, chunkMaxX = (cx + 1) * cs;
-            var chunkMinY = 0, chunkMaxY = WORLD_HEIGHT;
-            var chunkMinZ = cz * cs, chunkMaxZ = (cz + 1) * cs;
-
             // Skip if outside frustum
-            if (!this._isBoxInFrustum(chunkMinX, chunkMinY, chunkMinZ,
-                                       chunkMaxX, chunkMaxY, chunkMaxZ)) {
+            if (!this._isBoxInFrustum(
+                cx * cs, 0, cz * cs,
+                (cx + 1) * cs, WORLD_HEIGHT, (cz + 1) * cs
+            )) {
                 continue;
             }
 
@@ -379,7 +353,6 @@
     /**
      * Draw a single chunk mesh.
      * @private
-     * @param {ChunkMesh} chunkMesh - The chunk mesh to draw.
      */
     Donkeycraft.TerrainRenderer.prototype._drawChunk = function(chunkMesh) {
         if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
@@ -389,21 +362,19 @@
     /**
      * Get or create a 1x1 white placeholder texture.
      * @private
-     * @returns {WebGLTexture|null}
      */
     Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function() {
         if (!this._gl) return null;
+        if (this._placeholderTexture) return this._placeholderTexture;
 
-        if (!this._placeholderTexture) {
-            var gl = this._gl;
-            this._placeholderTexture = gl.createTexture();
-            gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        }
+        var gl = this._gl;
+        this._placeholderTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
 
         return this._placeholderTexture;
     };
@@ -428,7 +399,6 @@
         this._chunks = {};
         this._chunkCount = 0;
 
-        // Delete placeholder texture
         if (this._gl && this._placeholderTexture) {
             this._gl.deleteTexture(this._placeholderTexture);
             this._placeholderTexture = null;

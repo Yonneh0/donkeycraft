@@ -37,8 +37,7 @@
      */
     Donkeycraft.Lighting.prototype.getSunIntensity = function() {
         var sunHeight = Math.sin((this._timeOfDay - 0.25) * Math.PI * 2);
-        if (sunHeight <= 0) return 0;
-        return Math.pow(sunHeight, 0.7);
+        return sunHeight > 0 ? Math.pow(sunHeight, 0.7) : 0;
     };
 
     /**
@@ -46,10 +45,7 @@
      * @returns {number} Ambient intensity in [0.08, 1.0].
      */
     Donkeycraft.Lighting.prototype.getAmbientLight = function() {
-        var sunIntensity = this.getSunIntensity();
-
-        var ambient = 0.08 + 0.92 * sunIntensity;
-        return Donkeycraft.clamp(ambient, 0.08, 1.0);
+        return Donkeycraft.clamp(0.08 + 0.92 * this.getSunIntensity(), 0.08, 1.0);
     };
 
     /**
@@ -57,35 +53,30 @@
      * @returns {{r: number, g: number, b: number}} Sky color components in [0, 1].
      */
     Donkeycraft.Lighting.prototype.getSkyColor = function() {
+        var t = this._timeOfDay;
         var sunIntensity = this.getSunIntensity();
 
-        var dayR = 0.3, dayG = 0.6, dayB = 1.0;
-        var nightR = 0.02, nightG = 0.02, nightB = 0.08;
-        var sunsetR = 0.95, sunsetG = 0.55, sunsetB = 0.15;
-        var t = this._timeOfDay;
-        var r, g, b;
-
+        // Color keyframes
         if (t > 0.20 && t < 0.30) {
             var phase = (t - 0.20) / 0.10;
-            r = Donkeycraft.lerp(nightR, sunsetR, phase);
-            g = Donkeycraft.lerp(nightG, sunsetG, phase);
-            b = Donkeycraft.lerp(nightB, sunsetB, phase);
-        } else if (t > 0.70 && t < 0.80) {
-            var phase = (t - 0.70) / 0.10;
-            r = Donkeycraft.lerp(sunsetR, nightR, phase);
-            g = Donkeycraft.lerp(sunsetG, nightG, phase);
-            b = Donkeycraft.lerp(sunsetB, nightB, phase);
-        } else if (t >= 0.30 && t <= 0.70) {
-            r = dayR;
-            g = dayG;
-            b = dayB;
-        } else {
-            r = nightR;
-            g = nightG;
-            b = nightB;
+            return {
+                r: Donkeycraft.lerp(0.02, 0.95, phase),
+                g: Donkeycraft.lerp(0.02, 0.55, phase),
+                b: Donkeycraft.lerp(0.08, 0.15, phase)
+            };
         }
-
-        return { r: r, g: g, b: b };
+        if (t > 0.70 && t < 0.80) {
+            var phase = (t - 0.70) / 0.10;
+            return {
+                r: Donkeycraft.lerp(0.95, 0.02, phase),
+                g: Donkeycraft.lerp(0.55, 0.02, phase),
+                b: Donkeycraft.lerp(0.15, 0.08, phase)
+            };
+        }
+        if (t >= 0.30 && t <= 0.70) {
+            return { r: 0.3, g: 0.6, b: 1.0 }; // Day
+        }
+        return { r: 0.02, g: 0.02, b: 0.08 }; // Night
     };
 
     /**
@@ -112,12 +103,12 @@
         if (!shaderManager) return;
 
         var sunIntensity = this.getSunIntensity();
-        var ambient = this.getAmbientLight();
         var skyColor = this.getSkyColor();
-        shaderManager.setFloat('uSunIntensity', sunIntensity);
-        shaderManager.setFloat('uAmbient', ambient);
-        shaderManager.setVec3('uSkyColor', skyColor.r, skyColor.g, skyColor.b);
         var sunDir = this.getSunDirection();
+
+        shaderManager.setFloat('uSunIntensity', sunIntensity);
+        shaderManager.setFloat('uAmbient', this.getAmbientLight());
+        shaderManager.setVec3('uSkyColor', skyColor.r, skyColor.g, skyColor.b);
         shaderManager.setVec3('uSunDirection', sunDir.x, sunDir.y, sunDir.z);
     };
 

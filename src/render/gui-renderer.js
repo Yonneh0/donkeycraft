@@ -7,25 +7,20 @@
 
     /**
      * GUIRenderer — Renders 2D HUD elements on top of the 3D scene.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.GUIRenderer = function(gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
 
-        // Crosshair geometry (center screen marker)
+        // Crosshair geometry and buffers
         this._crosshairGeometry = null;
         this._crosshairVertBuf = null;
         this._crosshairIndexBuf = null;
 
-        // Hotbar geometry
+        // Hotbar geometry and buffers
         this._hotbarGeometry = null;
-        this._hotbarIndexBuf = null;    // Index buffer
-        this._hotbarVertexBuf = null;   // Persistent vertex buffer (updated each frame for highlight)
-
-        // Debug text geometry
-        this._debugGeometry = null;
+        this._hotbarIndexBuf = null;
+        this._hotbarVertexBuf = null;
 
         // Initialize buffers immediately
         this._initBuffers();
@@ -37,7 +32,6 @@
      * @private
      */
     Donkeycraft.GUIRenderer.prototype._buildCrosshairGeometry = function() {
-        // Two crossing lines as quads
         var lineWidth = 0.005;
         var lineLength = 0.03;
 
@@ -54,10 +48,7 @@
             0, lineLength, 0,   0, 1,   1, 1, 1, 1
         ]);
 
-        var indices = new Uint16Array([
-            0, 1, 2,  0, 2, 3,       // horizontal
-            4, 5, 6,  4, 6, 7        // vertical
-        ]);
+        var indices = new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
 
         this._crosshairGeometry = {
             vertices: vertices,
@@ -112,7 +103,6 @@
 
     /**
      * Initialize all GUI mesh buffers.
-     * Creates persistent vertex and index buffers for both crosshair and hotbar.
      */
     Donkeycraft.GUIRenderer.prototype._initBuffers = function() {
         var gl = this._gl;
@@ -147,7 +137,6 @@
 
     /**
      * Render the crosshair at center of screen.
-     * Uses persistent vertex and index buffers for the crosshair geometry.
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
@@ -155,10 +144,9 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight || !this._crosshairVertBuf) return;
 
-        // Use GUI shader
         if (!this._shaderManager.use('gui')) return;
 
-        // Set orthographic projection
+        // Orthographic projection
         var aspect = canvasWidth / canvasHeight;
         var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
         this._shaderManager.setMat4('uProjection', projMatrix);
@@ -167,30 +155,26 @@
         // Bind persistent vertex buffer for crosshair
         gl.bindBuffer(gl.ARRAY_BUFFER, this._crosshairVertBuf);
 
-        // Position: 3 floats, stride 9*4, offset 0
         var posLoc = this._shaderManager.getAttribute('aPosition');
+        var uvLoc = this._shaderManager.getAttribute('aUV');
+        var colorLoc = this._shaderManager.getAttribute('aColor');
+
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
-        // UV: 2 floats, stride 9*4, offset 12
-        var uvLoc = this._shaderManager.getAttribute('aUV');
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
         }
-        // Color: 4 floats, stride 9*4, offset 20
-        var colorLoc = this._shaderManager.getAttribute('aColor');
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw crosshair using persistent index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._crosshairIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._crosshairGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Disable attributes
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
@@ -213,10 +197,9 @@
         }
         if (!this._hotbarVertexBuf || !this._hotbarIndexBuf) return;
 
-        // Use GUI shader
         if (!this._shaderManager.use('gui')) return;
 
-        // Set orthographic projection
+        // Orthographic projection
         var aspect = canvasWidth / canvasHeight;
         var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
         this._shaderManager.setMat4('uProjection', projMatrix);
@@ -230,26 +213,24 @@
         for (var i = 0; i < 9; i++) {
             var isHighlighted = (i === selectedSlot);
             var highlight = isHighlighted ? colorHighlight : colorDefault;
-            var baseVertex = i * 4; // 4 vertices per slot
+            var baseVertex = i * 4;
 
             for (var v = 0; v < 4; v++) {
-                // Each vertex = 9 floats. Color starts at index 5 within each vertex.
-                var vi = (baseVertex + v) * 9 + 5;
-                vertices[vi]     = highlight[0];
-                vertices[vi + 1] = highlight[1];
-                vertices[vi + 2] = highlight[2];
-                vertices[vi + 3] = highlight[3];
+                var ci = (baseVertex + v) * 9 + 5;
+                vertices[ci]     = highlight[0];
+                vertices[ci + 1] = highlight[1];
+                vertices[ci + 2] = highlight[2];
+                vertices[ci + 3] = highlight[3];
             }
         }
-
-        // Bind geometry attributes
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var uvLoc = this._shaderManager.getAttribute('aUV');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
 
         // Upload modified vertex data to persistent buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this._hotbarVertexBuf);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
+
+        var posLoc = this._shaderManager.getAttribute('aPosition');
+        var uvLoc = this._shaderManager.getAttribute('aUV');
+        var colorLoc = this._shaderManager.getAttribute('aColor');
 
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
@@ -264,11 +245,9 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw hotbar using persistent index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._hotbarIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._hotbarGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Disable attributes
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
@@ -312,25 +291,10 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._crosshairVertBuf) {
-            gl.deleteBuffer(this._crosshairVertBuf);
-            this._crosshairVertBuf = null;
-        }
-
-        if (this._crosshairIndexBuf) {
-            gl.deleteBuffer(this._crosshairIndexBuf);
-            this._crosshairIndexBuf = null;
-        }
-
-        if (this._hotbarVertexBuf) {
-            gl.deleteBuffer(this._hotbarVertexBuf);
-            this._hotbarVertexBuf = null;
-        }
-
-        if (this._hotbarIndexBuf) {
-            gl.deleteBuffer(this._hotbarIndexBuf);
-            this._hotbarIndexBuf = null;
-        }
+        if (this._crosshairVertBuf) { gl.deleteBuffer(this._crosshairVertBuf); this._crosshairVertBuf = null; }
+        if (this._crosshairIndexBuf) { gl.deleteBuffer(this._crosshairIndexBuf); this._crosshairIndexBuf = null; }
+        if (this._hotbarVertexBuf) { gl.deleteBuffer(this._hotbarVertexBuf); this._hotbarVertexBuf = null; }
+        if (this._hotbarIndexBuf) { gl.deleteBuffer(this._hotbarIndexBuf); this._hotbarIndexBuf = null; }
 
         this._crosshairGeometry = null;
         this._hotbarGeometry = null;

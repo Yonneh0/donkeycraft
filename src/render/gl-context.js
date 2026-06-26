@@ -7,8 +7,6 @@
 
     /**
      * GLContext — WebGL 1 context wrapper with error handling and capability queries.
-     * @param {HTMLCanvasElement} canvas - The canvas element to create the WebGL context on.
-     * @returns {boolean} True if context creation succeeded.
      */
     Donkeycraft.GLContext = function(canvas) {
         this._canvas = canvas;
@@ -16,7 +14,6 @@
         this._capabilities = {};
         this._errorCount = 0;
 
-        // Initialize context; return value is ignored (constructor always returns `this`)
         var success = this._createContext();
         if (!success) {
             Donkeycraft.Logger.error('GLContext', 'WebGL context creation failed during construction');
@@ -26,7 +23,6 @@
     /**
      * Create the WebGL 1 context from the canvas element.
      * @private
-     * @returns {boolean} True if context was created successfully.
      */
     Donkeycraft.GLContext.prototype._createContext = function() {
         try {
@@ -74,10 +70,9 @@
             shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION)
         };
 
-        Donkeycraft.Logger.info('GLContext', 'Capabilities: ' +
-            'maxTextureSize=' + this._capabilities.maxTextureSize + ', ' +
-            'textureUnits=' + this._capabilities.maxTextureUnits + ', ' +
-            'renderer=' + this._capabilities.renderer);
+        Donkeycraft.Logger.info('GLContext', 'Capabilities: maxTextureSize=' +
+            this._capabilities.maxTextureSize + ', textureUnits=' +
+            this._capabilities.maxTextureUnits + ', renderer=' + this._capabilities.renderer);
     };
 
     /**
@@ -175,7 +170,6 @@
      * Destroy the context and free resources.
      */
     Donkeycraft.GLContext.prototype.destroy = function() {
-        // WebGL contexts don't have explicit destroy, but we clear state
         if (this._context) {
             this._context.clearColor(0, 0, 0, 1);
             this._context.clear(this._context.COLOR_BUFFER_BIT | this._context.DEPTH_BUFFER_BIT);

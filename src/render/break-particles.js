@@ -15,7 +15,7 @@
         this.vx = vx;
         this.vy = vy;
         this.vz = vz;
-        this.color = color; // {r, g, b}
+        this.color = color;
         this.lifetime = lifetime;
         this.maxLifetime = lifetime;
         this.alive = true;
@@ -23,8 +23,6 @@
 
     /**
      * BreakParticles — Manages block breaking particle effects.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.BreakParticles = function(gl, shaderManager) {
         this._gl = gl;
@@ -32,11 +30,10 @@
         this._particles = [];
         this._maxParticles = 256;
 
-        // Persistent vertex buffer (avoids per-frame WebGL allocation)
         this._vertexBuffer = null;
         this._contextLost = false;
+        this._vertexArray = null;
 
-        // Register context loss/restore listeners on the source canvas.
         if (gl) {
             var self = this;
             var srcEl = gl.canvas || gl._dcCanvas;
@@ -48,7 +45,7 @@
                 });
                 srcEl.addEventListener('webglcontextrestored', function() {
                     self._contextLost = false;
-                    self._vertexBuffer = null; // Recreated on next render
+                    self._vertexBuffer = null;
                 });
             }
         }
@@ -83,8 +80,6 @@
     /**
      * Get the particle color for a block ID.
      * @private
-     * @param {number} blockId - The block ID.
-     * @returns {{r: number, g: number, b: number}}
      */
     Donkeycraft.BreakParticles.prototype._getBlockParticleColor = function(blockId) {
         switch (blockId) {
@@ -107,17 +102,13 @@
         for (var i = this._particles.length - 1; i >= 0; i--) {
             var p = this._particles[i];
 
-            // Update lifetime
             p.lifetime -= deltaTime;
             if (p.lifetime <= 0) {
                 this._particles.splice(i, 1);
                 continue;
             }
 
-            // Apply gravity to velocity
             p.vy += gravity * deltaTime;
-
-            // Update position
             p.x += p.vx * deltaTime;
             p.y += p.vy * deltaTime;
             p.z += p.vz * deltaTime;
@@ -127,11 +118,7 @@
     /**
      * Render all active particles using the GUI shader program.
      * Particles are rendered as billboards that always face the camera.
-     * Each billboard is a quad constructed from the particle's world-space position,
-     * oriented using the camera's right and up vectors.
-     * Reuses a single persistent vertex buffer to avoid per-frame WebGL allocation.
      * Skips rendering if the WebGL context was lost.
-     * @param {Camera} camera - The camera instance (provides projection/view matrices).
      */
     Donkeycraft.BreakParticles.prototype.render = function(camera) {
         var gl = this._gl;
@@ -139,10 +126,8 @@
 
         if (this._contextLost) return;
 
-        // Use GUI shader (particles share attributes: aPosition, aUV, aColor)
         if (!this._shaderManager.use('gui')) return;
 
-        // Set camera matrices
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
@@ -150,43 +135,54 @@
         var right = camera.getRight();
         var up = camera.getUp();
 
-        var vertices = [];
         var particleSize = 0.1;
+        var totalVertices = this._particles.length * 6;
+
+        if (!this._vertexArray || this._vertexArray.length < totalVertices * 9) {
+            this._vertexArray = new Float32Array(totalVertices * 9);
+        }
+        var vertices = this._vertexArray;
 
         for (var i = 0; i < this._particles.length; i++) {
             var p = this._particles[i];
             var alpha = p.lifetime / p.maxLifetime;
 
-            var halfSize = particleSize;
             var cx = p.x, cy = p.y, cz = p.z;
-            var rx = right.x * halfSize, ry = right.y * halfSize, rz = right.z * halfSize;
-            var ux = up.x * halfSize, uy = up.y * halfSize, uz = up.z * halfSize;
+            var rx = right.x * particleSize, ry = right.y * particleSize, rz = right.z * particleSize;
+            var ux = up.x * particleSize, uy = up.y * particleSize, uz = up.z * particleSize;
 
-            // Four corners: bottom-left, bottom-right, top-right, top-left
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
             var trx = cx + rx + ux, try__ = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
-            // Quad vertices: position(3) + UV(2) + Color(4) = 9 floats each
-            vertices.push(
-                blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                brx, bry, brz,   1, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                trx, try__, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
-                blx, bly, blz,   0, 0,   p.color.r, p.color.g, p.color.b, alpha,
-                trx, try__, trz,  1, 1,   p.color.r, p.color.g, p.color.b, alpha,
-                tlx, tly, tlz,   0, 1,   p.color.r, p.color.g, p.color.b, alpha
-            );
+            var base = i * 54;
+            vertices[base]     = blx; vertices[base + 1] = bly; vertices[base + 2] = blz;
+            vertices[base + 3] = 0; vertices[base + 4] = 0;
+            vertices[base + 5] = p.color.r; vertices[base + 6] = p.color.g; vertices[base + 7] = p.color.b; vertices[base + 8] = alpha;
+            vertices[base + 9]  = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
+            vertices[base + 12] = 1; vertices[base + 13] = 0;
+            vertices[base + 14] = p.color.r; vertices[base + 15] = p.color.g; vertices[base + 16] = p.color.b; vertices[base + 17] = alpha;
+            vertices[base + 18] = trx; vertices[base + 19] = try__; vertices[base + 20] = trz;
+            vertices[base + 21] = 1; vertices[base + 22] = 1;
+            vertices[base + 23] = p.color.r; vertices[base + 24] = p.color.g; vertices[base + 25] = p.color.b; vertices[base + 26] = alpha;
+            vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
+            vertices[base + 30] = 0; vertices[base + 31] = 0;
+            vertices[base + 32] = p.color.r; vertices[base + 33] = p.color.g; vertices[base + 34] = p.color.b; vertices[base + 35] = alpha;
+            vertices[base + 36] = trx; vertices[base + 37] = try__; vertices[base + 38] = trz;
+            vertices[base + 39] = 1; vertices[base + 40] = 1;
+            vertices[base + 41] = p.color.r; vertices[base + 42] = p.color.g; vertices[base + 43] = p.color.b; vertices[base + 44] = alpha;
+            vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
+            vertices[base + 48] = 0; vertices[base + 49] = 1;
+            vertices[base + 50] = p.color.r; vertices[base + 51] = p.color.g; vertices[base + 52] = p.color.b; vertices[base + 53] = alpha;
         }
 
-        // Reuse or create persistent vertex buffer
         if (!this._vertexBuffer) {
             this._vertexBuffer = gl.createBuffer();
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalVertices * 9), gl.DYNAMIC_DRAW);
 
-        // Bind attributes
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
@@ -204,11 +200,7 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw particles
-        var totalVertices = this._particles.length * 6;
         gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
-
-        // Disable attributes
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
@@ -231,7 +223,6 @@
 
     /**
      * Destroy particle resources and free GPU memory.
-     * Resets context lost state for potential re-initialization.
      */
     Donkeycraft.BreakParticles.prototype.destroy = function() {
         var gl = this._gl;

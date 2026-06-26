@@ -1,0 +1,2 @@
+- Make your changes with targetted replace_in_file calls
+- Ensure you properly end your reasoning with </think> before attempting to call tools.

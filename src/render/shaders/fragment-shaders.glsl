@@ -17,18 +17,14 @@ uniform vec3 uFogColor;
 uniform float uFogDensity;
 
 void main() {
-    // Sample the texture atlas
     vec4 texColor = texture2D(uTexture, vUV);
 
-    // Apply diffuse lighting
-    vec3 finalColor = texColor.rgb * vLight;
-
-    // Skip fully transparent fragments
     if (texColor.a < 0.5) {
         discard;
     }
 
-    // Apply exponential distance fog
+    vec3 finalColor = texColor.rgb * vLight;
+
     float fogDist = vDepth;
     float fogFactor = 1.0 - exp(-fogDist * uFogDensity);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
@@ -67,13 +63,11 @@ uniform int uHasTexture;
 void main() {
     vec4 color = vColor;
 
-    // If a texture is provided, blend with it
     if (uHasTexture == 1) {
         vec4 texColor = texture2D(uTexture, vUV);
         color = texColor * color;
     }
 
-    // Skip fully transparent fragments
     if (color.a < 0.1) {
         discard;
     }
@@ -96,10 +90,7 @@ uniform vec3 uBottomColor;
 uniform float uHorizon;
 
 void main() {
-    // Normalize the Y component
     float y = normalize(vWorldPos).y;
-
-    // Mix between top and bottom colors based on height
     float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, y);
     vec3 skyColor = mix(uBottomColor, uTopColor, t);
 

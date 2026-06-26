@@ -7,27 +7,21 @@
 
     /**
      * HandRenderer — Renders the player's held item in first-person view.
-     * @param {WebGLRenderingContext} gl - The WebGL rendering context.
-     * @param {ShaderManager} shaderManager - The shared shader manager instance.
      */
     Donkeycraft.HandRenderer = function(gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
 
-        // Item quad geometry (2 triangles forming a rectangle)
+        // Item quad geometry and buffers
         this._itemGeometry = null;
-        this._itemIndexBuf = null;
-
-        // Persistent vertex buffer for item quad (avoids per-frame allocation)
         this._itemVertexBuf = null;
+        this._itemIndexBuf = null;
 
         // Current held item ID
         this._heldItemId = 1; // Default: stone
         this._bobAngle = 0;
 
         this._buildItemGeometry();
-
-        // Initialize buffers immediately
         this._initBuffers();
     };
 
@@ -36,7 +30,6 @@
      * @private
      */
     Donkeycraft.HandRenderer.prototype._buildItemGeometry = function() {
-        // Simple quad centered at origin
         var size = 1.0;
         var half = size / 2;
 
@@ -84,7 +77,6 @@
 
     /**
      * Render the held item in the bottom-right corner of the screen.
-     * Uses orthographic projection overlay with model matrix for transform.
      * @param {Camera} camera - The camera instance.
      * @param {number} canvasWidth - Current canvas width in pixels.
      * @param {number} canvasHeight - Current canvas height in pixels.
@@ -93,17 +85,13 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
 
-        // Use GUI shader for overlay rendering
         if (!this._shaderManager.use('gui')) return;
 
-        // Set up orthographic projection for screen-space rendering
+        // Orthographic projection for screen-space rendering
         var aspect = canvasWidth / canvasHeight;
         var projMatrix = Donkeycraft.Matrix4.createOrthographic(-aspect, aspect, -1, 1, -1, 1);
         this._shaderManager.setMat4('uProjection', projMatrix);
-
-        // Identity view for orthographic
-        var identity = Donkeycraft.Matrix4.createIdentity();
-        this._shaderManager.setMat4('uView', identity);
+        this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
 
         // Bob animation (subtle up/down oscillation)
         var bobY = Math.sin(this._bobAngle) * 0.05;
@@ -113,14 +101,14 @@
         var itemX = 0.6 + bobX;
         var itemY = -0.4 + bobY;
 
-        // Scale item based on canvas aspect ratio
+        // Scale based on canvas aspect ratio
         var scaleX = 0.3 / Math.max(aspect, 1);
         var scaleY = 0.3;
 
-        // Rotation angle for slight sway
+        // Slight rotation sway
         var itemAngle = -0.3 + Math.sin(this._bobAngle * 0.3) * 0.05;
 
-        // Build model matrix: scale → rotate → translate (screen-space overlay)
+        // Build model matrix: scale → rotate → translate
         var translateMatrix = Donkeycraft.Matrix4.createTranslation(itemX, itemY, 0);
         var scaleMatrix = Donkeycraft.Matrix4.createScale(scaleX, scaleY, 1);
         var rotMatrix = Donkeycraft.Matrix4.createRotation(itemAngle, new Donkeycraft.Vector3(0, 1, 0));
@@ -151,7 +139,6 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
         gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.DYNAMIC_DRAW);
 
-        // Bind geometry attributes
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var colorLoc = this._shaderManager.getAttribute('aColor');
@@ -169,11 +156,9 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Draw the item quad using persistent index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemIndexBuf);
         gl.drawElements(gl.TRIANGLES, this._itemGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Disable attributes
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
@@ -182,11 +167,8 @@
     /**
      * Get the color for a given item ID.
      * @private
-     * @param {number} itemId - The item ID.
-     * @returns {{r: number, g: number, b: number}} RGB color.
      */
     Donkeycraft.HandRenderer.prototype._getItemColor = function(itemId) {
-        // Simple color mapping for Phase 2 testing
         switch (itemId) {
             case 1: return { r: 0.5, g: 0.5, b: 0.5 };  // stone — gray
             case 2: return { r: 0.3, g: 0.6, b: 0.2 };  // grass — green
@@ -204,12 +186,12 @@
         var gl = this._gl;
         if (!gl || !this._itemGeometry) return;
 
-        // Create index buffer (static, never changes)
+        // Index buffer (static, never changes)
         this._itemIndexBuf = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._itemIndexBuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._itemGeometry.indices, gl.STATIC_DRAW);
 
-        // Create persistent vertex buffer (reused every frame, updated with modified positions)
+        // Persistent vertex buffer (updated every frame with color data)
         this._itemVertexBuf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this._itemVertexBuf);
         gl.bufferData(gl.ARRAY_BUFFER, this._itemGeometry.vertices, gl.DYNAMIC_DRAW);
@@ -222,15 +204,8 @@
         var gl = this._gl;
         if (!gl) return;
 
-        if (this._itemIndexBuf) {
-            gl.deleteBuffer(this._itemIndexBuf);
-            this._itemIndexBuf = null;
-        }
-
-        if (this._itemVertexBuf) {
-            gl.deleteBuffer(this._itemVertexBuf);
-            this._itemVertexBuf = null;
-        }
+        if (this._itemIndexBuf) { gl.deleteBuffer(this._itemIndexBuf); this._itemIndexBuf = null; }
+        if (this._itemVertexBuf) { gl.deleteBuffer(this._itemVertexBuf); this._itemVertexBuf = null; }
 
         this._itemGeometry = null;
     };

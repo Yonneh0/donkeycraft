@@ -1,5 +1,5 @@
 // Donkeycraft — Fog
-// Distance fog, sky color based on biome/time, fog density.
+// Distance fog rendering with time-based color.
 (function() {
     'use strict';
 
@@ -80,13 +80,13 @@
      * Apply fog uniforms to a shader program via the shader manager.
      * Sets: uFogColor (vec3), uFogDensity (float).
      * @param {ShaderManager} shaderManager - The shader manager instance.
+     * @returns {boolean} True if uniforms were set successfully.
      */
     Donkeycraft.Fog.prototype.applyToFogUniforms = function(shaderManager) {
         if (!shaderManager || !this._enabled) return false;
 
-        var ok1 = shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b);
-        var ok2 = shaderManager.setFloat('uFogDensity', this._density);
-        return ok1 && ok2;
+        return shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b) &&
+               shaderManager.setFloat('uFogDensity', this._density);
     };
 
 })();

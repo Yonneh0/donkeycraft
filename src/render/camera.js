@@ -8,9 +8,6 @@
 
     /**
      * Camera — First-person camera with position, rotation, projection matrix, and FOV.
-     * @param {number} [fov] - Field of view in degrees (default: 70).
-     * @param {number} [near=0.1] - Near clipping plane.
-     * @param {number} [far=1000] - Far clipping plane.
      */
     Donkeycraft.Camera = function(fov, near, far) {
         this._position = new Donkeycraft.Vector3(0, 64, 0);
@@ -23,6 +20,10 @@
 
         this._projectionMatrix = null;
         this._viewMatrix = null;
+
+        // Cached direction vectors (avoids allocation each call)
+        this._forward = new Donkeycraft.Vector3();
+        this._right = new Donkeycraft.Vector3();
     };
 
     /**
@@ -83,7 +84,7 @@
     };
 
     /**
-     * Get the forward direction vector.
+     * Get the forward direction vector (reuses cached vector).
      * @returns {Donkeycraft.Vector3} Normalized forward vector.
      */
     Donkeycraft.Camera.prototype.getForward = function() {
@@ -92,22 +93,34 @@
         var cosPitch = Math.cos(this._pitch);
         var sinPitch = Math.sin(this._pitch);
 
-        return new Donkeycraft.Vector3(
+        this._forward.set(
             -sinYaw * cosPitch,
             sinPitch,
             -cosYaw * cosPitch
         ).normalized();
+
+        return this._forward;
     };
 
     /**
-     * Get the right direction vector.
+     * Get the right direction vector (reuses cached vector).
      * @returns {Donkeycraft.Vector3} Normalized right vector.
      */
     Donkeycraft.Camera.prototype.getRight = function() {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
 
-        return new Donkeycraft.Vector3(cosYaw, 0, -sinYaw).normalized();
+        this._right.set(cosYaw, 0, -sinYaw).normalized();
+
+        return this._right;
+    };
+
+    /**
+     * Get the up direction vector.
+     * @returns {Donkeycraft.Vector3} Normalized up vector.
+     */
+    Donkeycraft.Camera.prototype.getUp = function() {
+        return new Donkeycraft.Vector3(0, 1, 0);
     };
 
     /**

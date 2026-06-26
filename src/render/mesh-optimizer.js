@@ -38,7 +38,7 @@
         var vertexCount = geometry.vertexCount;
         var faceDataSize = this._faceDataSize;
 
-        // Key: position(3) + normal(3) + light(1) — UV is excluded as it varies per face.
+        // Key: position(3) + normal(3) + light(1) — UV excluded as it varies per face.
         var vertexKeys = {};
         var uniqueVertices = [];
         var vertexToIndex = [];
@@ -144,12 +144,12 @@
             var ny = e1z * e2x - e1x * e2z;
             var nz = e1x * e2y - e1y * e2x;
 
-            // Vector from triangle center to camera (camera minus center)
+            // Vector from triangle center to camera
             var cx = cameraPos.x - (v0x + v1x + v2x) / 3;
             var cy = cameraPos.y - (v0y + v1y + v2y) / 3;
             var cz = cameraPos.z - (v0z + v1z + v2z) / 3;
 
-            // Dot product: if positive, face is front-facing (normal points toward camera)
+            // Dot product: if positive, face is front-facing
             var dot = nx * cx + ny * cy + nz * cz;
             if (dot > 0) {
                 keptTriangles.push(i0, i1, i2);

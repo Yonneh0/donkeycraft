@@ -22,19 +22,15 @@ varying float vDepth;
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
 
-    // Pass UV coordinates to fragment shader
     vUV = aUV;
 
-    // Transform normal by model matrix only (normal matrix = inverse-transpose of model-view).
-    // For rotation+translation matrices (no non-uniform scale), model matrix normal is sufficient.
-    vNormal = mat3(uModel) * aNormal;
-    vNormal = normalize(vNormal);
+    // Transform normal by model matrix (rotation+translation only, no non-uniform scale)
+    vNormal = normalize(mat3(uModel) * aNormal);
 
-    // Pass light intensity (pre-computed during geometry build)
     vLight = aLight;
 
-    // Compute view-space position for accurate exponential distance fog.
-    // We use the negative of view-space Z because in OpenGL, camera looks down -Z.
+    // Compute view-space Z for exponential distance fog.
+    // In OpenGL, camera looks down -Z, so we negate to get positive distance.
     vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
     vDepth = -viewPos.z;
 }
@@ -85,10 +81,7 @@ void main() {
 
 // ============================================================
 // Sky Vertex Shader (Large sphere for skybox)
-// NOTE: The view matrix passed here must already have translation
-// zeroed out (row 3 = [0, 0, 0, 1]). Do NOT try to modify the
-// matrix inside the shader — GLSL ES 1.00 does not support
-// matrix column indexing (skyView[3] = ...) is invalid.
+// The view matrix must have translation zeroed out (rotation-only).
 // ============================================================
 var SKY_VERTEX_SHADER = `
 attribute vec3 aPosition;
@@ -101,7 +94,6 @@ varying vec2 vUV;
 varying vec3 vWorldPos;
 
 void main() {
-    // uView is already rotation-only (translation zeroed in JavaScript)
     gl_Position = uProjection * uView * vec4(aPosition, 1.0);
     vUV = aUV;
     vWorldPos = aPosition;
