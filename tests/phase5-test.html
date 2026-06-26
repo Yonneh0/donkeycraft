@@ -704,21 +704,21 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
     var fallDmg1 = hurtBox2.calculateFallDamage(3);
     assertEq(fallDmg1, 0, 'Fall of 3 blocks: no damage (got ' + fallDmg1 + ')');
 
-    // Medium fall — some damage
+    // Medium fall — some damage: (10 - 3) * 0.5 = 3.5 HP
     survPlayer2.maxFallDistance = 10;
     var fallDmg2 = hurtBox2.calculateFallDamage(10);
-    assertEq(fallDmg2, 7, 'Fall of 10 blocks: damage = 7 (got ' + fallDmg2 + ')');
+    assertEq(fallDmg2, 3.5, 'Fall of 10 blocks: damage = 3.5 (got ' + fallDmg2 + ')');
 
-    // Long fall — lethal damage
+    // Long fall — lethal damage: (25 - 3) * 0.5 = 11 HP
     survPlayer2.maxFallDistance = 25;
     var fallDmg3 = hurtBox2.calculateFallDamage(25);
-    assertEq(fallDmg3, 22, 'Fall of 25 blocks: damage = 22 (got ' + fallDmg3 + ')');
+    assertEq(fallDmg3, 11, 'Fall of 25 blocks: damage = 11 (got ' + fallDmg3 + ')');
 
-    // Test applyFallDamage — applies and resets
+    // Test applyFallDamage — applies and resets: (10 - 3) * 0.5 = 3.5 HP
     survPlayer2.maxFallDistance = 10;
     var appliedDmg = hurtBox2.applyFallDamage();
-    assertEq(appliedDmg, 7, 'applyFallDamage returns damage dealt (got ' + appliedDmg + ')');
-    assertEq(hurtBox2.getHealth(), 13, 'Health after fall damage = 13 (got ' + hurtBox2.getHealth() + ')');
+    assertEq(appliedDmg, 3.5, 'applyFallDamage returns damage dealt (got ' + appliedDmg + ')');
+    assertEq(hurtBox2.getHealth(), 16.5, 'Health after fall damage = 16.5 (got ' + hurtBox2.getHealth() + ')');
     assertEq(survPlayer2.maxFallDistance, 0, 'Fall distance reset to 0 after applying damage');
 
     // Test knockback
@@ -854,12 +854,12 @@ h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px so
     flySystem.toggleFlyMode();
     assert(flySystem.isFlying() === true, 'Creative player: flying enabled after toggle');
 
-    // Test hurt box in survival — fall damage
+    // Test hurt box in survival — fall damage: (15 - 3) * 0.5 = 6 HP
     var hurtPlayer2 = new Donkeycraft.Player({ gameMode: 'survival' });
     var hurtBox4 = new Donkeycraft.HurtBox(hurtPlayer2);
     hurtPlayer2.maxFallDistance = 15;
     var fallDmg4 = hurtBox4.calculateFallDamage(15);
-    assertEq(fallDmg4, 12, 'Fall of 15 blocks: damage = 12 (got ' + fallDmg4 + ')');
+    assertEq(fallDmg4, 6, 'Fall of 15 blocks: damage = 6 (got ' + fallDmg4 + ')');
 
     // Cleanup
     simJumping.destroy();

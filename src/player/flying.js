@@ -83,16 +83,12 @@
             moveZ = 0;
         }
 
-        // Vertical movement: Space = up, Shift = down
+        // Vertical movement: Space = up, Shift = down (vanilla Minecraft allows descending while moving horizontally)
         var flyVy = 0;
         if (input.isKeyDown(Config.KEYBINDS.JUMP)) {
             flyVy = speed;
         } else if (input.isKeyDown(Config.KEYBINDS.SPRINT)) {
-            // Only descend if not already moving forward/backward/left/right
-            var isMovingHorizontally = forward !== 0 || strafe !== 0;
-            if (!isMovingHorizontally) {
-                flyVy = -Config.FLYING_TERMINAL_VELOCITY;
-            }
+            flyVy = -Config.FLYING_TERMINAL_VELOCITY;
         }
 
         // Apply velocity directly (no gravity in flying mode)

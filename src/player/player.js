@@ -156,10 +156,9 @@
      * @param {number} pitch - Pitch angle in radians [-π/2, π/2].
      */
     Donkeycraft.Player.prototype.setRotation = function(yaw, pitch) {
-        // Normalize yaw to [0, 2π)
-        while (yaw < 0) yaw += Math.PI * 2;
-        while (yaw >= Math.PI * 2) yaw -= Math.PI * 2;
-        this._rotation.yaw = yaw;
+        // Normalize yaw to [0, 2π) using modulo arithmetic (O(1) vs O(n) while loops)
+        var twoPi = Math.PI * 2;
+        this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
 
         // Clamp pitch to [-π/2, π/2] (straight down to straight up)
         this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
@@ -170,9 +169,8 @@
      * @param {number} deltaYaw - Yaw change in radians.
      */
     Donkeycraft.Player.prototype.adjustYaw = function(deltaYaw) {
-        this._rotation.yaw += deltaYaw;
-        while (this._rotation.yaw < 0) this._rotation.yaw += Math.PI * 2;
-        while (this._rotation.yaw >= Math.PI * 2) this._rotation.yaw -= Math.PI * 2;
+        var twoPi = Math.PI * 2;
+        this._rotation.yaw = ((this._rotation.yaw + deltaYaw) % twoPi + twoPi) % twoPi;
     };
 
     /**
@@ -369,7 +367,10 @@
             try {
                 this._subscribers[i](deltaTime);
             } catch (e) {
-                // Error isolation — don't let subscriber errors break the game
+                // Error isolation — log subscriber errors so debugging is possible
+                if (Donkeycraft.Logger) {
+                    Donkeycraft.Logger.error('Subscriber error in Player tick:', e);
+                }
             }
         }
     };

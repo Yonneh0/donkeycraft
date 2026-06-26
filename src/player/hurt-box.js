@@ -230,22 +230,21 @@
 
     /**
      * Calculate fall damage based on distance fallen.
-     * Formula: max(0, fallDistance - 3) — first 3 blocks are free.
-     * Damage is in half-hearts (1.0 = one full heart = 2 HP).
+     * Formula: max(0, (fallDistance - threshold) * 0.5) — first 3 blocks are free.
+     * Each point of damage = 1 HP (half a heart). Minecraft deals 1 half-heart per block beyond threshold.
      * @param {number} [fallDistance=0] - Distance fallen in blocks.
-     * @returns {number} Damage dealt (0 if no fall damage).
+     * @returns {number} Damage dealt in HP (0 if no fall damage).
      */
     Donkeycraft.HurtBox.prototype.calculateFallDamage = function(fallDistance) {
         fallDistance = fallDistance || this._player.getFallDistance();
 
         // No fall damage for first 3 blocks
-        if (fallDistance <= 3) {
+        if (fallDistance <= Config.FALL_DAMAGE_THRESHOLD) {
             return 0;
         }
 
-        // Damage is (fallDistance - 3) half-hearts
-        // Convert to HP: each point = 1 HP
-        var damage = fallDistance - 3;
+        // Damage = (fallDistance - threshold) * 0.5 HP per block
+        var damage = (fallDistance - Config.FALL_DAMAGE_THRESHOLD) * 0.5;
         return damage;
     };
 

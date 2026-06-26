@@ -7,7 +7,8 @@
     var Config = Donkeycraft.Config;
 
     /**
-     * Jumping — handles player jump mechanics and water swimming upward motion.
+     * Jumping — handles player jump mechanics (height, frequency, cooldown).
+     * Swimming upward motion is handled by Movement._tickSurvival to avoid double-boost.
      * @param {Donkeycraft.Player} player - Player entity instance.
      * @param {Donkeycraft.Input} input - Input handler instance.
      * @param {Donkeycraft.Collision} collision - Collision detection instance.
@@ -29,7 +30,7 @@
          * @type {number}
          * @private
          */
-        this._JUMP_COOLDOWN = 0.1;
+        this._jumpCooldownDuration = Config.JUMP_COOLDOWN;
     };
 
     /**
@@ -65,21 +66,7 @@
         // Check for jump input
         var jumpPressed = input.isKeyDown(Config.KEYBINDS.JUMP);
 
-        // Check if in water — swimming upward
-        var pos = player.getPosition();
-        var inWater = this._collision.isBlockLiquid(pos.x, pos.y + 0.3, pos.z);
-
-        if (inWater && jumpPressed) {
-            // Swimming upward boost
-            var currentVy = player.getVelocity().y;
-            player.setVelocity(
-                player.getVelocity().x,
-                Math.max(currentVy, 0.15),
-                player.getVelocity().z
-            );
-        }
-
-        // Normal jump (on ground)
+        // Normal jump (on ground) — swimming boost is handled by Movement._tickSurvival
         if (jumpPressed && player.onGround && this._jumpCooldown <= 0) {
             this.performJump();
         }
@@ -114,7 +101,7 @@
         );
 
         // Set cooldown to prevent rapid double-jumps
-        this._jumpCooldown = this._JUMP_COOLDOWN;
+        this._jumpCooldown = this._jumpCooldownDuration;
 
         return true;
     };

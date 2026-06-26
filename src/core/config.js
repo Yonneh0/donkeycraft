@@ -39,9 +39,14 @@
             MOUSE_SCROLL_SENSITIVITY: 1,// Hotbar scroll sensitivity
 
             // Physics
-            GRAVITY: -20.0,             // Gravity acceleration (blocks/s^2)
-            TERMINAL_VELOCITY: -40.0,   // Max fall speed (blocks/s)
-            FLYING_TERMINAL_VELOCITY: -20.0,
+            GRAVITY: -20.0,                        // Gravity acceleration (blocks/s^2)
+            TERMINAL_VELOCITY: -40.0,              // Max fall speed (blocks/s)
+            FLYING_TERMINAL_VELOCITY: -20.0,       // Max downward fly speed (blocks/s)
+
+            // Player mechanics
+            SWIM_BOOST: 0.15,            // Upward velocity boost when swimming with jump (blocks/s)
+            JUMP_COOLDOWN: 0.1,          // Cooldown between jumps (seconds)
+            FALL_DAMAGE_THRESHOLD: 3,    // Blocks of free fall before damage begins
 
             // Lighting
             SKY_LIGHT_DECAY: 1,         // Light decay per block

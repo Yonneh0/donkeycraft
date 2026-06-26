@@ -39,38 +39,23 @@
             maxZ: position.z + halfWidth
         };
 
-        // Check X axis
-        var testX = {
-            minX: aabbBefore.minX + deltaX,
-            minY: aabbBefore.minY,
-            minZ: aabbBefore.minZ,
-            maxX: aabbBefore.maxX + deltaX,
-            maxY: aabbBefore.maxY,
-            maxZ: aabbBefore.maxZ
-        };
-        var collisionX = this._checkAABBAgainstBlocks(testX);
+        // Check X axis — pass raw coordinates to avoid object allocation
+        var collisionX = this._checkAABBAgainstBlocks(
+            aabbBefore.minX + deltaX, aabbBefore.minY, aabbBefore.minZ,
+            aabbBefore.maxX + deltaX, aabbBefore.maxY, aabbBefore.maxZ
+        );
 
         // Check Y axis
-        var testY = {
-            minX: aabbBefore.minX,
-            minY: aabbBefore.minY + deltaY,
-            minZ: aabbBefore.minZ,
-            maxX: aabbBefore.maxX,
-            maxY: aabbBefore.maxY + deltaY,
-            maxZ: aabbBefore.maxZ
-        };
-        var collisionY = this._checkAABBAgainstBlocks(testY);
+        var collisionY = this._checkAABBAgainstBlocks(
+            aabbBefore.minX, aabbBefore.minY + deltaY, aabbBefore.minZ,
+            aabbBefore.maxX, aabbBefore.maxY + deltaY, aabbBefore.maxZ
+        );
 
         // Check Z axis
-        var testZ = {
-            minX: aabbBefore.minX,
-            minY: aabbBefore.minY,
-            minZ: aabbBefore.minZ + deltaZ,
-            maxX: aabbBefore.maxX,
-            maxY: aabbBefore.maxY,
-            maxZ: aabbBefore.maxZ + deltaZ
-        };
-        var collisionZ = this._checkAABBAgainstBlocks(testZ);
+        var collisionZ = this._checkAABBAgainstBlocks(
+            aabbBefore.minX, aabbBefore.minY, aabbBefore.minZ + deltaZ,
+            aabbBefore.maxX, aabbBefore.maxY, aabbBefore.maxZ + deltaZ
+        );
 
         return {
             collisionX: collisionX,
@@ -105,17 +90,12 @@
 
         var onGround = false;
 
-        // Resolve X axis
+        // Resolve X axis — pass raw coordinates to avoid object allocation
         if (deltaX !== 0) {
-            var testX = {
-                minX: aabb.minX + deltaX,
-                minY: aabb.minY,
-                minZ: aabb.minZ,
-                maxX: aabb.maxX + deltaX,
-                maxY: aabb.maxY,
-                maxZ: aabb.maxZ
-            };
-            if (this._checkAABBAgainstBlocks(testX)) {
+            if (this._checkAABBAgainstBlocks(
+                aabb.minX + deltaX, aabb.minY, aabb.minZ,
+                aabb.maxX + deltaX, aabb.maxY, aabb.maxZ
+            )) {
                 deltaX = 0;
             } else {
                 aabb.minX += deltaX;
@@ -125,15 +105,10 @@
 
         // Resolve Y axis
         if (deltaY !== 0) {
-            var testY = {
-                minX: aabb.minX,
-                minY: aabb.minY + deltaY,
-                minZ: aabb.minZ,
-                maxX: aabb.maxX,
-                maxY: aabb.maxY + deltaY,
-                maxZ: aabb.maxZ
-            };
-            if (this._checkAABBAgainstBlocks(testY)) {
+            if (this._checkAABBAgainstBlocks(
+                aabb.minX, aabb.minY + deltaY, aabb.minZ,
+                aabb.maxX, aabb.maxY + deltaY, aabb.maxZ
+            )) {
                 if (deltaY < 0) {
                     onGround = true;
                 }
@@ -146,15 +121,10 @@
 
         // Resolve Z axis
         if (deltaZ !== 0) {
-            var testZ = {
-                minX: aabb.minX,
-                minY: aabb.minY,
-                minZ: aabb.minZ + deltaZ,
-                maxX: aabb.maxX,
-                maxY: aabb.maxY,
-                maxZ: aabb.maxZ + deltaZ
-            };
-            if (this._checkAABBAgainstBlocks(testZ)) {
+            if (this._checkAABBAgainstBlocks(
+                aabb.minX, aabb.minY, aabb.minZ + deltaZ,
+                aabb.maxX, aabb.maxY, aabb.maxZ + deltaZ
+            )) {
                 deltaZ = 0;
             } else {
                 aabb.minZ += deltaZ;
@@ -292,16 +262,19 @@
     };
 
     /**
-     * Check if an AABB overlaps with any solid block.
-     * @param {{minX, minY, minZ, maxX, maxY, maxZ}} aabb - Axis-aligned bounding box.
+     * Check if a coordinate range overlaps with any solid block.
+     * Avoids object allocation by passing raw coordinates directly.
+     * @param {number} minX - Minimum X of the range.
+     * @param {number} minY - Minimum Y of the range.
+     * @param {number} minZ - Minimum Z of the range.
+     * @param {number} maxX - Maximum X of the range.
+     * @param {number} maxY - Maximum Y of the range.
+     * @param {number} maxZ - Maximum Z of the range.
      * @returns {boolean} True if overlapping with a solid block.
      * @private
      */
-    Donkeycraft.Collision.prototype._checkAABBAgainstBlocks = function(aabb) {
-        return this.getOverlappingBlocks(
-            aabb.minX, aabb.minY, aabb.minZ,
-            aabb.maxX, aabb.maxY, aabb.maxZ
-        ).length > 0;
+    Donkeycraft.Collision.prototype._checkAABBAgainstBlocks = function(minX, minY, minZ, maxX, maxY, maxZ) {
+        return this.getOverlappingBlocks(minX, minY, minZ, maxX, maxY, maxZ).length > 0;
     };
 
     /**

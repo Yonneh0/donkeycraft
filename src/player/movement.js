@@ -209,11 +209,9 @@
         }
 
         // Vertical movement: Space = up, Shift = down
+        // Vanilla Minecraft allows descending while moving horizontally
         var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-        var moveDown = (input.isKeyDown(Config.KEYBINDS.SPRINT) && !input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) &&
-                        !input.isKeyDown(Config.KEYBINDS.MOVE_BACKWARD) &&
-                        !input.isKeyDown(Config.KEYBINDS.MOVE_LEFT) &&
-                        !input.isKeyDown(Config.KEYBINDS.MOVE_RIGHT)) ? 1 : 0;
+        var moveDown = input.isKeyDown(Config.KEYBINDS.SPRINT) ? 1 : 0;
 
         var flyVy = 0;
         if (moveUp !== 0) {
