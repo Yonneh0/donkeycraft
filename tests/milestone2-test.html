@@ -3,26 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Donkeycraft — Milestone 2 "Voxel World" Test</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
-h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
-.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
-.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
-.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
-.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
-.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
-.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
-.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
-.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
-.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
-.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
-.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
-#canvas-container { margin: 16px 0; padding: 12px; background: #0a0a0a; border-radius: 6px; text-align: center; position: relative; }
-canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
-#fps-display { position: absolute; top: 8px; right: 12px; color: #2ecc71; font-size: 0.9em; font-weight: bold; }
-#info-overlay { position: absolute; top: 8px; left: 12px; color: #2ecc71; font-size: 0.8em; text-align: left; line-height: 1.4; }
-</style>
+<link rel="stylesheet" href="test.css">
 </head>
 <body>
 <h1>Donkeycraft — Milestone 2 "Voxel World" Test</h1>
@@ -79,175 +60,53 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
 <script src="../src/render/fog.js"></script>
 <script src="../src/render/lighting.js"></script>
 
+<!-- Load shared test framework -->
+<script src="test.js"></script>
+
 <script>
 (function() {
     'use strict';
 
-    var results = document.getElementById('results');
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
     var fpsDisplay = document.getElementById('fps-display');
     var infoOverlay = document.getElementById('info-overlay');
-    var totalTests = 0;
-    var passedTests = 0;
-    var failedTests = 0;
-    var currentSection = null;
 
     // ============================================================
-    // Test Framework (uniform across all tests)
+    // Section 1: World Generation Pipeline
     // ============================================================
-
-    function section(name) {
-        var div = document.createElement('div');
-        div.className = 'section';
-        var heading = document.createElement('h2');
-        heading.textContent = name;
-        div.appendChild(heading);
-        results.appendChild(div);
-        currentSection = div;
-    }
-
-    function assert(condition, message) {
-        totalTests++;
-        var div = document.createElement('div');
-        if (condition) {
-            passedTests++;
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-        } else {
-            failedTests++;
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
-        }
-        currentSection.appendChild(div);
-    }
-
-    function assertEq(actual, expected, message) {
-        totalTests++;
-        if (actual === expected) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function assertNear(actual, expected, epsilon, message) {
-        totalTests++;
-        if (Math.abs(actual - expected) < epsilon) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function assertType(val, type, message) {
-        totalTests++;
-        if (typeof val === type) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function assertArrEq(actual, expected, message) {
-        totalTests++;
-        if (actual.length !== expected.length) {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Length mismatch: ' + actual.length + ' vs ' + expected.length + '</div>';
-            currentSection.appendChild(div);
-            return;
-        }
-        for (var i = 0; i < actual.length; i++) {
-            if (actual[i] !== expected[i]) {
-                failedTests++;
-                var div3 = document.createElement('div');
-                div3.className = 'test fail';
-                div3.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Index ' + i + ': expected ' + expected[i] + ', got ' + actual[i] + '</div>';
-                currentSection.appendChild(div3);
-                return;
-            }
-        }
-        passedTests++;
-        var div2 = document.createElement('div');
-        div2.className = 'test pass';
-        div2.textContent = '\u2713 PASS: ' + message;
-        currentSection.appendChild(div2);
-    }
-
-    function info(msg) {
-        var div = document.createElement('div');
-        div.className = 'info-msg';
-        div.textContent = '>> ' + msg;
-        currentSection.appendChild(div);
-    }
-
-    function finishTests() {
-        var summary = document.createElement('div');
-        if (failedTests === 0) {
-            summary.className = 'summary pass';
-            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
-        } else {
-            summary.className = 'summary fail';
-            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
-        }
-        results.appendChild(summary);
-    }
-
-    // ============================================================
-    // TEST 1: World Generation Pipeline — Full Chunk Generation
-    // ============================================================
-    section('1. World Generation Pipeline');
+    F.section('1. World Generation Pipeline');
 
     // Re-init PerlinNoise for deterministic results
     Donkeycraft.PerlinNoise.init(42);
 
     // Create chunk manager with minimal render distance
     var cm = new Donkeycraft.ChunkManager({ renderDistance: 1 });
-    assert(cm !== null, 'ChunkManager created');
+    F.assert(cm !== null, 'ChunkManager created');
 
     // Get center chunk
     var chunk = cm.getChunk(0, 0);
-    assert(chunk instanceof Donkeycraft.Chunk, 'Chunk instance obtained from manager');
+    F.assert(chunk instanceof Donkeycraft.Chunk, 'Chunk instance obtained from manager');
 
     // Generate the full chunk (terrain + ores + caves + water + surface)
     try {
         Donkeycraft.StructureGenerator.generateChunkFull(chunk, 1); // Plains biome
-        assert(true, 'generateChunkFull completed for plains biome without error');
+        F.assert(true, 'generateChunkFull completed for plains biome without error');
     } catch (e) {
-        assert(false, 'generateChunkFull threw: ' + e.message);
+        F.assert(false, 'generateChunkFull threw: ' + e.message);
     }
 
-    assert(chunk.generated === true, 'Chunk marked as generated');
+    F.assert(chunk.generated === true, 'Chunk marked as generated');
 
     // Generate heightmap AFTER chunk generation (matches the one used internally by generateChunkFull)
     var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(0, 0);
-    assert(heightmap instanceof Array, 'Heightmap is an array');
+    F.assert(heightmap instanceof Array, 'Heightmap is an array');
     // Verify heightmap values are within valid range [1, WORLD_HEIGHT-10]
-    assert(heightmap.length === 256, 'Heightmap has 256 entries (16x16)');
+    F.assert(heightmap.length === 256, 'Heightmap has 256 entries (16x16)');
 
     var minHeight = Infinity;
     var maxHeight = -Infinity;
@@ -255,12 +114,12 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         if (heightmap[i] < minHeight) minHeight = heightmap[i];
         if (heightmap[i] > maxHeight) maxHeight = heightmap[i];
     }
-    assert(minHeight >= 1, 'Minimum height >= 1 (got ' + minHeight + ')');
-    assert(maxHeight <= 246, 'Maximum height <= 246 (got ' + maxHeight + ')');
+    F.assert(minHeight >= 1, 'Minimum height >= 1 (got ' + minHeight + ')');
+    F.assert(maxHeight <= 246, 'Maximum height <= 246 (got ' + maxHeight + ')');
 
     // Find surface Y at local (8,8) from heightmap
     var surfaceY = Math.min(heightmap[8 + 8 * 16], Donkeycraft.Config.WORLD_HEIGHT - 1);
-    assert(surfaceY >= 1 && surfaceY <= 246, 'Surface Y at (8,8) is ' + surfaceY);
+    F.assert(surfaceY >= 1 && surfaceY <= 246, 'Surface Y at (8,8) is ' + surfaceY);
 
     // Verify actual chunk surface matches heightmap by scanning downward for terrain block
     // Search downward from surface to find the top non-ore, non-air block (ores can be at surface)
@@ -273,16 +132,16 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         }
         terrainBlockY--;
     }
-    assert(terrainBlockY >= 0 && terrainBlockY < surfaceY, 
+    F.assert(terrainBlockY >= 0 && terrainBlockY < surfaceY, 
         'Found terrain block below surface at Y=' + terrainBlockY);
     var surfaceBlock = chunk.getBlock(8, terrainBlockY, 8);
-    assert(surfaceBlock === 2 || surfaceBlock === 3 || surfaceBlock === 1, 
+    F.assert(surfaceBlock === 2 || surfaceBlock === 3 || surfaceBlock === 1, 
         'Terrain block at (8,' + terrainBlockY + ',8) is grass/dirt/stone (got ID ' + surfaceBlock + ')');
 
     // ============================================================
-    // TEST 3: Ore Vein Placement Validation
+    // Section 3: Ore Vein Placement Validation
     // ============================================================
-    section('3. Ore Vein Placement Validation');
+    F.section('3. Ore Vein Placement Validation');
 
     // Count ore blocks placed in chunk
     var oreTypes = {
@@ -313,7 +172,7 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         }
     }
 
-    assert(totalOreBlocks >= 0, 'Ore blocks placed in chunk (total: ' + totalOreBlocks + ')');
+    F.assert(totalOreBlocks >= 0, 'Ore blocks placed in chunk (total: ' + totalOreBlocks + ')');
     
     // Report ore distribution
     var oreReport = [];
@@ -323,22 +182,22 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         }
     }
     if (oreReport.length > 0) {
-        info('Ore distribution: ' + oreReport.join(', '));
+        F.info('Ore distribution: ' + oreReport.join(', '));
     }
 
     // Verify Y-level constraints for ores
     var coalMinY = Donkeycraft.OreGenerator.getMinY('coal_ore');
     var coalMaxY = Donkeycraft.OreGenerator.getMaxY('coal_ore');
-    assert(coalMinY === 0 && coalMaxY === 160, 'Coal ore Y-range: ' + coalMinY + '-' + coalMaxY);
+    F.assert(coalMinY === 0 && coalMaxY === 160, 'Coal ore Y-range: ' + coalMinY + '-' + coalMaxY);
 
     var diamondMinY = Donkeycraft.OreGenerator.getMinY('diamond_ore');
     var diamondMaxY = Donkeycraft.OreGenerator.getMaxY('diamond_ore');
-    assert(diamondMinY === 0 && diamondMaxY === 32, 'Diamond ore Y-range: ' + diamondMinY + '-' + diamondMaxY);
+    F.assert(diamondMinY === 0 && diamondMaxY === 32, 'Diamond ore Y-range: ' + diamondMinY + '-' + diamondMaxY);
 
     // ============================================================
-    // TEST 4: Cave Generation Validation
+    // Section 4: Cave Generation Validation
     // ============================================================
-    section('4. Cave Generation Validation');
+    F.section('4. Cave Generation Validation');
 
     // Count air blocks that are below surface level (potential caves)
     var surfaceY = Math.min(heightmap[8*16+8], 255);
@@ -359,51 +218,51 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         }
     }
 
-    assert(undergroundAirCount >= 0, 'Underground air blocks detected (caves): ' + undergroundAirCount);
-    info('Cave density: ' + undergroundAirCount + ' air blocks below Y=' + (surfaceY - 5));
+    F.assert(undergroundAirCount >= 0, 'Underground air blocks detected (caves): ' + undergroundAirCount);
+    F.info('Cave density: ' + undergroundAirCount + ' air blocks below Y=' + (surfaceY - 5));
 
     // ============================================================
-    // TEST 5: Chunk Mesh Generation & Render Validation
+    // Section 5: Chunk Mesh Generation & Rendering
     // ============================================================
-    section('5. Chunk Mesh Generation & Rendering');
+    F.section('5. Chunk Mesh Generation & Rendering');
 
     // Create WebGL context and shader manager
     var canvas = document.getElementById('canvas');
     var glCtx = new Donkeycraft.GLContext(canvas);
-    assert(glCtx !== null, 'WebGL context created for rendering test');
+    F.assert(glCtx !== null, 'WebGL context created for rendering test');
 
     var gl = glCtx.getGL();
-    assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
+    F.assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
 
     var shaderMgr = new Donkeycraft.ShaderManager(gl);
-    assert(shaderMgr !== null, 'ShaderManager created');
+    F.assert(shaderMgr !== null, 'ShaderManager created');
 
     // Create geometry builder and build chunk mesh
     var geoBuilder = new Donkeycraft.GeometryBuilder();
-    assert(geoBuilder !== null, 'GeometryBuilder created');
+    F.assert(geoBuilder !== null, 'GeometryBuilder created');
 
     // Build chunk geometry using the generated chunk's block data
     var chunkGeo = geoBuilder.buildChunk(0, 0, function(x, y, z) {
         return chunk.getBlock(x, y, z);
     });
 
-    assert(chunkGeo !== null, 'Chunk geometry generated');
-    assert(chunkGeo.vertexCount > 0, 'Chunk has vertices (face culling working, count=' + chunkGeo.vertexCount + ')');
-    assert(chunkGeo.indexCount > 0, 'Chunk has indices (count=' + chunkGeo.indexCount + ')');
+    F.assert(chunkGeo !== null, 'Chunk geometry generated');
+    F.assert(chunkGeo.vertexCount > 0, 'Chunk has vertices (face culling working, count=' + chunkGeo.vertexCount + ')');
+    F.assert(chunkGeo.indexCount > 0, 'Chunk has indices (count=' + chunkGeo.indexCount + ')');
 
     // Optimize the mesh
     var meshOpt = new Donkeycraft.MeshOptimizer();
     var optimized = meshOpt.optimize(chunkGeo, null, null);
-    assert(optimized !== null, 'Mesh optimization completed');
-    assert(optimized.vertexCount > 0, 'Optimized mesh has vertices');
+    F.assert(optimized !== null, 'Mesh optimization completed');
+    F.assert(optimized.vertexCount > 0, 'Optimized mesh has vertices');
 
     // Create chunk mesh object
     var chunkMesh = new Donkeycraft.ChunkMesh(gl, shaderMgr);
-    assert(chunkMesh !== null, 'ChunkMesh created');
+    F.assert(chunkMesh !== null, 'ChunkMesh created');
 
     // Upload geometry to GPU
     chunkMesh.update(optimized);
-    assert(chunkMesh.getVertexCount() > 0, 'ChunkMesh uploaded with vertices');
+    F.assert(chunkMesh.getVertexCount() > 0, 'ChunkMesh uploaded with vertices');
 
     // Use an orthographic camera looking straight down at the chunk.
     // Chunk (0,0) spans x:0-15, z:0-15, y:0-67.
@@ -428,9 +287,9 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     atlas.bind();
 
     // ============================================================
-    // TEST 6: WebGL Render — Terrain Scene (Visual Test)
+    // Section 6: WebGL Render — Terrain Scene (Visual Test)
     // ============================================================
-    section('6. WebGL Render — Terrain Scene (Live View)');
+    F.section('6. WebGL Render — Terrain Scene (Live View)');
 
     gl.enable(gl.DEPTH_TEST);
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -455,11 +314,11 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     // Bind aPosition to location 0 explicitly
     var attribBindings = [{location: 0, name: 'aPosition'}];
     var colorProg = shaderMgr.createProgram('color', colorVertShader, colorFragShader, attribBindings);
-    assert(colorProg !== null, 'Color shader program compiled and linked');
+    F.assert(colorProg !== null, 'Color shader program compiled and linked');
 
     // IMPORTANT: Must activate the program BEFORE getting uniform/attribute locations
     var colorUsed = shaderMgr.use('color');
-    assert(colorUsed, 'Color shader activated');
+    F.assert(colorUsed, 'Color shader activated');
 
     // Now get uniform locations for color shader
     var cProjUniform = shaderMgr.getUniformLocation('uProjection');
@@ -471,12 +330,12 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     if (cProjUniform !== null) {
         gl.uniformMatrix4fv(cProjUniform, false, identity);
     } else {
-        info('WARNING: cProjection uniform location is null');
+        F.info('WARNING: cProjection uniform location is null');
     }
     if (cViewUniform !== null) {
         gl.uniformMatrix4fv(cViewUniform, false, identity);
     } else {
-        info('WARNING: cView uniform location is null');
+        F.info('WARNING: cView uniform location is null');
     }
 
     // Vertex format: position(3) + UV(2) + normal(3) + light(1) = 9 floats
@@ -526,10 +385,10 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         chunkMesh.draw();
         renderSuccessStatic = true;
         var renderErr = gl.getError();
-        assert(renderErr === gl.NO_ERROR, 'No WebGL errors during terrain render');
+        F.assert(renderErr === gl.NO_ERROR, 'No WebGL errors during terrain render');
     } catch (e) {
         // Shader may not match geometry attributes — still pass if mesh was built
-        info('Terrain render: ' + e.message + ' (geometry was built with ' + chunkGeo.vertexCount + ' vertices)');
+        F.info('Terrain render: ' + e.message + ' (geometry was built with ' + chunkGeo.vertexCount + ' vertices)');
     }
 
     // Cleanup test buffers
@@ -541,50 +400,31 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         var readBuf = new Uint8Array(4);
         gl.readPixels(canvas.width / 2 | 0, canvas.height / 2 | 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, readBuf);
         var isGreen = readBuf[0] < 50 && readBuf[1] > 200 && readBuf[2] < 50;
-        if (isGreen) {
-            passedTests++;
-            totalTests++;
-            var passDiv = document.createElement('div');
-            passDiv.className = 'test pass';
-            passDiv.textContent = '\u2713 PASS: Center pixel is GREEN (quad rendered) — got R=' + readBuf[0] + ' G=' + readBuf[1] + ' B=' + readBuf[2];
-            currentSection.appendChild(passDiv);
-        } else {
-            failedTests++;
-            totalTests++;
-            var failDiv = document.createElement('div');
-            failDiv.className = 'test fail';
-            failDiv.innerHTML = '\u2717 FAIL: Center pixel is NOT GREEN — got R=' + readBuf[0] + ' G=' + readBuf[1] + ' B=' + readBuf[2] + '<div class="detail">Expected R<50, G>200, B<50</div>';
-            currentSection.appendChild(failDiv);
-        }
+        F.assert(isGreen, 'Center pixel is GREEN (quad rendered) — got R=' + readBuf[0] + ' G=' + readBuf[1] + ' B=' + readBuf[2]);
     } catch (e) {
-        failedTests++;
-        totalTests++;
-        var failDiv2 = document.createElement('div');
-        failDiv2.className = 'test fail';
-        failDiv2.innerHTML = '\u2717 FAIL: readPixels failed — ' + e.message;
-        currentSection.appendChild(failDiv2);
+        F.assert(false, 'readPixels failed — ' + e.message);
     }
 
-    assert(renderSuccessStatic, 'Terrain scene rendered without exceptions');
+    F.assert(renderSuccessStatic, 'Terrain scene rendered without exceptions');
 
     // ============================================================
-    // TEST 7: Camera Position Validation
+    // Section 7: Camera Position & View Transform
     // ============================================================
-    section('7. Camera Position & View Transform');
+    F.section('7. Camera Position & View Transform');
 
     var camPos = camera.getPosition();
     // Camera was set to (8, 90, 25) for orthographic rendering test
-    assert(Math.abs(camPos.x - 8) < 0.1, 'Camera X at 8 (got ' + camPos.x + ')');
-    assert(Math.abs(camPos.y - 90) < 0.5, 'Camera Y at 90 (got ' + camPos.y + ')');
-    assert(Math.abs(camPos.z - 25) < 0.1, 'Camera Z at 25 (got ' + camPos.z + ')');
+    F.assert(Math.abs(camPos.x - 8) < 0.1, 'Camera X at 8 (got ' + camPos.x + ')');
+    F.assert(Math.abs(camPos.y - 90) < 0.5, 'Camera Y at 90 (got ' + camPos.y + ')');
+    F.assert(Math.abs(camPos.z - 25) < 0.1, 'Camera Z at 25 (got ' + camPos.z + ')');
 
     var forward = camera.getForward();
-    assertType(forward, 'object', 'Forward vector is a Vector3');
+    F.assertType(forward, 'object', 'Forward vector is a Vector3');
 
     // ============================================================
-    // TEST 8: Block Type Distribution
+    // Section 8: Block Type Distribution
     // ============================================================
-    section('8. Block Type Distribution in Generated Chunk');
+    F.section('8. Block Type Distribution in Generated Chunk');
 
     var blockCounts = {};
     for (var i = 0; i < chunk.blocks.length; i++) {
@@ -598,25 +438,25 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     var dirtCount = blockCounts[3] || 0;
     var airCount = blockCounts[0] || 0;
 
-    assert(stoneCount > 0, 'Stone blocks present: ' + stoneCount);
-    assert(grassCount > 0, 'Grass blocks on surface: ' + grassCount);
-    assert(dirtCount > 0, 'Dirt blocks below grass: ' + dirtCount);
-    assert(airCount > 0, 'Air blocks (including caves): ' + airCount);
+    F.assert(stoneCount > 0, 'Stone blocks present: ' + stoneCount);
+    F.assert(grassCount > 0, 'Grass blocks on surface: ' + grassCount);
+    F.assert(dirtCount > 0, 'Dirt blocks below grass: ' + dirtCount);
+    F.assert(airCount > 0, 'Air blocks (including caves): ' + airCount);
 
-    info('Block distribution: stone=' + stoneCount + ', grass=' + grassCount + ', dirt=' + dirtCount + ', air=' + airCount);
+    F.info('Block distribution: stone=' + stoneCount + ', grass=' + grassCount + ', dirt=' + dirtCount + ', air=' + airCount);
 
     // ============================================================
-    // TEST 9: Lighting Validation
+    // Section 9: Lighting Validation
     // ============================================================
-    section('9. Lighting Engine Validation');
+    F.section('9. Lighting Engine Validation');
 
     // Re-init lighting engine and run with heightmap (fast mode)
     try {
         Donkeycraft.LightingEngine.init();
         Donkeycraft.LightingEngine.calculateSkyLight(chunk, heightmap);
-        assert(true, 'LightingEngine calculateSkyLight completed');
+        F.assert(true, 'LightingEngine calculateSkyLight completed');
     } catch (e) {
-        assert(false, 'LightingEngine threw: ' + e.message);
+        F.assert(false, 'LightingEngine threw: ' + e.message);
     }
 
     // Verify sky light at surface Y from heightmap — find the actual terrain block
@@ -630,23 +470,23 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     // foundSkySurface is now one below the lowest sky-lit block
     var actualSurfaceY = foundSkySurface + 1;
 
-    assert(chunk.getSkyLight(8, actualSurfaceY, 8) === 15, 
+    F.assert(chunk.getSkyLight(8, actualSurfaceY, 8) === 15, 
         'Surface has full sky light at Y=' + actualSurfaceY + ' (heightmap says ' + checkSurfaceY + ')');
 
     // Below surface should also have sky light in fast mode
     if (actualSurfaceY > 0) {
-        assert(chunk.getSkyLight(8, actualSurfaceY - 1, 8) === 15, 
+        F.assert(chunk.getSkyLight(8, actualSurfaceY - 1, 8) === 15, 
             'Sky light below surface at Y=' + (actualSurfaceY-1) + ' is also 15');
     }
 
     // Verify block light defaults to 0
     var blockLightDefault = chunk.getBlockLight(8, 10, 8);
-    assert(blockLightDefault === 0, 'Non-emissive blocks have no block light (got ' + blockLightDefault + ')');
+    F.assert(blockLightDefault === 0, 'Non-emissive blocks have no block light (got ' + blockLightDefault + ')');
 
     // ============================================================
-    // TEST 10: Render Animation (Live View)
+    // Section 10: Render Animation (Live View)
     // ============================================================
-    section('10. Render Animation — Orbiting Camera (Visual Confirmation)');
+    F.section('10. Render Animation — Orbiting Camera (Visual Confirmation)');
 
     var animRunning = false;
     var frameCount = 0;
@@ -724,17 +564,16 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     setTimeout(function() {
         animRunning = false;
         
-        assert(renderSuccess, 'Terrain scene rendered successfully with orbiting camera');
-        assert(chunkGeo.vertexCount > 0, 'Chunk mesh has geometry to render');
+        F.assert(renderSuccess, 'Terrain scene rendered successfully with orbiting camera');
+        F.assert(chunkGeo.vertexCount > 0, 'Chunk mesh has geometry to render');
 
         // Cleanup
-        if (testMesh && !testMesh._destroyed) testMesh.destroy();
         if (chunkMesh && !chunkMesh._destroyed) chunkMesh.destroy();
         cm.destroy();
         atlas.destroy();
 
-        info('Orbiting terrain view ran for ~3 seconds — verify above.');
-        finishTests();
+        F.info('Orbiting terrain view ran for ~3 seconds — verify above.');
+        F.finishTests();
     }, 3500);
 
 })();

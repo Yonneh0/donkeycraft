@@ -3,25 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Donkeycraft — Milestone 1 "Hello World" Test</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Consolas', 'Monaco', monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; max-width: 960px; margin: 0 auto; }
-h1 { color: #00d4ff; font-size: 1.4em; margin-bottom: 8px; border-bottom: 2px solid #00d4ff; padding-bottom: 8px; }
-.subtitle { color: #888; font-size: 0.85em; margin-bottom: 16px; }
-.section { margin: 16px 0; padding: 12px 16px; background: #16213e; border-radius: 6px; border-left: 4px solid #333; }
-.section h2 { color: #00d4ff; font-size: 1.05em; margin-bottom: 8px; }
-.test { padding: 4px 0 4px 24px; font-size: 0.88em; border-left: 2px solid #333; margin: 2px 0; }
-.test.pass { color: #2ecc71; border-left-color: #2ecc71; }
-.test.fail { color: #e74c3c; border-left-color: #e74c3c; }
-.test .detail { color: #888; font-size: 0.85em; margin-top: 1px; }
-.summary { margin: 20px 0; padding: 14px 18px; border-radius: 6px; font-size: 1em; }
-.summary.pass { background: #0a3d0a; border-left: 4px solid #2ecc71; }
-.summary.fail { background: #3d0a0a; border-left: 4px solid #e74c3c; }
-.info-msg { color: #f1c40f; font-style: italic; padding: 4px 0 4px 24px; font-size: 0.85em; }
-#canvas-container { margin: 16px 0; padding: 12px; background: #0a0a0a; border-radius: 6px; text-align: center; position: relative; }
-canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
-#fps-display { position: absolute; top: 8px; right: 12px; color: #2ecc71; font-size: 0.9em; font-weight: bold; }
-</style>
+<link rel="stylesheet" href="test.css">
 </head>
 <body>
 <h1>Donkeycraft — Milestone 1 "Hello World" Test</h1>
@@ -49,151 +31,56 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
 <script src="../src/render/shader-manager.js"></script>
 <script src="../src/render/camera.js"></script>
 
+<!-- Load shared test framework -->
+<script src="test.js"></script>
+
 <script>
 (function() {
     'use strict';
 
-    var results = document.getElementById('results');
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
     var fpsDisplay = document.getElementById('fps-display');
-    var totalTests = 0;
-    var passedTests = 0;
-    var failedTests = 0;
-    var currentSection = null;
     var visualPass = false; // Set if canvas renders
 
     // ============================================================
-    // Test Framework (uniform across all tests)
+    // Section 1: Namespace checks
     // ============================================================
+    F.section('1. Namespace & Class Registration');
 
-    function section(name) {
-        var div = document.createElement('div');
-        div.className = 'section';
-        var heading = document.createElement('h2');
-        heading.textContent = name;
-        div.appendChild(heading);
-        results.appendChild(div);
-        currentSection = div;
-    }
-
-    function assert(condition, message) {
-        totalTests++;
-        var div = document.createElement('div');
-        if (condition) {
-            passedTests++;
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-        } else {
-            failedTests++;
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Assertion failed.</div>';
-        }
-        currentSection.appendChild(div);
-    }
-
-    function assertEq(actual, expected, message) {
-        totalTests++;
-        if (actual === expected) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ' + JSON.stringify(expected) + ', got ' + JSON.stringify(actual) + '</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function assertNear(actual, expected, epsilon, message) {
-        totalTests++;
-        if (Math.abs(actual - expected) < epsilon) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected ~' + expected + ', got ' + actual + ' (delta=' + Math.abs(actual - expected) + ', epsilon=' + epsilon + ')</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function assertType(val, type, message) {
-        totalTests++;
-        if (typeof val === type) {
-            passedTests++;
-            var div = document.createElement('div');
-            div.className = 'test pass';
-            div.textContent = '\u2713 PASS: ' + message;
-            currentSection.appendChild(div);
-        } else {
-            failedTests++;
-            var div = document.createElement('div');
-            div.className = 'test fail';
-            div.innerHTML = '\u2717 FAIL: ' + message + '<div class="detail">Expected type "' + type + '", got "' + typeof val + '"</div>';
-            currentSection.appendChild(div);
-        }
-    }
-
-    function info(msg) {
-        var div = document.createElement('div');
-        div.className = 'info-msg';
-        div.textContent = '>> ' + msg;
-        currentSection.appendChild(div);
-    }
-
-    function finishTests() {
-        var summary = document.createElement('div');
-        if (failedTests === 0) {
-            summary.className = 'summary pass';
-            summary.innerHTML = '<strong>ALL TESTS PASSED</strong> \u2014 ' + passedTests + '/' + totalTests;
-        } else {
-            summary.className = 'summary fail';
-            summary.innerHTML = '<strong>TESTS FAILED</strong> \u2014 ' + passedTests + '/' + totalTests + ' passed, ' + failedTests + ' failed';
-        }
-        results.appendChild(summary);
-    }
+    F.assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
+    F.assert(typeof Donkeycraft.GLContext === 'function', 'Donkeycraft.GLContext registered');
+    F.assert(typeof Donkeycraft.ShaderManager === 'function', 'Donkeycraft.ShaderManager registered');
+    F.assert(typeof Donkeycraft.Camera === 'function', 'Donkeycraft.Camera registered');
 
     // ============================================================
-    // TEST 1: Namespace & Class Registration
+    // Section 2: WebGL Context Creation
     // ============================================================
-    section('1. Namespace & Class Registration');
-
-    assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
-    assert(typeof Donkeycraft.GLContext === 'function', 'Donkeycraft.GLContext registered');
-    assert(typeof Donkeycraft.ShaderManager === 'function', 'Donkeycraft.ShaderManager registered');
-    assert(typeof Donkeycraft.Camera === 'function', 'Donkeycraft.Camera registered');
-
-    // ============================================================
-    // TEST 2: WebGL Context Creation
-    // ============================================================
-    section('2. WebGL Context Creation');
+    F.section('2. WebGL Context Creation');
 
     var canvas = document.getElementById('canvas');
     var glCtx = new Donkeycraft.GLContext(canvas);
-    assert(glCtx !== null, 'GLContext instance created');
-    assert(glCtx.getGL() !== null, 'WebGL context obtained from GLContext');
+    F.assert(glCtx !== null, 'GLContext instance created');
+    F.assert(glCtx.getGL() !== null, 'WebGL context obtained from GLContext');
 
     var gl = glCtx.getGL();
-    assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
+    F.assert(gl instanceof WebGLRenderingContext, 'WebGLRenderingContext obtained');
 
     // Test capability queries
-    assert(typeof glCtx.getMaxTextureSize() === 'number', 'getMaxTextureSize returns number');
-    assert(typeof glCtx.getMaxVertexUniforms() === 'number', 'getMaxVertexUniforms returns number');
+    F.assert(typeof glCtx.getMaxTextureSize() === 'number', 'getMaxTextureSize returns number');
+    F.assert(typeof glCtx.getMaxVertexUniforms() === 'number', 'getMaxVertexUniforms returns number');
 
     // ============================================================
-    // TEST 3: Shader Compilation & Linking
+    // Section 3: Shader Compilation & Linking
     // ============================================================
-    section('3. Shader Compilation & Linking');
+    F.section('3. Shader Compilation & Linking');
 
     var shaderMgr = new Donkeycraft.ShaderManager(gl);
-    assert(shaderMgr !== null, 'ShaderManager instance created');
+    F.assert(shaderMgr !== null, 'ShaderManager instance created');
 
     // Cube vertex shader — with color attribute and uniform matrices
     var cubeVertSrc = [
@@ -216,7 +103,7 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     ].join('\n');
 
     var cubeProgId = shaderMgr.createProgram('cube', cubeVertSrc, cubeFragSrc);
-    assert(cubeProgId !== null, 'Cube shader program compiled and linked');
+    F.assert(cubeProgId !== null, 'Cube shader program compiled and linked');
 
     // Simple test shader for basic rendering
     var testVertSrc = [
@@ -230,96 +117,96 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     ].join('\n');
 
     var testProgId = shaderMgr.createProgram('test-quad', testVertSrc, testFragSrc);
-    assert(testProgId !== null, 'Test quad shader program compiled and linked');
+    F.assert(testProgId !== null, 'Test quad shader program compiled and linked');
 
     // Test attribute location caching
     shaderMgr.use('test-quad');
     var posLoc = shaderMgr.getAttribute('aPosition');
-    assert(typeof posLoc === 'number' && posLoc >= 0, 'Attribute location retrieved');
+    F.assert(typeof posLoc === 'number' && posLoc >= 0, 'Attribute location retrieved');
 
     // ============================================================
-    // TEST 4: Matrix4 — Identity, Perspective, LookAt
+    // Section 4: Matrix4 — Transform Matrices
     // ============================================================
-    section('4. Matrix4 — Transform Matrices');
+    F.section('4. Matrix4 — Transform Matrices');
 
     var identity = Donkeycraft.Matrix4.createIdentity();
     var idData = identity.getData();
-    assert(idData[0] === 1 && idData[5] === 1 && idData[10] === 1 && idData[15] === 1, 'Identity matrix diagonal = 1');
+    F.assert(idData[0] === 1 && idData[5] === 1 && idData[10] === 1 && idData[15] === 1, 'Identity matrix diagonal = 1');
 
     var persp = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, canvas.width / canvas.height, 0.1, 100);
-    assert(persp instanceof Donkeycraft.Matrix4, 'Perspective matrix created');
+    F.assert(persp instanceof Donkeycraft.Matrix4, 'Perspective matrix created');
 
     var eye = new Donkeycraft.Vector3(0, 0, 5);
     var target = new Donkeycraft.Vector3(0, 0, 0);
     var up = new Donkeycraft.Vector3(0, 1, 0);
     var lookAt = Donkeycraft.Matrix4.createLookAt(eye, target, up);
-    assert(lookAt instanceof Donkeycraft.Matrix4, 'LookAt matrix created');
+    F.assert(lookAt instanceof Donkeycraft.Matrix4, 'LookAt matrix created');
 
     var trans = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
     var tData = trans.getData();
-    assert(tData[12] === 1 && tData[13] === 2 && tData[14] === 3, 'Translation matrix offsets correct');
+    F.assert(tData[12] === 1 && tData[13] === 2 && tData[14] === 3, 'Translation matrix offsets correct');
 
     // Rotation around Y axis (90 degrees)
     var zAxis = new Donkeycraft.Vector3(0, 1, 0);
     var rotY = Donkeycraft.Matrix4.createRotation(Math.PI / 2, zAxis);
-    assert(rotY instanceof Donkeycraft.Matrix4, 'Rotation matrix created');
+    F.assert(rotY instanceof Donkeycraft.Matrix4, 'Rotation matrix created');
 
     // Matrix multiplication
     var combined = trans.multiply(rotY);
-    assert(combined instanceof Donkeycraft.Matrix4, 'Matrix multiplication returns Matrix4');
+    F.assert(combined instanceof Donkeycraft.Matrix4, 'Matrix multiplication returns Matrix4');
 
     // ============================================================
-    // TEST 5: Camera — Position, Rotation, Matrices
+    // Section 5: Camera — Position, Rotation & Matrices
     // ============================================================
-    section('5. Camera — Position, Rotation & Matrices');
+    F.section('5. Camera — Position, Rotation & Matrices');
 
     var camera = new Donkeycraft.Camera(70, 0.1, 100);
-    assert(camera !== null, 'Camera instance created');
+    F.assert(camera !== null, 'Camera instance created');
 
     var pos = camera.getPosition();
-    assert(pos instanceof Donkeycraft.Vector3, 'Camera position is Vector3');
-    assert(Math.abs(pos.x) < 0.01, 'Camera X starts at 0');
-    assert(Math.abs(pos.y - 64) < 0.01, 'Camera Y starts at 64');
-    assert(Math.abs(pos.z) < 0.01, 'Camera Z starts at 0');
+    F.assert(pos instanceof Donkeycraft.Vector3, 'Camera position is Vector3');
+    F.assert(Math.abs(pos.x) < 0.01, 'Camera X starts at 0');
+    F.assert(Math.abs(pos.y - 64) < 0.01, 'Camera Y starts at 64');
+    F.assert(Math.abs(pos.z) < 0.01, 'Camera Z starts at 0');
 
     camera.setRotation(0, 0);
-    assert(Math.abs(camera.getYaw()) < 0.01, 'Yaw is 0');
-    assert(Math.abs(camera.getPitch()) < 0.01, 'Pitch is 0');
+    F.assert(Math.abs(camera.getYaw()) < 0.01, 'Yaw is 0');
+    F.assert(Math.abs(camera.getPitch()) < 0.01, 'Pitch is 0');
 
     var forward = camera.getForward();
-    assert(Math.abs(forward.z + 1) < 0.01, 'Forward Z is ~-1 at yaw=0 (looking down -Z)');
+    F.assert(Math.abs(forward.z + 1) < 0.01, 'Forward Z is ~-1 at yaw=0 (looking down -Z)');
 
     var right = camera.getRight();
-    assert(Math.abs(right.x - 1) < 0.01, 'Right X is ~1 at yaw=0');
+    F.assert(Math.abs(right.x - 1) < 0.01, 'Right X is ~1 at yaw=0');
 
     var matrices = camera.getMatrices();
-    assert(matrices.projection instanceof Donkeycraft.Matrix4, 'Projection matrix is Matrix4');
-    assert(matrices.view instanceof Donkeycraft.Matrix4, 'View matrix is Matrix4');
+    F.assert(matrices.projection instanceof Donkeycraft.Matrix4, 'Projection matrix is Matrix4');
+    F.assert(matrices.view instanceof Donkeycraft.Matrix4, 'View matrix is Matrix4');
 
     // Test target calculation
     camera.setPosition(0, 64, 0);
     var target = camera.getTarget();
-    assert(Math.abs(target.z + 1) < 0.01, 'Target Z is ~-1 at yaw=0');
+    F.assert(Math.abs(target.z + 1) < 0.01, 'Target Z is ~-1 at yaw=0');
 
     // ============================================================
-    // TEST 6: Shader Uniform Setting
+    // Section 6: Shader Uniform Setting
     // ============================================================
-    section('6. Shader Uniform Setting');
+    F.section('6. Shader Uniform Setting');
 
     shaderMgr.use('test-quad');
     shaderMgr.setFloat('uTest', 0.5);
-    assert(true, 'setFloat completed without error');
+    F.assert(true, 'setFloat completed without error');
 
     shaderMgr.setVec3('uTest3', 1.0, 0.0, 0.0);
-    assert(true, 'setVec3 completed without error');
+    F.assert(true, 'setVec3 completed without error');
 
     shaderMgr.setMat4('uTestMat', Donkeycraft.Matrix4.createIdentity());
-    assert(true, 'setMat4 completed without error');
+    F.assert(true, 'setMat4 completed without error');
 
     // ============================================================
-    // TEST 7: WebGL — Render a Green Quad (Visual Test)
+    // Section 7: WebGL — Render a Green Quad (Visual Test)
     // ============================================================
-    section('7. WebGL — Render Green Quad (Visual Confirmation)');
+    F.section('7. WebGL — Render Green Quad (Visual Confirmation)');
 
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.1, 0.1, 0.2, 1.0);
@@ -351,15 +238,15 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     gl.deleteBuffer(quadBuf);
 
     var err = gl.getError();
-    assert(err === gl.NO_ERROR, 'No WebGL errors after rendering quad');
+    F.assert(err === gl.NO_ERROR, 'No WebGL errors after rendering quad');
     visualPass = true; // If we got here without exception, canvas rendered
 
-    info('Green quad rendered to canvas — verify visually above.');
+    F.info('Green quad rendered to canvas — verify visually above.');
 
     // ============================================================
-    // TEST 8: Rotating Colored Cube (Visual Test)
+    // Section 8: Rotating Colored Cube (Visual Test)
     // ============================================================
-    section('8. WebGL — Rotating Colored Cube (Live Animation)');
+    F.section('8. WebGL — Rotating Colored Cube (Live Animation)');
 
     // Setup cube rendering with model/view/projection matrices
     gl.enable(gl.DEPTH_TEST);
@@ -438,7 +325,7 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
     ].join('\n');
 
     var rotProgId = shaderMgr.createProgram('rotating-cube', rotVertSrc, rotFragSrc);
-    assert(rotProgId !== null, 'Rotating cube shader compiled');
+    F.assert(rotProgId !== null, 'Rotating cube shader compiled');
 
     // Start animation loop
     var animRunning = false;
@@ -570,8 +457,8 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
 
     // Wait for animation to run, then evaluate
     setTimeout(function() {
-        assert(cubeRotated, 'Rotating colored cube rendered successfully');
-        assert(visualPass, 'WebGL canvas rendered without errors');
+        F.assert(cubeRotated, 'Rotating colored cube rendered successfully');
+        F.assert(visualPass, 'WebGL canvas rendered without errors');
 
         // Stop animation
         animRunning = false;
@@ -584,10 +471,10 @@ canvas { border: 1px solid #333; max-width: 100%; image-rendering: pixelated; }
         var badVert = 'THIS IS NOT VALID GLSL {{{';
         var badFrag = 'MORE BAD GLSL }}}';
         var badProg = shaderMgr.createProgram('bad-shader', badVert, badFrag);
-        assert(badProg === null || badProg === undefined, 'Invalid shader returns null/undefined (error caught)');
+        F.assert(badProg === null || badProg === undefined, 'Invalid shader returns null/undefined (error caught)');
 
-        info('Cube animation ran for ~2 seconds — verify rotating colored cube above.');
-        finishTests();
+        F.info('Cube animation ran for ~2 seconds — verify rotating colored cube above.');
+        F.finishTests();
     }, 2200);
 
 })();
