@@ -14,7 +14,7 @@
 
     /**
      * Generate an optimized index buffer from unindexed vertex data.
-     * Merges identical vertices to reduce draw call overhead.
+     * Merges identical vertices using a numeric hash for fast lookup.
      * @param {Object} geometry - Geometry with unindexed vertex data.
      * @param {number} [epsilon=0.001] - Float comparison tolerance.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
@@ -25,24 +25,27 @@
         var vertexCount = geometry.vertexCount;
         var faceDataSize = this._faceDataSize;
 
-        // Key: position(3) + normal(3) + light(1) — UV excluded as it varies per face.
-        var vertexKeys = {};
+        // Hash-based vertex deduplication using position + normal + light (UV excluded).
+        var hashTable = {};
         var uniqueCount = 0;
         var vertexToIndex = new Int32Array(vertexCount);
-
-        // Pre-allocate unique vertices array (will be trimmed later)
         var uniqueVertices = new Float32Array(vertexCount * faceDataSize);
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            var key = vertices[base] + ',' + vertices[base + 1] + ',' + vertices[base + 2] +
-                      ',' + vertices[base + 5] + ',' + vertices[base + 6] + ',' +
-                      vertices[base + 7] + ',' + vertices[base + 8];
+            // Numeric hash: combine position(3) + normal(3) + light(1) into a string key
+            // using rounded integer representation for exact matching.
+            var hx = Math.round(vertices[base] / epsilon);
+            var hy = Math.round(vertices[base + 1] / epsilon);
+            var hz = Math.round(vertices[base + 2] / epsilon);
+            var hn = Math.round((vertices[base + 5] + vertices[base + 6] + vertices[base + 7]) / epsilon);
+            var hl = Math.round(vertices[base + 8] / epsilon);
+            var key = hx ^ (hy << 10) ^ (hz << 20) ^ (hn << 30) ^ (hl << 5);
 
-            if (vertexKeys[key] !== undefined) {
-                vertexToIndex[i] = vertexKeys[key];
+            if (hashTable[key] !== undefined) {
+                vertexToIndex[i] = hashTable[key];
             } else {
-                vertexKeys[key] = uniqueCount;
+                hashTable[key] = uniqueCount;
                 vertexToIndex[i] = uniqueCount;
 
                 var destBase = uniqueCount * faceDataSize;
@@ -53,16 +56,14 @@
             }
         }
 
-        // Build index buffer from existing indices or generate quad indices
+        // Build index buffer from existing indices or generate quad indices.
         var indices;
         if (geometry.indices && geometry.indexCount > 0) {
-            // Remap existing indices to unique vertices
             indices = new Uint16Array(geometry.indexCount);
             for (var i = 0; i < geometry.indexCount; i++) {
                 indices[i] = vertexToIndex[geometry.indices[i]];
             }
         } else {
-            // Generate quad indices from unindexed data
             var quadCount = Math.floor(vertexCount / 4);
             indices = new Uint16Array(quadCount * 6);
             for (var q = 0; q < quadCount; q++) {
@@ -99,14 +100,20 @@
 
         if (indexCount === 0) return geometry;
 
-        var keptTriangles = [];
+        var maxTriangles = Math.floor(indexCount / 3);
+        var keptIndices;
+        if (geometry.indices instanceof Uint32Array) {
+            keptIndices = new Uint32Array(maxTriangles * 3);
+        } else {
+            keptIndices = new Uint16Array(maxTriangles * 3);
+        }
+        var keptCount = 0;
 
         for (var i = 0; i < indexCount; i += 3) {
             var i0 = indices[i];
             var i1 = indices[i + 1];
             var i2 = indices[i + 2];
 
-            // Get triangle vertices
             var v0x = vertices[i0 * faceDataSize];
             var v0y = vertices[i0 * faceDataSize + 1];
             var v0z = vertices[i0 * faceDataSize + 2];
@@ -119,40 +126,37 @@
             var v2y = vertices[i2 * faceDataSize + 1];
             var v2z = vertices[i2 * faceDataSize + 2];
 
-            // Compute edge vectors
             var e1x = v1x - v0x, e1y = v1y - v0y, e1z = v1z - v0z;
             var e2x = v2x - v0x, e2y = v2y - v0y, e2z = v2z - v0z;
 
-            // Compute face normal via cross product
             var nx = e1y * e2z - e1z * e2y;
             var ny = e1z * e2x - e1x * e2z;
             var nz = e1x * e2y - e1y * e2x;
 
-            // Vector from triangle center to camera
             var cx = cameraPos.x - (v0x + v1x + v2x) / 3;
             var cy = cameraPos.y - (v0y + v1y + v2y) / 3;
             var cz = cameraPos.z - (v0z + v1z + v2z) / 3;
 
-            // Dot product: if positive, face is front-facing
-            var dot = nx * cx + ny * cy + nz * cz;
-            if (dot > 0) {
-                keptTriangles.push(i0, i1, i2);
+            if (nx * cx + ny * cy + nz * cz > 0) {
+                keptIndices[keptCount * 3]     = i0;
+                keptIndices[keptCount * 3 + 1] = i1;
+                keptIndices[keptCount * 3 + 2] = i2;
+                keptCount++;
             }
         }
 
-        // Preserve the original index type from input geometry
         var resultIndices;
         if (geometry.indices instanceof Uint32Array) {
-            resultIndices = new Uint32Array(keptTriangles);
+            resultIndices = keptIndices.subarray(0, keptCount * 3);
         } else {
-            resultIndices = new Uint16Array(keptTriangles);
+            resultIndices = keptIndices.subarray(0, keptCount * 3);
         }
 
         return {
             vertices: vertices,
             indices: resultIndices,
             vertexCount: geometry.vertexCount,
-            indexCount: keptTriangles.length
+            indexCount: keptCount * 3
         };
     };
 

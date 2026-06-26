@@ -6,7 +6,7 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * BreakParticle — Individual particle data.
+     * BreakParticle — Individual particle state for the physics simulation.
      */
     function BreakParticle(x, y, z, vx, vy, vz, color, lifetime) {
         this.x = x;
@@ -29,6 +29,8 @@
         this._shaderManager = shaderManager;
         this._particles = [];
         this._maxParticles = 256;
+        this._particleCountPerBlock = 8;
+        this._gravity = -15.0;
 
         this._vertexBuffer = null;
         this._contextLost = false;
@@ -59,7 +61,7 @@
      * @param {number} blockId - The block ID that was broken.
      */
     Donkeycraft.BreakParticles.prototype.spawn = function(x, y, z, blockId) {
-        var count = 8;
+        var count = Math.min(this._particleCountPerBlock, this._maxParticles - this._particles.length);
         for (var i = 0; i < count && this._particles.length < this._maxParticles; i++) {
             var vx = (Math.random() - 0.5) * 2;
             var vy = Math.random() * 1.5 + 0.5;
@@ -97,7 +99,7 @@
      * @param {number} gravity - Gravity acceleration (negative = downward).
      */
     Donkeycraft.BreakParticles.prototype.update = function(deltaTime, gravity) {
-        gravity = gravity || -15.0;
+        var grav = gravity !== undefined ? gravity : this._gravity;
 
         for (var i = this._particles.length - 1; i >= 0; i--) {
             var p = this._particles[i];
@@ -108,7 +110,7 @@
                 continue;
             }
 
-            p.vy += gravity * deltaTime;
+            p.vy += grav * deltaTime;
             p.x += p.vx * deltaTime;
             p.y += p.vy * deltaTime;
             p.z += p.vz * deltaTime;
@@ -117,8 +119,7 @@
 
     /**
      * Render all active particles using the GUI shader program.
-     * Particles are rendered as billboards that always face the camera.
-     * Skips rendering if the WebGL context was lost.
+     * Particles are rendered as billboard quads that always face the camera.
      */
     Donkeycraft.BreakParticles.prototype.render = function(camera) {
         var gl = this._gl;
@@ -131,6 +132,8 @@
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
+
+        this._shaderManager.setInt('uHasTexture', 0);
 
         var right = camera.getRight();
         var up = camera.getUp();

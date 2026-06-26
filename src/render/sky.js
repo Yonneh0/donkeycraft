@@ -12,13 +12,13 @@
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._timeOfDay = 0.5;
+        this._starsVisible = true;
+        this._sunMoonVisible = true;
 
-        // Sky dome geometry and buffers
         this._skyDomeGeometry = null;
         this._skyDomeVertBuf = null;
         this._skyDomeIndexBuf = null;
 
-        // Reusable Float32Array for sky view matrix (avoids per-frame allocation)
         this._skyViewTemp = new Float32Array(16);
 
         this._buildSkyDome();
@@ -66,6 +66,38 @@
     };
 
     /**
+     * Set whether stars are visible.
+     * @param {boolean} visible - True to show stars.
+     */
+    Donkeycraft.Sky.prototype.setStarsVisible = function(visible) {
+        this._starsVisible = !!visible;
+    };
+
+    /**
+     * Check if stars are currently visible.
+     * @returns {boolean}
+     */
+    Donkeycraft.Sky.prototype.getStarsVisible = function() {
+        return this._starsVisible;
+    };
+
+    /**
+     * Set whether sun and moon are visible in the sky.
+     * @param {boolean} visible - True to show sun/moon.
+     */
+    Donkeycraft.Sky.prototype.setSunMoonVisible = function(visible) {
+        this._sunMoonVisible = !!visible;
+    };
+
+    /**
+     * Check if sun and moon are currently visible.
+     * @returns {boolean}
+     */
+    Donkeycraft.Sky.prototype.getSunMoonVisible = function() {
+        return this._sunMoonVisible;
+    };
+
+    /**
      * Set the time of day (0-1).
      * @param {number} t - Time value in [0, 1).
      */
@@ -94,13 +126,12 @@
 
         if (!this._shaderManager.use('sky')) return;
 
-        // Disable depth writing so sky doesn't occlude terrain
         gl.depthMask(false);
 
         var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
 
-        // Zero out translation from view matrix to keep sky fixed at world center.
+        // Zero out translation to keep sky fixed at world center.
         var viewData = matrices.view.getData();
         for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
         this._skyViewTemp[12] = 0;

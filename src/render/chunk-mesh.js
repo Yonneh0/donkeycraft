@@ -6,7 +6,7 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * ChunkMesh — Manages WebGL buffers for a single chunk's geometry.
+     * ChunkMesh — Manages WebGL buffers and draw calls for a single chunk's geometry.
      */
     Donkeycraft.ChunkMesh = function(gl, shaderManager) {
         this._gl = gl;
@@ -65,7 +65,7 @@
 
     /**
      * Update the mesh with new geometry data.
-     * @param {Object} geometry - Geometry object with vertices (Float32Array) and indices (Uint16Array or Uint32Array).
+     * @param {Object} geometry - Geometry with vertices (Float32Array) and indices (Uint16Array or Uint32Array).
      */
     Donkeycraft.ChunkMesh.prototype.update = function(geometry) {
         this._geometry = geometry;
@@ -76,7 +76,7 @@
     };
 
     /**
-     * Upload geometry to WebGL buffers.
+     * Upload geometry data to WebGL buffers.
      */
     Donkeycraft.ChunkMesh.prototype.uploadBuffers = function() {
         var gl = this._gl;
@@ -110,72 +110,89 @@
         var gl = this._gl;
         if (!gl || !this._indexBuffer || this._indexCount === 0) return false;
 
-        // Guard: don't draw destroyed or context-lost meshes
         if (this._destroyed || this._contextLost) return false;
 
-        // Upload if dirty
         if (this._dirty && this._geometry) {
             this.uploadBuffers();
         }
 
-        // Determine index type based on geometry data and extension support
+        // Determine index type based on geometry data and extension support.
         var indexType = gl.UNSIGNED_SHORT;
         if (this._geometryUsesUint32) {
             if (this._supportsUint32Indices) {
                 indexType = gl.UNSIGNED_INT;
             } else {
-                // Geometry requires Uint32 but extension is unavailable — cannot draw safely
+                // Geometry requires Uint32 but extension is unavailable — cannot draw safely.
                 Donkeycraft.Logger.error('ChunkMesh', 'Geometry uses Uint32 indices but OES_element_index_uint is not supported. Chunk will not render.');
                 return false;
             }
         }
 
-        // Bind vertex buffer
+        // Bind vertex buffer and set up attribute pointers.
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
 
-        // Get attribute locations from shader manager
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var uvLoc = this._shaderManager.getAttribute('aUV');
         var normLoc = this._shaderManager.getAttribute('aNormal');
         var lightLoc = this._shaderManager.getAttribute('aLight');
 
-        var vertexSize = 9;
-
-        // Position attribute (floats, stride 9*4, offset 0)
+        // Position attribute (3 floats at offset 0)
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, vertexSize * 4, 0);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
         }
 
-        // UV attribute (floats, stride 9*4, offset 3*4)
+        // UV attribute (2 floats at offset 12)
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, vertexSize * 4, 12);
+            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
         }
 
-        // Normal attribute (floats, stride 9*4, offset 5*4)
+        // Normal attribute (3 floats at offset 20)
         if (normLoc >= 0) {
             gl.enableVertexAttribArray(normLoc);
-            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, vertexSize * 4, 20);
+            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, 9 * 4, 20);
         }
 
-        // Light attribute (floats, stride 9*4, offset 8*4)
+        // Light attribute (1 float at offset 32)
         if (lightLoc >= 0) {
             gl.enableVertexAttribArray(lightLoc);
-            gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, vertexSize * 4, 32);
+            gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, 9 * 4, 32);
         }
 
-        // Draw using indices (respect index type)
+        // Draw using indices.
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
         gl.drawElements(gl.TRIANGLES, this._indexCount, indexType, 0);
 
-        // Disable attributes
+        // Disable attribute pointers.
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (normLoc >= 0) gl.disableVertexAttribArray(normLoc);
         if (lightLoc >= 0) gl.disableVertexAttribArray(lightLoc);
 
         return true;
+    };
+
+    /**
+     * Check if the mesh is dirty (needs buffer upload).
+     * @returns {boolean}
+     */
+    Donkeycraft.ChunkMesh.prototype.isDirty = function() {
+        return this._dirty;
+    };
+
+    /**
+     * Mark the mesh as clean (buffers are up to date).
+     */
+    Donkeycraft.ChunkMesh.prototype.markClean = function() {
+        this._dirty = false;
+    };
+
+    /**
+     * Mark the mesh as dirty (buffers need updating).
+     */
+    Donkeycraft.ChunkMesh.prototype.markDirty = function() {
+        this._dirty = true;
     };
 
     /**

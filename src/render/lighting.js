@@ -94,13 +94,12 @@
 
     /**
      * Apply lighting uniforms to a shader program via the shader manager.
-     * Note: The terrain shader currently uses fog-based lighting (uFogColor, uFogDensity)
-     * set by Fog.applyToFogUniforms() instead of per-light uniforms.
-     * This method is provided for potential future shader programs that use directional lighting.
+     * Sets: uSunIntensity (float), uAmbient (float), uSkyColor (vec3), uSunDirection (vec3).
      * @param {ShaderManager} shaderManager - The shader manager instance.
+     * @returns {boolean} True if uniforms were set successfully.
      */
     Donkeycraft.Lighting.prototype.applyToShader = function(shaderManager) {
-        if (!shaderManager) return;
+        if (!shaderManager) return false;
 
         var sunIntensity = this.getSunIntensity();
         var skyColor = this.getSkyColor();
@@ -110,6 +109,7 @@
         shaderManager.setFloat('uAmbient', this.getAmbientLight());
         shaderManager.setVec3('uSkyColor', skyColor.r, skyColor.g, skyColor.b);
         shaderManager.setVec3('uSunDirection', sunDir.x, sunDir.y, sunDir.z);
+        return true;
     };
 
 })();

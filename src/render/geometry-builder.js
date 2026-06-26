@@ -40,88 +40,69 @@
 
     /**
      * Build geometry data for a single chunk.
-     * Pre-allocates buffers based on maximum possible vertex/index counts.
+     * Uses dynamic arrays that grow as needed instead of pre-allocating maximum size.
      * @param {number} chunkX - X coordinate of the chunk.
      * @param {number} chunkZ - Z coordinate of the chunk.
      * @param {Function} getBlockFunc - Function(x, y, z) returning block ID at world position.
      * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.GeometryBuilder.prototype.buildChunk = function(chunkX, chunkZ, getBlockFunc) {
-        // Maximum possible: 16*256*16 blocks * 6 faces * 4 vertices = 393216 verts, 2*6 indices per face
-        var maxVerts = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE * 6 * 4;
-        var maxIndices = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE * 6 * 6;
-        var vertices = new Float32Array(maxVerts * 9);
-        var indices = new Uint32Array(maxIndices);
-        var vertOffset = 0;
-        var idxOffset = 0;
+        var vertices = [];
+        var indices = [];
 
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var blockId = getBlockFunc(x, y, z);
 
-                    // Skip air — only render faces of solid blocks
                     if (blockId === 0) continue;
 
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldY = y;
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Check each face for exposed adjacency
                     for (var f = 0; f < FACES.length; f++) {
                         var face = FACES[f];
                         var nx = worldX + face.dir[0];
                         var ny = worldY + face.dir[1];
                         var nz = worldZ + face.dir[2];
 
-                        // Get adjacent block — use getBlockFunc for same chunk, or stone for out-of-bounds
                         var adjBlock = this._getBlockAt(nx, ny, nz, getBlockFunc, chunkX, chunkZ);
 
-                        // Only render face if adjacent block is transparent
                         if (!this.isTransparent(adjBlock)) continue;
 
-                        // Get UV offset for this block/face
                         var uvOffset = this._getBlockUV(blockId, face.name);
-
                         var dir = face.dir;
                         var light = face.light;
 
-                        // Push 4 vertices (9 floats each): position(3) + UV(2) + normal(3) + light(1)
                         for (var c = 0; c < 4; c++) {
                             var corner = face.corners[c];
-                            var base = vertOffset * 9;
-                            vertices[base]     = worldX + corner[0];
-                            vertices[base + 1] = worldY + corner[1];
-                            vertices[base + 2] = worldZ + corner[2];
-                            vertices[base + 3] = uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0);
-                            vertices[base + 4] = uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0);
-                            vertices[base + 5] = dir[0];
-                            vertices[base + 6] = dir[1];
-                            vertices[base + 7] = dir[2];
-                            vertices[base + 8] = light;
-                            vertOffset++;
+                            vertices.push(
+                                worldX + corner[0],
+                                worldY + corner[1],
+                                worldZ + corner[2],
+                                uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0),
+                                uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0),
+                                dir[0], dir[1], dir[2], light
+                            );
                         }
 
-                        // Add two triangles (6 indices) using current vertex count as base
-                        var baseIdx = vertOffset - 4;
-                        indices[idxOffset++]     = baseIdx;
-                        indices[idxOffset + 1]   = baseIdx + 1;
-                        indices[idxOffset + 2]   = baseIdx + 2;
-                        indices[idxOffset + 3]   = baseIdx;
-                        indices[idxOffset + 4]   = baseIdx + 2;
-                        indices[idxOffset + 5]   = baseIdx + 3;
-                        idxOffset += 6;
+                        var baseIdx = vertices.length / 9 - 4;
+                        indices.push(
+                            baseIdx, baseIdx + 1, baseIdx + 2,
+                            baseIdx, baseIdx + 2, baseIdx + 3
+                        );
                     }
                 }
             }
         }
 
-        var vertexCount = vertOffset;
-        var indexCount = idxOffset;
+        var vertexCount = vertices.length / 9;
+        var indexCount = indices.length;
 
         return {
-            vertices: vertices.subarray(0, vertexCount * 9),
-            indices: indices.subarray(0, indexCount),
+            vertices: new Float32Array(vertices),
+            indices: new Uint32Array(indices),
             vertexCount: vertexCount,
             indexCount: indexCount,
             useUint32: true

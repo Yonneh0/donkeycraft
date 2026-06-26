@@ -20,10 +20,10 @@ varying float vDepth;
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
     vUV = aUV;
-    vNormal = normalize(mat3(uModel) * aNormal);
+    vNormal = aNormal;
     vLight = aLight;
 
-    // View-space Z for exponential distance fog (negate for positive distance)
+    // View-space Z for exponential distance fog
     vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
     vDepth = -viewPos.z;
 }
@@ -103,6 +103,6 @@ varying vec4 vColor;
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
     vUV = aUV;
-    vColor = vec4(aLight);
+    vColor = vec4(aLight, aLight, aLight, 1.0);
 }
 `;

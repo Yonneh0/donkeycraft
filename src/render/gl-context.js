@@ -23,6 +23,7 @@
     /**
      * Create the WebGL 1 context from the canvas element.
      * @private
+     * @returns {boolean}
      */
     Donkeycraft.GLContext.prototype._createContext = function() {
         try {
@@ -40,7 +41,6 @@
             }
 
             this._queryCapabilities();
-            Donkeycraft.Logger.info('GLContext', 'WebGL 1 context created successfully');
             return true;
 
         } catch (e) {
@@ -52,6 +52,7 @@
     /**
      * Query WebGL capabilities and limits.
      * @private
+     * @returns {void}
      */
     Donkeycraft.GLContext.prototype._queryCapabilities = function() {
         var gl = this._context;

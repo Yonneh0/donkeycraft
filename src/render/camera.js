@@ -20,7 +20,6 @@
         this._projectionMatrix = null;
         this._viewMatrix = null;
 
-        // Cached direction vectors (normalized in-place each call)
         this._forward = new Donkeycraft.Vector3();
         this._right = new Donkeycraft.Vector3();
     };
@@ -144,7 +143,6 @@
         this._projectionMatrix = Donkeycraft.Matrix4.createPerspective(
             fovRadians, this._aspect, this._near, this._far
         );
-        return this._projectionMatrix;
     };
 
     /**
@@ -156,7 +154,6 @@
         this._viewMatrix = Donkeycraft.Matrix4.createLookAt(
             this._position, target, new Donkeycraft.Vector3(0, 1, 0)
         );
-        return this._viewMatrix;
     };
 
     /**
@@ -165,7 +162,7 @@
      */
     Donkeycraft.Camera.prototype.getProjection = function() {
         if (!this._projectionMatrix) {
-            return this.updateProjection();
+            this.updateProjection();
         }
         return this._projectionMatrix;
     };
@@ -176,7 +173,7 @@
      */
     Donkeycraft.Camera.prototype.getView = function() {
         if (!this._viewMatrix) {
-            return this.updateView();
+            this.updateView();
         }
         return this._viewMatrix;
     };
@@ -198,7 +195,7 @@
      */
     Donkeycraft.Camera.prototype.setAspect = function(aspect) {
         this._aspect = aspect;
-        this._projectionMatrix = null; // Force rebuild
+        this._projectionMatrix = null;
     };
 
     /**
