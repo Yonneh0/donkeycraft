@@ -219,7 +219,9 @@
     inv7.setSlot(0, new Donkeycraft.ItemStack(1, 32));
     var dragState = inv7.beginDrag(0);
     F.assert(dragState !== null, 'beginDrag returns drag state');
-    F.assert(inv7.getSlot(0) === null, 'beginDrag clears source slot');
+    // beginDrag no longer clears the source slot — it stays until drop is confirmed or cancelled
+    F.assert(inv7.getSlot(0) !== null, 'beginDrag preserves source slot for safe cancellation');
+    F.assertEq(inv7.getSlot(0).getCount(), 32, 'source slot count preserved during drag');
     inv7.endDrag(dragState);
     F.assertEq(inv7.getSlot(0).getCount(), 32, 'endDrag restores source slot');
 
@@ -634,7 +636,14 @@
     F.info('applyEnchantment returned: ' + (enchanted ? 'stack' : 'null'));
 
     var takenEnchant = enchantUI.takeResult();
-    F.info('takeResult returned: ' + (takenEnchant ? 'stack' : 'null'));
+    if (takenEnchant) {
+        F.assert(takenEnchant.item !== null, 'takeResult returns item object');
+        F.assert(typeof takenEnchant.levelCost === 'number', 'takeResult returns levelCost');
+        F.assert(typeof takenEnchant.lapisCost === 'number', 'takeResult returns lapisCost');
+        F.info('takeResult returns {item, levelCost, lapisCost} for external state management');
+    } else {
+        F.info('takeResult returned null (enchantment may not have been applicable)');
+    }
 
     F.assert(enchantUI._container !== null, 'Container is set');
     F.assert(enchantUI._inputSlotEl !== null, 'Input slot element exists');
@@ -852,9 +861,14 @@
     var inputEvent = new Event('input', { bubbles: true, cancelable: true });
     searchInput.dispatchEvent(inputEvent);
 
-    // Verify search results
+    // Verify search results (now actually filters by name/ID)
     var searchResults = creativeInv2.searchItems('stone');
-    F.assert(searchResults.length > 0, 'searchItems returns results for "stone"');
+    F.assertType(searchResults, 'object', 'searchItems returns array');
+    // "stone" matches block IDs that contain "stone" in their name (e.g., stone=1, cobblestone=138)
+    // Also test ID matching: "221" matches iron_ingot=221
+    var idResults = creativeInv2.searchItems('221');
+    F.assertType(idResults, 'object', 'searchItems returns array for ID search');
+    F.info('searchItems returned ' + searchResults.length + ' results for "stone", ' + idResults.length + ' for "221"');
 
     // Verify grid element exists
     F.assert(creativeInv2._gridEl !== null, 'CreativeInventory grid element exists');

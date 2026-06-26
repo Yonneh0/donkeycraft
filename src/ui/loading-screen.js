@@ -135,9 +135,9 @@
         if (this._progressBar) this._progressBar.style.display = 'none';
         if (this._tipEl) this._tipEl.style.display = 'none';
 
-        // Show error
+        // Show error (use textContent to prevent XSS)
         this._errorEl.style.display = 'block';
-        this._errorEl.innerHTML = '<strong style="color:#e74c3c;font-size:1.2em;">ERROR</strong><br>' + errorMessage;
+        this._errorEl.textContent = 'ERROR: ' + errorMessage;
 
         // Update message
         if (this._messageEl) {
