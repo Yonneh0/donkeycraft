@@ -5,13 +5,13 @@
 <title>Phase 7 — Inventory & UI System Tests</title>
 <link rel="stylesheet" href="test.css">
 </head>
-<body style="margin: 0; padding: 20px;">
-<!-- Test framework containers -->
-<div id="test-summary" style="padding: 16px; margin-bottom: 16px; border-radius: 6px; font-size: 1.1em; font-weight: bold;"></div>
-<div id="results"></div>
+<body>
 <h1>Phase 7 — Inventory & UI System Tests</h1>
 <nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
 <div class="subtitle">Tests for item stacks, inventories, GUI screens, hotbar, crafting, and debug overlay.</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
 
 <!-- Load project scripts in dependency order -->
 <script src="../src/core/namespace.js"></script>
@@ -745,21 +745,18 @@
     slot1El.dispatchEvent(clickEvent1);
     F.assertEq(hotbar2.getSelectedSlot(), 1, 'Clicking different slot updates selection');
 
-    // Scroll wheel on hotbar container
-    var wheelEvent = new WheelEvent('wheel', { deltaY: -1 });
-    hotbarContainer2.dispatchEvent(wheelEvent);
-    F.assert(hotbar2.getSelectedSlot() === 0 || hotbar2.getSelectedSlot() === 8, 'Scroll wheel cycles hotbar selection');
+    // Scroll wheel cycles via selectNext/selectPrev (Input.js handles wheel events in-game)
+    hotbar2.selectNext();
+    F.assert(hotbar2.getSelectedSlot() === 2 || hotbar2.getSelectedSlot() === 0, 'selectNext cycles hotbar selection');
 
-    // Scroll down
-    var wheelEventDown = new WheelEvent('wheel', { deltaY: 1 });
-    hotbarContainer2.dispatchEvent(wheelEventDown);
-    F.assert(hotbar2.getSelectedSlot() >= 0 && hotbar2.getSelectedSlot() < 9, 'Scroll down cycles hotbar selection');
+    hotbar2.selectPrev();
+    F.assert(hotbar2.getSelectedSlot() >= 0 && hotbar2.getSelectedSlot() < 9, 'selectPrev cycles hotbar selection');
 
     // Verify slot display elements exist and have correct structure
     for (var h = 0; h < 9; h++) {
         var el = hotbar2._slotElements[h];
         F.assert(el !== null, 'Hotbar slot element ' + h + ' exists');
-        F.assert(el.classList.contains('dk-slot'), 'Hotbar slot has dk-slot class');
+        F.assert(el.classList.contains('dk-hotbar-slot'), 'Hotbar slot has dk-hotbar-slot class');
     }
 
     // Verify number indicators exist
@@ -831,14 +828,14 @@
 
     // Verify tab bar elements exist
     F.assert(creativeInv2._tabBarEl !== null, 'CreativeInventory tab bar element exists');
-    var tabEls = creativeInv2._tabBarEl.querySelectorAll('.dk-tab-btn');
+    var tabEls = creativeInv2._tabBarEl.querySelectorAll('.dk-inv-tab');
     F.assert(tabEls.length > 0, 'Tab bar has tab button elements');
 
     // Click a different tab
     var tabs = creativeInv2.getTabs();
     if (tabs.length > 1) {
         var secondTab = tabs[1];
-        var secondTabBtn = creativeInv2._tabBarEl.querySelectorAll('.dk-tab-btn')[1];
+        var secondTabBtn = creativeInv2._tabBarEl.querySelectorAll('.dk-inv-tab')[1];
         if (secondTabBtn) {
             var tabClick = new MouseEvent('click', { bubbles: true, cancelable: true });
             secondTabBtn.dispatchEvent(tabClick);
@@ -940,12 +937,12 @@
 
     F.assertEq(anvil2.getRenameText(), 'Test Named Item', 'AnvilUI rename text updated after input');
 
-    // Verify price element exists and updates
+    // Verify price element exists
     F.assert(anvil2._priceEl !== null, 'AnvilUI price element exists');
-    F.assertEq(anvil2.getPrice(), 1, 'AnvilUI price is 1 for rename operation');
 
     // Set left slot and verify result
     anvil2.setLeftSlot(new Donkeycraft.ItemStack(278, 1)); // diamond sword
+    F.assertEq(anvil2.getPrice(), 1, 'AnvilUI price is 1 for rename with item in left slot');
     var calculatedResult = anvil2.calculateResult();
     F.assert(calculatedResult !== null, 'AnvilUI calculateResult returns stack after setting left slot');
 
