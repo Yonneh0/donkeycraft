@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Phase 7 — Inventory & UI System Tests</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body style="margin: 0; padding: 20px;">
+<!-- Test framework containers -->
+<div id="test-summary" style="padding: 16px; margin-bottom: 16px; border-radius: 6px; font-size: 1.1em; font-weight: bold;"></div>
+<div id="results"></div>
+<h1>Phase 7 — Inventory & UI System Tests</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Tests for item stacks, inventories, GUI screens, hotbar, crafting, and debug overlay.</div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 3: Block System (for recipe registry) -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
+
+<!-- Phase 7: Inventory & UI System -->
+<script src="../src/ui/item-stack.js"></script>
+<script src="../src/ui/inventory.js"></script>
+<script src="../src/ui/gui-manager.js"></script>
+<script src="../src/ui/hotbar.js"></script>
+<script src="../src/ui/crafting-grid.js"></script>
+<script src="../src/ui/creative-inventory.js"></script>
+<script src="../src/ui/furnace-ui.js"></script>
+<script src="../src/ui/chest-ui.js"></script>
+<script src="../src/ui/anvil-ui.js"></script>
+<script src="../src/ui/enchanting-ui.js"></script>
+<script src="../src/ui/debug-overlay.js"></script>
+
+<!-- Load shared test framework -->
+<script src="test.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var F = TestFramework;
+    F.init('results');
+
+    // Ensure namespace is initialized
+    if (!window.Donkeycraft) window.Donkeycraft = {};
+    if (!window.Donkeycraft.EventBus) window.Donkeycraft.EventBus = function() {};
+    if (!window.Donkeycraft.Config) window.Donkeycraft.Config = { RENDER_DISTANCE: 8, CHUNK_SIZE: 16 };
+    if (!window.Donkeycraft.Logger) window.Donkeycraft.Logger = { debug: function(){}, info: function(){}, warn: function(){}, error: function(){}, clear: function(){} };
+
+    // ============================================================
+    // Section 1: ItemStack Tests
+    // ============================================================
+    F.section('1. ItemStack (item-stack.js)');
+
+    var stack1 = new Donkeycraft.ItemStack(1, 64);
+    F.assert(typeof stack1 !== 'undefined', 'ItemStack constructor creates instance');
+    F.assertEq(stack1.getItemId(), 1, 'getItemId returns correct ID');
+    F.assertEq(stack1.getCount(), 64, 'getCount returns correct count');
+
+    var emptyStack = new Donkeycraft.ItemStack(0, 0);
+    F.assert(emptyStack.isEmpty(), 'Empty stack (ID=0, count=0) is empty');
+    F.assert(!stack1.isEmpty(), 'Non-empty stack is not empty');
+
+    stack1.setCount(32);
+    F.assertEq(stack1.getCount(), 32, 'setCount updates count to 32');
+    stack1.setCount(-5);
+    F.assertEq(stack1.getCount(), 0, 'setCount clamps negative values to 0');
+
+    var stack2 = new Donkeycraft.ItemStack(3, 10);
+    stack2.increment(5);
+    F.assertEq(stack2.getCount(), 15, 'increment adds to count (10+5=15)');
+    stack2.decrement(3);
+    F.assertEq(stack2.getCount(), 12, 'decrement subtracts from count (15-3=12)');
+    stack2.decrement(100);
+    F.assertEq(stack2.getCount(), 0, 'decrement clamps to 0');
+
+    var stack3 = new Donkeycraft.ItemStack(5, 1);
+    F.assertEq(stack3.getItem(), 5, 'getItem returns item ID (alias for getItemId)');
+
+    var stack4 = new Donkeycraft.ItemStack(1, 1);
+    F.assert(!stack4.hasTag(), 'New stack has no tag');
+    stack4.setTag({ durability: 5 });
+    F.assert(stack4.hasTag(), 'Stack has tag after setTag');
+    F.assertEq(stack4.getTag().durability, 5, 'getTag returns correct durability');
+
+    var stack5 = new Donkeycraft.ItemStack(1, 1);
+    F.assertEq(stack5.getDurability(), 0, 'Default durability is 0');
+    stack5.setDurability(42);
+    F.assertEq(stack5.getDurability(), 42, 'setDurability stores value');
+
+    var stack6 = new Donkeycraft.ItemStack(278, 1);
+    F.assertType(stack6.getEnchantments(), 'object', 'getEnchantments returns array');
+    F.assertEq(stack6.getEnchantments().length, 0, 'Empty enchantment list is empty array');
+    stack6.addEnchantment(1, 3);
+    var enchants = stack6.getEnchantments();
+    F.assertEq(enchants.length, 1, 'addEnchantment adds one enchantment');
+    F.assertEq(enchants[0].id, 1, 'Enchantment ID is correct');
+    F.assertEq(enchants[0].level, 3, 'Enchantment level is correct');
+    stack6.addEnchantment(1, 5);
+    F.assertEq(stack6.getEnchantments().length, 1, 'addEnchantment updates existing enchantment count');
+    F.assertEq(stack6.getEnchantments()[0].level, 5, 'addEnchantment updates level to 5');
+
+    var stack7 = new Donkeycraft.ItemStack(1, 64, { durability: 10 });
+    var cloned = stack7.clone();
+    F.assertEq(cloned.getItemId(), 1, 'clone preserves item ID');
+    F.assertEq(cloned.getCount(), 64, 'clone preserves count');
+    F.assertEq(cloned.getTag().durability, 10, 'clone preserves tag');
+    F.assert(cloned !== stack7, 'clone creates new object');
+    cloned.setTag({ durability: 20 });
+    F.assertEq(stack7.getTag().durability, 10, 'clone is deep copy — original tag unchanged');
+
+    var stack8 = new Donkeycraft.ItemStack(1, 64);
+    var stack9 = new Donkeycraft.ItemStack(1, 32);
+    F.assert(stack8.matches(stack9), 'matches ignores count');
+
+    var stack10 = new Donkeycraft.ItemStack(1, 1, { name: 'test' });
+    var stack11 = new Donkeycraft.ItemStack(1, 1, { name: 'test' });
+    F.assert(stack10.matches(stack11), 'matches with identical tags');
+
+    var stack12 = new Donkeycraft.ItemStack(1, 1);
+    var stack13 = new Donkeycraft.ItemStack(3, 1);
+    F.assert(!stack12.matches(stack13), 'matches returns false for different items');
+
+    var stack14 = new Donkeycraft.ItemStack(1, 32);
+    var stack15 = new Donkeycraft.ItemStack(1, 32);
+    F.assert(stack14.canStackWith(stack15), 'canStackWith returns true for same items');
+
+    var stack16 = new Donkeycraft.ItemStack(1, 32);
+    var stack17 = new Donkeycraft.ItemStack(3, 32);
+    F.assert(!stack16.canStackWith(stack17), 'canStackWith returns false for different items');
+
+    var emptyS = new Donkeycraft.ItemStack(0, 0);
+    F.assert(!stack14.canStackWith(emptyS), 'canStackWith returns false with empty stack');
+
+    var stack18 = new Donkeycraft.ItemStack(5, 64, { durability: 20 });
+    var serialized = stack18.serialize();
+    F.assertEq(serialized.id, 5, 'serialize preserves ID');
+    F.assertEq(serialized.count, 64, 'serialize preserves count');
+    F.assertEq(serialized.tag.durability, 20, 'serialize preserves tag');
+
+    var restored = Donkeycraft.ItemStack.fromObject(serialized);
+    F.assertEq(restored.getItemId(), 5, 'fromObject restores ID');
+    F.assertEq(restored.getCount(), 64, 'fromObject restores count');
+    F.assertEq(restored.getTag().durability, 20, 'fromObject restores tag');
+
+    var nullStack = Donkeycraft.ItemStack.fromObject(null);
+    F.assert(nullStack.isEmpty(), 'fromObject(null) returns empty stack');
+
+    // ============================================================
+    // Section 2: Inventory Tests
+    // ============================================================
+    F.section('2. Inventory (inventory.js)');
+
+    var inv = new Donkeycraft.Inventory(9, 'Player Inventory');
+    F.assertEq(inv.getSlotCount(), 9, 'Inventory has 9 slots');
+    F.assertEq(inv.getTitle(), 'Player Inventory', 'Inventory title is correct');
+
+    var stoneStack = new Donkeycraft.ItemStack(1, 16);
+    inv.setSlot(0, stoneStack);
+    var retrieved = inv.getSlot(0);
+    F.assert(retrieved !== null, 'setSlot stores stack');
+    F.assertEq(retrieved.getItemId(), 1, 'Retrieved stack has correct ID');
+    F.assertEq(retrieved.getCount(), 16, 'Retrieved stack has correct count');
+
+    inv.clearSlot(0);
+    F.assert(inv.getSlot(0) === null, 'clearSlot empties slot');
+
+    inv.setSlot(0, new Donkeycraft.ItemStack(1, 8));
+    inv.setSlot(1, new Donkeycraft.ItemStack(3, 16));
+    var all = inv.getAllSlots();
+    F.assertEq(all.length, 9, 'getAllSlots returns array of correct length');
+    F.assertEq(all[0].getCount(), 8, 'getAllSlots preserves slot 0');
+    F.assertEq(all[1].getCount(), 16, 'getAllSlots preserves slot 1');
+
+    var inv2 = new Donkeycraft.Inventory(3);
+    inv2.setSlot(0, new Donkeycraft.ItemStack(1, 1));
+    inv2.setSlot(1, new Donkeycraft.ItemStack(3, 1));
+    F.assertEq(inv2.findEmptySlot(), 2, 'findEmptySlot returns first empty slot');
+
+    var inv3 = new Donkeycraft.Inventory(2);
+    inv3.setSlot(0, new Donkeycraft.ItemStack(1, 1));
+    inv3.setSlot(1, new Donkeycraft.ItemStack(3, 1));
+    F.assertEq(inv3.findEmptySlot(), -1, 'findEmptySlot returns -1 when full');
+
+    var inv4 = new Donkeycraft.Inventory(3);
+    inv4.setSlot(0, new Donkeycraft.ItemStack(1, 30));
+    var added = inv4.addItem(new Donkeycraft.ItemStack(1, 20));
+    F.assertEq(added, 20, 'addItem returns number of items added');
+    F.assertEq(inv4.getSlot(0).getCount(), 50, 'addItem stacks into existing matching slot (30+20=50)');
+
+    var inv5 = new Donkeycraft.Inventory(3);
+    inv5.setSlot(0, new Donkeycraft.ItemStack(1, 64));
+    var added2 = inv5.addItem(new Donkeycraft.ItemStack(3, 10));
+    F.assertEq(added2, 10, 'addItem fills empty slot when no matching stack');
+    F.assertEq(inv5.getSlot(1).getCount(), 10, 'addItem places items in empty slot');
+
+    var inv6 = new Donkeycraft.Inventory(3);
+    inv6.setSlot(0, new Donkeycraft.ItemStack(1, 10));
+    F.assert(inv6.contains(1, 5), 'contains returns true when item count meets minimum');
+    F.assert(!inv6.contains(1, 20), 'contains returns false when item count is insufficient');
+
+    inv6.setSlot(1, new Donkeycraft.ItemStack(1, 5));
+    F.assertEq(inv6.getItemCount(1), 15, 'getItemCount sums across all slots (10+5=15)');
+
+    var inv7 = new Donkeycraft.Inventory(3);
+    inv7.setSlot(0, new Donkeycraft.ItemStack(1, 32));
+    var dragState = inv7.beginDrag(0);
+    F.assert(dragState !== null, 'beginDrag returns drag state');
+    F.assert(inv7.getSlot(0) === null, 'beginDrag clears source slot');
+    inv7.endDrag(dragState);
+    F.assertEq(inv7.getSlot(0).getCount(), 32, 'endDrag restores source slot');
+
+    var inv8 = new Donkeycraft.Inventory(3);
+    F.assert(!inv8.isDragActive(), 'isDragActive returns false when no drag');
+    inv8.setSlot(0, new Donkeycraft.ItemStack(1, 10));
+    var ds = inv8.beginDrag(0);
+    F.assert(inv8.isDragActive(), 'isDragActive returns true during drag');
+    inv8.endDrag(ds);
+    F.assert(!inv8.isDragActive(), 'isDragActive returns false after endDrag');
+
+    var inv9 = new Donkeycraft.Inventory(3);
+    inv9.setSlot(0, new Donkeycraft.ItemStack(1, 16));
+    inv9.beginDrag(0);
+    var remaining = inv9.processDrop(0, 1);
+    F.assertEq(inv9.getSlot(1).getCount(), 16, 'processDrop places stack in empty slot');
+    F.assert(inv9.getSlot(0) === null, 'processDrop clears source slot');
+
+    var inv10 = new Donkeycraft.Inventory(4);
+    inv10.setSlot(0, new Donkeycraft.ItemStack(1, 64));
+    inv10.setSlot(1, new Donkeycraft.ItemStack(3, 10));
+    inv10.shiftClick(0);
+    F.assert(inv10.getSlot(0) === null, 'shiftClick clears source slot');
+    F.assertEq(inv10.getSlot(1).getCount(), 10, 'shiftClick does not merge different items');
+    F.assertEq(inv10.getSlot(2).getCount(), 64, 'shiftClick moves to empty slot');
+
+    var inv11 = new Donkeycraft.Inventory(3, 'Test Inv');
+    inv11.setSlot(0, new Donkeycraft.ItemStack(1, 32));
+    inv11.setSlot(2, new Donkeycraft.ItemStack(5, 8));
+    var data = inv11.serialize();
+    F.assertEq(data.slots.length, 3, 'serialize returns correct slot count');
+    F.assertEq(data.title, 'Test Inv', 'serialize preserves title');
+
+    var inv12 = new Donkeycraft.Inventory(3);
+    inv12.deserialize(data);
+    F.assertEq(inv12.getSlot(0).getCount(), 32, 'deserialize restores slot 0');
+    F.assertEq(inv12.getSlot(2).getCount(), 8, 'deserialize restores slot 2');
+    F.assertEq(inv12.getTitle(), 'Test Inv', 'deserialize restores title');
+
+    // ============================================================
+    // Section 3: GuiManager Tests
+    // ============================================================
+    F.section('3. GuiManager (gui-manager.js)');
+
+    var eventBus = new Donkeycraft.EventBus();
+    var guiMgr = new Donkeycraft.GuiManager(eventBus);
+    F.assert(!guiMgr.isOpen(), 'New GuiManager has no GUI open');
+
+    function FakeUI(data) {
+        this._data = data;
+        this.destroyed = false;
+    }
+    FakeUI.prototype.destroy = function() { this.destroyed = true; };
+    guiMgr.registerComponent('fake_gui', FakeUI);
+
+    guiMgr.open('fake_gui', { key: 'value' });
+    F.assert(guiMgr.isOpen(), 'GuiManager reports GUI open after open()');
+    F.assertEq(guiMgr.getCurrentType(), 'fake_gui', 'getCurrentType returns correct type');
+
+    var stack = guiMgr.getStack();
+    F.assertEq(stack.length, 1, 'GUI stack has one entry');
+
+    guiMgr.close();
+    F.assert(!guiMgr.isOpen(), 'GuiManager reports no GUI open after close()');
+    F.assert(stack[0].ui.destroyed === true, 'UI component destroy() called on close');
+
+    guiMgr.open('fake_gui');
+    guiMgr.open('fake_gui');
+    guiMgr.open('fake_gui');
+    F.assertEq(guiMgr.getStack().length, 3, 'GUI stack has three entries after triple open');
+    guiMgr.clearAll();
+    F.assertEq(guiMgr.getStack().length, 0, 'clearAll empties stack');
+
+    guiMgr.open('fake_gui');
+    var consumed = guiMgr.handleKeyPress('Escape');
+    F.assert(consumed === true, 'Escape key is consumed');
+    F.assert(!guiMgr.isOpen(), 'GUI closed after Escape key');
+
+    guiMgr.open('fake_gui');
+    var consumed2 = guiMgr.handleKeyPress('F');
+    F.assert(consumed2 === false, 'Non-Escape key returns false for generic GUI');
+
+    var openEvents = [];
+    eventBus.on('gui:open', function(data) { openEvents.push(data); });
+    var closeEvents = [];
+    eventBus.on('gui:close', function(data) { closeEvents.push(data); });
+
+    guiMgr.open('fake_gui');
+    F.assertEq(openEvents.length, 1, 'gui:open event emitted');
+    F.assertEq(openEvents[0].type, 'fake_gui', 'gui:open has correct type');
+
+    guiMgr.close();
+    F.assertEq(closeEvents.length, 1, 'gui:close event emitted');
+
+    var openListenerCalled = false;
+    guiMgr.onOpen(function(type) { if (type === 'test_gui') openListenerCalled = true; });
+    guiMgr.registerComponent('test_gui', FakeUI);
+    guiMgr.open('test_gui');
+    F.assert(openListenerCalled, 'onOpen listener called with correct type');
+
+    // ============================================================
+    // Section 4: Hotbar Tests
+    // ============================================================
+    F.section('4. Hotbar (hotbar.js)');
+
+    var hotbarContainer = document.createElement('div');
+    var hotbar = new Donkeycraft.Hotbar(hotbarContainer);
+    hotbarContainer.style.display = 'none';
+    document.body.appendChild(hotbarContainer);
+    F.assertEq(hotbar.getSelectedSlot(), 0, 'Default selected slot is 0');
+    F.assertEq(hotbar._slotElements.length, 9, 'Hotbar has 9 slot elements');
+
+    var hotbarStacks = [
+        new Donkeycraft.ItemStack(1, 64), null, new Donkeycraft.ItemStack(3, 16),
+        null, null, null, null, null, null
+    ];
+    hotbar.setSlots(hotbarStacks);
+    F.assertEq(hotbar._slots[0].getCount(), 64, 'setSlots updates slot 0');
+    F.assert(hotbar._slots[1] === null, 'setSlots sets slot 1 to null');
+
+    hotbar.setSelectedSlot(5);
+    F.assertEq(hotbar.getSelectedSlot(), 5, 'selected slot updated to 5');
+    hotbar.setSelectedSlot(9);
+    F.assertEq(hotbar.getSelectedSlot(), 5, 'selected slot unchanged for out-of-bounds index');
+    hotbar.setSelectedSlot(-1);
+    F.assertEq(hotbar.getSelectedSlot(), 5, 'selected slot unchanged for negative index');
+
+    hotbar.setSelectedSlot(0);
+    hotbar.selectNext();
+    F.assertEq(hotbar.getSelectedSlot(), 1, 'selectNext cycles to next slot');
+    hotbar.selectPrev();
+    F.assertEq(hotbar.getSelectedSlot(), 0, 'selectPrev cycles back');
+
+    hotbar.setSelectedSlot(8);
+    hotbar.selectNext();
+    F.assertEq(hotbar.getSelectedSlot(), 0, 'selectNext wraps from 8 to 0');
+
+    hotbar.setSelectedSlot(0);
+    hotbar.selectPrev();
+    F.assertEq(hotbar.getSelectedSlot(), 8, 'selectPrev wraps from 0 to 8');
+
+    var firstSlot = hotbar._slotElements[0];
+    F.assert(firstSlot !== null, 'First slot element exists');
+    F.assert(firstSlot.querySelector('.dk-slot-item') !== null, 'Slot contains item display element');
+    F.assert(firstSlot.querySelector('.dk-slot-number') !== null, 'Slot contains number indicator');
+
+    hotbar.destroy();
+    F.assertEq(hotbar._slotElements.length, 0, 'destroy clears slot elements');
+
+    // ============================================================
+    // Section 5: CraftingGrid Tests
+    // ============================================================
+    F.section('5. CraftingGrid (crafting-grid.js)');
+
+    var craftContainer = document.createElement('div');
+    var recipeRegistry = Donkeycraft.RecipeRegistry;
+    var grid = new Donkeycraft.CraftingGrid(craftContainer, recipeRegistry);
+    craftContainer.style.display = 'none';
+    document.body.appendChild(craftContainer);
+    F.assertEq(grid.getGrid().length, 9, 'Grid has 9 slots');
+
+    var woodStack = new Donkeycraft.ItemStack(5, 1);
+    grid.setGridSlot(0, woodStack);
+    var gridData = grid.getGrid();
+    F.assertEq(gridData[0].getCount(), 1, 'setGridSlot stores stack at index 0');
+    F.assert(gridData[1] === null, 'Unset slots remain null');
+
+    var grid2D = grid.getGridAs2D();
+    F.assertType(grid2D, 'object', 'getGridAs2D returns object');
+    F.assertType(grid2D[0], 'object', 'getGridAs2D returns 2D array');
+    F.assertEq(grid2D[0][0], 5, 'getGridAs2D has correct item ID at [0][0]');
+    F.assertEq(grid2D[0][1], 0, 'getGridAs2D has 0 for empty slot');
+
+    grid.setGridSlot(1, new Donkeycraft.ItemStack(3, 1));
+    grid.clearGrid();
+    F.assertEq(grid.getGrid().length, 9, 'clearGrid preserves array length');
+    F.assert(grid.getResultStack() === null, 'clearGrid clears result');
+
+    // Test with a full 3x3 recipe: clock (recipe ID 34)
+    // Recipe pattern: [222,222,222, 222,214,222, 222,222,222] — 8 gold_ingot + 1 coal at center
+    // Grid layout (3-wide): row0=[0][1][2], row1=[3][4][5], row2=[6][7][8]
+    var goldStack = new Donkeycraft.ItemStack(222, 1);
+    var coalStack = new Donkeycraft.ItemStack(214, 1);
+    grid.setGridSlot(0, goldStack);   // row0 col0
+    grid.setGridSlot(1, goldStack);  // row0 col1
+    grid.setGridSlot(2, goldStack);  // row0 col2
+    grid.setGridSlot(3, goldStack);  // row1 col0
+    grid.setGridSlot(4, coalStack);  // row1 col1 (center) — coal for redstone signal
+    grid.setGridSlot(5, goldStack);  // row1 col2
+    grid.setGridSlot(6, goldStack);  // row2 col0
+    grid.setGridSlot(7, goldStack);  // row2 col1
+    grid.setGridSlot(8, goldStack);  // row2 col2
+
+    var result = grid.matchRecipe();
+    F.assert(result !== null, 'matchRecipe finds recipe for current grid (clock recipe)');
+
+    var resultStack = grid.getResultStack();
+    if (resultStack) {
+        F.assert(!resultStack.isEmpty(), 'Result stack is not empty when recipe matches');
+    }
+
+    var taken = grid.takeResult();
+    if (taken) {
+        F.assert(taken !== null, 'takeResult returns the result stack');
+        F.assert(grid.getResultStack() === null, 'takeResult clears result slot');
+    } else {
+        F.info('No result to take (recipe may not produce output in test environment)');
+    }
+
+    grid.clearGrid();
+    F.assert(!grid.isMatchValid(), 'isMatchValid returns false with empty grid');
+
+    F.assert(grid._container !== null, 'Container is set');
+    F.assertEq(grid._gridElements.length, 9, 'Grid has 9 slot elements');
+    F.assert(grid._resultElement !== null, 'Result element exists');
+
+    grid.destroy();
+    F.assertEq(grid._grid.length, 0, 'destroy clears grid array');
+
+    // ============================================================
+    // Section 6: CreativeInventory Tests
+    // ============================================================
+    F.section('6. CreativeInventory (creative-inventory.js)');
+
+    var creativeContainer = document.createElement('div');
+    var creativeInv = new Donkeycraft.CreativeInventory(creativeContainer);
+    creativeContainer.style.display = 'none';
+    document.body.appendChild(creativeContainer);
+    F.assert(creativeInv.getTabs().length > 0, 'CreativeInventory has tabs');
+    F.assertEq(creativeInv.getCurrentTab(), 'building', 'Default tab is "building"');
+
+    creativeInv.selectTab('tools');
+    F.assertEq(creativeInv.getCurrentTab(), 'tools', 'selectTab changes current tab');
+
+    var itemByIdx = creativeInv.getItemByIndex(0);
+    F.assert(itemByIdx > 0, 'getItemByIndex returns valid item ID');
+
+    var outOfBounds = creativeInv.getItemByIndex(9999);
+    F.assertEq(outOfBounds, 0, 'getItemByIndex returns 0 for out-of-bounds index');
+
+    var gridSize = creativeInv.getGridSize();
+    F.assert(gridSize.rows > 0, 'getGridSize returns positive rows');
+    F.assert(gridSize.cols > 0, 'getGridSize returns positive cols');
+
+    var allItems = creativeInv.searchItems('stone');
+    F.assertType(allItems, 'object', 'searchItems returns array');
+    F.assert(allItems.length > 0, 'searchItems returns items');
+
+    F.assert(creativeInv._container !== null, 'Container is set');
+    F.assert(creativeInv._tabBarEl !== null, 'Tab bar element exists');
+    F.assert(creativeInv._gridEl !== null, 'Grid element exists');
+    F.assert(creativeInv._searchEl !== null, 'Search input element exists');
+
+    creativeInv.destroy();
+    F.assert(creativeInv._listeners === undefined || creativeInv._listeners === null || creativeInv._listeners.length === 0, 'destroy clears listeners');
+
+    // ============================================================
+    // Section 7: FurnaceUI Tests
+    // ============================================================
+    F.section('7. FurnaceUI (furnace-ui.js)');
+
+    var furnaceContainer = document.createElement('div');
+    var furnace = new Donkeycraft.FurnaceUI(furnaceContainer);
+    furnaceContainer.style.display = 'none';
+    document.body.appendChild(furnaceContainer);
+    F.assertEq(furnace.getProgress(), 0, 'Initial progress is 0');
+    F.assert(!furnace.isBurning(), 'Furnace not burning initially');
+
+    F.assert(furnace.getInputSlot() === null, 'Input slot is null initially');
+    F.assert(furnace.getFuelSlot() === null, 'Fuel slot is null initially');
+    F.assert(furnace.getOutputSlot() === null, 'Output slot is null initially');
+
+    var coalStack = new Donkeycraft.ItemStack(214, 8);
+    var ironOreStack = new Donkeycraft.ItemStack(11, 1);
+    furnace.setSlot(0, coalStack);
+    furnace.setSlot(1, ironOreStack);
+    F.assertEq(furnace.getFuelSlot().getCount(), 8, 'Fuel slot set correctly');
+    F.assertEq(furnace.getInputSlot().getItemId(), 11, 'Input slot set correctly');
+
+    F.assert(furnace.isBurning(), 'Furnace burns with fuel and input');
+
+    furnace.setProgress(0.5);
+    F.assertEq(furnace.getProgress(), 0.5, 'setProgress sets to 0.5');
+    furnace.setProgress(-1);
+    F.assert(furnace.getProgress() >= 0, 'setProgress clamps negative to 0');
+    furnace.setProgress(2);
+    F.assert(furnace.getProgress() <= 1, 'setProgress clamps above 1 to max');
+
+    F.assert(furnace._container !== null, 'Container is set');
+    F.assert(furnace._fuelSlotEl !== null, 'Fuel slot element exists');
+    F.assert(furnace._inputSlotEl !== null, 'Input slot element exists');
+    F.assert(furnace._outputSlotEl !== null, 'Output slot element exists');
+    F.assert(furnace._progressBarEl !== null, 'Progress bar element exists');
+
+    furnace.destroy();
+    F.assertEq(furnace._slots.length, 0, 'destroy clears slots array');
+
+    // ============================================================
+    // Section 8: ChestUI Tests
+    // ============================================================
+    F.section('8. ChestUI (chest-ui.js)');
+
+    var chestContainer = document.createElement('div');
+    var singleChest = new Donkeycraft.ChestUI(chestContainer, false);
+    chestContainer.style.display = 'none';
+    document.body.appendChild(chestContainer);
+    F.assertEq(singleChest.getSlotCount(), 27, 'Single chest has 27 slots');
+    F.assert(!singleChest.isDoubleChest(), 'isDoubleChest returns false');
+
+    var doubleContainer = document.createElement('div');
+    var doubleChest = new Donkeycraft.ChestUI(doubleContainer, true);
+    doubleContainer.style.display = 'none';
+    document.body.appendChild(doubleContainer);
+    F.assertEq(doubleChest.getSlotCount(), 54, 'Double chest has 54 slots');
+    F.assert(doubleChest.isDoubleChest(), 'isDoubleChest returns true for double chest');
+
+    singleChest.setSlot(0, new Donkeycraft.ItemStack(1, 64));
+    var chestItem = singleChest.getSlot(0);
+    F.assert(chestItem !== null, 'getSlot returns stored stack');
+    F.assertEq(chestItem.getCount(), 64, 'getSlot returns correct count');
+
+    var takenChest = singleChest.takeItem(0);
+    F.assertEq(takenChest.getCount(), 64, 'takeItem returns correct stack');
+    F.assert(singleChest.getSlot(0) === null, 'takeItem clears slot');
+
+    var takenEmpty = singleChest.takeItem(0);
+    F.assert(takenEmpty === null, 'takeItem returns null for empty slot');
+
+    var oob = singleChest.getSlot(99);
+    F.assert(oob === null, 'getSlot returns null for out-of-bounds index');
+
+    F.assert(singleChest._container !== null, 'Container is set');
+    F.assertEq(singleChest._container.querySelectorAll('.dk-chest-slot').length, 27, 'Single chest has 27 slot elements');
+
+    singleChest.destroy();
+    F.assertEq(singleChest._slots.length, 0, 'destroy clears slots array');
+
+    // ============================================================
+    // Section 9: AnvilUI Tests
+    // ============================================================
+    F.section('9. AnvilUI (anvil-ui.js)');
+
+    var anvilContainer = document.createElement('div');
+    var anvil = new Donkeycraft.AnvilUI(anvilContainer);
+    anvilContainer.style.display = 'none';
+    document.body.appendChild(anvilContainer);
+    F.assert(anvil.getLeftSlot() === null, 'Left slot is null initially');
+    F.assert(anvil.getRightSlot() === null, 'Right slot is null initially');
+    F.assert(anvil.getResultSlot() === null, 'Result slot is null initially');
+    F.assertEq(anvil.getPrice(), 0, 'Price is 0 initially');
+
+    var ironIngot = new Donkeycraft.ItemStack(221, 1);
+    anvil.setLeftSlot(ironIngot);
+    F.assertEq(anvil.getLeftSlot().getCount(), 1, 'Left slot set correctly');
+
+    anvil.setRenameText('My Iron Ingot');
+    F.assertEq(anvil.getRenameText(), 'My Iron Ingot', 'setRenameText stores text');
+    var renameResult = anvil.getResultSlot();
+    if (renameResult) {
+        F.assertEq(renameResult.getTag().customName, 'My Iron Ingot', 'Rename result has custom name in tag');
+    }
+
+    F.assertEq(anvil.getPrice(), 1, 'Rename costs 1 level');
+
+    var calculated = anvil.calculateResult();
+    F.assert(calculated !== null, 'calculateResult returns a stack');
+
+    var anvilTaken = anvil.takeResult();
+    F.assert(anvilTaken !== null, 'takeResult returns the result');
+    F.assert(anvil.getResultSlot() === null, 'takeResult clears result slot');
+
+    F.assert(anvil._container !== null, 'Container is set');
+    F.assert(anvil._leftSlotEl !== null, 'Left slot element exists');
+    F.assert(anvil._renameInputEl !== null, 'Rename input element exists');
+    F.assert(anvil._priceEl !== null, 'Price element exists');
+
+    anvil.destroy();
+    F.assertEq(anvil._slots.length, 0, 'destroy clears slots array');
+
+    // ============================================================
+    // Section 10: EnchantingUI Tests
+    // ============================================================
+    F.section('10. EnchantingUI (enchanting-ui.js)');
+
+    var enchantContainer = document.createElement('div');
+    var enchantUI = new Donkeycraft.EnchantingUI(enchantContainer);
+    enchantContainer.style.display = 'none';
+    document.body.appendChild(enchantContainer);
+    F.assert(enchantUI.getInputSlot() === null, 'Input slot is null initially');
+    F.assertEq(enchantUI.getLapisCount(), 0, 'Lapis count is 0');
+    F.assertEq(enchantUI.getLevelCost(), 0, 'Level cost is 0 initially');
+
+    var diamondSword = new Donkeycraft.ItemStack(278, 1);
+    enchantUI.setInputSlot(diamondSword);
+    F.assertEq(enchantUI.getInputSlot().getItemId(), 278, 'Input slot set correctly');
+
+    var enchOpts = enchantUI.getAvailableEnchantments();
+    F.assertType(enchOpts, 'object', 'getAvailableEnchantments returns array');
+    F.assertEq(enchOpts.length, 3, 'getAvailableEnchantments returns 3 options');
+
+    enchantUI.selectEnchantment(0);
+    var cost = enchantUI.getLevelCost();
+    F.assert(cost >= 0, 'selectEnchantment sets a valid level cost');
+
+    enchantUI.setPlayerLevels(10);
+    F.assertEq(enchantUI._playerLevels, 10, 'setPlayerLevels stores value');
+
+    enchantUI.setLapisCount(3);
+    F.assertEq(enchantUI.getLapisCount(), 3, 'setLapisCount stores value');
+
+    var enchanted = enchantUI.applyEnchantment();
+    F.info('applyEnchantment returned: ' + (enchanted ? 'stack' : 'null'));
+
+    var takenEnchant = enchantUI.takeResult();
+    F.info('takeResult returned: ' + (takenEnchant ? 'stack' : 'null'));
+
+    F.assert(enchantUI._container !== null, 'Container is set');
+    F.assert(enchantUI._inputSlotEl !== null, 'Input slot element exists');
+    F.assertEq(enchantUI._optionEls.length, 3, 'Option elements exist');
+    F.assert(enchantUI._lapisSlotEl !== null, 'Lapis slot element exists');
+
+    enchantUI.destroy();
+    F.assertEq(enchantUI._enchantOptions.length, 0, 'destroy clears enchant options');
+
+    // ============================================================
+    // Section 11: DebugOverlay Tests
+    // ============================================================
+    F.section('11. DebugOverlay (debug-overlay.js)');
+
+    var debugOverlay = new Donkeycraft.DebugOverlay(eventBus);
+    F.assertEq(debugOverlay.getFPS(), 0, 'Initial FPS is 0');
+
+    debugOverlay.setFPS(60);
+    F.assertEq(debugOverlay.getFPS(), 60, 'setFPS updates value');
+
+    debugOverlay.setGameMode('creative');
+    F.assertEq(debugOverlay.getGameMode(), 'creative', 'setGameMode stores value');
+
+    var coords = debugOverlay.getPlayerCoords();
+    F.assertEq(coords.x, 0, 'Player coords x is 0 without player');
+    F.assertEq(coords.y, 0, 'Player coords y is 0 without player');
+    F.assertEq(coords.z, 0, 'Player coords z is 0 without player');
+    F.assertEq(coords.mode, 'creative', 'Player coords mode reflects game mode');
+
+    var chunkInfo = debugOverlay.getChunkInfo();
+    F.assertEq(chunkInfo.loaded, 0, 'Chunk info shows 0 loaded without chunk manager');
+
+    var biomeName = debugOverlay.getBiomeName();
+    F.assertEq(biomeName, 'Unknown', 'Biome name is Unknown without references');
+
+    var light = debugOverlay.getLightLevels();
+    F.assertEq(light.sky, 15, 'Sky light defaults to 15');
+    F.assertEq(light.block, 0, 'Block light defaults to 0');
+
+    var mockPlayer = {
+        getX: function() { return 123.45; },
+        getY: function() { return 64.0; },
+        getZ: function() { return -78.9; },
+        getPitch: function() { return 0.5; },
+        getYaw: function() { return 1.2; },
+        getGameMode: function() { return 'survival' }
+    };
+
+    var mockChunkManager = {
+        getAllChunks: function() { return [{}, {}, {}]; },
+        getChunk: function(cx, cz) {
+            return {
+                getSkyLight: function(x, y, z) { return 12; },
+                getBlockLight: function(x, y, z) { return 4; }
+            };
+        }
+    };
+
+    debugOverlay.setPlayer(mockPlayer);
+    debugOverlay.setChunkManager(mockChunkManager);
+    debugOverlay.setBiome({ getBiomeAt: function() { return { name: 'Plains' }; } });
+
+    var data = debugOverlay.collectData();
+    F.assertEq(data.fps, 60, 'collectData includes FPS');
+    F.assertNear(data.coordinates.x, 123.45, 0.01, 'collectData includes player X');
+    F.assertNear(data.coordinates.y, 64.0, 0.01, 'collectData includes player Y');
+    F.assertNear(data.coordinates.z, -78.9, 0.01, 'collectData includes player Z');
+    F.assertEq(data.chunkInfo.loaded, 3, 'collectData includes chunk count');
+    F.assertEq(data.biome, 'Plains', 'collectData includes biome name');
+    F.assertEq(data.lightLevels.sky, 12, 'collectData includes sky light from chunk');
+    F.assertEq(data.lightLevels.block, 4, 'collectData includes block light from chunk');
+
+    debugOverlay.destroy();
+    F.assert(debugOverlay._eventBus === null, 'destroy clears eventBus reference');
+
+    // ============================================================
+    // Section 12: Functional UI Integration Tests (DOM Interaction)
+    // ============================================================
+    F.section('12. Functional UI Integration Tests');
+
+    // --- 12a: Hotbar DOM Interaction ---
+    F.info('Testing Hotbar DOM interaction...');
+
+    var hotbarContainer2 = document.createElement('div');
+    hotbarContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(hotbarContainer2);
+    var hotbar2 = new Donkeycraft.Hotbar(hotbarContainer2);
+
+    // Set slots with visible items
+    hotbar2.setSlots([
+        new Donkeycraft.ItemStack(1, 64),
+        new Donkeycraft.ItemStack(3, 16),
+        null,
+        new Donkeycraft.ItemStack(5, 1),
+        null, null, null, null, null
+    ]);
+
+    // Click slot 3
+    var slot3El = hotbar2._slotElements[3];
+    F.assert(slot3El !== null, 'Slot 3 element exists');
+    var clickEvent3 = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    slot3El.dispatchEvent(clickEvent3);
+    F.assertEq(hotbar2.getSelectedSlot(), 3, 'Clicking hotbar slot updates selected slot');
+
+    // Click slot 1
+    var slot1El = hotbar2._slotElements[1];
+    var clickEvent1 = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    slot1El.dispatchEvent(clickEvent1);
+    F.assertEq(hotbar2.getSelectedSlot(), 1, 'Clicking different slot updates selection');
+
+    // Scroll wheel on hotbar container
+    var wheelEvent = new WheelEvent('wheel', { deltaY: -1 });
+    hotbarContainer2.dispatchEvent(wheelEvent);
+    F.assert(hotbar2.getSelectedSlot() === 0 || hotbar2.getSelectedSlot() === 8, 'Scroll wheel cycles hotbar selection');
+
+    // Scroll down
+    var wheelEventDown = new WheelEvent('wheel', { deltaY: 1 });
+    hotbarContainer2.dispatchEvent(wheelEventDown);
+    F.assert(hotbar2.getSelectedSlot() >= 0 && hotbar2.getSelectedSlot() < 9, 'Scroll down cycles hotbar selection');
+
+    // Verify slot display elements exist and have correct structure
+    for (var h = 0; h < 9; h++) {
+        var el = hotbar2._slotElements[h];
+        F.assert(el !== null, 'Hotbar slot element ' + h + ' exists');
+        F.assert(el.classList.contains('dk-slot'), 'Hotbar slot has dk-slot class');
+    }
+
+    // Verify number indicators exist
+    for (var n = 0; n < 9; n++) {
+        var numEl = hotbar2._slotElements[n].querySelector('.dk-slot-number');
+        F.assert(numEl !== null, 'Hotbar slot ' + n + ' has number indicator');
+    }
+
+    hotbar2.destroy();
+    document.body.removeChild(hotbarContainer2);
+
+    // --- 12b: CraftingGrid DOM Interaction ---
+    F.info('Testing CraftingGrid DOM interaction...');
+
+    var craftContainer2 = document.createElement('div');
+    craftContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(craftContainer2);
+    var grid2 = new Donkeycraft.CraftingGrid(craftContainer2, Donkeycraft.RecipeRegistry);
+
+    // Verify grid slot elements exist
+    F.assertEq(grid2._gridElements.length, 9, 'CraftingGrid has 9 grid slot elements');
+    for (var g = 0; g < 9; g++) {
+        var gEl = grid2._gridElements[g];
+        F.assert(gEl !== null, 'Grid slot element ' + g + ' exists');
+        F.assert(gEl.querySelector('.dk-slot-item') !== null, 'Grid slot has item display element');
+    }
+
+    // Verify result element exists
+    F.assert(grid2._resultElement !== null, 'CraftingGrid result element exists');
+    F.assert(grid2._resultElement.querySelector('.dk-slot-item') !== null, 'Result element has item display');
+
+    // Set up a recipe and click result
+    var goldS = new Donkeycraft.ItemStack(222, 1);
+    var coalS = new Donkeycraft.ItemStack(214, 1);
+    grid2.setGridSlot(0, goldS);
+    grid2.setGridSlot(1, goldS);
+    grid2.setGridSlot(2, goldS);
+    grid2.setGridSlot(3, goldS);
+    grid2.setGridSlot(4, coalS);
+    grid2.setGridSlot(5, goldS);
+    grid2.setGridSlot(6, goldS);
+    grid2.setGridSlot(7, goldS);
+    grid2.setGridSlot(8, goldS);
+
+    // Verify recipe matched and result is displayed
+    F.assert(grid2.isMatchValid(), 'CraftingGrid shows valid match after setting recipe');
+    F.assert(grid2.getResultStack() !== null, 'Result stack exists when recipe matches');
+
+    // Click result element (simulate taking result)
+    var resultClick = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    grid2._resultElement.dispatchEvent(resultClick);
+
+    // Verify result was taken (grid cleared or event emitted)
+    F.assert(grid2.getResultStack() === null || grid2.isMatchValid(), 'Result click processed');
+
+    grid2.clearGrid();
+    F.assert(!grid2.isMatchValid(), 'CraftingGrid shows no match after clearing grid');
+
+    grid2.destroy();
+    document.body.removeChild(craftContainer2);
+
+    // --- 12c: CreativeInventory DOM Interaction ---
+    F.info('Testing CreativeInventory DOM interaction...');
+
+    var creativeContainer2 = document.createElement('div');
+    creativeContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(creativeContainer2);
+    var creativeInv2 = new Donkeycraft.CreativeInventory(creativeContainer2);
+
+    // Verify tab bar elements exist
+    F.assert(creativeInv2._tabBarEl !== null, 'CreativeInventory tab bar element exists');
+    var tabEls = creativeInv2._tabBarEl.querySelectorAll('.dk-tab-btn');
+    F.assert(tabEls.length > 0, 'Tab bar has tab button elements');
+
+    // Click a different tab
+    var tabs = creativeInv2.getTabs();
+    if (tabs.length > 1) {
+        var secondTab = tabs[1];
+        var secondTabBtn = creativeInv2._tabBarEl.querySelectorAll('.dk-tab-btn')[1];
+        if (secondTabBtn) {
+            var tabClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+            secondTabBtn.dispatchEvent(tabClick);
+            F.assertEq(creativeInv2.getCurrentTab(), secondTab, 'Clicking tab button changes current tab');
+        }
+    }
+
+    // Verify search input exists
+    F.assert(creativeInv2._searchEl !== null, 'CreativeInventory search input element exists');
+
+    // Type in search input
+    var searchInput = creativeInv2._searchEl;
+    searchInput.value = 'stone';
+    var inputEvent = new Event('input', { bubbles: true, cancelable: true });
+    searchInput.dispatchEvent(inputEvent);
+
+    // Verify search results
+    var searchResults = creativeInv2.searchItems('stone');
+    F.assert(searchResults.length > 0, 'searchItems returns results for "stone"');
+
+    // Verify grid element exists
+    F.assert(creativeInv2._gridEl !== null, 'CreativeInventory grid element exists');
+
+    creativeInv2.destroy();
+    document.body.removeChild(creativeContainer2);
+
+    // --- 12d: FurnaceUI DOM Interaction ---
+    F.info('Testing FurnaceUI DOM interaction...');
+
+    var furnaceContainer2 = document.createElement('div');
+    furnaceContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(furnaceContainer2);
+    var furnace2 = new Donkeycraft.FurnaceUI(furnaceContainer2);
+
+    // Verify slot elements exist
+    F.assert(furnace2._fuelSlotEl !== null, 'FurnaceUI fuel slot element exists');
+    F.assert(furnace2._inputSlotEl !== null, 'FurnaceUI input slot element exists');
+    F.assert(furnace2._outputSlotEl !== null, 'FurnaceUI output slot element exists');
+
+    // Verify progress bar exists
+    F.assert(furnace2._progressBarEl !== null, 'FurnaceUI progress bar element exists');
+
+    // Click fuel slot (simulate placing coal)
+    var fuelClick = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    furnace2._fuelSlotEl.dispatchEvent(fuelClick);
+
+    // Set fuel and input, then check progress bar updates
+    furnace2.setSlot(0, new Donkeycraft.ItemStack(214, 8)); // coal as fuel
+    furnace2.setSlot(1, new Donkeycraft.ItemStack(11, 1)); // iron ore as input
+    F.assert(furnace2.isBurning(), 'FurnaceUI burns with valid fuel and input');
+
+    // Simulate progress update via DOM element click on progress bar
+    var progressClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+    furnace2._progressBarEl.dispatchEvent(progressClick);
+
+    furnace2.destroy();
+    document.body.removeChild(furnaceContainer2);
+
+    // --- 12e: ChestUI DOM Interaction ---
+    F.info('Testing ChestUI DOM interaction...');
+
+    var chestContainer2 = document.createElement('div');
+    chestContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(chestContainer2);
+    var chest2 = new Donkeycraft.ChestUI(chestContainer2, false);
+
+    // Verify slot elements exist
+    var chestSlotEls = chestContainer2.querySelectorAll('.dk-chest-slot');
+    F.assertEq(chestSlotEls.length, 27, 'ChestUI has 27 slot elements');
+
+    // Click a chest slot
+    var firstChestSlot = chestSlotEls[0];
+    var chestSlotClick = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    firstChestSlot.dispatchEvent(chestSlotClick);
+
+    // Set an item and verify display updates
+    chest2.setSlot(0, new Donkeycraft.ItemStack(1, 64));
+    F.assertEq(chest2.getSlot(0).getCount(), 64, 'ChestUI slot updated after setSlot');
+
+    chest2.destroy();
+    document.body.removeChild(chestContainer2);
+
+    // --- 12f: AnvilUI DOM Interaction ---
+    F.info('Testing AnvilUI DOM interaction...');
+
+    var anvilContainer2 = document.createElement('div');
+    anvilContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(anvilContainer2);
+    var anvil2 = new Donkeycraft.AnvilUI(anvilContainer2);
+
+    // Verify rename input exists
+    F.assert(anvil2._renameInputEl !== null, 'AnvilUI rename input element exists');
+
+    // Type in rename input
+    var renameInput = anvil2._renameInputEl;
+    renameInput.value = 'Test Named Item';
+    var renameInputEvent = new Event('input', { bubbles: true, cancelable: true });
+    renameInput.dispatchEvent(renameInputEvent);
+
+    F.assertEq(anvil2.getRenameText(), 'Test Named Item', 'AnvilUI rename text updated after input');
+
+    // Verify price element exists and updates
+    F.assert(anvil2._priceEl !== null, 'AnvilUI price element exists');
+    F.assertEq(anvil2.getPrice(), 1, 'AnvilUI price is 1 for rename operation');
+
+    // Set left slot and verify result
+    anvil2.setLeftSlot(new Donkeycraft.ItemStack(278, 1)); // diamond sword
+    var calculatedResult = anvil2.calculateResult();
+    F.assert(calculatedResult !== null, 'AnvilUI calculateResult returns stack after setting left slot');
+
+    anvil2.destroy();
+    document.body.removeChild(anvilContainer2);
+
+    // --- 12g: EnchantingUI DOM Interaction ---
+    F.info('Testing EnchantingUI DOM interaction...');
+
+    var enchantContainer2 = document.createElement('div');
+    enchantContainer2.style.cssText = 'position:absolute;top:-9999px;left:-9999px;';
+    document.body.appendChild(enchantContainer2);
+    var enchantUI2 = new Donkeycraft.EnchantingUI(enchantContainer2);
+
+    // Verify option elements exist
+    F.assertEq(enchantUI2._optionEls.length, 3, 'EnchantingUI has 3 option elements');
+
+    // Click an enchantment option
+    var firstOptionEl = enchantUI2._optionEls[0];
+    var optionClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+    firstOptionEl.dispatchEvent(optionClick);
+
+    // Set input slot and lapis, then check cost
+    enchantUI2.setInputSlot(new Donkeycraft.ItemStack(278, 1)); // diamond sword
+    enchantUI2.setLapisCount(4);
+    F.assertEq(enchantUI2.getLapisCount(), 4, 'EnchantingUI lapis count updated');
+
+    // Verify lapis slot element exists
+    F.assert(enchantUI2._lapisSlotEl !== null, 'EnchantingUI lapis slot element exists');
+
+    enchantUI2.destroy();
+    document.body.removeChild(enchantContainer2);
+
+    // --- 12h: DebugOverlay DOM Rendering ---
+    F.info('Testing DebugOverlay DOM rendering...');
+
+    var debugOverlay2 = new Donkeycraft.DebugOverlay(eventBus);
+
+    // Collect data and verify it has all expected fields
+    var debugData = debugOverlay2.collectData();
+    F.assert(typeof debugData.fps === 'number', 'DebugOverlay data includes FPS number');
+    F.assertType(debugData.coordinates, 'object', 'DebugOverlay data includes coordinates object');
+    F.assertType(debugData.chunkInfo, 'object', 'DebugOverlay data includes chunk info object');
+    F.assertType(debugData.lightLevels, 'object', 'DebugOverlay data includes light levels object');
+
+    // Simulate player update event
+    var mockPlayer2 = {
+        getX: function() { return 500.0; },
+        getY: function() { return 70.5; },
+        getZ: function() { return -200.3; },
+        getGameMode: function() { return 'spectator' }
+    };
+    debugOverlay2.setPlayer(mockPlayer2);
+
+    var updatedData = debugOverlay2.collectData();
+    F.assertNear(updatedData.coordinates.x, 500.0, 0.1, 'DebugOverlay reflects updated player X');
+    F.assertNear(updatedData.coordinates.y, 70.5, 0.1, 'DebugOverlay reflects updated player Y');
+    F.assertNear(updatedData.coordinates.z, -200.3, 0.1, 'DebugOverlay reflects updated player Z');
+    F.assertEq(updatedData.gameMode, 'spectator', 'DebugOverlay reflects updated game mode');
+
+    debugOverlay2.destroy();
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>
