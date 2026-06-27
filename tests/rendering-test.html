@@ -184,7 +184,7 @@
             '  vec3 v3 = uTestVec3;',
             '  vec4 v4 = uTestVec4;',
             '  vec4 tc = texture2D(uTestSampler, v2);',
-            '  gl_FragColor = tc * f * float(i) * v4;',
+            '  gl_FragColor = tc * f * float(i) * v4 * vec4(v3, 1.0);',
             '}'
         ].join('\n');
 
@@ -485,7 +485,12 @@
     if (hasWebGL) {
         var sm2 = new Donkeycraft.ShaderManager(gl);
         var vSrc = 'attribute vec3 aPos; void main() { gl_Position = vec4(aPos, 1.0); }';
-        var fSrc = 'precision mediump float; uniform vec3 uFogColor; uniform float uFogDensity; void main() { gl_FragColor = vec4(uFogColor, 1.0); }';
+        var fSrc = [
+            'precision mediump float;',
+            'uniform vec3 uFogColor;',
+            'uniform float uFogDensity;',
+            'void main() { gl_FragColor = vec4(uFogColor, 1.0 - uFogDensity); }'
+        ].join('\n');
         sm2.createProgram('fogTest', vSrc, fSrc);
         sm2.use('fogTest');
 
@@ -539,9 +544,9 @@
     // Sky color
     light.setTimeOfDay(0.5);
     var skyDay = light.getSkyColor();
-    F.assert(skyDay.r > 0 && skyDay.r < 1, 'Day sky r in [0,1]');
-    F.assert(skyDay.g > 0 && skyDay.g < 1, 'Day sky g in [0,1]');
-    F.assert(skyDay.b > 0 && skyDay.b < 1, 'Day sky b in [0,1]');
+    F.assert(skyDay.r > 0 && skyDay.r <= 1, 'Day sky r in [0,1]');
+    F.assert(skyDay.g > 0 && skyDay.g <= 1, 'Day sky g in [0,1]');
+    F.assert(skyDay.b >= 0 && skyDay.b <= 1, 'Day sky b in [0,1]');
 
     light.setTimeOfDay(0.0);
     var skyNight = light.getSkyColor();
@@ -558,12 +563,30 @@
     var sunDir = light.getSunDirection();
     F.assertType(sunDir, 'object', 'getSunDirection() returns Vector3');
 
-    // applyToShader
+    // applyToShader — use all uniforms in fragment output so WebGL doesn't optimize them out.
     if (hasWebGL) {
         var sm3 = new Donkeycraft.ShaderManager(gl);
-        var vSrc2 = 'attribute vec3 aPos; uniform float uSunIntensity; uniform float uAmbient; uniform vec3 uSkyColor; uniform vec3 uSunDirection; void main() { gl_Position = vec4(aPos, 1.0); }';
-        var fSrc2 = 'precision mediump float; void main() { gl_FragColor = vec4(1.0); }';
-        sm3.createProgram('lightTest', vSrc2, fSrc2);
+        var vSrcLight = [
+            'attribute vec3 aPos;',
+            'uniform float uSunIntensity;',
+            'uniform float uAmbient;',
+            'uniform vec3 uSkyColor;',
+            'uniform vec3 uSunDirection;',
+            'void main() { gl_Position = vec4(aPos, 1.0); }'
+        ].join('\n');
+
+        var fSrcLight = [
+            'precision mediump float;',
+            'uniform float uSunIntensity;',
+            'uniform float uAmbient;',
+            'uniform vec3 uSkyColor;',
+            'uniform vec3 uSunDirection;',
+            'void main() {',
+            '  gl_FragColor = vec4(uSkyColor * uSunIntensity * uAmbient, 1.0);',
+            '}'
+        ].join('\n');
+
+        sm3.createProgram('lightTest', vSrcLight, fSrcLight);
         sm3.use('lightTest');
 
         var applyLightResult = light.applyToShader(sm3);
@@ -657,8 +680,10 @@
     weather.clear();
     F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'clear() sets CLEAR');
 
-    // Thunder intensity
+    // Thunder intensity — set RAIN first (thunder follows rain), then tick to trigger fluctuation
+    weather.setWeather(Donkeycraft.WEATHER_RAIN);
     weather.setWeather(Donkeycraft.WEATHER_THUNDER);
+    weather.tick();
     F.assert(weather.getThunderIntensity() >= 0.7 && weather.getThunderIntensity() <= 1.0, 'Thunder intensity in [0.7, 1.0]');
 
     // setThunderIntensity

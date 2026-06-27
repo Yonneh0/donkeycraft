@@ -110,9 +110,10 @@
         var sinYaw = Math.sin(this._yaw);
         var cosPitch = Math.cos(this._pitch);
 
+        // Standard FPS convention: positive pitch = looking up, negative pitch = looking down.
         this._forward.set(
             -sinYaw * cosPitch,
-            -Math.sin(this._pitch),
+            Math.sin(this._pitch),
             -cosYaw * cosPitch
         ).normalize();
 
@@ -120,15 +121,15 @@
     };
 
     /**
-     * Get the right direction vector (reuses cached vector).
+     * Get the right direction vector (horizontal, always orthogonal to world-up).
+     * Reuses cached vector.
      * @returns {Donkeycraft.Vector3} Normalized right vector.
      */
     Donkeycraft.Camera.prototype.getRight = function() {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
-        var cosPitch = Math.cos(this._pitch);
 
-        this._right.set(cosYaw * cosPitch, 0, -sinYaw * cosPitch).normalize();
+        this._right.set(cosYaw, 0, -sinYaw).normalize();
 
         return this._right;
     };
@@ -268,9 +269,11 @@
     Donkeycraft.Camera.prototype.moveRight3D = function(amount) {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
-        // Horizontal right vector (Y=0) for stable strafing in any pitch
+        // Horizontal right vector (Y=0) for stable strafing in any pitch.
+        // Right is perpendicular to forward in the horizontal plane:
+        //   forward = (-sinYaw, 0, -cosYaw), right = (cosYaw, 0, -sinYaw)
         this._position.x += cosYaw * amount;
-        this._position.z += sinYaw * amount;
+        this._position.z -= sinYaw * amount;
     };
 
     /**
