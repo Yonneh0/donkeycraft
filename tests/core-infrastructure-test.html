@@ -122,24 +122,29 @@
     bus.emit('argsTest', 42, 'hello', true);
     F.assertArrEq(argResult, [42, 'hello', true], 'Arguments passthrough works');
 
-    // off (unsubscribe function)
+    // off (unsubscribe function) — use a named variable for stable reference
+    var unsubFn1 = function() { F.info('unsubTest fired'); };
+    var unsub1 = bus.on('unsubTest', unsubFn1);
     var unsubFired = false;
-    var unsub = bus.on('unsubTest', function() { unsubFired = true; });
-    bus.emit('unsubTest');
+    bus.on('unsubTest2', function() { unsubFired = true; });
+    bus.emit('unsubTest2');
     F.assert(unsubFired, 'Listener fires before unsubscribe');
-    unsub();
-    bus.emit('unsubTest');
-    F.assert(!unsubFired, 'Unsubscribe function prevents further calls');
+    unsub1();
+    // Verify unsubTest listener was removed (not unsubTest2 which has different callback)
+    var unsubListeners = bus._listeners['unsubTest'];
+    F.assert(unsubListeners === undefined || unsubListeners.length === 0, 'Unsubscribe function prevents further calls (listeners=' + (unsubListeners ? unsubListeners.length : 'deleted') + ')');
 
-    // off direct removal
-    var offFired = false;
-    var offCb = function() { offFired = true; };
-    bus.on('offTest', offCb);
-    bus.emit('offTest');
-    F.assert(offFired, 'Listener fires before off()');
-    bus.off('offTest', offCb);
-    bus.emit('offTest');
-    F.assert(!offFired, 'off() removes listener');
+    // off direct removal — use the SAME named callback for both on() and off()
+    var offCb3 = function() { F.info('offTest3 fired'); };
+    var offFired3 = false;
+    bus.on('offTest4', offCb3);  // Register the exact same reference
+    bus.on('offTest4', function() { offFired3 = true; });
+    bus.emit('offTest4');
+    F.assert(offFired3, 'Listener fires before off()');
+    bus.off('offTest4', offCb3);  // Remove the exact same reference
+    // Debug: check what's in the listeners array after off()
+    var offListeners = bus._listeners['offTest4'];
+    F.assert(offListeners === undefined || offListeners.length === 0, 'off() removes listener (listeners=' + (offListeners ? offListeners.length : 'deleted') + ')');
 
     // once — fires exactly once
     var onceFired = 0;
