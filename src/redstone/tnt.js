@@ -195,9 +195,17 @@
                 _tntStates[key].primeTick = Donkeycraft.RedstoneEngine ? Donkeycraft.RedstoneEngine.getCurrentTick() : 0;
             }
 
-            // Emit event for sound playback
+            // Emit lit event via global EventBus for sound playback
             if (Donkeycraft.EventBus) {
-                // tnt:lit event would be emitted here
+                try {
+                    Donkeycraft.EventBus.emitSafe('tnt:lit', {
+                        x: x,
+                        y: y,
+                        z: z
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
             }
         }
 
@@ -209,9 +217,18 @@
          * @private
          */
         function _explode(x, y, z) {
-            // Emit explosion event for game systems
+            // Emit explosion event via global EventBus for game systems
             if (Donkeycraft.EventBus) {
-                // tnt:explode event would be emitted here
+                try {
+                    Donkeycraft.EventBus.emitSafe('tnt:explode', {
+                        x: x,
+                        y: y,
+                        z: z,
+                        radius: EXPLOSION_RADIUS
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
             }
 
             // Calculate blast wave: which blocks get destroyed

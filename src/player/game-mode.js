@@ -68,10 +68,10 @@
             this._creativeInfinite = false;
         }
 
-        // Emit game mode change event
+        // Emit game mode change event via global EventBus
         if (EventBus && oldMode !== mode) {
             try {
-                EventBus.emit('gameMode:changed', {
+                EventBus.emitSafe('gameMode:changed', {
                     oldMode: oldMode,
                     newMode: mode
                 });
@@ -149,10 +149,10 @@
         this._creativeFlying = !this._creativeFlying;
         this._player.flyEnabled = this._creativeFlying;
 
-        // Emit fly mode change event
+        // Emit fly mode change event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('flyMode:changed', {
+                EventBus.emitSafe('flyMode:changed', {
                     flying: this._creativeFlying
                 });
             } catch (e) {

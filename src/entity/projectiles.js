@@ -189,10 +189,10 @@
         }
 
         if (this.explode) {
-            // Lava bucket — emit explosion event
+            // Lava bucket — emit explosion event via global EventBus
             if (Donkeycraft.EventBus) {
                 try {
-                    Donkeycraft.EventBus.emit('projectile:explode', {
+                    Donkeycraft.EventBus.emitSafe('projectile:explode', {
                         projectile: this,
                         x: Math.floor(hitX),
                         y: Math.floor(hitY),
@@ -206,10 +206,10 @@
         }
 
         if (this.area) {
-            // Dragon breath — create area effect
+            // Dragon breath — create area effect via global EventBus
             if (Donkeycraft.EventBus) {
                 try {
-                    Donkeycraft.EventBus.emit('projectile:area', {
+                    Donkeycraft.EventBus.emitSafe('projectile:area', {
                         projectile: this,
                         x: Math.floor(hitX),
                         y: Math.floor(hitY),

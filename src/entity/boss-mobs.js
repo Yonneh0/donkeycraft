@@ -235,10 +235,10 @@
             return;
         }
 
-        // Emit breath attack event
+        // Emit breath attack event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('boss:breath', {
+                Donkeycraft.EventBus.emitSafe('boss:breath', {
                     entity: this,
                     targetX: this._targetPlayer.getPosition().x,
                     targetZ: this._targetPlayer.getPosition().z,
@@ -258,10 +258,10 @@
             return;
         }
 
-        // Emit projectile spawn event
+        // Emit projectile spawn event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('boss:projectile', {
+                Donkeycraft.EventBus.emitSafe('boss:projectile', {
                     entity: this,
                     startX: this._position.x,
                     startY: this._position.y + this.height * 0.5,
@@ -282,10 +282,10 @@
      * @private
      */
     Donkeycraft.BossMob.prototype.onDeath = function() {
-        // Emit death event
+        // Emit death event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('boss:death', {
+                Donkeycraft.EventBus.emitSafe('boss:death', {
                     entity: this,
                     type: this.type
                 });

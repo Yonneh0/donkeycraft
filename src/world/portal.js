@@ -403,13 +403,17 @@
                 }
             }
 
-            // Emit travel event
-            if (_eventBus) {
-                _eventBus.emit('portal:travel', {
-                    fromDimension: fromDimension,
-                    toDimension: toDimension,
-                    position: { x: transformed.x, y: transformed.y, z: transformed.z }
-                });
+            // Emit travel event via global EventBus
+            if (Donkeycraft.EventBus) {
+                try {
+                    Donkeycraft.EventBus.emitSafe('portal:travel', {
+                        fromDimension: fromDimension,
+                        toDimension: toDimension,
+                        position: { x: transformed.x, y: transformed.y, z: transformed.z }
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
             }
 
             // Update current dimension

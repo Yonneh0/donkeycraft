@@ -163,11 +163,11 @@
      * @private
      */
     Donkeycraft.PassiveMob.prototype.onDeath = function() {
-        // Emit item drop event for external systems to handle
+        // Emit item drop event via global EventBus for external systems to handle
         if (Donkeycraft.EventBus) {
             try {
                 var count = this.dropCount[0] + Math.floor(Math.random() * (this.dropCount[1] - this.dropCount[0] + 1));
-                Donkeycraft.EventBus.emit('mob:drop', {
+                Donkeycraft.EventBus.emitSafe('mob:drop', {
                     entity: this,
                     item: this.dropItem,
                     count: count,

@@ -95,12 +95,16 @@
             result.chunk.setBlock(result.lx, result.ly, result.lz, blockId);
             chunkManager.markChunkDirty(result.chunk.chunkX, result.chunk.chunkZ);
 
-            // Emit placement event (guarded — EventBus may not be initialized in tests)
-            if (Donkeycraft.EventBus && typeof Donkeycraft.EventBus.emit === 'function') {
-                Donkeycraft.EventBus.emit('blockPlaced', {
-                    x: ix, y: iy, z: iz,
-                    blockId: blockId
-                });
+            // Emit placement event via global EventBus
+            if (Donkeycraft.EventBus) {
+                try {
+                    Donkeycraft.EventBus.emitSafe('blockPlaced', {
+                        x: ix, y: iy, z: iz,
+                        blockId: blockId
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
             }
 
             return true;

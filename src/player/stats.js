@@ -96,10 +96,10 @@
             this._stats[statName] = (this._stats[statName] || 0) + amount;
         }
 
-        // Emit stat changed event
+        // Emit stat changed event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('stat:changed', {
+                EventBus.emitSafe('stat:changed', {
                     name: statName,
                     value: this._stats[statName]
                 });

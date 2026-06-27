@@ -7,7 +7,8 @@
 
     /**
      * EventBus — manages event listeners and dispatches events.
-     * @param {string} namespace - Optional namespace prefix for events (e.g., 'world', 'player').
+     * Supports namespaced events, one-time listeners, and safe static emission.
+     * @param {string} [namespace=''] - Optional namespace prefix for events (e.g., 'world', 'player').
      */
     Donkeycraft.EventBus = function(namespace) {
         this._namespace = namespace || '';
@@ -16,20 +17,18 @@
 
     /**
      * Register a listener for an event.
-     * @param {string} event - Event name.
+     * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - Function to call when event fires.
-     * @param {*} context - Optional context to bind callback to.
-     * @returns {Function} - Unsubscribe function.
+     * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
+     * @returns {Function} Unsubscribe function that removes this listener without firing it.
      */
     Donkeycraft.EventBus.prototype.on = function(event, callback, context) {
         var key = this._namespace + event;
         if (!this._listeners[key]) {
             this._listeners[key] = [];
         }
-        var entry = { callback: callback, context: context || this };
-        this._listeners[key].push(entry);
+        this._listeners[key].push({ callback: callback, context: context || this });
 
-        // Return unsubscribe function
         var self = this;
         return function() {
             self.off(event, callback);
@@ -37,10 +36,13 @@
     };
 
     /**
-     * Register a one-time listener for an event.
-     * @param {string} event - Event name.
-     * @param {Function} callback - Function to call when event fires.
-     * @param {*} context - Optional context to bind callback to.
+     * Register a one-time listener for an event. The callback fires exactly once,
+     * then is automatically removed. Calling the returned unsubscribe before the
+     * event emits also prevents firing without removing from the listener array.
+     * @param {string} event - Event name (namespace prefix is automatically prepended).
+     * @param {Function} callback - Function to call when event fires (once).
+     * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
+     * @returns {Function} Unsubscribe function that prevents the one-time listener from ever firing.
      */
     Donkeycraft.EventBus.prototype.once = function(event, callback, context) {
         var self = this;
@@ -50,34 +52,34 @@
         var wrapped = function() {
             if (fired) return;
             fired = true;
-            // Remove from listeners immediately after firing
+            // Remove the wrapped callback from listeners
             if (self._listeners[key]) {
                 self._listeners[key] = self._listeners[key].filter(function(entry) {
-                    return entry.callback !== wrapped;
+                    return entry.callback !== wrapped && entry._originalCallback !== callback;
                 });
             }
             callback.apply(context || self, arguments);
         };
 
-        var unsub = this.on(event, wrapped, context);
+        this.on(event, wrapped, context || this);
 
-        // Store original callback reference on the entry so off(event, originalCallback) works
+        // Tag the last-added entry so off(event, originalCallback) also removes it
         var listeners = this._listeners[key];
         if (listeners && listeners.length > 0) {
             listeners[listeners.length - 1]._originalCallback = callback;
         }
 
-        // Return a combined unsubscribe that also prevents firing if called before emit
         return function() {
             fired = true;
-            unsub();
+            self.off(event, callback);
         };
     };
 
     /**
-     * Remove a listener for an event.
-     * @param {string} event - Event name.
-     * @param {Function} callback - Callback to remove. Works with both regular and once() callbacks.
+     * Remove a previously registered listener for an event.
+     * Works with both regular (`on`) and one-time (`once`) callbacks.
+     * @param {string} event - Event name (namespace prefix is automatically prepended).
+     * @param {Function} callback - The exact callback function reference to remove.
      */
     Donkeycraft.EventBus.prototype.off = function(event, callback) {
         var key = this._namespace + event;
@@ -87,7 +89,7 @@
             return entry.callback !== callback && entry._originalCallback !== callback;
         });
 
-        // Clean up empty arrays
+        // Clean up empty arrays to prevent memory leaks
         if (this._listeners[key].length === 0) {
             delete this._listeners[key];
         }
@@ -95,8 +97,10 @@
 
     /**
      * Dispatch an event to all registered listeners.
-     * @param {string} event - Event name.
-     * @param {...*} args - Arguments to pass to listeners.
+     * Listeners are invoked in registration order. Exceptions in one listener
+     * do not prevent subsequent listeners from firing.
+     * @param {string} event - Event name (namespace prefix is automatically prepended).
+     * @param {...*} args - Arguments passed to each listener callback.
      */
     Donkeycraft.EventBus.prototype.emit = function(event) {
         var key = this._namespace + event;
@@ -110,6 +114,8 @@
             } catch (e) {
                 if (Donkeycraft.Logger) {
                     Donkeycraft.Logger.error('EventBus error on "' + event + '":', e);
+                } else {
+                    console.error('EventBus error on "' + event + '":', e);
                 }
             }
         }
@@ -123,22 +129,29 @@
     };
 
     /**
-     * Safely emit an event on the global EventBus (if available).
-     * @param {string} event - Event name.
-     * @param {...*} args - Arguments to pass to listeners.
+     * Safely emit an event on the globally-registered EventBus instance.
+     * This is the correct method for standalone modules (entities, redstone, interaction)
+     * that do not have a direct reference to their owning EventBus instance.
+     * Call EventBus.setGlobal() during game initialization to register the global instance.
+     * @param {string} event - Event name (no namespace prefix — uses the global instance directly).
+     * @param {...*} args - Arguments passed to each listener callback.
      */
     Donkeycraft.EventBus.emitSafe = function(event) {
-        if (!Donkeycraft.EventBus._global) return;
+        var globalInstance = Donkeycraft.EventBus._global;
+        if (!globalInstance || typeof globalInstance.emit !== 'function') return;
         var args = Array.prototype.slice.call(arguments, 1);
-        Donkeycraft.EventBus._global.emit.apply(Donkeycraft.EventBus._global, [event].concat(args));
+        globalInstance.emit.apply(globalInstance, [event].concat(args));
     };
 
     /**
-     * Set the global EventBus instance for emitSafe to use.
-     * @param {Donkeycraft.EventBus} instance - Global EventBus instance.
+     * Register the global EventBus instance for use by emitSafe().
+     * Call this once during game initialization with the main game's EventBus.
+     * @param {Donkeycraft.EventBus} instance - The global EventBus instance.
      */
     Donkeycraft.EventBus.setGlobal = function(instance) {
-        Donkeycraft.EventBus._global = instance;
+        if (instance && typeof instance.emit === 'function') {
+            Donkeycraft.EventBus._global = instance;
+        }
     };
 
 })();

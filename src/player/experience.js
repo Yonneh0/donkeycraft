@@ -126,10 +126,10 @@
 
         this._points = remaining;
 
-        // Emit XP change event
+        // Emit XP change event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('xp:changed', {
+                EventBus.emitSafe('xp:changed', {
                     level: this._level,
                     points: this._points,
                     totalXP: this._totalXP
@@ -159,10 +159,10 @@
 
         this._points -= amount;
 
-        // Emit XP change event
+        // Emit XP change event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('xp:spent', {
+                EventBus.emitSafe('xp:spent', {
                     level: this._level,
                     points: this._points,
                     cost: amount
@@ -182,10 +182,10 @@
     Donkeycraft.Experience.prototype.pickupOrb = function(amount) {
         this.addXP(amount);
 
-        // Emit orb pickup event
+        // Emit orb pickup event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('xp:orb', {
+                EventBus.emitSafe('xp:orb', {
                     amount: amount,
                     level: this._level,
                     points: this._points

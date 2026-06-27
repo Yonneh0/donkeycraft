@@ -311,10 +311,10 @@
             }
         }
 
-        // Emit death event via EventBus
+        // Emit death event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('player:death', {
+                Donkeycraft.EventBus.emitSafe('player:death', {
                     source: deathSource,
                     health: 0,
                     player: this._player

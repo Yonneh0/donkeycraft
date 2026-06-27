@@ -172,8 +172,9 @@
             // Initialize input handler
             this._input = new Donkeycraft.Input();
 
-            // Create event bus
+            // Create event bus and register as global for emitSafe()
             this._eventBus = new Donkeycraft.EventBus();
+            Donkeycraft.EventBus.setGlobal(this._eventBus);
 
             Donkeycraft.Logger.info('Game', 'Initialization complete');
             return true;

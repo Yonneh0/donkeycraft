@@ -278,10 +278,10 @@
             this.setAlive(false);
         }
 
-        // Emit damage event — standardize format for consistent handling
+        // Emit damage event via global EventBus for consistent handling
         if (EventBus) {
             try {
-                EventBus.emit('entity:damage', {
+                EventBus.emitSafe('entity:damage', {
                     target: this,
                     attacker: source,
                     amount: amount,

@@ -47,8 +47,12 @@
      * @param {Object} data - Event payload.
      */
     Donkeycraft.WorldStore.prototype._emit = function(eventName, data) {
-        if (this._eventBus) {
-            this._eventBus.emit(eventName, data);
+        if (this._eventBus && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe(eventName, data);
+            } catch (e) {
+                // EventBus may not be available in tests
+            }
         }
     };
 

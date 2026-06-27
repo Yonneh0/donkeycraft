@@ -232,10 +232,10 @@
             damaged = true;
         }
 
-        // Emit damage event for external systems to handle
+        // Emit damage event via global EventBus for external systems to handle
         if (Donkeycraft.EventBus && !damaged) {
             try {
-                Donkeycraft.EventBus.emit('entity:damage', {
+                Donkeycraft.EventBus.emitSafe('entity:damage', {
                     attacker: this,
                     target: this._targetPlayer,
                     damage: this.damage,
@@ -280,10 +280,10 @@
             return false;
         }
 
-        // Emit explosion event
+        // Emit explosion event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('entity:explode', {
+                Donkeycraft.EventBus.emitSafe('entity:explode', {
                     entity: this,
                     x: Math.floor(this._position.x),
                     y: Math.floor(this._position.y),

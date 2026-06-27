@@ -163,10 +163,10 @@
             isBaby: true
         });
 
-        // Emit breed event
+        // Emit breed event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
-                Donkeycraft.EventBus.emit('animal:bred', {
+                Donkeycraft.EventBus.emitSafe('animal:bred', {
                     parent1: this,
                     parent2: partner,
                     baby: baby,

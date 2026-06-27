@@ -62,10 +62,10 @@
         }
         this._byType[type].push(entity);
 
-        // Emit spawn event
+        // Emit spawn event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('entity:spawn', {
+                EventBus.emitSafe('entity:spawn', {
                     entity: entity,
                     id: id,
                     type: type
@@ -102,10 +102,10 @@
 
         entity.despawn();
 
-        // Emit despawn event
+        // Emit despawn event via global EventBus
         if (EventBus) {
             try {
-                EventBus.emit('entity:despawn', {
+                EventBus.emitSafe('entity:despawn', {
                     entity: entity,
                     id: id
                 });
