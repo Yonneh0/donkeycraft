@@ -653,25 +653,37 @@
 
         /**
          * Get the cached obsidian block ID.
+         * Triggers re-resolution if ID is 0 (lazy initialization).
          * @returns {number} Obsidian block ID, or 0 if not resolved.
          */
         function getObsidianId() {
+            if (_obsidianId === 0) {
+                _resolvePortalBlockIds();
+            }
             return _obsidianId;
         }
 
         /**
          * Get the cached nether portal block ID.
+         * Triggers re-resolution if ID is 0 (lazy initialization).
          * @returns {number} Nether portal block ID, or 0 if not resolved.
          */
         function getNetherPortalId() {
+            if (_netherPortalId === 0) {
+                _resolvePortalBlockIds();
+            }
             return _netherPortalId;
         }
 
         /**
          * Get the cached end portal block ID.
+         * Triggers re-resolution if ID is 0 (lazy initialization).
          * @returns {number} End portal block ID, or 0 if not resolved.
          */
         function getEndPortalId() {
+            if (_endPortalId === 0) {
+                _resolvePortalBlockIds();
+            }
             return _endPortalId;
         }
 
