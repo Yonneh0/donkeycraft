@@ -27,7 +27,7 @@
         function _resolveWaterBlockId() {
             if (_waterBlockId !== null) return; // Already resolved
             if (!Donkeycraft.BlockRegistry) {
-                _waterBlockId = 9; // Fallback to common Minecraft water ID
+                _waterBlockId = 212; // Fallback: water block ID per block.js registry
                 return;
             }
 
@@ -40,8 +40,8 @@
                 }
             }
 
-            // Final fallback: try common IDs
-            _waterBlockId = 9;
+            // Final fallback: water is ID 212 in block.js
+            _waterBlockId = 212;
         }
 
         /**

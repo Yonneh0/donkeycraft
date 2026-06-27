@@ -35,16 +35,7 @@
         function _resolveNetherBlockIds() {
             if (!Donkeycraft.BlockRegistry) return;
 
-            var resolve = function(names, target) {
-                for (var i = 0; i < names.length; i++) {
-                    var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
-                    if (block) { _[target] = block.id; return; }
-                }
-            };
-            var _;
-
-            // Bedrock
-            _ = _bedrockId; resolve(['nether_bedrock', 'bedrock'], function() { /* handled below */ });
+            // Bedrock (try nether_bedrock first, fall back to bedrock)
             var br = Donkeycraft.BlockRegistry.getBlockByName('nether_bedrock') || Donkeycraft.BlockRegistry.getBlockByName('bedrock');
             if (br) _bedrockId = br.id;
 

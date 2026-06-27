@@ -53,6 +53,10 @@
             _eventBus = bus;
             _chunkManager = chunkManager;
             _resolvePortalBlockIds();
+
+            if (!chunkManager) {
+                Donkeycraft.Logger.warn('Portal', 'ChunkManager not provided — block queries will return 0');
+            }
         }
 
         /**
@@ -283,6 +287,11 @@
          * @returns {boolean} True if portal was created successfully.
          */
         function createPortal(worldX, worldY, worldZ, direction) {
+            if (!_chunkManager) {
+                Donkeycraft.Logger.error('Portal', 'Cannot create portal — ChunkManager is null');
+                return false;
+            }
+
             direction = direction !== undefined ? direction : 0;
 
             // Determine frame orientation from direction
@@ -392,6 +401,7 @@
          */
         function travelToDimension(fromDimension, toDimension, x, y, z) {
             if (!Donkeycraft.Dimensions || !Donkeycraft.Dimensions.transformCoordinates) {
+                Donkeycraft.Logger.error('Portal', 'Dimensions system not available for travel');
                 return null;
             }
 

@@ -137,12 +137,12 @@
         /**
          * Generate a full heightmap and return it (convenience wrapper).
          * Delegates to generateHeightmap; provided for API consistency with other generator modules.
+         * Note: generateHeightmap already calls _ensureNoiseInit internally, so this is safe.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
          * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
          */
         function generate(chunkX, chunkZ) {
-            _ensureNoiseInit();
             return generateHeightmap(chunkX, chunkZ);
         }
 

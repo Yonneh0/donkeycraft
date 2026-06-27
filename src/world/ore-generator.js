@@ -88,15 +88,16 @@
         }
 
         /**
-         * Place ore veins in a chunk based on biome restrictions and ore definitions.
+         * Place ores in a chunk based on biome restrictions and ore definitions.
          * Resolves block IDs from BlockRegistry at runtime for correctness.
+         * Auto-initializes the ore generator (resolves all block IDs) on first call.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
          * @param {number} biomeId - Biome ID for this chunk.
          */
         function placeOres(chunk, biomeId) {
             if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
 
-            // Ensure block IDs are resolved
+            // Auto-initialize: resolve all block IDs from BlockRegistry on first call
             if (!_blockCache && Donkeycraft.BlockRegistry) {
                 _resolveBlockIds();
             }

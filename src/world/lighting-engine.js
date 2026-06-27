@@ -83,9 +83,11 @@
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         var surfaceY = heightmap[x + z * CHUNK_SIZE] || 0;
 
-                        // Fill sky light from surface down with constant light=15
+                        // Fill sky light from surface down with decay
                         for (var y = surfaceY; y >= 0 && y < WORLD_HEIGHT; y--) {
-                            chunk.setSkyLight(x, y, z, 15);
+                            // Decay by 1 per block below surface (simulates basic occlusion)
+                            var lightAtDepth = Math.max(0, 15 - (surfaceY - y));
+                            chunk.setSkyLight(x, y, z, lightAtDepth);
                         }
                     }
                 }
@@ -162,8 +164,13 @@
         function _bfsFloodFill(chunk, queue) {
             var visited = new Uint16Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
 
+            // Max queue size to prevent infinite loops from re-queueing
+            var maxIterations = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE * 4;
+            var iterations = 0;
+
             var head = 0;
-            while (head < queue.length) {
+            while (head < queue.length && iterations < maxIterations) {
+                iterations++;
                 var current = queue[head++];
                 var cx = current.x;
                 var cy = current.y;

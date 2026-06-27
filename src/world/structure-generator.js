@@ -105,8 +105,8 @@
                     var height = heightmap[x + z * CHUNK_SIZE] || 64;
 
                     for (var y = 0; y <= height; y++) {
-                        if (y < 3) {
-                            // Bedrock layer at bottom of world
+                        if (y === 0) {
+                            // Bedrock layer at bottom of world (single layer)
                             chunk.setBlock(x, y, z, bedrockId);
                         } else if (y < height - 3) {
                             // Stone below terrain

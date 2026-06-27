@@ -108,7 +108,9 @@
                     ) * 0.003;
 
                     // Continuous Y iteration for connected cave networks
-                    for (var y = minY; y < maxY; y++) {
+                    // Use while loop so manual y increment works correctly
+                    var y = minY;
+                    while (y < maxY) {
                         // Primary cave noise — fbm with global seed baked into PerlinNoise
                         var noiseVal = Donkeycraft.PerlinNoise.fbm(
                             worldX * 0.02,
@@ -126,11 +128,12 @@
                             _carveTunnel(chunk, x, y, z, tunnelRadius);
                         }
 
-                        // Skip Y iteration for performance — caves are spaced vertically
+                        // Skip Y levels for performance — caves are spaced vertically
+                        // Jump ahead after the first few Y levels to avoid excessive computation
                         if (y > minY + 20) {
-                            // Jump ahead but not too far to avoid missing small caves
-                            y += 3;
-                            if (y >= maxY) break;
+                            y += 4; // +1 from while increment = net +5 per iteration
+                        } else {
+                            y++;
                         }
                     }
                 }

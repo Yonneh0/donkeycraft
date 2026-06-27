@@ -29,26 +29,50 @@
         function init() {
             if (_initialized) return;
 
+            _doResolveBlocks();
+            _initialized = true;
+        }
+
+        /**
+         * Re-initialize the physics module after new blocks are added to BlockRegistry.
+         * Clears existing caches and re-resolves all block sets from scratch.
+         * Call this after dynamically adding new blocks to the registry.
+         * @public
+         */
+        function reinit() {
+            // Clear caches
+            _gravityBlocks = {};
+            _liquidBlocks = {};
+            _initialized = false;
+
+            // Re-resolve
+            _doResolveBlocks();
+            _initialized = true;
+        }
+
+        /**
+         * Internal: resolve all gravity and liquid block sets.
+         * @private
+         */
+        function _doResolveBlocks() {
+            if (!Donkeycraft.BlockRegistry) return;
+
             // Resolve gravity-affected blocks by name from BlockRegistry
             var gravityBlockNames = ['sand', 'gravel', 'redstone_block'];
 
-            if (Donkeycraft.BlockRegistry) {
-                for (var i = 0; i < gravityBlockNames.length; i++) {
-                    var block = Donkeycraft.BlockRegistry.getBlockByName(gravityBlockNames[i]);
-                    if (block) {
-                        _gravityBlocks[block.id] = true;
-                    }
-                }
-
-                // Populate liquid block cache by checking all registered blocks
-                for (var id = 0; id < 1000; id++) {
-                    if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(id)) {
-                        _liquidBlocks[id] = true;
-                    }
+            for (var i = 0; i < gravityBlockNames.length; i++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(gravityBlockNames[i]);
+                if (block) {
+                    _gravityBlocks[block.id] = true;
                 }
             }
 
-            _initialized = true;
+            // Populate liquid block cache by checking all registered blocks
+            for (var id = 0; id < 1000; id++) {
+                if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(id)) {
+                    _liquidBlocks[id] = true;
+                }
+            }
         }
 
         /**
@@ -94,11 +118,11 @@
 
         /**
          * Apply gravity to all gravity-affected blocks in a chunk.
-         * Processes from bottom to top so falling blocks don't fall multiple times per tick.
+         * Processes from top to bottom so falling blocks move only once per tick.
          * @param {Donkeycraft.Chunk} chunk - The chunk to process.
          */
         function applyGravityToChunk(chunk) {
-            for (var y = 0; y < WORLD_HEIGHT; y++) {
+            for (var y = WORLD_HEIGHT - 1; y >= 0; y--) {
                 for (var x = 0; x < CHUNK_SIZE; x++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         applyGravity(chunk, x, y, z);
@@ -304,6 +328,7 @@
         return {
             getInstance: getInstance,
             init: init,
+            reinit: reinit,
             applyGravity: applyGravity,
             applyGravityToChunk: applyGravityToChunk,
             applyGravityColumn: applyGravityColumn,
