@@ -166,6 +166,9 @@
             var trx = cx + rx + ux, trY = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
+            // Note: trY is intentionally used as the Y coordinate for top-right corner
+            // (variable name matches the local `trY` declaration above).
+
             var r = p.color.r, g = p.color.g, b = p.color.b;
             var base = i * vertPerParticle * floatsPerVertex;
 

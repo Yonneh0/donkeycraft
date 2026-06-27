@@ -94,7 +94,8 @@
 
     /**
      * Apply lighting uniforms to a shader program via the shader manager.
-     * Sets: uSunIntensity (float), uAmbient (float), uSkyColor (vec3), uSunDirection (vec3).
+     * Sets: uLightFactor (float) — combined sun intensity × ambient light for terrain shading.
+     * This is the primary uniform used by the terrain fragment shader for dynamic lighting.
      * @param {ShaderManager} shaderManager - The shader manager instance.
      * @returns {boolean} True if uniforms were set successfully.
      */
@@ -102,14 +103,10 @@
         if (!shaderManager) return false;
 
         var sunIntensity = this.getSunIntensity();
-        var skyColor = this.getSkyColor();
-        var sunDir = this.getSunDirection();
+        var ambientLight = this.getAmbientLight();
+        var lightFactor = Math.max(sunIntensity, ambientLight);
 
-        shaderManager.setFloat('uSunIntensity', sunIntensity);
-        shaderManager.setFloat('uAmbient', this.getAmbientLight());
-        shaderManager.setVec3('uSkyColor', skyColor.r, skyColor.g, skyColor.b);
-        shaderManager.setVec3('uSunDirection', sunDir.x, sunDir.y, sunDir.z);
-        return true;
+        return shaderManager.setFloat('uLightFactor', lightFactor);
     };
 
 })();

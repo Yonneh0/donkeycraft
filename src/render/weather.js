@@ -367,6 +367,297 @@
     };
 
     /**
+     * WeatherRenderer — Renders weather particles (rain, snow) using the GUI shader.
+     * @param {WebGLRenderingContext} gl - WebGL context.
+     * @param {ShaderManager} shaderManager - Shader manager instance.
+     */
+    Donkeycraft.WeatherRenderer = function(gl, shaderManager) {
+        this._gl = gl;
+        this._shaderManager = shaderManager;
+        this._maxParticles = 2000;
+        this._particleCount = 0;
+        this._active = false;
+
+        // Particle data arrays (Structure of Arrays for performance)
+        this._px = new Float32Array(this._maxParticles);
+        this._py = new Float32Array(this._maxParticles);
+        this._pz = new Float32Array(this._maxParticles);
+        this._pvx = new Float32Array(this._maxParticles);
+        this._pvy = new Float32Array(this._maxParticles);
+        this._pvz = new Float32Array(this._maxParticles);
+        this._pAlpha = new Float32Array(this._maxParticles);
+
+        // Vertex buffer for particle positions (position(3) + color(4) = 9 floats per vertex)
+        this._vertexBuffer = null;
+        this._vertexArray = null;
+        this._contextLost = false;
+
+        if (gl && gl.canvas) {
+            var self = this;
+            gl.canvas.addEventListener('webglcontextlost', function(e) {
+                e.preventDefault();
+                self._contextLost = true;
+                self._vertexBuffer = null;
+            });
+            gl.canvas.addEventListener('webglcontextrestored', function() {
+                self._contextLost = false;
+                self._vertexBuffer = null;
+            });
+        }
+    };
+
+    /**
+     * Activate weather rendering with the current weather state.
+     */
+    Donkeycraft.WeatherRenderer.prototype.activate = function() {
+        this._active = true;
+        this._particleCount = 0;
+    };
+
+    /**
+     * Deactivate weather rendering.
+     */
+    Donkeycraft.WeatherRenderer.prototype.deactivate = function() {
+        this._active = false;
+        this._particleCount = 0;
+    };
+
+    /**
+     * Spawn a single weather particle at the given position.
+     * @private
+     */
+    Donkeycraft.WeatherRenderer.prototype._spawnParticle = function(x, y, z, type) {
+        if (this._particleCount >= this._maxParticles) return;
+
+        var i = this._particleCount;
+        this._px[i] = x;
+        this._py[i] = y;
+        this._pz[i] = z;
+
+        if (type === 'snow') {
+            // Snow falls slowly and drifts
+            this._pvx[i] = (Math.random() - 0.5) * 0.5;
+            this._pvy[i] = -0.5 - Math.random() * 0.5;
+            this._pvz[i] = (Math.random() - 0.5) * 0.5;
+            this._pAlpha[i] = 0.6 + Math.random() * 0.4;
+        } else {
+            // Rain falls fast with slight wind
+            this._pvx[i] = (Math.random() - 0.5) * 0.3;
+            this._pvy[i] = -8 - Math.random() * 4;
+            this._pvz[i] = (Math.random() - 0.5) * 0.3 + 0.5; // wind toward +Z
+            this._pAlpha[i] = 0.4 + Math.random() * 0.4;
+        }
+
+        this._particleCount++;
+    };
+
+    /**
+     * Update weather particles by delta time.
+     * @param {number} deltaTime - Time since last frame in seconds.
+     * @param {Donkeycraft.Vector3} playerPos - Player position for particle culling.
+     */
+    Donkeycraft.WeatherRenderer.prototype.update = function(deltaTime, playerPos) {
+        if (!this._active || this._particleCount === 0) return;
+
+        var removed = 0;
+
+        for (var i = 0; i < this._particleCount; i++) {
+            var idx = i - removed;
+
+            // Update position
+            this._px[idx] += this._pvx[idx] * deltaTime;
+            this._py[idx] += this._pvy[idx] * deltaTime;
+            this._pz[idx] += this._pvz[idx] * deltaTime;
+
+            // Remove particles that fall below y = 0 or are too far from player
+            if (this._py[idx] < 0) {
+                // Respawn at top of render area
+                this._py[idx] = 128;
+                this._px[idx] = playerPos.x + (Math.random() - 0.5) * 120;
+                this._pz[idx] = playerPos.z + (Math.random() - 0.5) * 120;
+            }
+
+            var dx = this._px[idx] - playerPos.x;
+            var dz = this._pz[idx] - playerPos.z;
+            if (dx * dx + dz * dz > 60 * 60) {
+                // Respawn closer to player
+                this._py[idx] = 128;
+                this._px[idx] = playerPos.x + (Math.random() - 0.5) * 120;
+                this._pz[idx] = playerPos.z + (Math.random() - 0.5) * 120;
+            }
+        }
+    };
+
+    /**
+     * Render weather particles using the GUI shader program.
+     * Particles are rendered as small quads (billboarded).
+     * @param {Camera} camera - The camera instance.
+     * @param {number} particleDensity - Particle density [0, 1].
+     * @param {string} type - Particle type ('rain' or 'snow').
+     */
+    Donkeycraft.WeatherRenderer.prototype.render = function(camera, particleDensity, type) {
+        var gl = this._gl;
+        if (!gl || !this._shaderManager || !this._active || this._particleCount === 0) return;
+
+        if (this._contextLost) return;
+
+        if (!this._shaderManager.use('gui')) return;
+
+        var matrices = camera.getMatrices();
+        this._shaderManager.setMat4('uProjection', matrices.projection);
+        this._shaderManager.setMat4('uView', matrices.view);
+        this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+        this._shaderManager.setInt('uHasTexture', 0);
+
+        var right = camera.getRight();
+        var up = camera.getUp();
+
+        // Build vertex data: each particle is a quad (6 vertices)
+        var particleSize = type === 'snow' ? 0.15 : 0.03;
+        var vertsPerParticle = 6;
+        var floatsPerVertex = 9;
+        var totalFloats = this._particleCount * vertsPerParticle * floatsPerVertex;
+
+        if (!this._vertexArray || this._vertexArray.length < totalFloats) {
+            this._vertexArray = new Float32Array(totalFloats);
+        }
+        var vertices = this._vertexArray;
+
+        for (var i = 0; i < this._particleCount; i++) {
+            var px = this._px[i];
+            var py = this._py[i];
+            var pz = this._pz[i];
+            var alpha = this._pAlpha[i] * particleDensity;
+
+            // Billboard quad (always faces camera)
+            var rx = right.x * particleSize, ry = right.y * particleSize, rz = right.z * particleSize;
+            var ux = up.x * particleSize, uy = up.y * particleSize, uz = up.z * particleSize;
+
+            // Four corners of the quad
+            var blx = px - rx - ux, bly = py - ry - uy, blz = pz - rz - uz;
+            var brx = px + rx - ux, bry = py + ry - uy, brz = pz + rz - uz;
+            var trx = px + rx + ux, trY = py + ry + uy, trz = pz + rz + uz;
+            var tlx = px - rx + ux, tly = py - ry + uy, tlz = pz - rz + uz;
+
+            // Color based on particle type
+            var r, g, b;
+            if (type === 'snow') {
+                r = 0.95; g = 0.95; b = 1.0;
+            } else {
+                r = 0.6; g = 0.7; b = 0.9;
+            }
+
+            var base = i * vertsPerParticle * floatsPerVertex;
+
+            // Bottom-left
+            vertices[base] = blx; vertices[base + 1] = bly; vertices[base + 2] = blz;
+            vertices[base + 3] = 0; vertices[base + 4] = 0;
+            vertices[base + 5] = r; vertices[base + 6] = g; vertices[base + 7] = b; vertices[base + 8] = alpha;
+            // Bottom-right
+            vertices[base + 9] = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
+            vertices[base + 12] = 1; vertices[base + 13] = 0;
+            vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
+            // Top-right
+            vertices[base + 18] = trx; vertices[base + 19] = trY; vertices[base + 20] = trz;
+            vertices[base + 21] = 1; vertices[base + 22] = 1;
+            vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
+            // Bottom-left (duplicate for second triangle)
+            vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
+            vertices[base + 30] = 0; vertices[base + 31] = 0;
+            vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
+            // Top-right (duplicate)
+            vertices[base + 36] = trx; vertices[base + 37] = trY; vertices[base + 38] = trz;
+            vertices[base + 39] = 1; vertices[base + 40] = 1;
+            vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
+            // Top-left
+            vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
+            vertices[base + 48] = 0; vertices[base + 49] = 1;
+            vertices[base + 50] = r; vertices[base + 51] = g; vertices[base + 52] = b; vertices[base + 53] = alpha;
+        }
+
+        // Upload vertex data to GPU
+        if (!this._vertexBuffer) {
+            this._vertexBuffer = gl.createBuffer();
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
+
+        var posLoc = this._shaderManager.getAttribute('aPosition');
+        var uvLoc = this._shaderManager.getAttribute('aUV');
+        var colorLoc = this._shaderManager.getAttribute('aColor');
+
+        if (posLoc >= 0) {
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+        }
+        if (uvLoc >= 0) {
+            gl.enableVertexAttribArray(uvLoc);
+            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
+        }
+        if (colorLoc >= 0) {
+            gl.enableVertexAttribArray(colorLoc);
+            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
+        }
+
+        var totalVertices = this._particleCount * vertsPerParticle;
+        gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
+
+        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+        if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
+        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+    };
+
+    /**
+     * Spawn initial particles for the current weather state.
+     * @param {number} count - Number of particles to spawn.
+     */
+    Donkeycraft.WeatherRenderer.prototype.spawnInitialParticles = function(count) {
+        var self = this;
+        count = Math.min(count || 500, this._maxParticles);
+
+        // These are seeded with random positions — actual player-relative positions
+        // are set during update() when player position is known.
+        for (var i = 0; i < count; i++) {
+            this._px[i] = (Math.random() - 0.5) * 120;
+            this._py[i] = Math.random() * 128;
+            this._pz[i] = (Math.random() - 0.5) * 120;
+            this._pAlpha[i] = 0.5 + Math.random() * 0.5;
+        }
+
+        this._particleCount = count;
+    };
+
+    /**
+     * Get the current particle count.
+     * @returns {number}
+     */
+    Donkeycraft.WeatherRenderer.prototype.getParticleCount = function() {
+        return this._particleCount;
+    };
+
+    /**
+     * Destroy weather renderer resources and free GPU memory.
+     */
+    Donkeycraft.WeatherRenderer.prototype.destroy = function() {
+        var gl = this._gl;
+        if (this._vertexBuffer && gl) {
+            gl.deleteBuffer(this._vertexBuffer);
+            this._vertexBuffer = null;
+        }
+
+        this._px = null;
+        this._py = null;
+        this._pz = null;
+        this._pvx = null;
+        this._pvy = null;
+        this._pvz = null;
+        this._pAlpha = null;
+        this._vertexArray = null;
+        this._particleCount = 0;
+        this._active = false;
+    };
+
+    /**
      * Destroy the Weather instance and free resources.
      */
     Donkeycraft.Weather.prototype.destroy = function() {

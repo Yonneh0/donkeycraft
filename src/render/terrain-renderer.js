@@ -29,8 +29,11 @@
         this._dirtyChunks = {};
 
         // Pending meshes: chunks whose geometry couldn't be built yet (e.g., block data not ready)
-        // map "chunkX,chunkZ" → { x: number, z: number }
+        // map "chunkX,chunkZ" → { x: number, z: number, retries: number }
         this._pendingMeshes = {};
+
+        // Maximum retry attempts for pending mesh builds before giving up
+        this._maxPendingRetries = 30;
 
         // Geometry builder and mesh optimizer
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
@@ -210,15 +213,26 @@
                 continue;
             }
 
+            // Increment retry counter (default to 0 if not set)
+            pending.retries = (pending.retries || 0) + 1;
+
+            // Skip if max retries exceeded — log warning and drop the chunk
+            if (pending.retries > this._maxPendingRetries) {
+                Donkeycraft.Logger.warn('TerrainRenderer',
+                    'Pending chunk (' + pending.x + ',' + pending.z + ') exceeded max retries (' +
+                    this._maxPendingRetries + ') — dropping from pending queue');
+                keysToDelete.push(key);
+                continue;
+            }
+
             // Rebuild geometry with current block data
             self._createChunkMesh(pending.x, pending.z);
 
-            // If still no mesh, keep it pending (block data may still be unavailable)
-            if (!this._chunks[key]) {
-                // Keep pending — will retry next frame
-            } else {
+            // If mesh was built successfully, remove from pending
+            if (this._chunks[key]) {
                 keysToDelete.push(key);
             }
+            // Otherwise keep it pending for next frame retry
         }
 
         // Remove processed entries
@@ -352,13 +366,14 @@
 
     /**
      * Multiply two 4×4 matrices (column-major), storing result in optional target buffer.
+     * Result: r = a × b where both inputs and output are column-major arrays.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function(a, b, target) {
         var r = target || new Float32Array(16);
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
-                r[i * 4 + j] = a[i]      * b[j * 4]    +
+                r[i + j * 4] = a[i]      * b[j * 4]    +
                                a[4 + i]  * b[j * 4 + 1] +
                                a[8 + i]  * b[j * 4 + 2] +
                                a[12 + i] * b[j * 4 + 3];
@@ -413,7 +428,9 @@
             this._fog.applyToFogUniforms(this._shaderManager);
         }
 
-        // Set dynamic lighting factor (sun intensity * ambient)
+        // Set dynamic lighting factor (sun intensity * ambient).
+        // Delegated to Lighting.applyToShader() when called externally,
+        // but set directly here as the terrain renderer's own path.
         if (this._lighting) {
             var sunIntensity = this._lighting.getSunIntensity();
             var ambientLight = this._lighting.getAmbientLight();

@@ -152,42 +152,6 @@
     };
 
     /**
-     * Create and link a program from source strings.
-     * @param {string} name - Program identifier for caching.
-     * @param {string} vertSource - Vertex shader GLSL source.
-     * @param {string} fragSource - Fragment shader GLSL source.
-     * @param {string[]} [attribLocations] - Optional attribute location bindings.
-     * @returns {WebGLProgram|null}
-     */
-    Donkeycraft.ShaderManager.prototype.createProgram = function(name, vertSource, fragSource, attribLocations) {
-        var vertShader = this.compileShader(vertSource, 'vertex');
-        if (!vertShader) return null;
-
-        var fragShader = this.compileShader(fragSource, 'fragment');
-        if (!fragShader) {
-            this._gl.deleteShader(vertShader);
-            return null;
-        }
-
-        var program = this.linkProgram(vertShader, fragShader, attribLocations);
-        if (!program) {
-            this._gl.deleteShader(vertShader);
-            this._gl.deleteShader(fragShader);
-            return null;
-        }
-
-        // Delete shaders after linking (no longer needed)
-        this._gl.deleteShader(vertShader);
-        this._gl.deleteShader(fragShader);
-
-        if (name) {
-            this._programs[name] = program;
-        }
-
-        return program;
-    };
-
-    /**
      * Use a cached program by name.
      * @param {string} name - Program name.
      * @returns {boolean} True if program was found and activated.
@@ -448,6 +412,135 @@
         return {
             shaders: this._shaderCount,
             programs: this._programCount
+        };
+    };
+
+    /**
+     * Create a program from source strings with error handling.
+     * @param {string} name - Program identifier for caching.
+     * @param {string} vertSource - Vertex shader GLSL source.
+     * @param {string} fragSource - Fragment shader GLSL source.
+     * @param {string[]} [attribLocations] - Optional attribute location bindings.
+     * @returns {WebGLProgram|null}
+     */
+    Donkeycraft.ShaderManager.prototype.createProgram = function(name, vertSource, fragSource, attribLocations) {
+        var vertShader = this.compileShader(vertSource, 'vertex');
+        if (!vertShader) {
+            Donkeycraft.Logger.error('ShaderManager', 'Failed to compile vertex shader for program "' + name + '"');
+            return null;
+        }
+
+        var fragShader = this.compileShader(fragSource, 'fragment');
+        if (!fragShader) {
+            this._gl.deleteShader(vertShader);
+            Donkeycraft.Logger.error('ShaderManager', 'Failed to compile fragment shader for program "' + name + '"');
+            return null;
+        }
+
+        var program = this.linkProgram(vertShader, fragShader, attribLocations);
+        if (!program) {
+            Donkeycraft.Logger.error('ShaderManager', 'Failed to link program "' + name + '"');
+            this._gl.deleteShader(vertShader);
+            this._gl.deleteShader(fragShader);
+            return null;
+        }
+
+        // Delete shaders after linking (no longer needed)
+        this._gl.deleteShader(vertShader);
+        this._gl.deleteShader(fragShader);
+
+        if (name) {
+            this._programs[name] = program;
+        }
+
+        return program;
+    };
+
+    /**
+     * Read shader sources from DOM script tags and create all programs.
+     * Expects <script type="text/plain" id="dk-vertex-shaders"> and <script type="text/plain" id="dk-fragment-shaders">.
+     * Creates programs: 'terrain', 'sky', 'gui', 'break'.
+     * @returns {{terrain: WebGLProgram, sky: WebGLProgram, gui: WebGLProgram, break: WebGLProgram}|null}
+     */
+    Donkeycraft.ShaderManager.prototype.createProgramsFromDOM = function() {
+        var gl = this._gl;
+        if (!gl) return null;
+
+        // Extract shader source code from DOM script tags
+        var vertexScript = document.getElementById('dk-vertex-shaders');
+        var fragmentScript = document.getElementById('dk-fragment-shaders');
+
+        if (!vertexScript || !fragmentScript) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing shader script tags (dk-vertex-shaders, dk-fragment-shaders)');
+            return null;
+        }
+
+        var vertexText = vertexScript.textContent || vertexScript.innerText;
+        var fragmentText = fragmentScript.textContent || fragmentScript.innerText;
+
+        // Parse shader variables from the text content.
+        // Format: var SHADER_NAME = `...`;
+        var self = this;
+
+        function extractShaders(text) {
+            var shaders = {};
+            var regex = /var\s+(\w+_SHADER)\s*=\s*`([^`]*)`/g;
+            var match;
+            while ((match = regex.exec(text)) !== null) {
+                shaders[match[1]] = match[2];
+            }
+            return shaders;
+        }
+
+        var vertexShaders = extractShaders(vertexText);
+        var fragmentShaders = extractShaders(fragmentText);
+
+        Donkeycraft.Logger.info('ShaderManager', 'Parsed ' + Object.keys(vertexShaders).length + ' vertex shaders, ' +
+            Object.keys(fragmentShaders).length + ' fragment shaders from DOM');
+
+        // Create terrain program (terrain vertex + terrain fragment)
+        var terrainVert = vertexShaders.TERRAIN_VERTEX_SHADER;
+        var terrainFrag = fragmentShaders.TERRAIN_FRAGMENT_SHADER;
+        if (!terrainVert || !terrainFrag) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing terrain shader sources');
+        }
+        var terrainProg = this.createProgram('terrain', terrainVert, terrainFrag);
+
+        // Create sky program (sky vertex + sky fragment)
+        var skyVert = vertexShaders.SKY_VERTEX_SHADER;
+        var skyFrag = fragmentShaders.SKY_FRAGMENT_SHADER;
+        if (!skyVert || !skyFrag) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing sky shader sources');
+        }
+        var skyProg = this.createProgram('sky', skyVert, skyFrag);
+
+        // Create gui program (gui vertex + gui fragment)
+        var guiVert = vertexShaders.GUI_VERTEX_SHADER;
+        var guiFrag = fragmentShaders.GUI_FRAGMENT_SHADER;
+        if (!guiVert || !guiFrag) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing gui shader sources');
+        }
+        var guiProg = this.createProgram('gui', guiVert, guiFrag);
+
+        // Create break program (break vertex + gui fragment — particles use GUI shader)
+        var breakVert = vertexShaders.BREAK_VERTEX_SHADER;
+        if (!breakVert || !guiFrag) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing break shader sources');
+        }
+        var breakProg = this.createProgram('break', breakVert, guiFrag);
+
+        // Verify all programs were created
+        if (!terrainProg || !skyProg || !guiProg || !breakProg) {
+            Donkeycraft.Logger.error('ShaderManager', 'One or more shader programs failed to compile/link');
+            return null;
+        }
+
+        Donkeycraft.Logger.info('ShaderManager', 'All shader programs created successfully: terrain, sky, gui, break');
+        return {
+            terrain: terrainProg,
+            sky: skyProg,
+            gui: guiProg,
+            break: breakProg
         };
     };
 
