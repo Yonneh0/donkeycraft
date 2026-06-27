@@ -42,19 +42,6 @@
 
 </div>
 
-<!-- Loading Screen (shown during async init) -->
-<div id="dk-loading-screen">
-    <div class="dk-loading-container">
-        <div class="dk-loading-title">Donkeycraft</div>
-        <div class="dk-progress-bar-container">
-            <div class="dk-progress-bar" id="dk-progress-bar"></div>
-        </div>
-        <div class="dk-progress-text" id="dk-progress-text">Initializing...</div>
-        <div class="dk-tip" id="dk-loading-tip"></div>
-        <div class="dk-error" id="dk-loading-error"></div>
-    </div>
-</div>
-
 <!-- Error Screen (shown on fatal errors) -->
 <div id="dk-error-screen">
     <div class="dk-error-title">Something went wrong</div>
@@ -198,23 +185,415 @@
 <!-- Phase 20: UI Elements -->
 <script src="src/ui/gui-elements.js"></script>
 
-<!-- Game initialization (Phase 21 not yet implemented) -->
+<!-- Shader Sources (embedded for file:/// compatibility) -->
+<script type="text/plain" id="dk-vertex-shaders">
+// Donkeycraft — Vertex Shaders
+// All vertex shaders as string resources for terrain, particles, and GUI rendering.
+
+// Terrain Vertex Shader
+var TERRAIN_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec3 aNormal;
+attribute float aLight;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec2 vUV;
+varying vec3 vNormal;
+varying float vLight;
+varying float vDepth;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vNormal = aNormal;
+    vLight = aLight;
+
+    // View-space Z for exponential distance fog
+    vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
+    vDepth = -viewPos.z;
+}
+`;
+
+// Block Break Vertex Shader
+var BREAK_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec4 aColor;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+void main() {
+    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vColor = aColor;
+}
+`;
+
+// GUI Vertex Shader
+var GUI_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec4 aColor;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vColor = aColor;
+}
+`;
+
+// Sky Vertex Shader
+var SKY_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+
+varying vec2 vUV;
+varying vec3 vWorldPos;
+
+void main() {
+    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vWorldPos = aPosition;
+}
+`;
+
+// Hand/Item Vertex Shader
+var HAND_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec3 aNormal;
+attribute float aLight;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vColor = vec4(aLight, aLight, aLight, 1.0);
+}
+`;
+</script>
+
+<script type="text/plain" id="dk-fragment-shaders">
+// Donkeycraft — Fragment Shaders
+// All fragment shaders for terrain lighting, fog, sky, and GUI rendering.
+
+// Terrain Fragment Shader
+var TERRAIN_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec3 vNormal;
+varying float vLight;
+varying float vDepth;
+
+uniform sampler2D uTexture;
+uniform vec3 uFogColor;
+uniform float uFogDensity;
+
+void main() {
+    vec4 texColor = texture2D(uTexture, vUV);
+    if (texColor.a < 0.5) discard;
+
+    vec3 finalColor = texColor.rgb * vLight;
+
+    // Exponential distance fog
+    float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    finalColor = mix(finalColor, uFogColor, fogFactor);
+
+    gl_FragColor = vec4(finalColor, texColor.a);
+}
+`;
+
+// Fog Fragment Shader
+var FOG_FRAGMENT_SHADER = `
+precision mediump float;
+uniform vec4 uFogColor;
+
+void main() {
+    gl_FragColor = uFogColor;
+}
+`;
+
+// GUI Fragment Shader
+var GUI_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+uniform sampler2D uTexture;
+uniform int uHasTexture;
+
+void main() {
+    vec4 color = vColor;
+    if (uHasTexture == 1) {
+        color = texture2D(uTexture, vUV) * color;
+    }
+    if (color.a < 0.1) discard;
+    gl_FragColor = color;
+}
+`;
+
+// Sky Fragment Shader
+var SKY_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec3 vWorldPos;
+
+uniform vec3 uTopColor;
+uniform vec3 uBottomColor;
+uniform float uHorizon;
+
+void main() {
+    float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);
+    gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);
+}
+`;
+
+// Hand/Item Fragment Shader
+var HAND_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+uniform sampler2D uTexture;
+
+void main() {
+    vec4 texColor = texture2D(uTexture, vUV);
+    if (texColor.a < 0.1) discard;
+    gl_FragColor = vec4(texColor.rgb * vColor.rgb, texColor.a * vColor.a);
+}
+`;
+
+// Particle Fragment Shader
+var PARTICLE_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec4 vColor;
+
+uniform sampler2D uTexture;
+
+void main() {
+    vec4 texColor = texture2D(uTexture, vUV);
+    if (vColor.a * texColor.a < 0.1) discard;
+    gl_FragColor = vec4(vColor.rgb, vColor.a * texColor.a);
+}
+`;
+</script>
+
+<!-- Phase 21: Main Entry Point & Game Loop -->
+<script src="src/game.js"></script>
+
+<!-- Game initialization (Phase 21: Main Entry Point & Game Loop) -->
 <script>
 (function() {
     'use strict';
 
-    // Hide loading screen — game loop starts when Phase 21 is implemented.
-    var loadingScreen = document.getElementById('dk-loading-screen');
-    if (loadingScreen) {
-        loadingScreen.style.display = 'none';
+    /**
+     * Start the game after async initialization completes.
+     * Called by InitSequence pipeline on 'game:ready' event.
+     * @private
+     */
+    function startGame(systems) {
+
+        // Create the game instance
+        var game = new Donkeycraft.Game({
+            renderDistance: systems.renderDistance,
+            gameMode: systems.gameMode || 'survival'
+        });
+
+        // Initialize all subsystems (WebGL, shaders, player, chunks, etc.)
+        var initOk = game.init();
+        if (!initOk) {
+            showError('Failed to initialize game. WebGL may not be supported.');
+            return;
+        }
+
+        // Wire up external systems: movement, collision, jump, flying, raycast, block actions
+        game.setSystems(
+            systems.movementSystem,
+            systems.collisionSystem,
+            systems.jumpSystem,
+            systems.flyingSystem,
+            systems.raycastSystem,
+            systems.blockActionSystem,
+            systems.blockPlacementSystem,
+            systems.interactableBlocksSystem
+        );
+
+        // Set overlay reference for pointer lock
+        game._overlay = document.getElementById('dk-overlay');
+
+        // --- Input: Pointer Lock ---
+        var overlay = document.getElementById('dk-overlay');
+        overlay.addEventListener('click', function() {
+            if (!document.pointerLockElement) {
+                game.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', function() {
+            game._pointerLocked = !!document.pointerLockElement;
+        });
+
+        // --- Input: Mouse Movement (camera rotation) ---
+        overlay.addEventListener('mousemove', function(e) {
+            if (!game._pointerLocked) return;
+            var dx = e.movementX || 0;
+            var dy = e.movementY || 0;
+            if (game._camera) {
+                game._camera.applyMouseDelta(dx, dy);
+            }
+        });
+
+        // --- Input: Keyboard (block break/place) ---
+        document.addEventListener('keydown', function(e) {
+            // F — toggle creative flying
+            if (e.code === 'KeyF' && game._player) {
+                if (game._player.gameMode === 'creative' || game._player.gameMode === 'spectator') {
+                    game._flyingSystem.toggleFlyMode(game._player);
+                }
+            }
+            // Escape — exit pointer lock
+            if (e.code === 'Escape') {
+                game.exitPointerLock();
+            }
+        });
+
+        // --- Input: Mouse buttons (break/place) ---
+        document.addEventListener('mousedown', function(e) {
+            if (!game._pointerLocked) return;
+            // Left click = break, Right click = place
+            if (e.button === 0) {
+                // Mouse0 handled in _processInteractions via isKeyDown
+            }
+            if (e.button === 2) {
+                // Mouse2 handled in _processInteractions via isKeyDown
+            }
+        });
+
+        // Prevent context menu on right-click
+        overlay.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+
+        // --- Start the game loop ---
+        game.start();
+
+        // Store globally for debugging / cleanup
+        window._dkGame = game;
     }
 
-    // Show a placeholder message since Phase 21 (src/game.js) is not yet available.
-    var debugOverlay = document.getElementById('dk-debug-overlay');
-    if (debugOverlay) {
-        debugOverlay.style.display = 'block';
-        debugOverlay.textContent = '[Phase 21 pending] Main Game Loop — UI layer operational';
+    /**
+     * Show error screen on fatal error.
+     * @private
+     * @param {string} message - Error message to display.
+     */
+    function showError(message) {
+        var errorScreen = document.getElementById('dk-error-screen');
+        var errorMessage = document.getElementById('dk-error-message');
+        if (errorScreen && errorMessage) {
+            errorMessage.textContent = message;
+            errorScreen.style.display = 'flex';
+        }
     }
+
+    /**
+     * Retry button handler — reload the page.
+     * @private
+     */
+    function setupRetry() {
+        var retryBtn = document.getElementById('dk-retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', function() {
+                location.reload();
+            });
+        }
+    }
+
+    // ============================================================
+    // Initialize: run async pipeline, then start game
+    // ============================================================
+    setupRetry();
+
+    // Create LoadingScreen instance (constructor already creates+shows DOM)
+    var loadingScreen = new Donkeycraft.LoadingScreen();
+
+    // Run the async initialization pipeline
+    var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
+
+    // Wire loading screen progress updates to init phases
+    initSeq.on('init:phase:start', function(data) {
+        loadingScreen.setMessage('Initializing ' + data.phase.replace('-', ' ') + '...');
+    });
+
+    initSeq.on('init:phase:end', function(data) {
+        var phaseNames = ['config', 'texture-atlas', 'audio', 'indexeddb'];
+        var idx = phaseNames.indexOf(data.phase);
+        loadingScreen.updateProgress((idx + 1) * 25);
+    });
+
+    initSeq.on('init:error', function(data) {
+        loadingScreen.showError(data.error.message || 'Unknown error');
+    });
+
+    // Start the async pipeline and handle completion
+    initSeq.initialize().then(function(systems) {
+        // Update progress to 100%
+        loadingScreen.updateProgress(100);
+        loadingScreen.setMessage('Ready!');
+
+        // Extract systems from init result
+        var gameSystems = {
+            renderDistance: Donkeycraft.Config.RENDER_DISTANCE,
+            gameMode: 'survival',
+            movementSystem: Donkeycraft.Movement,
+            collisionSystem: Donkeycraft.Collision,
+            jumpSystem: Donkeycraft.JumpSystem,
+            flyingSystem: Donkeycraft.FlyingSystem,
+            raycastSystem: Donkeycraft.Raycast,
+            blockActionSystem: Donkeycraft.BlockAction,
+            blockPlacementSystem: Donkeycraft.BlockPlacement,
+            interactableBlocksSystem: Donkeycraft.InteractableBlocks
+        };
+
+        // Start the game with all systems wired up
+        startGame(gameSystems);
+
+        // Dispose loading screen after game starts
+        setTimeout(function() { loadingScreen.dispose(); }, 500);
+    }).catch(function(err) {
+        loadingScreen.showError(err.message || 'Initialization failed');
+    });
+
 })();
 </script>
 

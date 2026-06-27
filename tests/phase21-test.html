@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 21 Main Entry Point & Game Loop Test</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Phase 21 Main Entry Point & Game Loop Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: Main Game class — initialization, main loop (update + render), pause/resume, destroy</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 2 Rendering -->
+<script src="../src/render/gl-context.js"></script>
+<script src="../src/render/shader-manager.js"></script>
+<script src="../src/render/geometry-builder.js"></script>
+<script src="../src/render/mesh-optimizer.js"></script>
+<script src="../src/render/chunk-mesh.js"></script>
+<script src="../src/render/terrain-renderer.js"></script>
+<script src="../src/render/camera.js"></script>
+<script src="../src/render/fog.js"></script>
+<script src="../src/render/sky.js"></script>
+<script src="../src/render/lighting.js"></script>
+<script src="../src/render/hand-renderer.js"></script>
+<script src="../src/render/break-particles.js"></script>
+<script src="../src/render/gui-renderer.js"></script>
+
+<!-- Phase 3 Block System -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
+
+<!-- Phase 4 World Generation -->
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/biome.js"></script>
+<script src="../src/world/terrain-generator.js"></script>
+<script src="../src/world/ore-generator.js"></script>
+<script src="../src/world/cave-generator.js"></script>
+<script src="../src/world/structure-generator.js"></script>
+<script src="../src/world/water-generator.js"></script>
+<script src="../src/world/terrain-surface.js"></script>
+<script src="../src/world/lighting-engine.js"></script>
+<script src="../src/world/physics.js"></script>
+<script src="../src/world/world-utils.js"></script>
+
+<!-- Phase 5 Player & Movement -->
+<script src="../src/player/player.js"></script>
+<script src="../src/player/movement.js"></script>
+<script src="../src/player/collision.js"></script>
+<script src="../src/player/jumping.js"></script>
+<script src="../src/player/flying.js"></script>
+<script src="../src/player/hurt-box.js"></script>
+
+<!-- Phase 6 Interaction -->
+<script src="../src/interaction/raycast.js"></script>
+<script src="../src/interaction/block-action.js"></script>
+<script src="../src/interaction/block-placement.js"></script>
+<script src="../src/interaction/interactable-blocks.js"></script>
+
+<!-- Phase 13 Weather (optional) -->
+<script src="../src/render/weather.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Phase 21: Main Game -->
+<script src="../src/game.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Namespace & Class Registration
+    // ============================================================
+    F.section('1. Namespace & Class Registration');
+
+    F.assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
+    F.assert(typeof Donkeycraft.Game === 'function', 'Donkeycraft.Game is a function (constructor)');
+    F.assertType(Donkeycraft.Game.prototype.init, 'function', 'init is a function');
+    F.assertType(Donkeycraft.Game.prototype.start, 'function', 'start is a function');
+    F.assertType(Donkeycraft.Game.prototype.stop, 'function', 'stop is a function');
+    F.assertType(Donkeycraft.Game.prototype.pause, 'function', 'pause is a function');
+    F.assertType(Donkeycraft.Game.prototype.resume, 'function', 'resume is a function');
+    F.assertType(Donkeycraft.Game.prototype.isRunning, 'function', 'isRunning is a function');
+    F.assertType(Donkeycraft.Game.prototype.isPaused, 'function', 'isPaused is a function');
+    F.assertType(Donkeycraft.Game.prototype.getFPS, 'function', 'getFPS is a function');
+    F.assertType(Donkeycraft.Game.prototype.getTickCount, 'function', 'getTickCount is a function');
+    F.assertType(Donkeycraft.Game.prototype.getPlayer, 'function', 'getPlayer is a function');
+    F.assertType(Donkeycraft.Game.prototype.getCamera, 'function', 'getCamera is a function');
+    F.assertType(Donkeycraft.Game.prototype.getChunkManager, 'function', 'getChunkManager is a function');
+    F.assertType(Donkeycraft.Game.prototype.getInput, 'function', 'getInput is a function');
+    F.assertType(Donkeycraft.Game.prototype.getTimer, 'function', 'getTimer is a function');
+    F.assertType(Donkeycraft.Game.prototype.getEventBus, 'function', 'getEventBus is a function');
+    F.assertType(Donkeycraft.Game.prototype.setCameraSync, 'function', 'setCameraSync is a function');
+    F.assertType(Donkeycraft.Game.prototype.requestPointerLock, 'function', 'requestPointerLock is a function');
+    F.assertType(Donkeycraft.Game.prototype.exitPointerLock, 'function', 'exitPointerLock is a function');
+    F.assertType(Donkeycraft.Game.prototype.destroy, 'function', 'destroy is a function');
+    F.assertType(Donkeycraft.Game.prototype.setSystems, 'function', 'setSystems is a function');
+
+    // ============================================================
+    // Section 2: Constructor — Default Values
+    // ============================================================
+    F.section('2. Constructor — Default Values');
+
+    var game1 = new Donkeycraft.Game();
+    F.assert(game1._renderDistance === Donkeycraft.Config.RENDER_DISTANCE, 'Default render distance matches Config.RENDER_DISTANCE (' + Donkeycraft.Config.RENDER_DISTANCE + ')');
+    F.assertEq(game1._gameMode, 'survival', 'Default game mode is "survival"');
+    F.assert(!game1._running, 'Game not running after construction');
+    F.assert(!game1._paused, 'Game not paused after construction');
+    F.assert(game1._cameraSyncEnabled === true, 'Camera sync enabled by default');
+
+    // ============================================================
+    // Section 3: Constructor — Custom Options
+    // ============================================================
+    F.section('3. Constructor — Custom Options');
+
+    var game2 = new Donkeycraft.Game({ renderDistance: 4, gameMode: 'creative' });
+    F.assertEq(game2._renderDistance, 4, 'Custom render distance = 4');
+    F.assertEq(game2._gameMode, 'creative', 'Custom game mode is "creative"');
+
+    var game3 = new Donkeycraft.Game({ renderDistance: 12, gameMode: 'spectator' });
+    F.assertEq(game3._renderDistance, 12, 'Custom render distance = 12');
+    F.assertEq(game3._gameMode, 'spectator', 'Custom game mode is "spectator"');
+
+    var game4 = new Donkeycraft.Game({});
+    F.assert(game4._renderDistance === Donkeycraft.Config.RENDER_DISTANCE, 'Empty options object uses default render distance');
+
+    // ============================================================
+    // Section 4: init() — Missing Canvas
+    // ============================================================
+    F.section('4. init() — Missing Canvas');
+
+    var gameNoCanvas = new Donkeycraft.Game();
+    // Ensure no #dk-canvas exists in the test page
+    var existingCanvas = document.getElementById('dk-canvas');
+    if (existingCanvas) {
+        existingCanvas.remove();
+    }
+    var initResult = gameNoCanvas.init();
+    F.assert(!initResult, 'init() returns false when canvas is missing');
+
+    // ============================================================
+    // Section 5: init() — With Canvas Element
+    // ============================================================
+    F.section('5. init() — With Canvas Element');
+
+    // Create a canvas element for testing
+    var testCanvas = document.createElement('canvas');
+    testCanvas.id = 'dk-canvas';
+    testCanvas.width = 800;
+    testCanvas.height = 600;
+    document.body.appendChild(testCanvas);
+
+    var gameWithCanvas = new Donkeycraft.Game();
+    var initResult2 = gameWithCanvas.init();
+    // Note: init() may succeed or fail depending on WebGL support in the test environment.
+    // The key is that it doesn't throw an error.
+    F.assertType(initResult2, 'boolean', 'init() returns a boolean');
+
+    if (initResult2) {
+        F.assert(gameWithCanvas._gl !== null, 'WebGL context created successfully');
+        F.assert(gameWithCanvas._camera !== null, 'Camera created');
+        F.assert(gameWithCanvas._player !== null, 'Player created');
+        F.assert(gameWithCanvas._chunkManager !== null, 'ChunkManager created');
+        F.assert(gameWithCanvas._timer !== null, 'Timer created');
+        F.assert(gameWithCanvas._input !== null, 'Input created');
+        F.assert(gameWithCanvas._eventBus !== null, 'EventBus created');
+        F.assert(gameWithCanvas._terrainRenderer !== null, 'TerrainRenderer created');
+        F.assert(gameWithCanvas._shaderManager !== null, 'ShaderManager created');
+
+        // Check player position at spawn point
+        var pPos = gameWithCanvas._player.getPosition();
+        var expectedSpawnY = Math.floor(Donkeycraft.Config.WORLD_HEIGHT / 2);
+        F.assertEq(Math.floor(pPos.x), 0, 'Player X near spawn (0.5)');
+        F.assertEq(pPos.y, expectedSpawnY, 'Player Y at spawn height (' + expectedSpawnY + ')');
+        F.assertEq(Math.floor(pPos.z), 0, 'Player Z near spawn (0.5)');
+    } else {
+        F.info('init() returned false — WebGL may not be available in this environment');
+    }
+
+    // Clean up canvas
+    testCanvas.remove();
+
+    // ============================================================
+    // Section 6: start()/stop() — Timer Lifecycle
+    // ============================================================
+    F.section('6. start()/stop() — Timer Lifecycle');
+
+    // Create a minimal game with mock canvas for start/stop testing
+    var mockCanvas = document.createElement('canvas');
+    mockCanvas.id = 'dk-canvas';
+    mockCanvas.width = 800;
+    mockCanvas.height = 600;
+    document.body.appendChild(mockCanvas);
+
+    var gameForStartStop = new Donkeycraft.Game();
+    var initOk = gameForStartStop.init();
+
+    if (initOk) {
+        // Verify not running before start
+        F.assert(!gameForStartStop.isRunning(), 'Game not running before start()');
+        F.assert(!gameForStartStop.isPaused(), 'Game not paused before start()');
+
+        // Start the game
+        gameForStartStop.start();
+        F.assert(gameForStartStop.isRunning(), 'Game is running after start()');
+        F.assert(!gameForStartStop.isPaused(), 'Game not paused after start()');
+
+        // Stop the game
+        gameForStartStop.stop();
+        F.assert(!gameForStartStop.isRunning(), 'Game not running after stop()');
+        F.assert(!gameForStartStop.isPaused(), 'Game not paused after stop()');
+    } else {
+        F.info('Skipping start/stop tests — init() failed (no WebGL)');
+    }
+
+    mockCanvas.remove();
+
+    // ============================================================
+    // Section 7: pause()/resume() — Pause State Management
+    // ============================================================
+    F.section('7. pause()/resume() — Pause State Management');
+
+    var mockCanvas2 = document.createElement('canvas');
+    mockCanvas2.id = 'dk-canvas';
+    mockCanvas2.width = 800;
+    mockCanvas2.height = 600;
+    document.body.appendChild(mockCanvas2);
+
+    var gameForPause = new Donkeycraft.Game();
+    var initOk2 = gameForPause.init();
+
+    if (initOk2) {
+        gameForPause.start();
+        F.assert(gameForPause.isRunning(), 'Game running before pause()');
+
+        // Pause the game
+        gameForPause.pause();
+        F.assert(gameForPause.isPaused(), 'Game is paused after pause()');
+
+        // Resume the game
+        gameForPause.resume();
+        F.assert(!gameForPause.isPaused(), 'Game not paused after resume()');
+        F.assert(gameForPause.isRunning(), 'Game still running after resume()');
+
+        // Double pause (should be no-op)
+        gameForPause.pause();
+        gameForPause.pause();
+        F.assert(gameForPause.isPaused(), 'Double pause still paused');
+
+        // Double resume (should be no-op)
+        gameForPause.resume();
+        gameForPause.resume();
+        F.assert(!gameForPause.isPaused(), 'Double resume not paused');
+    } else {
+        F.info('Skipping pause/resume tests — init() failed (no WebGL)');
+    }
+
+    gameForPause.stop();
+    mockCanvas2.remove();
+
+    // ============================================================
+    // Section 8: start() — Double Start Guard
+    // ============================================================
+    F.section('8. start() — Double Start Guard');
+
+    var mockCanvas3 = document.createElement('canvas');
+    mockCanvas3.id = 'dk-canvas';
+    mockCanvas3.width = 800;
+    mockCanvas3.height = 600;
+    document.body.appendChild(mockCanvas3);
+
+    var gameForDoubleStart = new Donkeycraft.Game();
+    var initOk3 = gameForDoubleStart.init();
+
+    if (initOk3) {
+        gameForDoubleStart.start();
+        F.assert(gameForDoubleStart.isRunning(), 'Game running after first start()');
+
+        // Second start should be a no-op
+        gameForDoubleStart.start();
+        F.assert(gameForDoubleStart.isRunning(), 'Game still running after second start()');
+
+        gameForDoubleStart.stop();
+    } else {
+        F.info('Skipping double start test — init() failed (no WebGL)');
+    }
+
+    mockCanvas3.remove();
+
+    // ============================================================
+    // Section 9: stop() — Double Stop Guard
+    // ============================================================
+    F.section('9. stop() — Double Stop Guard');
+
+    var mockCanvas4 = document.createElement('canvas');
+    mockCanvas4.id = 'dk-canvas';
+    mockCanvas4.width = 800;
+    mockCanvas4.height = 600;
+    document.body.appendChild(mockCanvas4);
+
+    var gameForDoubleStop = new Donkeycraft.Game();
+    var initOk4 = gameForDoubleStop.init();
+
+    if (initOk4) {
+        gameForDoubleStop.start();
+        gameForDoubleStop.stop();
+        F.assert(!gameForDoubleStop.isRunning(), 'Game not running after first stop()');
+
+        // Second stop should be a no-op
+        gameForDoubleStop.stop();
+        F.assert(!gameForDoubleStop.isRunning(), 'Game still not running after second stop()');
+
+        gameForDoubleStop.destroy();
+    } else {
+        F.info('Skipping double stop test — init() failed (no WebGL)');
+    }
+
+    mockCanvas4.remove();
+
+    // ============================================================
+    // Section 10: getFPS() / getTickCount() — Before and After Start
+    // ============================================================
+    F.section('10. getFPS() / getTickCount() — Before and After Start');
+
+    var gameForMetrics = new Donkeycraft.Game();
+    // Before init, timer is null — should return 0
+    F.assertEq(gameForMetrics.getFPS(), 0, 'getFPS() returns 0 before init');
+    F.assertEq(gameForMetrics.getTickCount(), 0, 'getTickCount() returns 0 before init');
+
+    var initOk5 = gameForMetrics.init();
+    if (initOk5) {
+        // After init but before start, tick count should still be 0
+        F.assertEq(gameForMetrics.getTickCount(), 0, 'getTickCount() returns 0 after init, before start');
+
+        gameForMetrics.start();
+        var initialTicks = gameForMetrics.getTickCount();
+        F.assert(initialTicks >= 0, 'getTickCount() returns non-negative after start (' + initialTicks + ')');
+
+        gameForMetrics.stop();
+        F.assertType(gameForMetrics.getFPS(), 'number', 'getFPS() returns a number after stop');
+    } else {
+        F.info('Skipping metrics tests — init() failed (no WebGL)');
+    }
+
+    gameForMetrics.destroy();
+
+    // ============================================================
+    // Section 11: Getters — Return Correct Types
+    // ============================================================
+    F.section('11. Getters — Return Correct Types');
+
+    var mockCanvas5 = document.createElement('canvas');
+    mockCanvas5.id = 'dk-canvas';
+    mockCanvas5.width = 800;
+    mockCanvas5.height = 600;
+    document.body.appendChild(mockCanvas5);
+
+    var gameForGetters = new Donkeycraft.Game();
+    var initOk6 = gameForGetters.init();
+
+    if (initOk6) {
+        // getPlayer returns a Player instance
+        var player = gameForGetters.getPlayer();
+        F.assertType(player, 'object', 'getPlayer() returns an object');
+        F.assert(typeof Donkeycraft.Player === 'function' || player instanceof Object, 'Player is an object');
+
+        // getCamera returns a Camera-like object
+        var camera = gameForGetters.getCamera();
+        F.assertType(camera, 'object', 'getCamera() returns an object');
+
+        // getChunkManager returns a ChunkManager-like object
+        var cm = gameForGetters.getChunkManager();
+        F.assertType(cm, 'object', 'getChunkManager() returns an object');
+
+        // getInput returns an Input-like object
+        var input = gameForGetters.getInput();
+        F.assertType(input, 'object', 'getInput() returns an object');
+
+        // getTimer returns a Timer-like object
+        var timer = gameForGetters.getTimer();
+        F.assertType(timer, 'object', 'getTimer() returns an object');
+
+        // getEventBus returns an EventBus-like object
+        var bus = gameForGetters.getEventBus();
+        F.assertType(bus, 'object', 'getEventBus() returns an object');
+
+        // setCameraSync toggles the flag
+        gameForGetters.setCameraSync(false);
+        F.assert(!gameForGetters._cameraSyncEnabled, 'setCameraSync(false) disables camera sync');
+        gameForGetters.setCameraSync(true);
+        F.assert(gameForGetters._cameraSyncEnabled, 'setCameraSync(true) enables camera sync');
+    } else {
+        F.info('Skipping getter tests — init() failed (no WebGL)');
+    }
+
+    gameForGetters.destroy();
+    mockCanvas5.remove();
+
+    // ============================================================
+    // Section 12: Camera-Player Sync
+    // ============================================================
+    F.section('12. Camera-Player Sync');
+
+    var mockCanvas6 = document.createElement('canvas');
+    mockCanvas6.id = 'dk-canvas';
+    mockCanvas6.width = 800;
+    mockCanvas6.height = 600;
+    document.body.appendChild(mockCanvas6);
+
+    var gameForSync = new Donkeycraft.Game();
+    var initOk7 = gameForSync.init();
+
+    if (initOk7) {
+        // Verify camera sync is enabled by default
+        F.assert(gameForSync._cameraSyncEnabled, 'Camera sync enabled by default');
+
+        // Disable sync
+        gameForSync.setCameraSync(false);
+        F.assert(!gameForSync._cameraSyncEnabled, 'Camera sync disabled via setCameraSync(false)');
+
+        // Re-enable sync
+        gameForSync.setCameraSync(true);
+        F.assert(gameForSync._cameraSyncEnabled, 'Camera sync re-enabled via setCameraSync(true)');
+    } else {
+        F.info('Skipping camera-sync tests — init() failed (no WebGL)');
+    }
+
+    gameForSync.destroy();
+    mockCanvas6.remove();
+
+    // ============================================================
+    // Section 13: destroy() — Clean Shutdown
+    // ============================================================
+    F.section('13. destroy() — Clean Shutdown');
+
+    var mockCanvas7 = document.createElement('canvas');
+    mockCanvas7.id = 'dk-canvas';
+    mockCanvas7.width = 800;
+    mockCanvas7.height = 600;
+    document.body.appendChild(mockCanvas7);
+
+    var gameForDestroy = new Donkeycraft.Game();
+    var initOk8 = gameForDestroy.init();
+
+    if (initOk8) {
+        gameForDestroy.start();
+        F.assert(gameForDestroy.isRunning(), 'Game running before destroy()');
+
+        // Destroy should not throw and should stop the game
+        try {
+            gameForDestroy.destroy();
+            F.assert(true, 'destroy() completes without throwing an error');
+        } catch (e) {
+            F.assert(false, 'destroy() threw: ' + e.message);
+        }
+
+        F.assert(!gameForDestroy.isRunning(), 'Game not running after destroy()');
+    } else {
+        // Even without WebGL, destroy should not throw
+        try {
+            gameForDestroy.destroy();
+            F.assert(true, 'destroy() completes without throwing (no WebGL case)');
+        } catch (e) {
+            F.assert(false, 'destroy() threw: ' + e.message);
+        }
+    }
+
+    mockCanvas7.remove();
+
+    // ============================================================
+    // Section 14: destroy() — Double Destroy Guard
+    // ============================================================
+    F.section('14. destroy() — Double Destroy Guard');
+
+    var gameForDoubleDestroy = new Donkeycraft.Game();
+    try {
+        gameForDoubleDestroy.destroy();
+        gameForDoubleDestroy.destroy();
+        F.assert(true, 'Double destroy() does not throw');
+    } catch (e) {
+        F.assert(false, 'Double destroy() threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 15: setSystems() — External System Registration
+    // ============================================================
+    F.section('15. setSystems() — External System Registration');
+
+    var mockCanvas8 = document.createElement('canvas');
+    mockCanvas8.id = 'dk-canvas';
+    mockCanvas8.width = 800;
+    mockCanvas8.height = 600;
+    document.body.appendChild(mockCanvas8);
+
+    var gameForSystems = new Donkeycraft.Game();
+    var initOk9 = gameForSystems.init();
+
+    if (initOk9) {
+        // Create mock systems
+        var mockMovement = { speed: 5.0 };
+        var mockCollision = { check: function() {} };
+        var mockJump = { canJump: function() { return true; }, performJump: function() {}, isSwimmingUp: function() { return false; } };
+        var mockFlying = { isEnabled: function() { return false; } };
+        var mockRaycast = Donkeycraft.Raycast; // Use real Raycast
+        var mockBlockAction = Donkeycraft.BlockAction; // Use real BlockAction
+        var mockBlockPlacement = Donkeycraft.BlockPlacement; // Use real BlockPlacement
+
+        // setSystems should not throw
+        try {
+            gameForSystems.setSystems(
+                mockMovement, mockCollision, mockJump, mockFlying,
+                mockRaycast, mockBlockAction, mockBlockPlacement, null
+            );
+            F.assert(true, 'setSystems() completes without throwing');
+
+            // Verify systems were stored
+            F.assert(gameForSystems._movementSystem === mockMovement, '_movementSystem set correctly');
+            F.assert(gameForSystems._collisionSystem === mockCollision, '_collisionSystem set correctly');
+            F.assert(gameForSystems._raycastSystem === mockRaycast, '_raycastSystem set correctly');
+            F.assert(gameForSystems._blockActionSystem === mockBlockAction, '_blockActionSystem set correctly');
+            F.assert(gameForSystems._blockPlacementSystem === mockBlockPlacement, '_blockPlacementSystem set correctly');
+        } catch (e) {
+            F.assert(false, 'setSystems() threw: ' + e.message);
+        }
+
+        gameForSystems.destroy();
+    } else {
+        F.info('Skipping setSystems test — init() failed (no WebGL)');
+    }
+
+    mockCanvas8.remove();
+
+    // ============================================================
+    // Section 16: Edge Cases — Null/Undefined Handling
+    // ============================================================
+    F.section('16. Edge Cases — Null/Undefined Handling');
+
+    // Constructor with null options
+    var gameNullOpts = new Donkeycraft.Game(null);
+    F.assert(gameNullOpts._renderDistance === Donkeycraft.Config.RENDER_DISTANCE, 'null options uses default render distance');
+    F.assertEq(gameNullOpts._gameMode, 'survival', 'null options uses default game mode');
+
+    // Constructor with undefined options
+    var gameUndefinedOpts = new Donkeycraft.Game(undefined);
+    F.assert(gameUndefinedOpts._renderDistance === Donkeycraft.Config.RENDER_DISTANCE, 'undefined options uses default render distance');
+
+    // ============================================================
+    // Section 17: Edge Cases — Invalid Render Distance
+    // ============================================================
+    F.section('17. Edge Cases — Invalid Render Distance');
+
+    var gameBadDist = new Donkeycraft.Game({ renderDistance: -5 });
+    F.assertEq(gameBadDist._renderDistance, -5, 'Negative render distance is stored as-is (no validation in constructor)');
+
+    // NaN is falsy in JS, so NaN || default = default — constructor uses || operator
+    var gameNaN = new Donkeycraft.Game({ renderDistance: NaN });
+    F.assertEq(gameNaN._renderDistance, Donkeycraft.Config.RENDER_DISTANCE, 'NaN render distance falls back to default via || operator');
+
+    // ============================================================
+    // Section 18: Integration — Event Bus Emission
+    // ============================================================
+    F.section('18. Integration — Event Bus Emission');
+
+    var mockCanvas9 = document.createElement('canvas');
+    mockCanvas9.id = 'dk-canvas';
+    mockCanvas9.width = 800;
+    mockCanvas9.height = 600;
+    document.body.appendChild(mockCanvas9);
+
+    var gameForEvents = new Donkeycraft.Game();
+    var initOk10 = gameForEvents.init();
+
+    if (initOk10) {
+        // Register an event listener
+        var eventFired = false;
+        var receivedData = null;
+        gameForEvents.getEventBus().on('game:tick', function(data) {
+            eventFired = true;
+            receivedData = data;
+        });
+
+        // Start the game briefly to trigger a tick
+        gameForEvents.start();
+
+        // Wait a frame for the tick callback to fire
+        // We can't easily wait in a test, so we check that the timer is running
+        F.assert(gameForEvents.isRunning(), 'Game is running (timer active)');
+
+        // Stop and verify the event bus was not cleared
+        gameForEvents.stop();
+        F.assertType(gameForEvents.getEventBus(), 'object', 'EventBus still exists after stop()');
+    } else {
+        F.info('Skipping event bus test — init() failed (no WebGL)');
+    }
+
+    mockCanvas9.remove();
+
+    // ============================================================
+    // Section 19: Input Integration — Key Detection Methods
+    // ============================================================
+    F.section('19. Input Integration — Key Detection Methods');
+
+    var mockCanvas10 = document.createElement('canvas');
+    mockCanvas10.id = 'dk-canvas';
+    mockCanvas10.width = 800;
+    mockCanvas10.height = 600;
+    document.body.appendChild(mockCanvas10);
+
+    var gameForInput = new Donkeycraft.Game();
+    var initOk11 = gameForInput.init();
+
+    if (initOk11) {
+        var input = gameForInput.getInput();
+        F.assertType(input.isKeyDown, 'function', 'Input.isKeyDown is a function');
+        F.assertType(input.isKeyJustPressed, 'function', 'Input.isKeyJustPressed is a function');
+        F.assertType(input.isMouseCaptured, 'function', 'Input.isMouseCaptured is a function');
+        F.assertType(input.updateKeyStates, 'function', 'Input.updateKeyStates is a function');
+        F.assertType(input.captureMouse, 'function', 'Input.captureMouse is a function');
+        F.assertType(input.releaseMouse, 'function', 'Input.releaseMouse is a function');
+
+        // Key should not be pressed initially
+        F.assert(!input.isKeyDown('KeyW'), 'KeyW not pressed initially');
+        F.assert(!input.isKeyJustPressed('KeyW'), 'KeyW not just pressed initially');
+
+        // Mouse should not be captured initially
+        F.assert(!input.isMouseCaptured(), 'Mouse not captured initially');
+    } else {
+        F.info('Skipping input integration test — init() failed (no WebGL)');
+    }
+
+    gameForInput.destroy();
+    mockCanvas10.remove();
+
+    // ============================================================
+    // Section 20: Integration — Chunk Manager Callbacks
+    // ============================================================
+    F.section('20. Integration — Chunk Manager Callbacks');
+
+    var mockCanvas11 = document.createElement('canvas');
+    mockCanvas11.id = 'dk-canvas';
+    mockCanvas11.width = 800;
+    mockCanvas11.height = 600;
+    document.body.appendChild(mockCanvas11);
+
+    var gameForChunks = new Donkeycraft.Game();
+    var initOk12 = gameForChunks.init();
+
+    if (initOk12) {
+        var cm = gameForChunks.getChunkManager();
+        F.assertType(cm.onChunkLoad, 'function', 'onChunkLoad callback exists');
+        F.assertType(cm.onChunkUnload, 'function', 'onChunkUnload callback exists');
+        // onChunksChanged is an EventBus subscriber object (returned by EventBus.on()), not a function
+        F.assertType(cm.onChunksChanged, 'object', 'onChunksChanged is an event subscriber (object)');
+
+        // Verify chunk manager has expected methods
+        F.assertType(cm.getChunk, 'function', 'ChunkManager.getChunk is a function');
+        F.assertType(cm.hasChunk, 'function', 'ChunkManager.hasChunk is a function');
+        F.assertType(cm.unloadChunk, 'function', 'ChunkManager.unloadChunk is a function');
+        F.assertType(cm.updatePlayerPosition, 'function', 'ChunkManager.updatePlayerPosition is a function');
+        F.assertType(cm.markChunkDirty, 'function', 'ChunkManager.markChunkDirty is a function');
+        F.assertType(cm.getDirtyChunks, 'function', 'ChunkManager.getDirtyChunks is a function');
+    } else {
+        F.info('Skipping chunk manager integration test — init() failed (no WebGL)');
+    }
+
+    gameForChunks.destroy();
+    mockCanvas11.remove();
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>

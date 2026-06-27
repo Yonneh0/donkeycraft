@@ -80,6 +80,8 @@
 
     /**
      * Get or create a chunk at the given coordinates.
+     * If the chunk is new and terrain generation systems are available,
+     * populates it with terrain data (heightmap, biomes, ores, caves, water, surface).
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {Donkeycraft.Chunk} The chunk (newly created or existing).
@@ -89,9 +91,18 @@
         if (!this._chunks.has(key)) {
             var chunk = new Donkeycraft.Chunk(chunkX, chunkZ);
             this._chunks.set(key, chunk);
+
+            // Generate terrain for new chunk if generation systems are available
             if (this.onChunkLoad) {
                 this.onChunkLoad(chunk);
             }
+
+            // Only generate terrain once per chunk
+            if (!chunk.generated && this._generateTerrain) {
+                this._generateTerrain(chunkX, chunkZ);
+                chunk.generated = true;
+            }
+
             return chunk;
         }
         return this._chunks.get(key);
@@ -298,6 +309,129 @@
         });
         this._chunks.clear();
         this._dirtyChunks.clear();
+    };
+
+    /**
+     * Generate terrain for a chunk at the given coordinates.
+     * Fills the chunk with heightmap-based terrain, ores, caves, water, and surface layers.
+     * @private
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     */
+    Donkeycraft.ChunkManager.prototype._generateTerrain = function(chunkX, chunkZ) {
+        var key = chunkKey(chunkX, chunkZ);
+        var chunk = this._chunks.get(key);
+        if (!chunk) return;
+
+        // Get terrain generator
+        var terrainGen = Donkeycraft.TerrainGenerator;
+        if (!terrainGen || !terrainGen.generateHeightmap) {
+            Donkeycraft.Logger.warn('ChunkManager', 'TerrainGenerator not available');
+            return;
+        }
+
+        // Get biome for this chunk (use plains as default since BiomeRegistry has no getBiomeForChunk)
+        var biome = null;
+        if (Donkeycraft.BiomeRegistry) {
+            biome = Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
+        }
+        chunk.biomeId = biome ? biome.id : 1;
+
+        Donkeycraft.Logger.info('ChunkManager', 'Generating terrain for chunk [' + chunkX + ',' + chunkZ + ']');
+
+        // Generate heightmap
+        var heightmap = null;
+        try {
+            heightmap = terrainGen.generateHeightmap(chunkX, chunkZ, biome);
+            Donkeycraft.Logger.info('ChunkManager', 'Heightmap generated, length=' + (heightmap ? heightmap.length : 'null'));
+        } catch (e) {
+            Donkeycraft.Logger.error('ChunkManager', 'Heightmap generation failed: ' + e.message);
+            return;
+        }
+
+        if (!heightmap || heightmap.length === 0) {
+            Donkeycraft.Logger.error('ChunkManager', 'Empty heightmap for chunk [' + chunkX + ',' + chunkZ + ']');
+            return;
+        }
+
+        // Fill chunk blocks based on heightmap
+        var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+        var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+
+        // Helper to look up block by name (returns block or null)
+        function getBlock(name) {
+            return Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockByName(name) : null;
+        }
+
+        for (var localX = 0; localX < CHUNK_SIZE; localX++) {
+            for (var localZ = 0; localZ < CHUNK_SIZE; localZ++) {
+                var height = heightmap[localX + localZ * CHUNK_SIZE] || 64;
+
+                // Determine surface type based on biome
+                var isDesert = !!biome.isDesert;
+                var hasSnow = !!biome.hasSnow;
+                var isOcean = !!biome.isOcean;
+
+                for (var y = 0; y < WORLD_HEIGHT; y++) {
+                    var blockId = 0; // Air by default
+
+                    if (y === 0) {
+                        // Bedrock layer
+                        var bedrock = getBlock('bedrock');
+                        blockId = bedrock ? bedrock.id : 7;
+                    } else if (y < height - 4) {
+                        // Stone base
+                        var stone = getBlock('stone');
+                        blockId = stone ? stone.id : 1;
+                    } else if (y < height) {
+                        // Sub-surface layer
+                        if (isDesert) {
+                            var sandstone = getBlock('sandstone');
+                            blockId = sandstone ? sandstone.id : 2;
+                        } else if (hasSnow) {
+                            var snowBlock = getBlock('snow_block');
+                            blockId = snowBlock ? snowBlock.id : 80;
+                        } else {
+                            var dirt = getBlock('dirt');
+                            blockId = dirt ? dirt.id : 3;
+                        }
+                    } else if (y === height) {
+                        // Surface layer
+                        if (isDesert) {
+                            var sand = getBlock('sand');
+                            blockId = sand ? sand.id : 12;
+                        } else if (hasSnow) {
+                            var snowBlock = getBlock('snow_block');
+                            blockId = snowBlock ? snowBlock.id : 80;
+                        } else {
+                            var grassBlock = getBlock('grass_block');
+                            blockId = grassBlock ? grassBlock.id : 2;
+                        }
+                    } else if (y >= 62 && isOcean) {
+                        // Water in oceans
+                        var water = getBlock('water');
+                        blockId = water ? water.id : 9;
+                    }
+
+                    if (blockId > 0) {
+                        chunk.setBlock(localX, y, localZ, blockId);
+                    }
+                }
+            }
+        }
+
+        // Apply cave generation if available
+        if (Donkeycraft.CaveGenerator && Donkeycraft.CaveGenerator.generateCaves) {
+            try { Donkeycraft.CaveGenerator.generateCaves(chunk, chunkX, chunkZ); } catch (e) { /* skip */ }
+        }
+
+        // Apply ore generation if available
+        if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.generateOres) {
+            try { Donkeycraft.OreGenerator.generateOres(chunk, chunkX, chunkZ, biome); } catch (e) { /* skip */ }
+        }
+
+        // Mark chunk as needing mesh regeneration
+        chunk._dirty = true;
     };
 
 })();

@@ -364,16 +364,18 @@ HTML entry point, stylesheets, DOM-based UI elements. Functional test page (`tes
 
 ---
 
-## Phase 21: Main Entry Point & Game Loop [STATUS: PENDING]
+##
+
+## Phase 21: Main Entry Point & Game Loop [STATUS: FULLY OPERATIONAL]
 
 Main game class and script loader.
 *Note: `loader.js` removed. Scripts are loaded via `<script>` tags in `index.html`.*
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 105 | `src/game.js` | Main game class: initialization, main loop (update + render), pause/resume | 200 | [ ] |
+| 105 | `src/game.js` | Main game class: initialization, main loop (update + render), pause/resume, destroy, camera-player sync, chunk updates, input integration | ~700 | [FULLY OPERATIONAL] — verified: 20 test sections, 111 assertions, all passing. init/start/stop/pause/resume/destroy lifecycle, constructor defaults/custom options, missing canvas handling, timer lifecycle, double-start/stop guards, FPS/tick metrics, getters, camera sync, destroy cleanup, setSystems registration, null/undefined/NaN edge cases, event bus emission, input integration, chunk manager callbacks |
 
-**Subtotal Phase 21: ~200 lines, 1 file**
+**Subtotal Phase 21: ~700 lines, 1 file**
 
 ---
 

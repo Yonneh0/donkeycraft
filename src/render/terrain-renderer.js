@@ -141,6 +141,14 @@
         // Build geometry (face culling already done during build)
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
 
+        // Debug logging
+        if (geometry.vertexCount === 0) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] has 0 vertices — checking block data');
+            // Sample a few blocks to debug
+            var sampleBlock = localGetBlock(8, 64, 8);
+            Donkeycraft.Logger.info('TerrainRenderer', 'Sample block at (8,64,8) = ' + sampleBlock);
+        }
+
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
         chunkMesh.update(geometry);
