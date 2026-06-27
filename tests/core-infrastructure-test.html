@@ -134,17 +134,16 @@
     var unsubListeners = bus._listeners['unsubTest'];
     F.assert(unsubListeners === undefined || unsubListeners.length === 0, 'Unsubscribe function prevents further calls (listeners=' + (unsubListeners ? unsubListeners.length : 'deleted') + ')');
 
-    // off direct removal — use the SAME named callback for both on() and off()
-    var offCb3 = function() { F.info('offTest3 fired'); };
-    var offFired3 = false;
-    bus.on('offTest4', offCb3);  // Register the exact same reference
-    bus.on('offTest4', function() { offFired3 = true; });
-    bus.emit('offTest4');
-    F.assert(offFired3, 'Listener fires before off()');
-    bus.off('offTest4', offCb3);  // Remove the exact same reference
-    // Debug: check what's in the listeners array after off()
-    var offListeners = bus._listeners['offTest4'];
-    F.assert(offListeners === undefined || offListeners.length === 0, 'off() removes listener (listeners=' + (offListeners ? offListeners.length : 'deleted') + ')');
+    // off direct removal — register ONLY ONE callback so removing it leaves array empty
+    var offCb4 = function() { F.info('offTest4 fired'); };
+    var offFired4 = false;
+    bus.on('offTest5', offCb4);  // Register only this one reference
+    bus.emit('offTest5');
+    F.assert(offFired4, 'Listener fires before off()');
+    bus.off('offTest5', offCb4);  // Remove the only callback
+    // Verify array is empty after off()
+    var offListeners5 = bus._listeners['offTest5'];
+    F.assert(offListeners5 === undefined || offListeners5.length === 0, 'off() removes listener (listeners=' + (offListeners5 ? offListeners5.length : 'deleted') + ')');
 
     // once — fires exactly once
     var onceFired = 0;
