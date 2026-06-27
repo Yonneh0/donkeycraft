@@ -628,24 +628,28 @@
 
     // ============================================================
     // Section 17: AssetCache — Initialization & Full Cycle
+    // Uses a shared cache variable so sections 18-20 can reuse it
+    // and we can close the connection before cleanup.
     // ============================================================
+
+    var assetCacheInstance = null;
 
     section2Chain = section2Chain.then(function() {
         F.section('17. AssetCache — Initialization & Readiness');
 
-        var cache = new Donkeycraft.AssetCache('test-asset-cache-audit');
-        F.assertType(cache, 'object', 'AssetCache instance created');
-        F.assertType(cache.init, 'function', 'AssetCache.init is a function');
-        F.assertType(cache.isReady, 'function', 'AssetCache.isReady is a function');
-        F.assert(!cache.isReady(), 'AssetCache not ready before init');
+        assetCacheInstance = new Donkeycraft.AssetCache('test-asset-cache-audit');
+        F.assertType(assetCacheInstance, 'object', 'AssetCache instance created');
+        F.assertType(assetCacheInstance.init, 'function', 'AssetCache.init is a function');
+        F.assertType(assetCacheInstance.isReady, 'function', 'AssetCache.isReady is a function');
+        F.assert(!assetCacheInstance.isReady(), 'AssetCache not ready before init');
 
         F.assertType(Donkeycraft.ASSET_CACHE_DB_NAME, 'string', 'ASSET_CACHE_DB_NAME is a string');
         F.assertType(Donkeycraft.ASSET_CACHE_VERSION, 'number', 'ASSET_CACHE_VERSION is a number');
 
-        return cache.init().then(function(result) {
+        return assetCacheInstance.init().then(function(result) {
             F.assertType(result, 'boolean', 'AssetCache.init returns boolean');
-            if (cache.isReady()) {
-                F.assert(cache._db !== null, 'AssetCache has DB reference after init');
+            if (assetCacheInstance.isReady()) {
+                F.assert(assetCacheInstance._db !== null, 'AssetCache has DB reference after init');
             } else {
                 F.info('AssetCache not ready (IndexedDB may not be available)');
             }
@@ -654,109 +658,108 @@
 
     // ============================================================
     // Section 18: AssetCache — Sound Cache/Load/Delete Cycle
+    // Reuses assetCacheInstance from section 17.
     // ============================================================
 
     section2Chain = section2Chain.then(function() {
         F.section('18. AssetCache — Sound Cache/Load/Delete Cycle');
 
-        var cache = new Donkeycraft.AssetCache('test-asset-cache-audit');
-        return cache.init().then(function() {
-            if (!cache.isReady()) {
-                F.info('AssetCache not ready — skipping sound tests');
-                return Promise.resolve();
+        if (!assetCacheInstance || !assetCacheInstance.isReady()) {
+            F.info('AssetCache not ready — skipping sound tests');
+            return Promise.resolve();
+        }
+
+        var testSoundData = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+
+        // Set sound
+        return assetCacheInstance.setSound('audit_test_sound', testSoundData).then(function(saved) {
+            if (saved) {
+                F.assert(saved === true, 'setSound returns true on success');
+
+                // Immediately get to verify
+                return assetCacheInstance.getSound('audit_test_sound');
+            } else {
+                F.info('setSound failed — may be quota restricted');
+                return null;
             }
+        }).then(function(soundData) {
+            if (soundData) {
+                F.assertType(soundData, 'string', 'getSound returns string');
+                F.assertEq(soundData.substring(0, 25), testSoundData.substring(0, 25), 'getSound returns correct sound data');
 
-            var testSoundData = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+                // Check has() — key format is 'sound:audit_test_sound'
+                return assetCacheInstance.has('sound:audit_test_sound').then(function(hasIt) {
+                    F.assert(hasIt === true, 'has returns true for cached sound');
 
-            // Set sound
-            return cache.setSound('audit_test_sound', testSoundData).then(function(saved) {
-                if (saved) {
-                    F.assert(saved === true, 'setSound returns true on success');
+                    // Delete it — same key format
+                    return assetCacheInstance.delete('sound:audit_test_sound').then(function(deleted) {
+                        F.assert(deleted === true, 'delete returns true on success');
 
-                    // Immediately get to verify
-                    return cache.getSound('audit_test_sound');
-                } else {
-                    F.info('setSound failed — may be quota restricted');
-                    return null;
-                }
-            }).then(function(soundData) {
-                if (soundData) {
-                    F.assertType(soundData, 'string', 'getSound returns string');
-                    F.assertEq(soundData.substring(0, 25), testSoundData.substring(0, 25), 'getSound returns correct sound data');
-
-                    // Check has() — key format is 'sound:audit_test_sound'
-                    return cache.has('sound:audit_test_sound').then(function(hasIt) {
-                        F.assert(hasIt === true, 'has returns true for cached sound');
-
-                        // Delete it — same key format
-                        return cache.delete('sound:audit_test_sound').then(function(deleted) {
-                            F.assert(deleted === true, 'delete returns true on success');
-
-                            // Verify deletion — use full key format
-                            return cache.has('sound:audit_test_sound');
-                        });
-                    }).then(function(hasAfterDelete) {
-                        F.assert(hasAfterDelete === false, 'has returns false after delete');
+                        // Verify deletion — use full key format
+                        return assetCacheInstance.has('sound:audit_test_sound');
                     });
-                } else {
-                    F.info('Sound verification skipped (setSound failed)');
-                }
-            });
+                }).then(function(hasAfterDelete) {
+                    F.assert(hasAfterDelete === false, 'has returns false after delete');
+                });
+            } else {
+                F.info('Sound verification skipped (setSound failed)');
+            }
         });
     });
 
     // ============================================================
     // Section 19: AssetCache — has / delete for non-existent key
+    // Reuses assetCacheInstance from section 17.
     // ============================================================
 
     section2Chain = section2Chain.then(function() {
         F.section('19. AssetCache — has/delete for non-existent key');
 
-        var cache = new Donkeycraft.AssetCache('test-asset-cache-audit');
-        return cache.init().then(function() {
-            if (!cache.isReady()) {
-                F.info('AssetCache not ready — skipping tests');
-                return Promise.resolve();
-            }
+        if (!assetCacheInstance || !assetCacheInstance.isReady()) {
+            F.info('AssetCache not ready — skipping tests');
+            return Promise.resolve();
+        }
 
-            return cache.has('non-existent-key').then(function(hasIt) {
-                F.assert(hasIt === false, 'has returns false for non-existent key');
+        return assetCacheInstance.has('non-existent-key').then(function(hasIt) {
+            F.assert(hasIt === false, 'has returns false for non-existent key');
 
-                return cache.delete('non-existent-key').then(function(deleted) {
-                    F.assert(deleted === false, 'delete returns false for non-existent key');
-                });
+            return assetCacheInstance.delete('non-existent-key').then(function(deleted) {
+                F.assert(deleted === false, 'delete returns false for non-existent key');
             });
         });
     });
 
     // ============================================================
     // Section 20: AssetCache — clearAll / getUsageStats
+    // Reuses assetCacheInstance from section 17. Closes connection after.
     // ============================================================
 
     section2Chain = section2Chain.then(function() {
         F.section('20. AssetCache — clearAll / getUsageStats');
 
-        var cache = new Donkeycraft.AssetCache('test-asset-cache-audit');
-        return cache.init().then(function() {
-            if (!cache.isReady()) {
-                F.info('AssetCache not ready — skipping tests');
-                return Promise.resolve();
-            }
+        if (!assetCacheInstance || !assetCacheInstance.isReady()) {
+            F.info('AssetCache not ready — skipping tests');
+            return Promise.resolve();
+        }
 
-            return cache.clearAll().then(function() {
-                return cache.getUsageStats().then(function(stats) {
-                    F.assertType(stats, 'object', 'getUsageStats returns object');
-                    F.assertType(stats.entryCount, 'number', 'stats.entryCount is number');
-                    F.assertType(stats.totalSize, 'number', 'stats.totalSize is number');
-                    F.assert(Array.isArray(stats.entries), 'stats.entries is array');
-                    F.assertEq(stats.entryCount, 0, 'entryCount is 0 after clearAll');
+        return assetCacheInstance.clearAll().then(function() {
+            return assetCacheInstance.getUsageStats().then(function(stats) {
+                F.assertType(stats, 'object', 'getUsageStats returns object');
+                F.assertType(stats.entryCount, 'number', 'stats.entryCount is number');
+                F.assertType(stats.totalSize, 'number', 'stats.totalSize is number');
+                F.assert(Array.isArray(stats.entries), 'stats.entries is array');
+                F.assertEq(stats.entryCount, 0, 'entryCount is 0 after clearAll');
 
-                    return cache.getTotalSize().then(function(size) {
-                        F.assertType(size, 'number', 'getTotalSize returns number');
-                        F.assertEq(size, 0, 'totalSize is 0 after clearAll');
-                    });
+                return assetCacheInstance.getTotalSize().then(function(size) {
+                    F.assertType(size, 'number', 'getTotalSize returns number');
+                    F.assertEq(size, 0, 'totalSize is 0 after clearAll');
                 });
             });
+        }).then(function() {
+            // Close the AssetCache DB connection before cleanup
+            if (assetCacheInstance.destroy) {
+                assetCacheInstance.destroy();
+            }
         });
     });
 
@@ -778,37 +781,31 @@
     });
 
     // ============================================================
-    // Cleanup: Close and delete all test databases created during this test run
+    // Cleanup: Close all DB connections then delete test databases
     // ============================================================
 
     section2Chain = section2Chain.then(function() {
         F.section('Cleanup — Removing Test Databases');
 
-        // List of database names created during testing
+        // Close the WorldStore connection first
+        var cleanupChain = Promise.resolve();
+        if (ws && ws._db) {
+            ws.destroy();
+        }
+
+        // Now delete all test databases
         var testDbNames = [
             'test-db-storage-audit',
             'custom-test-db-audit',
             'test-asset-cache-audit'
         ];
 
-        var cleanupChain = Promise.resolve();
-
         for (var i = 0; i < testDbNames.length; i++) {
             (function(dbName) {
                 cleanupChain = cleanupChain.then(function() {
                     return new Promise(function(resolve) {
-                        // First, close any open connections to the database
-                        try {
-                            var db = indexedDB.open(dbName, 1);
-                            db.onsuccess = function() {
-                                db.result.close();
-                            };
-                            db.onerror = function() {
-                                // DB not open, nothing to close
-                            };
-                        } catch (e) {}
-
-                        // Then delete the database
+                        // deleteDatabase silently succeeds if DB doesn't exist.
+                        // If open connections exist, it waits for them to close first.
                         try {
                             var deleteReq = indexedDB.deleteDatabase(dbName);
                             deleteReq.onsuccess = function() {
@@ -816,12 +813,13 @@
                                 resolve();
                             };
                             deleteReq.onerror = function() {
-                                // May fail if connections are still open — that's okay
-                                F.info('Could not delete database (connections may still be open): ' + dbName);
+                                // Open connections may delay deletion — that's fine,
+                                // they close when the test page unloads.
+                                F.info('Deletion pending (open connections): ' + dbName);
                                 resolve();
                             };
                         } catch (e) {
-                            F.info('Database deletion error for ' + dbName + ': ' + e.message);
+                            F.info('DB error for ' + dbName + ': ' + e.message);
                             resolve();
                         }
                     });
