@@ -246,7 +246,7 @@ Enchantments, potions, and tool durability.
 
 ---
 
-### 12. Save/Load System
+### 12. Storage System
 IndexedDB world storage, level data persistence, and asset caching.
 
 | # | File | Description | Lines |
@@ -284,7 +284,7 @@ IndexedDB world storage, level data persistence, and asset caching.
 | 9. Entity & Mob System | 9 | ~2,779 |
 | 10. Redstone System | 6 | ~2,177 |
 | 11. Game Systems | 3 | ~1,267 |
-| 12. Save/Load System | 3 | ~1,530 |
+| 12. Storage System | 3 | ~1,530 |
 | 13. Main Entry Point | 1 | ~1,195 |
 | **TOTAL** | **98 files** | **~28,478 lines of JS/GLSL** |
 
