@@ -74,6 +74,15 @@
     };
 
     /**
+     * Set the texture atlas to use for terrain rendering.
+     * When set, the terrain renderer binds the atlas texture instead of the placeholder.
+     * @param {Donkeycraft.TextureAtlas} atlas - Texture atlas instance.
+     */
+    Donkeycraft.TerrainRenderer.prototype.setTextureAtlas = function(atlas) {
+        this._textureAtlas = atlas;
+    };
+
+    /**
      * Get the current lighting system instance.
      * @returns {Lighting|null}
      */
@@ -204,9 +213,6 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
-        Donkeycraft.Logger.info('TerrainRenderer',
-            'Chunk [' + chunkX + ',' + chunkZ + '] mesh created — ' + geometry.vertexCount + ' vertices, ' +
-            geometry.indexCount + ' indices');
     };
 
     /**
@@ -430,9 +436,15 @@
 
         // Set texture unit (atlas on unit 0)
         gl.activeTexture(gl.TEXTURE0);
-        var placeholderTex = this._getPlaceholderTexture();
-        if (placeholderTex) {
-            gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
+        if (this._textureAtlas && this._textureAtlas.isReady()) {
+            // Bind the generated texture atlas
+            this._textureAtlas.bind();
+        } else {
+            // Fall back to placeholder (checkerboard)
+            var placeholderTex = this._getPlaceholderTexture();
+            if (placeholderTex) {
+                gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
+            }
         }
         this._shaderManager.setSampler('uTexture', 0);
 
@@ -487,10 +499,6 @@
         var gl = this._gl;
         if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
 
-        Donkeycraft.Logger.info('TerrainRenderer',
-            'Drawing chunk [' + chunkMesh._chunkX + ',' + chunkMesh._chunkZ + '] — ' +
-            chunkMesh.getIndexCount() + ' indices');
-
         var result = chunkMesh.draw();
 
         // Check for WebGL errors after draw
@@ -526,15 +534,35 @@
 
         var gl = this._gl;
 
-        // Try to use generateMissing() texture for visual consistency
+        // Try to use generateMissing() texture for visual consistency.
+        // generateMissing() returns an HTMLImageElement built from a canvas toDataURL().
+        // Since Image loading is async, we must NOT call texImage2D directly on it.
+        // Instead, draw the image onto a temp canvas and upload from there.
         var missingTex = Donkeycraft.TextureGenerator ?
             Donkeycraft.TextureGenerator.generateMissing() : null;
 
-        if (missingTex && missingTex.src) {
-            // Create WebGL texture from the missing texture image
+        if (missingTex && (missingTex.src || missingTex.getContext)) {
+            // Create WebGL texture
             this._placeholderTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
+
+            if (missingTex.getContext) {
+                // It's a canvas — upload directly
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
+            } else if (missingTex.complete && missingTex.naturalWidth > 0) {
+                // Image already loaded — draw to canvas first
+                var tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 16;
+                tempCanvas.height = 16;
+                var tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(missingTex, 0, 0, 16, 16);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
+            } else {
+                // Image not loaded yet — defer to next frame via pending texture
+                this._placeholderTexture = null;
+                return null;
+            }
+
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);

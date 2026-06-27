@@ -397,7 +397,7 @@
         }
         chunk.biomeId = biome.id;
 
-        Donkeycraft.Logger.info('ChunkManager', 'Generating overworld terrain for chunk [' + chunkX + ',' + chunkZ + ']');
+        // Donkeycraft.Logger.info('ChunkManager', 'Generating overworld terrain for chunk [' + chunkX + ',' + chunkZ + ']');
 
         // Generate heightmap
         var heightmap = null;

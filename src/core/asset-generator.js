@@ -5054,4 +5054,120 @@
         };
     })();
 
+    // ============================================================
+    // AssetGenerator — simple Promise-based wrapper for init-sequence
+    // ============================================================
+
+    /**
+     * AssetGenerator — thin Promise-based wrapper around TextureGenerator + AssetManager.
+     * Used by init-sequence.js to generate all procedural textures before the game loop starts.
+     * @namespace
+     */
+    Donkeycraft.AssetGenerator = (function() {
+        /**
+         * Generate all procedural block textures and return them as a Promise.
+         * @returns {Promise<Object>} Resolves with { blockId: HTMLImageElement } map.
+         */
+        function generateAllTextures() {
+            return new Promise(function(resolve) {
+                try {
+                    // Ensure BlockRegistry is available
+                    if (!Donkeycraft.BlockRegistry || !Donkeycraft.TextureGenerator) {
+                        Donkeycraft.Logger.warn('AssetGenerator', 'BlockRegistry or TextureGenerator not available — skipping texture generation');
+                        resolve({});
+                        return;
+                    }
+
+                    // Generate all textures via TextureGenerator
+                    var textures = Donkeycraft.TextureGenerator.generateAllTextures();
+
+                    // Initialize AssetManager if needed
+                    if (!Donkeycraft.AssetManager) {
+                        Donkeycraft.Logger.warn('AssetGenerator', 'AssetManager not available');
+                        resolve(textures || {});
+                        return;
+                    }
+
+                    // Store generated textures in AssetManager for later retrieval
+                    Donkeycraft.AssetManager.generateAllBlockTextures();
+
+                    Donkeycraft.Logger.info('AssetGenerator', 'Generated ' + (Object.keys(textures || {}).length) + ' block textures');
+                    resolve(textures || {});
+                } catch (e) {
+                    Donkeycraft.Logger.error('AssetGenerator', 'Texture generation failed: ' + e.message);
+                    resolve({}); // Graceful fallback — terrain-renderer will use placeholder
+                }
+            });
+        }
+
+        /**
+         * Generate a missing-texture checkerboard image for fallback rendering.
+         * @returns {HTMLImageElement|null} HTML image element, or null if canvas not available.
+         */
+        function generateMissingTexture() {
+            try {
+                var canvas = document.createElement('canvas');
+                canvas.width = 16;
+                canvas.height = 16;
+                var ctx = canvas.getContext('2d');
+
+                // Checkerboard pattern: alternating white and magenta squares
+                var size = 8;
+                for (var row = 0; row < 2; row++) {
+                    for (var col = 0; col < 2; col++) {
+                        ctx.fillStyle = (row + col) % 2 === 0 ? '#ffffff' : '#ff00ff';
+                        ctx.fillRect(col * size, row * size, size, size);
+                    }
+                }
+
+                // Draw "X" to indicate missing
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(2, 2);
+                ctx.lineTo(14, 14);
+                ctx.moveTo(14, 2);
+                ctx.lineTo(2, 14);
+                ctx.stroke();
+
+                var img = new Image();
+                img.src = canvas.toDataURL('image/png');
+                return img;
+            } catch (e) {
+                if (Donkeycraft.Logger) {
+                    Donkeycraft.Logger.error('AssetGenerator', 'Failed to generate missing texture: ' + e.message);
+                }
+                return null;
+            }
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The AssetGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.AssetGenerator;
+        }
+
+        return {
+            getInstance: getInstance,
+            generateAllTextures: generateAllTextures,
+            generateMissingTexture: generateMissingTexture
+        };
+    })();
+
+    // ============================================================
+    // TextureGenerator — add generateMissing() fallback method
+    // ============================================================
+
+    // Add generateMissing to TextureGenerator if it doesn't exist yet
+    if (typeof Donkeycraft.TextureGenerator === 'object' && typeof Donkeycraft.TextureGenerator.generateAllTextures === 'function') {
+        // Only add generateMissing if not already defined
+        if (typeof Donkeycraft.TextureGenerator.generateMissing !== 'function') {
+            Donkeycraft.TextureGenerator.generateMissing = function() {
+                return Donkeycraft.AssetGenerator ? Donkeycraft.AssetGenerator.generateMissingTexture() : null;
+            };
+        }
+    }
+
 })();

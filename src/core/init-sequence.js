@@ -85,9 +85,10 @@
     };
 
     /**
-     * _initTextureAtlas — generate all procedural block textures via AssetGenerator.
+     * _initTextureAtlas — generate all procedural block textures, register them on a TextureAtlas,
+     * build the WebGL texture, and return it.
      * @private
-     * @returns {Promise<Object>} Resolves with { textures } when ready.
+     * @returns {Promise<Object>} Resolves with { textures, atlas } when ready.
      */
     Donkeycraft.InitSequence.prototype._initTextureAtlas = function() {
         var self = this;
@@ -107,18 +108,49 @@
                             }
                         }
 
-                        resolve({ textures: textures || {} });
+                        // Build a WebGL TextureAtlas from the generated textures if WebGL context is available.
+                        var atlas = null;
+                        try {
+                            var canvas = document.getElementById('dk-canvas');
+                            if (canvas && typeof WebGLRenderingContext !== 'undefined') {
+                                var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                                if (gl && Donkeycraft.TextureAtlas && Donkeycraft.BlockRegistry) {
+                                    atlas = new Donkeycraft.TextureAtlas(gl);
+                                    var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
+                                    var registered = 0;
+                                    for (var i = 0; i < blocks.length; i++) {
+                                        var id = blocks[i].id;
+                                        if (textures[id] instanceof HTMLImageElement) {
+                                            atlas.registerBlockTexture(id, textures[id]);
+                                            registered++;
+                                        }
+                                    }
+                                    Donkeycraft.Logger.info('InitSequence', 'Registering ' + registered + ' textures on TextureAtlas');
+                                    if (atlas.generate()) {
+                                        Donkeycraft.Logger.info('InitSequence', 'TextureAtlas generated successfully — ' + registered + ' blocks');
+                                    } else {
+                                        Donkeycraft.Logger.warn('InitSequence', 'TextureAtlas.generate() returned false');
+                                        atlas = null;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            Donkeycraft.Logger.warn('InitSequence', 'Failed to build TextureAtlas: ' + e.message);
+                            atlas = null;
+                        }
+
+                        resolve({ textures: textures || {}, atlas: atlas });
                     }).catch(function(err) {
                         Donkeycraft.Logger.error('InitSequence', 'Texture generation failed: ' + err.message);
-                        resolve({ textures: {} });
+                        resolve({ textures: {}, atlas: null });
                     });
                 } else {
                     Donkeycraft.Logger.warn('InitSequence', 'AssetGenerator not available — skipping texture generation');
-                    resolve({ textures: {} });
+                    resolve({ textures: {}, atlas: null });
                 }
             } catch (e) {
                 Donkeycraft.Logger.error('InitSequence', 'Texture atlas init error: ' + e.message);
-                resolve({ textures: {} });
+                resolve({ textures: {}, atlas: null });
             }
         });
     };

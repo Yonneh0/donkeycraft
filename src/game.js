@@ -152,10 +152,46 @@
                 Donkeycraft.Logger.warn('Game', 'Web Audio API not available: ' + e.message);
             }
 
+            // ============================================================
+            // Create and upload the texture atlas from generated textures.
+            // The init-sequence already called AssetGenerator.generateAllTextures()
+            // and stored results in AssetManager — retrieve them here.
+            // ============================================================
+            this._textureAtlas = null;
+            try {
+                var generatedTex = Donkeycraft.AssetManager ? Donkeycraft.AssetManager.getAllTextures() : null;
+                if (generatedTex && Object.keys(generatedTex).length > 0) {
+                    // Register each generated texture on the atlas
+                    var atlas = new Donkeycraft.TextureAtlas(this._gl);
+                    var blocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
+                    for (var _i = 0; _i < blocks.length; _i++) {
+                        var _b = blocks[_i];
+                        if (generatedTex[_b.id]) {
+                            atlas.registerBlockTexture(_b.id, generatedTex[_b.id]);
+                        }
+                    }
+                    if (atlas.generate()) {
+                        this._textureAtlas = atlas;
+                        Donkeycraft.Logger.info('Game', 'Texture atlas created: ' + atlas.getTextureCount() + ' textures');
+                    } else {
+                        Donkeycraft.Logger.warn('Game', 'Texture atlas generation failed — will use placeholder');
+                    }
+                } else {
+                    Donkeycraft.Logger.warn('Game', 'No generated textures found in AssetManager — will use placeholder');
+                }
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Texture atlas creation failed: ' + e.message);
+            }
+
             // Create terrain renderer (pass lighting for dynamic time-of-day)
             this._terrainRenderer = new Donkeycraft.TerrainRenderer(
                 this._gl, this._shaderManager, this._fog, this._lighting
             );
+
+            // Wire the texture atlas onto the terrain renderer so it binds the correct texture
+            if (this._textureAtlas && this._terrainRenderer.setTextureAtlas) {
+                this._terrainRenderer.setTextureAtlas(this._textureAtlas);
+            }
             this._terrainRenderer.setRenderDistance(this._renderDistance);
 
             // Create hand renderer
@@ -194,10 +230,10 @@
             // Set up chunk manager callbacks
             var cm = this._chunkManager;
             cm.onChunkLoad = function(chunk) {
-                Donkeycraft.Logger.info('Game', 'Chunk loaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
+                // Donkeycraft.Logger.info('Game', 'Chunk loaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
             };
             cm.onChunkUnload = function(chunk) {
-                Donkeycraft.Logger.info('Game', 'Chunk unloaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
+                // Donkeycraft.Logger.info('Game', 'Chunk unloaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
                 self._terrainRenderer.markChunkDirty(chunk.chunkX, chunk.chunkZ);
             };
 
@@ -1624,8 +1660,6 @@
             console.log('[Donkeycraft] _render skipped — running:', this._running, 'gl:', !!this._gl, 'paused:', this._paused);
             return;
         }
-        console.log('[Donkeycraft] _render frame #', this.getTickCount());
-
         // Resize canvas if needed
         this._resizeCanvas();
 
@@ -1688,7 +1722,6 @@
 
         // Render terrain (handles fog color + uLightFactor internally)
         try {
-            Donkeycraft.Logger.info('Game', '_render: terrainRenderer=' + !!this._terrainRenderer + ' camera=' + !!this._camera + ' chunkCount=' + (this._terrainRenderer ? this._terrainRenderer.getChunkCount() : 0));
             if (this._terrainRenderer && this._camera) {
                 this._terrainRenderer.render(this._camera);
             }
