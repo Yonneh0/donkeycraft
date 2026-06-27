@@ -58,6 +58,9 @@
             SKY_LIGHT_DECAY: 1,         // Sky light decay per block (unused)
             BLOCK_LIGHT_DECAY: 1,       // Block light decay per tick (unused)
 
+            // Time settings
+            WORLD_TIME_SCALE: 60,       // Ticks per second for time-of-day (60s = full day cycle)
+
             // Key bindings (keyboard only — mouse buttons are accessed via Input.getMouseState())
             KEYBINDS: {
                 MOVE_FORWARD: 'KeyW',

@@ -191,50 +191,50 @@
     };
 
     /**
-     * Set the world store for auto-save persistence.
+     * setWorldStore — set the world store for auto-save persistence.
      * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance.
      */
     Donkeycraft.Game.prototype.setWorldStore = function(worldStore) {
         this._worldStore = worldStore;
     };
 
-        /**
-         * Set external system references (called after Game.init()).
-         * If constructor functions are passed instead of instances, they will be instantiated
-         * using the systems created during Game.init() (input, player, collision, chunkManager).
-         * @param {Function|Object} movementSystem - Movement physics system (constructor or instance).
-         * @param {Function|Object} collisionSystem - Collision detection system (constructor or instance).
-         * @param {Function|Object} jumpSystem - Jump mechanics system (constructor or instance).
-         * @param {Function|Object} flyingSystem - Flying mechanics system (constructor or instance).
-         * @param {Object} raycastSystem - Raycasting system (static module, not a constructor).
-         * @param {Object} blockActionSystem - Block breaking system (static module, not a constructor).
-         * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
-         * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
-         * @param {Object} [redstoneEngine] - Redstone engine instance (optional).
-         */
+    /**
+     * setSystems — set external system references (called after Game.init()).
+     * If constructor functions are passed instead of instances, they will be instantiated
+     * using the systems created during Game.init() (input, player, collision, chunkManager).
+     * @param {Function|Object} movementSystem - Movement physics system (constructor or instance).
+     * @param {Function|Object} collisionSystem - Collision detection system (constructor or instance).
+     * @param {Function|Object} jumpSystem - Jump mechanics system (constructor or instance).
+     * @param {Function|Object} flyingSystem - Flying mechanics system (constructor or instance).
+     * @param {Object} raycastSystem - Raycasting system (static module, not a constructor).
+     * @param {Object} blockActionSystem - Block breaking system (static module, not a constructor).
+     * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
+     * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
+     * @param {Object} [redstoneEngine] - Redstone engine instance (optional).
+     */
     Donkeycraft.Game.prototype.setSystems = function(
         movementSystem, collisionSystem, jumpSystem, flyingSystem,
         raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem, redstoneEngine
     ) {
         var self = this;
 
+        // Instantiate Collision first (so Movement can reference it without creating a temp instance)
+        if (collisionSystem && typeof collisionSystem === 'function') {
+            this._collisionSystem = new collisionSystem(this._chunkManager);
+        } else {
+            this._collisionSystem = collisionSystem;
+        }
+
         // Instantiate Movement if passed as a constructor (needs input, player, collision, chunkManager)
         if (movementSystem && typeof movementSystem === 'function') {
             this._movementSystem = new movementSystem(
                 this._input,
                 this._player,
-                this._collisionSystem || new collisionSystem(this._chunkManager),
+                this._collisionSystem,
                 this._chunkManager
             );
         } else {
             this._movementSystem = movementSystem;
-        }
-
-        // Instantiate Collision if passed as a constructor (needs chunkManager)
-        if (collisionSystem && typeof collisionSystem === 'function') {
-            this._collisionSystem = new collisionSystem(this._chunkManager);
-        } else {
-            this._collisionSystem = collisionSystem;
         }
 
         // Instantiate Jumping if passed as a constructor (needs player, input, collision)
@@ -285,13 +285,11 @@
 
         var self = this;
         var CHUNKS_PER_SAVE = Config.CHUNKS_PER_SAVE;
-        var SAVE_BATCH_DELAY = Config.SAVE_BATCH_DELAY;
         var dirtyChunks = this._chunkManager ? this._chunkManager.getDirtyChunks() : [];
 
         if (dirtyChunks.length === 0) return;
 
         // Save chunks in batches for performance
-        var savedCount = 0;
         var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length);
 
         for (var i = 0; i < batchSize && i < dirtyChunks.length; i++) {
@@ -306,9 +304,7 @@
                 blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
             };
 
-            this._worldStore.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
-                if (success) savedCount++;
-            }).catch(function() {
+            this._worldStore.saveChunk(worldName, cx, cz, chunkData).catch(function() {
                 // Silently ignore individual save failures
             });
         }
@@ -404,7 +400,7 @@
     };
 
     /**
-     * Check if the game is currently running.
+     * isRunning — check if the game is currently running.
      * @returns {boolean}
      */
     Donkeycraft.Game.prototype.isRunning = function() {
@@ -490,19 +486,19 @@
     };
 
     /**
-     * isPointerLocked — check if pointer lock is currently active.
-     * @returns {boolean} True if pointer is locked.
-     */
-    Donkeycraft.Game.prototype.isPointerLocked = function() {
-        return document.pointerLockElement !== null;
-    };
-
-    /**
      * setOverlay — set the overlay DOM element used for pointer lock target.
      * @param {HTMLElement} overlayEl - The overlay container element.
      */
     Donkeycraft.Game.prototype.setOverlay = function(overlayEl) {
         this._overlay = overlayEl;
+    };
+
+    /**
+     * isPointerLocked — check if pointer lock is currently active.
+     * @returns {boolean} True if pointer is locked.
+     */
+    Donkeycraft.Game.prototype.isPointerLocked = function() {
+        return document.pointerLockElement !== null;
     };
 
     /**

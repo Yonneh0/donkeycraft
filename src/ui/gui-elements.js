@@ -11,11 +11,11 @@
 
     /**
      * GuiDragDrop — manages drag-and-drop operations between GUI slots.
-     * @param {HTMLElement} container - Parent container element.
+     * @param {HTMLElement|null} container - Parent container element.
      * @param {Object} [options={}] - Configuration options.
-     * @param {Function} [options.onDragStart] - Callback when drag starts.
-     * @param {Function} [options.onDragEnd] - Callback when drag ends.
-     * @param {Function} [options.onDrop] - Callback on drop target.
+     * @param {Function} [options.onDragStart] - Callback when drag starts, called with (slotIndex, slotData).
+     * @param {Function} [options.onDragEnd] - Callback when drag ends, called with (targetSlotIndex).
+     * @param {Function} [options.onDrop] - Callback on drop, called with (sourceSlot, targetSlot, stack).
      */
     Donkeycraft.GuiDragDrop = function(container, options) {
         this._container = container || null;
@@ -33,7 +33,7 @@
         this._listeners = {};
         this._boundHandlers = {};
 
-        if (this._container) {
+        if (this._container && this._container.nodeType === 1) {
             this._bindEvents();
         }
     };
@@ -45,7 +45,7 @@
     Donkeycraft.GuiDragDrop.prototype._bindEvents = function() {
         var self = this;
 
-        // Mouse down on slots ( delegated from container )
+        // Mouse down on slots (delegated from container)
         this._boundHandlers.mouseDown = function(e) {
             var slotEl = e.target.closest('.dk-slot, .dk-hotbar-slot, .dk-item-slot');
             if (!slotEl) return;
@@ -60,7 +60,7 @@
             }
         };
 
-        // Mouse move on container
+        // Mouse move on document
         this._boundHandlers.mouseMove = function(e) {
             if (!self._dragState.active) return;
             e.preventDefault();
@@ -68,7 +68,7 @@
             self._highlightDropTarget(e);
         };
 
-        // Mouse up anywhere
+        // Mouse up on document
         this._boundHandlers.mouseUp = function(e) {
             if (!self._dragState.active) return;
             self._endDrag(e);
@@ -141,10 +141,12 @@
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._highlightDropTarget = function(e) {
-        // Remove previous highlights
-        var prev = this._container.querySelectorAll('.dk-slot.drag-over, .dk-hotbar-slot.drag-over, .dk-item-slot.drag-over');
-        for (var i = 0; i < prev.length; i++) {
-            prev[i].classList.remove('drag-over');
+        // Remove previous highlights from container
+        if (this._container) {
+            var prev = this._container.querySelectorAll('.dk-slot.drag-over, .dk-hotbar-slot.drag-over, .dk-item-slot.drag-over');
+            for (var i = 0; i < prev.length; i++) {
+                prev[i].classList.remove('drag-over');
+            }
         }
 
         var targetEl = document.elementFromPoint(e.clientX, e.clientY);
@@ -165,23 +167,25 @@
         if (!this._dragState.active) return;
 
         var targetSlot = null;
+
+        // Clean up drag visual — remove before hit-testing so elementFromPoint works correctly
+        if (this._dragState.dragElement && this._dragState.dragElement.parentNode) {
+            this._dragState.dragElement.parentNode.removeChild(this._dragState.dragElement);
+        }
+
+        // Remove all drag-over highlights from document body
+        var highlights = document.querySelectorAll('.drag-over');
+        for (var i = 0; i < highlights.length; i++) {
+            highlights[i].classList.remove('drag-over');
+        }
+
+        // Find drop target after cleanup
         var targetEl = document.elementFromPoint(e.clientX, e.clientY);
         if (targetEl) {
             var slotEl = targetEl.closest('.dk-slot, .dk-hotbar-slot, .dk-item-slot');
             if (slotEl) {
                 targetSlot = parseInt(slotEl.dataset.slotIndex, 10);
             }
-        }
-
-        // Clean up drag visual
-        if (this._dragState.dragElement && this._dragState.dragElement.parentNode) {
-            this._dragState.dragElement.parentNode.removeChild(this._dragState.dragElement);
-        }
-
-        // Remove all drag-over highlights
-        var highlights = this._container.querySelectorAll('.drag-over');
-        for (var i = 0; i < highlights.length; i++) {
-            highlights[i].classList.remove('drag-over');
         }
 
         // Notify drop callback
@@ -211,10 +215,12 @@
     /**
      * _getSlotData — retrieves data from a slot by index.
      * @param {number} slotIndex - Slot index.
-     * @returns {Object|null} Slot data object or null.
+     * @returns {Object|null} Slot data object with itemText and countText, or null.
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._getSlotData = function(slotIndex) {
+        if (!this._container) return null;
+
         var slotEl = this._container.querySelector('[data-slot-index="' + slotIndex + '"]');
         if (!slotEl) return null;
 
@@ -229,9 +235,9 @@
     };
 
     /**
-     * _emit — emits a drag-and-drop event.
-     * @param {string} event - Event name.
-     * @param {Object} data - Event data.
+     * _emit — emits a drag-and-drop event to all registered listeners.
+     * @param {string} event - Event name ('drag:start', 'drag:end').
+     * @param {Object} data - Event data object.
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._emit = function(event, data) {
@@ -245,7 +251,7 @@
     /**
      * on — subscribes to a drag-and-drop event.
      * @param {string} event - Event name ('drag:start', 'drag:end').
-     * @param {Function} callback - Callback function.
+     * @param {Function} callback - Callback function called with (data).
      * @returns {Function} Unsubscribe function.
      */
     Donkeycraft.GuiDragDrop.prototype.on = function(event, callback) {
@@ -269,7 +275,8 @@
             this._dragState.dragElement.parentNode.removeChild(this._dragState.dragElement);
         }
 
-        var highlights = this._container.querySelectorAll('.drag-over');
+        // Remove all drag-over highlights from document body
+        var highlights = document.querySelectorAll('.drag-over');
         for (var i = 0; i < highlights.length; i++) {
             highlights[i].classList.remove('drag-over');
         }
@@ -289,16 +296,20 @@
     };
 
     /**
-     * destroy — cleans up all resources.
+     * destroy — cleans up all DOM event listeners and internal state.
      */
     Donkeycraft.GuiDragDrop.prototype.destroy = function() {
         this.cancelDrag();
 
-        if (this._container) {
+        if (this._container && this._boundHandlers.mouseDown) {
             this._container.removeEventListener('mousedown', this._boundHandlers.mouseDown);
         }
-        document.removeEventListener('mousemove', this._boundHandlers.mouseMove);
-        document.removeEventListener('mouseup', this._boundHandlers.mouseUp);
+        if (this._boundHandlers.mouseMove) {
+            document.removeEventListener('mousemove', this._boundHandlers.mouseMove);
+        }
+        if (this._boundHandlers.mouseUp) {
+            document.removeEventListener('mouseup', this._boundHandlers.mouseUp);
+        }
 
         this._listeners = {};
         this._boundHandlers = {};
@@ -314,7 +325,7 @@
      * @param {Object} [options={}] - Configuration options.
      * @param {string} [options.className='dk-button'] - CSS class name.
      * @param {boolean} [options.disabled=false] - Initial disabled state.
-     * @param {HTMLElement} [options.container=null] - Optional parent container.
+     * @param {HTMLElement} [options.container=null] - Optional parent container element.
      */
     Donkeycraft.GuiButton = function(text, options) {
         options = options || {};
@@ -336,13 +347,16 @@
         this._listeners = {};
         this._boundHandlers = {};
 
+        // Bind events eagerly so event subscriptions work before getElement() is called
+        this._bindEvents();
+
         if (options.container) {
             options.container.appendChild(this._element);
         }
     };
 
     /**
-     * _bindEvents — attaches click and hover handlers.
+     * _bindEvents — attaches click and hover handlers to the button element.
      * @private
      */
     Donkeycraft.GuiButton.prototype._bindEvents = function() {
@@ -385,9 +399,6 @@
      * @returns {HTMLButtonElement}
      */
     Donkeycraft.GuiButton.prototype.getElement = function() {
-        if (!this._boundHandlers.click) {
-            this._bindEvents();
-        }
         return this._element;
     };
 
@@ -475,7 +486,23 @@
     };
 
     /**
-     * destroy — removes the button from DOM and cleans up.
+     * onMouseLeave — subscribes to mouse leave events.
+     * @param {Function} callback - Called with (event) argument.
+     * @returns {Function} Unsubscribe function.
+     */
+    Donkeycraft.GuiButton.prototype.onMouseLeave = function(callback) {
+        if (!this._listeners.mouseleave) this._listeners.mouseleave = [];
+        this._listeners.mouseleave.push(callback);
+
+        var self = this;
+        return function() {
+            var idx = self._listeners.mouseleave.indexOf(callback);
+            if (idx >= 0) self._listeners.mouseleave.splice(idx, 1);
+        };
+    };
+
+    /**
+     * destroy — removes the button from DOM and cleans up event listeners.
      */
     Donkeycraft.GuiButton.prototype.destroy = function() {
         if (this._element && this._element.parentNode) {
@@ -491,8 +518,8 @@
 
     /**
      * GuiTabNavigator — manages tabbed UI navigation.
-     * @param {HTMLElement} container - Parent container element.
-     * @param {Array} tabs - Array of tab label strings.
+     * @param {HTMLElement|null} container - Parent container element.
+     * @param {Array<string>} tabs - Array of tab label strings.
      */
     Donkeycraft.GuiTabNavigator = function(container, tabs) {
         this._container = container || null;
@@ -510,7 +537,7 @@
     };
 
     /**
-     * _buildDOM — creates the tab bar and content area.
+     * _buildDOM — creates the tab bar and content area inside the container.
      * @private
      */
     Donkeycraft.GuiTabNavigator.prototype._buildDOM = function() {
@@ -518,7 +545,9 @@
 
         var self = this;
 
-        this._container.className = 'dk-gui-panel dk-interactive';
+        // Preserve existing classes, add required ones
+        this._container.classList.add('dk-gui-panel');
+        this._container.classList.add('dk-interactive');
 
         // Title
         var titleEl = document.createElement('div');
@@ -576,7 +605,9 @@
         this._activeTabIndex = index;
 
         // Clear and rebuild content
-        this._tabContentEl.innerHTML = '';
+        if (this._tabContentEl) {
+            this._tabContentEl.innerHTML = '';
+        }
         this._emit('tab:change', { tabIndex: index, oldTab: oldTab });
     };
 
@@ -599,7 +630,7 @@
     /**
      * getTabName — gets the name of a tab by index.
      * @param {number} index - Tab index.
-     * @returns {string|null}
+     * @returns {string|null} Tab name or null if out of bounds.
      */
     Donkeycraft.GuiTabNavigator.prototype.getTabName = function(index) {
         if (index < 0 || index >= this._tabs.length) return null;
@@ -618,14 +649,14 @@
 
     /**
      * getElement — gets the root container element.
-     * @returns {HTMLElement}
+     * @returns {HTMLElement|null}
      */
     Donkeycraft.GuiTabNavigator.prototype.getElement = function() {
         return this._container;
     };
 
     /**
-     * _emit — emits an event.
+     * _emit — emits an event to all registered listeners.
      * @param {string} event - Event name.
      * @param {Object} data - Event data.
      * @private
@@ -641,7 +672,7 @@
     /**
      * on — subscribes to an event.
      * @param {string} event - Event name ('tab:change', 'close').
-     * @param {Function} callback - Callback function.
+     * @param {Function} callback - Callback function called with (data).
      * @returns {Function} Unsubscribe function.
      */
     Donkeycraft.GuiTabNavigator.prototype.on = function(event, callback) {
@@ -656,7 +687,7 @@
     };
 
     /**
-     * destroy — cleans up resources.
+     * destroy — cleans up resources and event listeners.
      */
     Donkeycraft.GuiTabNavigator.prototype.destroy = function() {
         this._listeners = {};
@@ -672,12 +703,12 @@
      * @param {string} [options.placeholder=''] - Placeholder text.
      * @param {string} [options.value=''] - Initial value.
      * @param {number} [options.maxLength=100] - Maximum input length.
-     * @param {HTMLElement} [options.container=null] - Optional parent container.
+     * @param {HTMLElement} [options.container=null] - Optional parent container element.
      */
     Donkeycraft.GuiTextInput = function(options) {
         options = options || {};
         this._placeholder = options.placeholder || '';
-        this._maxLength = options.maxLength || 100;
+        this._maxLength = options.maxLength !== undefined && options.maxLength !== null ? Math.max(1, options.maxLength) : 100;
         this._error = false;
 
         this._element = document.createElement('input');
@@ -690,13 +721,16 @@
         this._listeners = {};
         this._boundHandlers = {};
 
+        // Bind events eagerly so event subscriptions work before getElement() is called
+        this._bindEvents();
+
         if (options.container) {
             options.container.appendChild(this._element);
         }
     };
 
     /**
-     * _bindEvents — attaches input and validation handlers.
+     * _bindEvents — attaches input, blur, and keydown handlers to the input element.
      * @private
      */
     Donkeycraft.GuiTextInput.prototype._bindEvents = function() {
@@ -740,9 +774,6 @@
      * @returns {HTMLInputElement}
      */
     Donkeycraft.GuiTextInput.prototype.getElement = function() {
-        if (!this._boundHandlers.input) {
-            this._bindEvents();
-        }
         return this._element;
     };
 
@@ -774,7 +805,7 @@
 
     /**
      * setMaxLength — sets the maximum allowed input length.
-     * @param {number} max - Maximum length.
+     * @param {number} max - Maximum length (minimum 1).
      */
     Donkeycraft.GuiTextInput.prototype.setMaxLength = function(max) {
         this._maxLength = (max !== undefined && max !== null) ? Math.max(1, max) : 100;
@@ -786,7 +817,7 @@
     /**
      * setError — sets or clears the error state.
      * @param {boolean} error - Whether to show error state.
-     * @param {string} [message=''] - Optional error message.
+     * @param {string} [message=''] - Optional error message (not used in DOM, passed to listeners).
      */
     Donkeycraft.GuiTextInput.prototype.setError = function(error, message) {
         this._error = !!error;
@@ -893,7 +924,7 @@
     };
 
     /**
-     * destroy — removes the input from DOM and cleans up.
+     * destroy — removes the input from DOM and cleans up event listeners.
      */
     Donkeycraft.GuiTextInput.prototype.destroy = function() {
         if (this._element && this._element.parentNode) {
