@@ -14,6 +14,8 @@
 
     /**
      * WorldTime — Manages world time, day counting, and moon phases.
+     * Day cycle: 24000 ticks (20 minutes at 20 TPS).
+     * Moon phase cycle: 168000 ticks (7 days).
      * @param {number} [totalTicks=0] — Initial total tick count.
      */
     Donkeycraft.WorldTime = function(totalTicks) {
@@ -21,7 +23,7 @@
     };
 
     /**
-     * Advance time by one tick.
+     * Advance time by one game tick.
      */
     Donkeycraft.WorldTime.prototype.tick = function() {
         this._totalTicks++;
@@ -29,14 +31,14 @@
 
     /**
      * Advance time by a number of ticks.
-     * @param {number} count — Number of ticks to advance.
+     * @param {number} count - Number of ticks to advance.
      */
     Donkeycraft.WorldTime.prototype.advance = function(count) {
         this._totalTicks += count;
     };
 
     /**
-     * Get the total number of ticks elapsed.
+     * Get the total number of ticks elapsed since world creation.
      * @returns {number} Total ticks.
      */
     Donkeycraft.WorldTime.prototype.getTotalTicks = function() {
@@ -44,15 +46,15 @@
     };
 
     /**
-     * Set the total number of ticks.
-     * @param {number} ticks — Total ticks to set.
+     * Set the total number of ticks. Negative values are clamped to 0.
+     * @param {number} ticks - Total ticks to set.
      */
     Donkeycraft.WorldTime.prototype.setTotalTicks = function(ticks) {
         this._totalTicks = ticks < 0 ? 0 : ticks;
     };
 
     /**
-     * Get the number of full days elapsed.
+     * Get the number of full days elapsed (each day = 24000 ticks).
      * @returns {number} Number of complete days.
      */
     Donkeycraft.WorldTime.prototype.getDays = function() {
@@ -61,7 +63,7 @@
 
     /**
      * Get the number of ticks within the current day [0, 23999].
-     * @returns {number} Ticks in current day.
+     * @returns {number} Ticks elapsed since the last day boundary.
      */
     Donkeycraft.WorldTime.prototype.getTicksInDay = function() {
         return this._totalTicks % Donkeycraft.WORLD_TIME_TICKS_PER_DAY;
@@ -69,7 +71,7 @@
 
     /**
      * Get the time of day as a normalized value in [0, 1).
-     * 0.0 = sunrise, 0.25 = noon, 0.5 = sunset, 0.75 = midnight.
+     * 0.0 = sunrise, 0.25 = noon (~6000 ticks), 0.5 = sunset (~12000 ticks), 0.75 = midnight (~18000 ticks).
      * @returns {number} Time of day in [0, 1).
      */
     Donkeycraft.WorldTime.prototype.getTimeOfDay = function() {
@@ -78,8 +80,8 @@
 
     /**
      * Check if it is currently daytime.
-     * Daytime: time of day in [0.2, 0.75) — from just before sunrise to just before sunset.
-     * @returns {boolean} True if daytime.
+     * Daytime: time of day in [0.2, 0.75) — approximately 6:00 AM to 6:00 PM in-game.
+     * @returns {boolean} True if the current time is daytime.
      */
     Donkeycraft.WorldTime.prototype.isDaytime = function() {
         var tod = this.getTimeOfDay();
@@ -88,8 +90,8 @@
 
     /**
      * Check if it is currently nighttime.
-     * Nighttime: time of day in [0.75, 1.2) — from sunset to just after sunrise.
-     * @returns {boolean} True if nighttime.
+     * Nighttime: time of day in [0.75, 1.0) ∪ [0, 0.2) — from sunset (~6 PM) to just before sunrise (~6 AM).
+     * @returns {boolean} True if the current time is nighttime.
      */
     Donkeycraft.WorldTime.prototype.isNight = function() {
         var tod = this.getTimeOfDay();
@@ -97,16 +99,16 @@
     };
 
     /**
-     * Get the current hour of the day [0, 23].
-     * @returns {number} Hour (0-23).
+     * Get the current hour of the day [0, 23] based on the 24000-tick cycle.
+     * @returns {number} Hour in [0, 23].
      */
     Donkeycraft.WorldTime.prototype.getHour = function() {
         return Math.floor(this.getTicksInDay() / Donkeycraft.WORLD_TIME_TICKS_PER_HOUR);
     };
 
     /**
-     * Get the current minute within the hour [0, 59].
-     * @returns {number} Minute (0-59).
+     * Get the current minute within the hour [0, 59] based on the 1000-tick hour.
+     * @returns {number} Minute in [0, 59].
      */
     Donkeycraft.WorldTime.prototype.getMinute = function() {
         var ticksInHour = this.getTicksInDay() % Donkeycraft.WORLD_TIME_TICKS_PER_HOUR;
@@ -114,17 +116,18 @@
     };
 
     /**
-     * Get the moon phase [0, 7].
-     * Phase 0 = new moon, 4 = full moon. Cycles every 7 days (168000 ticks).
-     * @returns {number} Moon phase (0-7).
+     * Get the current moon phase [0, 7].
+     * Phase 0 = new moon, 2 = first quarter, 4 = full moon, 6 = last quarter.
+     * Cycles every 7 days (168000 ticks).
+     * @returns {number} Moon phase in [0, 7].
      */
     Donkeycraft.WorldTime.prototype.getMoonPhase = function() {
         return Math.floor((this._totalTicks / (Donkeycraft.WORLD_TIME_MOON_PHASE_CYCLE / 8)) % 8);
     };
 
     /**
-     * Get a human-readable moon phase name.
-     * @returns {string} Moon phase name.
+     * Get a human-readable moon phase name from the current phase.
+     * @returns {string} Moon phase name (e.g., 'New Moon', 'Full Moon').
      */
     Donkeycraft.WorldTime.prototype.getMoonPhaseName = function() {
         var names = [
@@ -141,9 +144,9 @@
     };
 
     /**
-     * Get the fraction of moon illumination [0, 1].
-     * 0 = new moon (invisible), 1 = full moon.
-     * @returns {number} Illumination fraction.
+     * Get the approximate fraction of moon illumination [0, 1].
+     * 0 = new moon (invisible), 1 = full moon. Uses linear approximation from phase.
+     * @returns {number} Illumination fraction in [0, 1].
      */
     Donkeycraft.WorldTime.prototype.getMoonIllumination = function() {
         var phase = this.getMoonPhase();
@@ -156,6 +159,7 @@
 
     /**
      * Get the length of a full day cycle in ticks.
+     * Always returns 24000 ticks (20 minutes at 20 TPS).
      * @returns {number} Ticks per day (always 24000).
      */
     Donkeycraft.WorldTime.getDayLength = function() {
@@ -164,8 +168,8 @@
 
     /**
      * Convert a time-of-day value [0, 1) to ticks in day.
-     * @param {number} tod — Time of day in [0, 1).
-     * @returns {number} Ticks in day.
+     * @param {number} tod - Time of day in [0, 1).
+     * @returns {number} Corresponding tick count in [0, 23999].
      */
     Donkeycraft.WorldTime.todToTicks = function(tod) {
         return Math.floor((tod % 1 + 1) % 1 * Donkeycraft.WORLD_TIME_TICKS_PER_DAY);
@@ -173,8 +177,8 @@
 
     /**
      * Convert ticks in day to a time-of-day value [0, 1).
-     * @param {number} ticksInDay — Ticks in current day.
-     * @returns {number} Time of day in [0, 1).
+     * @param {number} ticksInDay - Tick count in [0, 23999].
+     * @returns {number} Normalized time of day in [0, 1).
      */
     Donkeycraft.WorldTime.ticksToTod = function(ticksInDay) {
         return (ticksInDay % Donkeycraft.WORLD_TIME_TICKS_PER_DAY) / Donkeycraft.WORLD_TIME_TICKS_PER_DAY;
@@ -182,9 +186,9 @@
 
     /**
      * Create a WorldTime from a time-of-day value [0, 1).
-     * Preserves the day count from the provided totalTicks.
-     * @param {number} tod — Time of day in [0, 1).
-     * @param {number} [currentTotal=0] — Current total ticks to preserve day count.
+     * Preserves the day count from the provided currentTotal ticks.
+     * @param {number} tod - Time of day in [0, 1).
+     * @param {number} [currentTotal=0] - Current total ticks to preserve day count.
      * @returns {Donkeycraft.WorldTime} New WorldTime instance.
      */
     Donkeycraft.WorldTime.fromTimeOfDay = function(tod, currentTotal) {
@@ -194,15 +198,15 @@
     };
 
     /**
-     * Reset time to zero.
+     * Reset time to zero ticks.
      */
     Donkeycraft.WorldTime.prototype.reset = function() {
         this._totalTicks = 0;
     };
 
     /**
-     * Serialize time state to a plain object.
-     * @returns {{totalTicks: number}} Serialized state.
+     * Serialize time state to a plain object for persistence.
+     * @returns {{totalTicks: number}} Serialized state object.
      */
     Donkeycraft.WorldTime.prototype.serialize = function() {
         return {
@@ -211,8 +215,9 @@
     };
 
     /**
-     * Deserialize from a plain object.
-     * @param {Object} data — Serialized state.
+     * Deserialize time state from a plain object.
+     * Negative totalTicks values are clamped to 0.
+     * @param {Object} data - Serialized state with totalTicks property.
      * @returns {Donkeycraft.WorldTime} This instance for chaining.
      */
     Donkeycraft.WorldTime.prototype.deserialize = function(data) {
@@ -224,6 +229,7 @@
 
     /**
      * Destroy the WorldTime instance and free resources.
+     * Resets totalTicks to 0.
      */
     Donkeycraft.WorldTime.prototype.destroy = function() {
         this._totalTicks = 0;

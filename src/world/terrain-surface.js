@@ -12,7 +12,8 @@
     // ============================================================
 
     /**
-     * TerrainSurface — applies biome-specific surface layers to chunks.
+     * TerrainSurface — applies biome-specific surface layers (grass, sand, snow, stone, clay)
+     * to chunks by replacing top blocks based on the chunk's biome ID and heightmap.
      */
     Donkeycraft.TerrainSurface = (function() {
         // Cached block references
@@ -49,10 +50,10 @@
 
         /**
          * Apply the surface layer to a chunk based on biome.
-         * Replaces top terrain blocks with appropriate surface blocks.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Replaces top terrain blocks with appropriate surface blocks (grass, sand, snow, stone, clay).
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number} biomeId - Biome ID for this chunk.
-         * @param {number[]} heightmap - Heightmap array.
+         * @param {number[]} heightmap - Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
          */
         function applySurfaceLayer(chunk, biomeId, heightmap) {
             switch (biomeId) {
@@ -89,8 +90,8 @@
         }
 
         /**
-         * Apply grass surface (grass block + dirt layer).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Apply grass surface: grass block on top, 1-2 layers of dirt below stone.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
@@ -120,8 +121,9 @@
         }
 
         /**
-         * Apply sand surface (desert).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Apply sand surface: replaces top 1-3 blocks with sand where terrain is below water level.
+         * Replaces stone and dirt beneath the surface with sand.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
@@ -154,8 +156,8 @@
         }
 
         /**
-         * Apply snow surface (taiga).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Apply snow surface: snow block on top, dirt layer below stone, optional second snow layer.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
@@ -192,8 +194,9 @@
         }
 
         /**
-         * Apply stone surface (extreme hills, mountains).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Apply stone surface: keeps stone as the top block (no grass/sand/snow).
+         * Used for extreme hills and mountain biomes.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
@@ -213,8 +216,9 @@
         }
 
         /**
-         * Apply swamp surface (muddy dirt + clay).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Apply swamp surface: dirt on top, clay layer below stone.
+         * Swamps use dirt instead of grass blocks and have clay underneath.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */

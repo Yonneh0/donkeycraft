@@ -12,7 +12,8 @@
     // ============================================================
 
     /**
-     * Chunk — stores block data for a 16×WORLD_HEIGHT×16 region.
+     * Chunk — stores block data, sky light, and block light for a 16×WORLD_HEIGHT×16 region.
+     * Uses Uint16Array for blocks (supporting IDs > 255) and Uint8Array for light values.
      * @param {number} chunkX - X coordinate of this chunk (in chunk units).
      * @param {number} chunkZ - Z coordinate of this chunk (in chunk units).
      */
@@ -80,7 +81,8 @@
     }
 
     /**
-     * Get the block ID at local coordinates.
+     * Get the block ID at local coordinates within this chunk.
+     * Returns 0 (air) if coordinates are out of bounds.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -94,7 +96,9 @@
     };
 
     /**
-     * Set the block ID at local coordinates.
+     * Set the block ID at local coordinates within this chunk.
+     * Marks the chunk as dirty if the block value changes.
+     * Silently ignores out-of-bounds coordinates.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -112,7 +116,8 @@
     };
 
     /**
-     * Get the sky light value at local coordinates.
+     * Get the sky light value at local coordinates within this chunk.
+     * Returns 15 (full sky light) if coordinates are out of bounds.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -126,7 +131,8 @@
     };
 
     /**
-     * Set the sky light value at local coordinates.
+     * Set the sky light value at local coordinates within this chunk.
+     * Silently ignores out-of-bounds coordinates. Clamps light to [0, 15].
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -140,7 +146,8 @@
     };
 
     /**
-     * Get the block light value at local coordinates.
+     * Get the block light value at local coordinates within this chunk.
+     * Returns 0 if coordinates are out of bounds.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -154,7 +161,8 @@
     };
 
     /**
-     * Set the block light value at local coordinates.
+     * Set the block light value at local coordinates within this chunk.
+     * Silently ignores out-of-bounds coordinates. Clamps light to [0, 15].
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -169,7 +177,7 @@
 
     /**
      * Get the global X coordinate for this chunk's left edge.
-     * @returns {number}
+     * @returns {number} Global X = chunkX * CHUNK_SIZE.
      */
     Donkeycraft.Chunk.prototype.globalX = function() {
         return this.chunkX * CHUNK_SIZE;
@@ -177,17 +185,17 @@
 
     /**
      * Get the global Z coordinate for this chunk's front edge.
-     * @returns {number}
+     * @returns {number} Global Z = chunkZ * CHUNK_SIZE.
      */
     Donkeycraft.Chunk.prototype.globalZ = function() {
         return this.chunkZ * CHUNK_SIZE;
     };
 
     /**
-     * Convert global coordinates to local chunk coordinates.
-     * @param {number} gx - Global X.
-     * @param {number} gz - Global Z.
-     * @returns {{lx: number, lz: number}} Local x and z.
+     * Convert global X/Z coordinates to local chunk coordinates.
+     * @param {number} gx - Global X coordinate.
+     * @param {number} gz - Global Z coordinate.
+     * @returns {{lx: number, lz: number}} Object with local x and z in [0, 15].
      */
     Donkeycraft.Chunk.prototype.globalToLocal = function(gx, gz) {
         return {
@@ -197,29 +205,29 @@
     };
 
     /**
-     * Check if this chunk has unapplied changes.
-     * @returns {boolean}
+     * Check if this chunk has unapplied changes that need mesh regeneration.
+     * @returns {boolean} True if the chunk is dirty.
      */
     Donkeycraft.Chunk.prototype.isDirty = function() {
         return this._dirty;
     };
 
     /**
-     * Mark this chunk as clean (changes applied).
+     * Mark this chunk as clean — changes have been applied to the mesh.
      */
     Donkeycraft.Chunk.prototype.markClean = function() {
         this._dirty = false;
     };
 
     /**
-     * Mark this chunk as dirty (needs mesh regeneration).
+     * Mark this chunk as dirty — signals that the mesh needs regeneration.
      */
     Donkeycraft.Chunk.prototype.markDirty = function() {
         this._dirty = true;
     };
 
     /**
-     * Clear all light data in this chunk.
+     * Clear all sky and block light data in this chunk (sets to zero).
      */
     Donkeycraft.Chunk.prototype.clearLight = function() {
         this.skyLight.fill(0);
@@ -227,8 +235,9 @@
     };
 
     /**
-     * Fill the entire chunk with a specific block ID.
-     * @param {number} blockId - Block ID to fill with.
+     * Fill the entire chunk's block data with a specific block ID.
+     * Marks the chunk as dirty.
+     * @param {number} blockId - Block ID to fill with (0 = air).
      */
     Donkeycraft.Chunk.prototype.fill = function(blockId) {
         this.blocks.fill(blockId);
@@ -236,15 +245,16 @@
     };
 
     /**
-     * Get a view of the block data as a Uint8Array (for bulk operations).
-     * @returns {Uint8Array}
+     * Get a view of the block data as a Uint16Array (for bulk WebGL buffer uploads).
+     * @returns {Uint16Array} View of block data.
      */
     Donkeycraft.Chunk.prototype.getBlockData = function() {
         return this.blocks;
     };
 
     /**
-     * Destroy and free resources.
+     * Destroy and free chunk resources — nulls internal arrays.
+     * Call this when the chunk is no longer needed.
      */
     Donkeycraft.Chunk.prototype.destroy = function() {
         this.blocks = null;
@@ -257,19 +267,18 @@
     // ============================================================
 
     /**
-     * Convert global block coordinates to chunk coordinates.
+     * Convert global block X coordinate to chunk X coordinate.
      * @param {number} globalX - Global X coordinate.
-     * @param {number} globalZ - Global Z coordinate.
-     * @returns {{chunkX: number, chunkZ: number}}
+     * @returns {number} Chunk X coordinate.
      */
     Donkeycraft.Chunk.chunkCoordX = function(globalX) {
         return Math.floor(globalX / CHUNK_SIZE);
     };
 
     /**
-     * Convert global block coordinates to chunk Z coordinate.
+     * Convert global block Z coordinate to chunk Z coordinate.
      * @param {number} globalZ - Global Z coordinate.
-     * @returns {number}
+     * @returns {number} Chunk Z coordinate.
      */
     Donkeycraft.Chunk.chunkCoordZ = function(globalZ) {
         return Math.floor(globalZ / CHUNK_SIZE);
@@ -277,8 +286,9 @@
 
     /**
      * Get the local X coordinate within a chunk from global X.
+     * Handles negative coordinates correctly via modular arithmetic.
      * @param {number} globalX - Global X coordinate.
-     * @returns {number} Local X [0, 15].
+     * @returns {number} Local X in [0, 15].
      */
     Donkeycraft.Chunk.localCoordX = function(globalX) {
         return ((globalX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
@@ -286,8 +296,9 @@
 
     /**
      * Get the local Z coordinate within a chunk from global Z.
+     * Handles negative coordinates correctly via modular arithmetic.
      * @param {number} globalZ - Global Z coordinate.
-     * @returns {number} Local Z [0, 15].
+     * @returns {number} Local Z in [0, 15].
      */
     Donkeycraft.Chunk.localCoordZ = function(globalZ) {
         return ((globalZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;

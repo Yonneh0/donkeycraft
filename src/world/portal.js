@@ -7,12 +7,6 @@
     var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
     var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
 
-    // Block IDs for portal-related blocks
-    var OBSIDIAN_ID = 17;
-    var CRYING_OBSIDIAN_ID = 18;
-    var NETHER_PORTAL_ID = 276;
-    var END_PORTAL_ID = 277;
-
     // ============================================================
     // Portal
     // ============================================================
@@ -24,15 +18,41 @@
         var _portalPositions = {};   // "dim,x,y,z" → portal state
         var _eventBus = null;         // EventBus for emitting events
         var _chunkManager = null;     // ChunkManager reference
+        var _obsidianId = 0;          // Cached obsidian block ID from BlockRegistry
+        var _cryingObsidianId = 0;    // Cached crying obsidian block ID from BlockRegistry
+        var _netherPortalId = 0;      // Cached nether portal block ID from BlockRegistry
+        var _endPortalId = 0;         // Cached end portal block ID from BlockRegistry
+
+        /**
+         * Resolve portal-related block IDs from BlockRegistry.
+         * @private
+         */
+        function _resolvePortalBlockIds() {
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var obsidian = Donkeycraft.BlockRegistry.getBlockByName('obsidian');
+            if (obsidian) _obsidianId = obsidian.id;
+
+            var cryingObsidian = Donkeycraft.BlockRegistry.getBlockByName('crying_obsidian');
+            if (cryingObsidian) _cryingObsidianId = cryingObsidian.id;
+
+            var netherPortal = Donkeycraft.BlockRegistry.getBlockByName('nether_portal');
+            if (netherPortal) _netherPortalId = netherPortal.id;
+
+            var endPortal = Donkeycraft.BlockRegistry.getBlockByName('end_portal');
+            if (endPortal) _endPortalId = endPortal.id;
+        }
 
         /**
          * Initialize the portal system.
+         * Resolves block IDs from BlockRegistry and sets up references.
          * @param {Donkeycraft.EventBus} bus - The game EventBus.
          * @param {Donkeycraft.ChunkManager} chunkManager - The current dimension's ChunkManager.
          */
         function init(bus, chunkManager) {
             _eventBus = bus;
             _chunkManager = chunkManager;
+            _resolvePortalBlockIds();
         }
 
         /**
@@ -54,19 +74,19 @@
         /**
          * Check if a block ID is portal-related (obsidian, crying obsidian).
          * @param {number} blockId - Block ID to check.
-         * @returns {boolean}
+         * @returns {boolean} True if the block can be used for portal frames.
          */
         function isPortalBlock(blockId) {
-            return blockId === OBSIDIAN_ID || blockId === CRYING_OBSIDIAN_ID;
+            return blockId === _obsidianId || blockId === _cryingObsidianId;
         }
 
         /**
-         * Check if a block ID is a portal block (nether_portal, end_portal).
+         * Check if a block ID is an active portal block (nether_portal, end_portal).
          * @param {number} blockId - Block ID to check.
-         * @returns {boolean}
+         * @returns {boolean} True if the block is a portal block.
          */
         function isPortalActive(blockId) {
-            return blockId === NETHER_PORTAL_ID || blockId === END_PORTAL_ID;
+            return blockId === _netherPortalId || blockId === _endPortalId;
         }
 
         /**
@@ -283,11 +303,11 @@
                 for (var i = 0; i < width; i++) {
                     // Bottom and top bars
                     if (y === 0 || y === height - 1) {
-                        Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
+                        Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, _obsidianId);
                     } else {
                         // Side pillars (only corners)
                         if (i === 0 || i === width - 1) {
-                            Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
+                            Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, _obsidianId);
                         }
                     }
                 }
@@ -301,7 +321,7 @@
                         worldX + pi * dx,
                         worldY + py,
                         worldZ + pi * dz,
-                        NETHER_PORTAL_ID
+                        _netherPortalId
                     );
                 }
             }
@@ -480,27 +500,47 @@
         }
 
         /**
-         * Get the obsidian block ID used for portal frames.
-         * @returns {number}
+         * Get the cached obsidian block ID.
+         * @returns {number} Obsidian block ID, or 0 if not resolved.
          */
         function getObsidianId() {
-            return OBSIDIAN_ID;
+            return _obsidianId;
         }
 
         /**
-         * Get the nether portal block ID.
-         * @returns {number}
+         * Get the cached nether portal block ID.
+         * @returns {number} Nether portal block ID, or 0 if not resolved.
          */
         function getNetherPortalId() {
-            return NETHER_PORTAL_ID;
+            return _netherPortalId;
         }
 
         /**
-         * Get the end portal block ID.
-         * @returns {number}
+         * Get the cached end portal block ID.
+         * @returns {number} End portal block ID, or 0 if not resolved.
          */
         function getEndPortalId() {
-            return END_PORTAL_ID;
+            return _endPortalId;
+        }
+
+        /**
+         * Invalidate cached portal block IDs and re-resolve from BlockRegistry.
+         * Call this after dynamically adding new blocks to the registry.
+         */
+        function invalidateBlockIdCache() {
+            _obsidianId = 0;
+            _cryingObsidianId = 0;
+            _netherPortalId = 0;
+            _endPortalId = 0;
+            _resolvePortalBlockIds();
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The Portal module.
+         */
+        function getInstance() {
+            return Donkeycraft.Portal;
         }
 
         /**
@@ -510,6 +550,10 @@
             _portalPositions = {};
             _eventBus = null;
             _chunkManager = null;
+            _obsidianId = 0;
+            _cryingObsidianId = 0;
+            _netherPortalId = 0;
+            _endPortalId = 0;
         }
 
         return {
@@ -528,6 +572,8 @@
             getObsidianId: getObsidianId,
             getNetherPortalId: getNetherPortalId,
             getEndPortalId: getEndPortalId,
+            invalidateBlockIdCache: invalidateBlockIdCache,
+            getInstance: getInstance,
             destroy: destroy
         };
     })();

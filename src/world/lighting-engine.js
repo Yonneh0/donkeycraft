@@ -21,6 +21,7 @@
 
         /**
          * Initialize the lighting engine with known block light opacities.
+         * Pre-populates the opacity cache for blocks 0-255 for faster lookups.
          */
         function init() {
             for (var id = 0; id < 256; id++) {
@@ -67,10 +68,10 @@
         }
 
         /**
-         * Calculate sky light for a chunk based on heightmap.
+         * Calculate sky light for a chunk based on heightmap or actual block data.
          * Sky light decreases with depth and block occlusion.
          * @param {Donkeycraft.Chunk} chunk - The chunk to calculate light for.
-         * @param {number[]} heightmap - Heightmap array (optional, if null uses actual blocks).
+         * @param {number[]} [heightmap] - Optional heightmap array for fast mode. If omitted, uses precise BFS.
          */
         function calculateSkyLight(chunk, heightmap) {
             // Reset sky light
@@ -107,9 +108,10 @@
         }
 
         /**
-         * Calculate block light for a chunk (from torches, lava, etc.).
-         * Uses BFS flood fill from light sources.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Calculate block light for a chunk from all light-emitting blocks.
+         * Uses BFS flood fill propagation from each light source, allowing re-queueing
+         * when a stronger light path is found for better accuracy.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to calculate light for.
          */
         function calculateBlockLight(chunk) {
             // Reset block light
@@ -151,12 +153,14 @@
 
         /**
          * BFS flood fill for block light propagation.
+         * Allows re-queueing blocks when a stronger light path is found,
+         * ensuring optimal light levels across the chunk.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {Array<{x: number, y: number, z: number}>} queue - Initial light sources.
          * @private
          */
         function _bfsFloodFill(chunk, queue) {
-            var visited = new Uint8Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
+            var visited = new Uint16Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
 
             var head = 0;
             while (head < queue.length) {
@@ -189,7 +193,6 @@
                     }
 
                     var idx = n.x + n.y * CHUNK_SIZE + n.z * CHUNK_SIZE * WORLD_HEIGHT;
-                    if (visited[idx]) continue;
 
                     var neighborBlockId = chunk.getBlock(n.x, n.y, n.z);
                     var opacity = getLightOpacity(neighborBlockId);
@@ -197,12 +200,16 @@
                     var newLight = currentLight - opacity;
                     if (newLight <= 0) continue;
 
-                    // Update if this is a stronger light
+                    // Update if this is a stronger light than existing
                     var existingLight = chunk.getBlockLight(n.x, n.y, n.z);
                     if (newLight > existingLight) {
                         chunk.setBlockLight(n.x, n.y, n.z, newLight);
-                        visited[idx] = 1;
-                        queue.push({ x: n.x, y: n.y, z: n.z });
+
+                        // Re-queue if not already visited or if this is a significantly better path
+                        if (visited[idx] < newLight) {
+                            visited[idx] = newLight;
+                            queue.push({ x: n.x, y: n.y, z: n.z });
+                        }
                     }
                 }
             }
@@ -210,10 +217,11 @@
 
         /**
          * Update lighting for a single block position (incremental update).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - Local X.
-         * @param {number} y - Local Y.
-         * @param {number} z - Local Z.
+         * Recalculates sky light for the column and re-runs block light if needed.
+         * @param {Donkeycraft.Chunk} chunk - The chunk containing the block.
+         * @param {number} x - Local X coordinate [0, 15].
+         * @param {number} y - Local Y coordinate [0, 255].
+         * @param {number} z - Local Z coordinate [0, 15].
          */
         function updateBlockLighting(chunk, x, y, z) {
             // Recalculate sky light for this column
@@ -247,8 +255,8 @@
         }
 
         /**
-         * Update lighting for an entire chunk (full recalculation).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Update lighting for an entire chunk (full recalculation of sky and block light).
+         * @param {Donkeycraft.Chunk} chunk - The chunk to update.
          */
         function updateChunkLighting(chunk) {
             calculateSkyLight(chunk);
@@ -256,9 +264,10 @@
         }
 
         /**
-         * Get the light opacity for a block type (cached, supports full Uint16 range).
-         * @param {number} blockId - Block ID.
-         * @returns {number} Light opacity (0-15).
+         * Get the light opacity for a block type. Uses cached values for blocks 0-255,
+         * and dynamically caches extended values for IDs beyond that range.
+         * @param {number} blockId - Block ID (0-65535).
+         * @returns {number} Light opacity in range [0, 15].
          */
         function getLightOpacity(blockId) {
             if (blockId <= 255) {
@@ -275,7 +284,8 @@
         }
 
         /**
-         * Invalidate the light opacity cache and rebuild it.
+         * Invalidate the light opacity cache and rebuild it from BlockRegistry.
+         * Call this after dynamically adding new blocks to the registry.
          */
         function invalidateCache() {
             for (var id = 0; id < 256; id++) {
@@ -289,14 +299,31 @@
             }
         }
 
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The LightingEngine module.
+         */
+        function getInstance() {
+            return Donkeycraft.LightingEngine;
+        }
+
+        /**
+         * Destroy and free resources.
+         */
+        function destroy() {
+            invalidateCache();
+        }
+
         return {
+            getInstance: getInstance,
             init: init,
             calculateSkyLight: calculateSkyLight,
             calculateBlockLight: calculateBlockLight,
             updateBlockLighting: updateBlockLighting,
             updateChunkLighting: updateChunkLighting,
             getLightOpacity: getLightOpacity,
-            invalidateCache: invalidateCache
+            invalidateCache: invalidateCache,
+            destroy: destroy
         };
     })();
 

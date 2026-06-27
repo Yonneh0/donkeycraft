@@ -28,6 +28,27 @@
         var _defaultConfig = { minY: 0, maxY: WORLD_HEIGHT, lavaYLevel: _lavaYLevel };
 
         /**
+         * Check if a block ID is replaceable (air, liquids, flowers, grass, etc.).
+         * Used to determine which blocks caves can carve through.
+         * @param {number} blockId - Block ID to check.
+         * @returns {boolean} True if the block can be carved through.
+         * @private
+         */
+        function _isReplaceable(blockId) {
+            // Air is always replaceable
+            if (blockId === 0) return true;
+
+            // Check via BlockRegistry if available
+            try {
+                if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return true;
+                if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return true;
+                if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return true;
+            } catch (e) { /* ignore registry method errors */ }
+
+            return false;
+        }
+
+        /**
          * Generate caves in a chunk using 3D noise.
          * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
          * @param {number} biomeId - Biome ID for this chunk.
@@ -104,6 +125,13 @@
 
                             _carveTunnel(chunk, x, y, z, tunnelRadius);
                         }
+
+                        // Skip Y iteration for performance — caves are spaced vertically
+                        if (y > minY + 20) {
+                            // Jump ahead but not too far to avoid missing small caves
+                            y += 3;
+                            if (y >= maxY) break;
+                        }
                     }
                 }
             }
@@ -112,6 +140,7 @@
         /**
          * Carve a tunnel at the given position with the given radius.
          * Uses spherical shape with smooth falloff for natural-looking caves.
+         * Carves through air, liquids, and replaceable blocks (flowers, grass, tall grass, etc.).
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -136,10 +165,9 @@
                                 by >= 0 && by < WORLD_HEIGHT &&
                                 bz >= 0 && bz < CHUNK_SIZE) {
                                 var currentBlock = chunk.getBlock(bx, by, bz);
-                                // Only carve air and liquids (not solid blocks).
+                                // Carve air, liquids, and replaceable blocks.
                                 if (currentBlock === 0 ||
-                                    (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isLiquid &&
-                                     Donkeycraft.BlockRegistry.isLiquid(currentBlock))) {
+                                    _isReplaceable(currentBlock)) {
                                     chunk.setBlock(bx, by, bz, 0); // Air
                                 }
                             }
@@ -151,7 +179,8 @@
 
         /**
          * Get the cave density threshold.
-         * @returns {number}
+         * Higher values produce more caves (threshold is subtracted from noise, so higher = easier to carve).
+         * @returns {number} Cave density threshold.
          */
         function getDensity() {
             return _caveDensity;
@@ -159,43 +188,61 @@
 
         /**
          * Set the cave density threshold.
-         * @param {number} value - New density value.
+         * Higher values produce more caves (threshold is subtracted from noise, so higher = easier to carve).
+         * @param {number} value - New density value in range [0, 1].
          */
         function setDensity(value) {
             _caveDensity = value;
         }
 
         /**
-         * Get the base cave tunnel radius.
-         * @returns {number}
+         * Get the base cave tunnel radius in blocks.
+         * @returns {number} Base tunnel radius.
          */
         function getRadius() {
             return _caveRadius;
         }
 
         /**
-         * Set the base cave tunnel radius.
-         * @param {number} value - New radius value.
+         * Set the base cave tunnel radius in blocks.
+         * @param {number} value - New radius value (positive number).
          */
         function setRadius(value) {
             _caveRadius = value;
         }
 
         /**
-         * Get the lava Y level threshold.
-         * @returns {number}
+         * Get the Y level below which lava caves are generated.
+         * @returns {number} Lava cave Y level threshold.
          */
         function getLavaYLevel() {
             return _lavaYLevel;
         }
 
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The CaveGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.CaveGenerator;
+        }
+
+        /**
+         * Destroy and free resources.
+         */
+        function destroy() {
+            // No resources to free
+        }
+
         return {
+            getInstance: getInstance,
             generateCaves: generateCaves,
             getDensity: getDensity,
             setDensity: setDensity,
             getRadius: getRadius,
             setRadius: setRadius,
-            getLavaYLevel: getLavaYLevel
+            getLavaYLevel: getLavaYLevel,
+            destroy: destroy
         };
     })();
 

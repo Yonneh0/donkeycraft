@@ -143,6 +143,7 @@
 
     /**
      * BiomeRegistry — central registry for all biome definitions.
+     * Provides lookup by ID, name, climate matching, and random selection.
      */
     Donkeycraft.BiomeRegistry = (function() {
         var _biomes = {};         // Map: id → Biome
@@ -231,7 +232,7 @@
         /**
          * Get a biome by ID.
          * @param {number} id - Biome ID.
-         * @returns {Donkeycraft.Biome|null} The biome, or null if not found.
+         * @returns {Donkeycraft.Biome|null} The biome instance, or null if not found.
          */
         function getBiomeById(id) {
             return _biomes[id] || null;
@@ -239,16 +240,16 @@
 
         /**
          * Get a biome by name.
-         * @param {string} name - Biome name.
-         * @returns {Donkeycraft.Biome|null} The biome, or null if not found.
+         * @param {string} name - Biome name (e.g., 'plains', 'desert').
+         * @returns {Donkeycraft.Biome|null} The biome instance, or null if not found.
          */
         function getBiomeByName(name) {
             return _byName[name] || null;
         }
 
         /**
-         * Get all biomes as an array.
-         * @returns {Donkeycraft.Biome[]} Array of all biome instances.
+         * Get all biomes as an array (copy, not reference).
+         * @returns {Donkeycraft.Biome[]} Copy of the internal biome array.
          */
         function getAllBiomes() {
             return _allBiomes.slice();
@@ -256,7 +257,7 @@
 
         /**
          * Get the number of registered biomes.
-         * @returns {number}
+         * @returns {number} Count of registered biomes.
          */
         function getBiomeCount() {
             return _allBiomes.length;
@@ -265,15 +266,15 @@
         /**
          * Check if a biome exists for the given ID.
          * @param {number} id - Biome ID.
-         * @returns {boolean}
+         * @returns {boolean} True if a biome exists for this ID.
          */
         function hasBiome(id) {
             return id in _biomes;
         }
 
         /**
-         * Get a random biome.
-         * @returns {Donkeycraft.Biome}
+         * Get a random biome from the registry.
+         * @returns {Donkeycraft.Biome} A random biome instance.
          */
         function getRandomBiome() {
             var allBiomes = getAllBiomes();
@@ -281,11 +282,12 @@
         }
 
         /**
-         * Find a biome by temperature and rainfall values.
-         * Useful for dynamic biome assignment based on world generation.
+         * Find the biome whose temperature and rainfall values are closest to the given values.
+         * Uses Manhattan distance (|tempDiff| + |rainDiff|) to find the nearest match.
+         * Useful for dynamic biome assignment based on world generation coordinates.
          * @param {number} temperature - Temperature value [0, 1].
          * @param {number} rainfall - Rainfall value [0, 1].
-         * @returns {Donkeycraft.Biome|null} The closest matching biome, or null.
+         * @returns {Donkeycraft.Biome|null} The closest matching biome instance, or null if no biomes registered.
          */
         function getBiomeByClimate(temperature, rainfall) {
             var closest = null;

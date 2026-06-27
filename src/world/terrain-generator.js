@@ -39,9 +39,10 @@
 
         /**
          * Generate a heightmap for a chunk at the given world coordinates.
+         * Uses multi-octave Perlin noise (fbm) with biome-specific parameters.
          * @param {number} chunkX - Chunk X coordinate (in chunks).
          * @param {number} chunkZ - Chunk Z coordinate (in chunks).
-         * @param {Donkeycraft.Biome|null} [biome=null] - Biome for this chunk.
+         * @param {Donkeycraft.Biome|null} [biome=null] - Biome for this chunk; defaults to plains.
          * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE with height values.
          */
         function generateHeightmap(chunkX, chunkZ, biome) {
@@ -121,13 +122,13 @@
         }
 
         /**
-         * Get the terrain height at a specific world X, Z position.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * Get the terrain height at a specific world X, Z position within a heightmap.
+         * @param {number} chunkX - Chunk X coordinate (unused, for API compatibility).
+         * @param {number} chunkZ - Chunk Z coordinate (unused, for API compatibility).
          * @param {number} localX - Local X within chunk [0, 15].
          * @param {number} localZ - Local Z within chunk [0, 15].
          * @param {number[]} heightmap - Heightmap array.
-         * @returns {number} Terrain height at this position.
+         * @returns {number} Terrain height at this position (64 if not found).
          */
         function getHeightAt(chunkX, chunkZ, localX, localZ, heightmap) {
             return heightmap[localX + localZ * CHUNK_SIZE] || 64;
@@ -135,9 +136,10 @@
 
         /**
          * Generate a full heightmap and return it (convenience wrapper).
+         * Delegates to generateHeightmap; provided for API consistency with other generator modules.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
-         * @returns {number[]} Heightmap array.
+         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
          */
         function generate(chunkX, chunkZ) {
             _ensureNoiseInit();

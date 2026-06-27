@@ -190,6 +190,24 @@
             this._eventBus = new Donkeycraft.EventBus();
             Donkeycraft.EventBus.setGlobal(this._eventBus);
 
+            // Initialize world generation subsystems (must happen before first chunk load)
+            if (Donkeycraft.Physics && Donkeycraft.Physics.init) {
+                Donkeycraft.Physics.init();
+            }
+            if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.init) {
+                Donkeycraft.LightingEngine.init();
+            }
+            if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.init) {
+                Donkeycraft.OreGenerator.init();
+            }
+
+            // Initialize portal system with chunk manager reference
+            if (Donkeycraft.Portal && Donkeycraft.Portal.init) {
+                var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
+                var dimChunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(currentDim);
+                Donkeycraft.Portal.init(this._eventBus, dimChunkManager || this._chunkManager);
+            }
+
             Donkeycraft.Logger.info('Game', 'Initialization complete');
             return true;
 

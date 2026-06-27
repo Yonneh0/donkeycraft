@@ -80,14 +80,16 @@
      */
     Donkeycraft.OreGenerator = (function() {
         /**
-         * Initialize the ore generator by resolving block IDs.
+         * Initialize the ore generator by resolving all ore block IDs from BlockRegistry.
+         * Resolves blocks by name, falling back to common aliases for robustness.
          */
         function init() {
             _resolveBlockIds();
         }
 
         /**
-         * Place ores in a chunk.
+         * Place ore veins in a chunk based on biome restrictions and ore definitions.
+         * Resolves block IDs from BlockRegistry at runtime for correctness.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
          * @param {number} biomeId - Biome ID for this chunk.
          */
@@ -200,8 +202,8 @@
         }
 
         /**
-         * Get the minimum Y level for an ore by name.
-         * @param {string} oreName - Ore name.
+         * Get the minimum Y level for an ore type by name.
+         * @param {string} oreName - Ore definition name (e.g., 'diamond_ore').
          * @returns {number} Minimum Y level, or -1 if not found.
          */
         function getMinY(oreName) {
@@ -214,8 +216,8 @@
         }
 
         /**
-         * Get the maximum Y level for an ore by name.
-         * @param {string} oreName - Ore name.
+         * Get the maximum Y level for an ore type by name.
+         * @param {string} oreName - Ore definition name (e.g., 'diamond_ore').
          * @returns {number} Maximum Y level, or -1 if not found.
          */
         function getMaxY(oreName) {
@@ -229,24 +231,24 @@
 
         /**
          * Get all ore definitions.
-         * @returns {Array} Array of ore definition objects.
+         * @returns {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>} Array of ore definition objects.
          */
         function getOreDefinitions() {
             return ORE_DEFS.slice();
         }
 
         /**
-         * Get the number of ore types.
-         * @returns {number}
+         * Get the number of ore types defined.
+         * @returns {number} Number of ore definitions.
          */
         function getOreCount() {
             return ORE_DEFS.length;
         }
 
         /**
-         * Simple 2D hash for deterministic randomness.
-         * @param {number} x
-         * @param {number} y
+         * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
+         * @param {number} x - X coordinate.
+         * @param {number} y - Y coordinate.
          * @returns {number} Positive 32-bit integer.
          * @private
          */
@@ -261,9 +263,9 @@
 
         /**
          * Generate a pseudo-random number in a range using deterministic hashing.
-         * @param {number} index - Variation index.
-         * @param {number} min - Minimum value.
-         * @param {number} max - Maximum value.
+         * @param {number} index - Variation index for this vein placement attempt.
+         * @param {number} min - Minimum Y value.
+         * @param {number} max - Maximum Y value.
          * @returns {number} Integer in [min, max].
          * @private
          */
@@ -272,13 +274,30 @@
             return min + (hash % (max - min + 1));
         }
 
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The OreGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.OreGenerator;
+        }
+
+        /**
+         * Destroy and free resources.
+         */
+        function destroy() {
+            _blockCache = null;
+        }
+
         return {
+            getInstance: getInstance,
             init: init,
             placeOres: placeOres,
             getMinY: getMinY,
             getMaxY: getMaxY,
             getOreDefinitions: getOreDefinitions,
-            getOreCount: getOreCount
+            getOreCount: getOreCount,
+            destroy: destroy
         };
     })();
 

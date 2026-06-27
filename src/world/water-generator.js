@@ -17,6 +17,7 @@
     Donkeycraft.WaterGenerator = (function() {
         var _waterLevel = 63; // Default sea level
         var _waterBlockId = null; // Cached water block ID from BlockRegistry
+        var _liquidBlocks = {}; // Cache of liquid block IDs for quick lookup
 
         /**
          * Resolve the water block ID from BlockRegistry.
@@ -54,6 +55,22 @@
         }
 
         /**
+         * Resolve the water block ID and liquid cache from BlockRegistry.
+         * @private
+         */
+        function _resolveLiquidBlocks() {
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var liquidNames = ['water', 'water_still', 'flowing_water', 'lava', 'lava_still', 'flowing_lava'];
+            for (var i = 0; i < liquidNames.length; i++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(liquidNames[i]);
+                if (block) {
+                    _registerLiquidBlock(block.id);
+                }
+            }
+        }
+
+        /**
          * Place water sources in a chunk.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place water in.
          * @param {number} biomeId - Biome ID for this chunk.
@@ -65,7 +82,8 @@
             var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
             if (!biome) return;
 
-            // Resolve water block ID once
+            // Resolve water block ID and liquid cache
+            _resolveLiquidBlocks();
             _resolveWaterBlockId();
             if (!_waterBlockId || _waterBlockId === 0) return;
 
@@ -211,9 +229,18 @@
         }
 
         /**
+         * Register a block ID as a liquid block.
+         * @param {number} blockId - Block ID to register.
+         * @private
+         */
+        function _registerLiquidBlock(blockId) {
+            _liquidBlocks[blockId] = true;
+        }
+
+        /**
          * Check if a block ID is a liquid.
          * @param {number} blockId - Block ID.
-         * @returns {boolean}
+         * @returns {boolean} True if the block is a liquid.
          */
         function isLiquidBlock(blockId) {
             return _liquidBlocks[blockId] === true;
@@ -221,7 +248,7 @@
 
         /**
          * Get all known liquid block IDs.
-         * @returns {number[]}
+         * @returns {number[]} Array of liquid block IDs.
          */
         function getLiquidBlockIds() {
             var result = [];
@@ -231,6 +258,14 @@
                 }
             }
             return result;
+        }
+
+        /**
+         * Clear the liquid block cache.
+         * @private
+         */
+        function _clearLiquidCache() {
+            _liquidBlocks = {};
         }
 
         /**
@@ -248,12 +283,30 @@
             return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
         }
 
+        /**
+         * Destroy and free resources.
+         */
+        function destroy() {
+            _waterBlockId = null;
+            _liquidBlocks = {};
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The WaterGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.WaterGenerator;
+        }
+
         return {
+            getInstance: getInstance,
             placeWater: placeWater,
             getWaterLevel: getWaterLevel,
             setWaterLevel: setWaterLevel,
             isLiquidBlock: isLiquidBlock,
-            getLiquidBlockIds: getLiquidBlockIds
+            getLiquidBlockIds: getLiquidBlockIds,
+            destroy: destroy
         };
     })();
 

@@ -16,6 +16,78 @@
      */
     Donkeycraft.NetherGenerator = (function() {
         var _chunkManager = null;
+        var _bedrockId = 0;
+        var _netherrackId = 0;
+        var _soulSandId = 0;
+        var _basaltId = 0;
+        var _blackstoneId = 0;
+        var _lavaId = 0;
+        var _quartzOreId = 0;
+        var _netherGoldOreId = 0;
+        var _gildedBlackstoneId = 0;
+        var _magmaBlockId = 0;
+        var _ancientDebrisId = 0;
+
+        /**
+         * Resolve nether block IDs from BlockRegistry.
+         * @private
+         */
+        function _resolveNetherBlockIds() {
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var resolve = function(names, target) {
+                for (var i = 0; i < names.length; i++) {
+                    var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
+                    if (block) { _[target] = block.id; return; }
+                }
+            };
+            var _;
+
+            // Bedrock
+            _ = _bedrockId; resolve(['nether_bedrock', 'bedrock'], function() { /* handled below */ });
+            var br = Donkeycraft.BlockRegistry.getBlockByName('nether_bedrock') || Donkeycraft.BlockRegistry.getBlockByName('bedrock');
+            if (br) _bedrockId = br.id;
+
+            // Netherrack
+            var nr = Donkeycraft.BlockRegistry.getBlockByName('netherrack');
+            if (nr) _netherrackId = nr.id;
+
+            // Soul Sand
+            var ss = Donkeycraft.BlockRegistry.getBlockByName('soul_sand');
+            if (ss) _soulSandId = ss.id;
+
+            // Basalt
+            var ba = Donkeycraft.BlockRegistry.getBlockByName('basalt');
+            if (ba) _basaltId = ba.id;
+
+            // Blackstone
+            var bl = Donkeycraft.BlockRegistry.getBlockByName('blackstone');
+            if (bl) _blackstoneId = bl.id;
+
+            // Lava
+            var la = Donkeycraft.BlockRegistry.getBlockByName('lava') || Donkeycraft.BlockRegistry.getBlockByName('lava_still');
+            if (la) _lavaId = la.id;
+
+            // Nether Quartz Ore
+            var qo = Donkeycraft.BlockRegistry.getBlockByName('nether_quartz_ore');
+            if (qo) _quartzOreId = qo.id;
+
+            // Nether Gold Ore
+            var ngo = Donkeycraft.BlockRegistry.getBlockByName('nether_gold_ore');
+            if (ngo) _netherGoldOreId = ngo.id;
+
+            // Gilded Blackstone
+            var gb = Donkeycraft.BlockRegistry.getBlockByName('gilded_blackstone');
+            if (gb) _gildedBlackstoneId = gb.id;
+
+            // Magma Block
+            var mg = Donkeycraft.BlockRegistry.getBlockByName('magma');
+            if (mg) _magmaBlockId = mg.id;
+
+            // Ancient Debris
+            var ad = Donkeycraft.BlockRegistry.getBlockByName('ancient_debris');
+            if (ad) _ancientDebrisId = ad.id;
+        }
 
         /**
          * Set the chunk manager reference for terrain generation.
@@ -29,11 +101,17 @@
          * Generate full nether terrain for a chunk.
          * Accepts either (chunk, chunkX, chunkZ) when called from ChunkManager
          * or (chunkX, chunkZ) when called directly with _chunkManager set.
+         * Resolves block IDs from BlockRegistry on first call.
          * @param {Donkeycraft.Chunk|number} chunkOrX - Chunk object or chunk X coordinate.
-         * @param {number|number} [chunkZ] - Chunk Z coordinate or chunk X (when using legacy signature).
-         * @param {number} [chunkZ] - Chunk Z coordinate (when chunk is provided).
+         * @param {number} [chunkZ] - Chunk Z coordinate (when using new signature) or chunk X (legacy).
+         * @param {number} [optChunkZ] - Chunk Z coordinate (legacy unused param).
          */
         function generateNetherTerrain(chunkOrX, chunkZ, optChunkZ) {
+            // Resolve block IDs on first call
+            if (!_bedrockId && !Donkeycraft.BlockRegistry.getBlockByName('nether_bedrock')) {
+                _resolveNetherBlockIds();
+            }
+
             var chunk;
             var cx, cz;
 
@@ -75,9 +153,7 @@
          * @private
          */
         function _generateBedrockFloor(chunk) {
-            if (!chunk || !chunk.setBlock) return;
-            var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
-            if (!bedrock) return;
+            if (!chunk || !chunk.setBlock || !_bedrockId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -86,7 +162,7 @@
                     var thickness = Math.floor(n * 3) + 3; // 3 to 5
 
                     for (var y = 0; y < thickness && y < WORLD_HEIGHT; y++) {
-                        chunk.setBlock(x, y, z, bedrock.id);
+                        chunk.setBlock(x, y, z, _bedrockId);
                     }
                 }
             }
@@ -98,9 +174,7 @@
          * @private
          */
         function _generateBedrockCeiling(chunk) {
-            if (!chunk || !chunk.setBlock) return;
-            var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
-            if (!bedrock) return;
+            if (!chunk || !chunk.setBlock || !_bedrockId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -109,7 +183,7 @@
 
                     for (var y = 0; y < thickness && WORLD_HEIGHT - 1 - y >= 0; y++) {
                         var ceilingY = WORLD_HEIGHT - 1 - y;
-                        chunk.setBlock(x, ceilingY, z, bedrock.id);
+                        chunk.setBlock(x, ceilingY, z, _bedrockId);
                     }
                 }
             }
@@ -121,16 +195,14 @@
          * @private
          */
         function _fillNetherrack(chunk) {
-            if (!chunk || !chunk.setBlock) return;
-            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
-            if (!netherrack) return;
+            if (!chunk || !chunk.setBlock || !_netherrackId) return;
 
             // Floor bedrock occupies Y=0..~5, ceiling bedrock occupies Y=~WORLD_HEIGHT-5..end
             // Fill netherrack in between, avoiding areas already occupied by bedrock
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var y = 6; y < WORLD_HEIGHT - 6; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
-                        chunk.setBlock(x, y, z, netherrack.id);
+                        chunk.setBlock(x, y, z, _netherrackId);
                     }
                 }
             }
@@ -142,22 +214,20 @@
          * @private
          */
         function _generateLavaSeas(chunk) {
-            if (!chunk || !chunk.setBlock) return;
-            var lava = Donkeycraft.BlockRegistry.getBlockById(213);
-            if (!lava) return;
+            if (!chunk || !chunk.setBlock || !_lavaId) return;
 
             var lavaY = 31;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     // Place lava at sea level
-                    chunk.setBlock(x, lavaY, z, lava.id);
-                    chunk.setBlock(x, lavaY + 1, z, lava.id);
+                    chunk.setBlock(x, lavaY, z, _lavaId);
+                    chunk.setBlock(x, lavaY + 1, z, _lavaId);
 
                     // Add some variation
                     var variation = Donkeycraft.PerlinNoise.noise2D(x * 0.05, z * 0.05);
                     if (variation > 0.3) {
-                        chunk.setBlock(x, lavaY - 1, z, lava.id);
+                        chunk.setBlock(x, lavaY - 1, z, _lavaId);
                     }
                 }
             }
@@ -171,13 +241,7 @@
          * @private
          */
         function _generateNetherFeatures(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
-            var soulSand = Donkeycraft.BlockRegistry.getBlockById(258);
-            var basalt = Donkeycraft.BlockRegistry.getBlockById(110);
-            var blackstone = Donkeycraft.BlockRegistry.getBlockById(112);
-
-            if (!netherrack) return;
+            if (!chunk || !chunk.setBlock || !_netherrackId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -185,46 +249,52 @@
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
                     // Soul sand layers (flat patches near Y=20-40)
-                    var soulSandNoise = Donkeycraft.PerlinNoise.fbm(
-                        worldX * 0.03, 0, worldZ * 0.03, 3, 0.5, 2.0
-                    );
-                    if (soulSandNoise > 0.4 && soulSand) {
-                        for (var y = 18; y <= 42; y++) {
-                            var block = chunk.getBlock(x, y, z);
-                            if (block === netherrack.id) {
-                                chunk.setBlock(x, y, z, soulSand.id);
+                    if (_soulSandId) {
+                        var soulSandNoise = Donkeycraft.PerlinNoise.fbm(
+                            worldX * 0.03, 0, worldZ * 0.03, 3, 0.5, 2.0
+                        );
+                        if (soulSandNoise > 0.4) {
+                            for (var y = 18; y <= 42; y++) {
+                                var block = chunk.getBlock(x, y, z);
+                                if (block === _netherrackId) {
+                                    chunk.setBlock(x, y, z, _soulSandId);
+                                }
                             }
                         }
                     }
 
                     // Basalt columns (tall vertical structures)
-                    var basaltNoise = Donkeycraft.PerlinNoise.fbm(
-                        worldX * 0.02 + 50, 0, worldZ * 0.02 + 50, 2, 0.6, 2.0
-                    );
-                    if (basaltNoise > 0.5 && basalt) {
-                        for (var y2 = 40; y2 <= 70; y2++) {
-                            var bBlock = chunk.getBlock(x, y2, z);
-                            if (bBlock === netherrack.id) {
-                                chunk.setBlock(x, y2, z, basalt.id);
+                    if (_basaltId) {
+                        var basaltNoise = Donkeycraft.PerlinNoise.fbm(
+                            worldX * 0.02 + 50, 0, worldZ * 0.02 + 50, 2, 0.6, 2.0
+                        );
+                        if (basaltNoise > 0.5) {
+                            for (var y2 = 40; y2 <= 70; y2++) {
+                                var bBlock = chunk.getBlock(x, y2, z);
+                                if (bBlock === _netherrackId) {
+                                    chunk.setBlock(x, y2, z, _basaltId);
+                                }
                             }
                         }
                     }
 
                     // Blackstone clusters
-                    var blackstoneNoise = Donkeycraft.PerlinNoise.noise2D(
-                        worldX * 0.08 + 200, worldZ * 0.08 + 200
-                    );
-                    if (blackstoneNoise > 0.6 && blackstone) {
-                        var clusterSize = 2 + Math.floor(Math.random() * 3);
-                        for (var cx = 0; cx < clusterSize; cx++) {
-                            for (var cy = 0; cy < clusterSize; cy++) {
-                                for (var cz = 0; cz < clusterSize; cz++) {
-                                    var nx = x + cx - Math.floor(clusterSize / 2);
-                                    var ny = 50 + cy - Math.floor(clusterSize / 2);
-                                    var nz = z + cz - Math.floor(clusterSize / 2);
-                                    if (nx >= 0 && nx < CHUNK_SIZE && ny > 5 && ny < WORLD_HEIGHT - 5 && nz >= 0 && nz < CHUNK_SIZE) {
-                                        if (chunk.getBlock(nx, ny, nz) === netherrack.id) {
-                                            chunk.setBlock(nx, ny, nz, blackstone.id);
+                    if (_blackstoneId) {
+                        var blackstoneNoise = Donkeycraft.PerlinNoise.noise2D(
+                            worldX * 0.08 + 200, worldZ * 0.08 + 200
+                        );
+                        if (blackstoneNoise > 0.6) {
+                            var clusterSize = 2 + Math.floor(Math.random() * 3);
+                            for (var cdx = 0; cdx < clusterSize; cdx++) {
+                                for (var cdy = 0; cdy < clusterSize; cdy++) {
+                                    for (var cdz = 0; cdz < clusterSize; cdz++) {
+                                        var nbx = x + cdx - Math.floor(clusterSize / 2);
+                                        var nby = 50 + cdy - Math.floor(clusterSize / 2);
+                                        var nbz = z + cdz - Math.floor(clusterSize / 2);
+                                        if (nbx >= 0 && nbx < CHUNK_SIZE && nby > 5 && nby < WORLD_HEIGHT - 5 && nbz >= 0 && nbz < CHUNK_SIZE) {
+                                            if (chunk.getBlock(nbx, nby, nbz) === _netherrackId) {
+                                                chunk.setBlock(nbx, nby, nbz, _blackstoneId);
+                                            }
                                         }
                                     }
                                 }
@@ -243,65 +313,65 @@
          * @private
          */
         function _generateOreVeins(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
-            var quartzOre = Donkeycraft.BlockRegistry.getBlockById(238);
-            var goldOre = Donkeycraft.BlockRegistry.getBlockById(272);
-            var gildedBlackstone = Donkeycraft.BlockRegistry.getBlockById(260);
-            var magmaBlock = Donkeycraft.BlockRegistry.getBlockById(274);
-            var ancientDebris = Donkeycraft.BlockRegistry.getBlockById(273);
-
-            if (!netherrack) return;
+            if (!chunk || !chunk.setBlock || !_netherrackId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var y = 5; y < WORLD_HEIGHT - 5; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         var block = chunk.getBlock(x, y, z);
-                        if (block !== netherrack.id) continue;
+                        if (block !== _netherrackId) continue;
 
                         var worldX = chunkX * CHUNK_SIZE + x;
                         var worldY = y;
                         var worldZ = chunkZ * CHUNK_SIZE + z;
 
                         // Nether quartz ore
-                        var quartzNoise = Donkeycraft.PerlinNoise.noise2D(
-                            worldX * 0.1 + 300, worldZ * 0.1 + 300
-                        );
-                        if (quartzNoise > 0.7 && Math.random() < 0.15 && quartzOre) {
-                            chunk.setBlock(x, y, z, quartzOre.id);
+                        if (_quartzOreId) {
+                            var quartzNoise = Donkeycraft.PerlinNoise.noise2D(
+                                worldX * 0.1 + 300, worldZ * 0.1 + 300
+                            );
+                            if (quartzNoise > 0.7 && Math.random() < 0.15) {
+                                chunk.setBlock(x, y, z, _quartzOreId);
+                            }
                         }
 
                         // Nether gold ore
-                        var goldNoise = Donkeycraft.PerlinNoise.noise2D(
-                            worldX * 0.12 + 400, worldY * 0.1 + 400
-                        );
-                        if (goldNoise > 0.6 && Math.random() < 0.1 && goldOre) {
-                            chunk.setBlock(x, y, z, goldOre.id);
+                        if (_netherGoldOreId) {
+                            var goldNoise = Donkeycraft.PerlinNoise.noise2D(
+                                worldX * 0.12 + 400, worldY * 0.1 + 400
+                            );
+                            if (goldNoise > 0.6 && Math.random() < 0.1) {
+                                chunk.setBlock(x, y, z, _netherGoldOreId);
+                            }
                         }
 
                         // Gilded blackstone
-                        var gildedNoise = Donkeycraft.PerlinNoise.noise2D(
-                            worldX * 0.09 + 500, worldZ * 0.09 + 500
-                        );
-                        if (gildedNoise > 0.75 && Math.random() < 0.08 && gildedBlackstone) {
-                            chunk.setBlock(x, y, z, gildedBlackstone.id);
+                        if (_gildedBlackstoneId) {
+                            var gildedNoise = Donkeycraft.PerlinNoise.noise2D(
+                                worldX * 0.09 + 500, worldZ * 0.09 + 500
+                            );
+                            if (gildedNoise > 0.75 && Math.random() < 0.08) {
+                                chunk.setBlock(x, y, z, _gildedBlackstoneId);
+                            }
                         }
 
                         // Magma blocks (rare)
-                        var magmaNoise = Donkeycraft.PerlinNoise.noise2D(
-                            worldX * 0.06 + 600, worldY * 0.06 + 600
-                        );
-                        if (magmaNoise > 0.8 && Math.random() < 0.05 && magmaBlock) {
-                            chunk.setBlock(x, y, z, magmaBlock.id);
+                        if (_magmaBlockId) {
+                            var magmaNoise = Donkeycraft.PerlinNoise.noise2D(
+                                worldX * 0.06 + 600, worldY * 0.06 + 600
+                            );
+                            if (magmaNoise > 0.8 && Math.random() < 0.05) {
+                                chunk.setBlock(x, y, z, _magmaBlockId);
+                            }
                         }
 
                         // Ancient debris (extremely rare, Y=8-22)
-                        if (y >= 8 && y <= 22 && ancientDebris) {
+                        if (_ancientDebrisId && y >= 8 && y <= 22) {
                             var debrisNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.04 + 700, worldZ * 0.04 + 700
                             );
                             if (debrisNoise > 0.9 && Math.random() < 0.01) {
-                                chunk.setBlock(x, y, z, ancientDebris.id);
+                                chunk.setBlock(x, y, z, _ancientDebrisId);
                             }
                         }
                     }
@@ -353,18 +423,58 @@
         }
 
         /**
+         * Invalidate cached nether block IDs and re-resolve from BlockRegistry.
+         * Call this after dynamically adding new blocks to the registry.
+         */
+        function invalidateBlockIdCache() {
+            _bedrockId = 0;
+            _netherrackId = 0;
+            _soulSandId = 0;
+            _basaltId = 0;
+            _blackstoneId = 0;
+            _lavaId = 0;
+            _quartzOreId = 0;
+            _netherGoldOreId = 0;
+            _gildedBlackstoneId = 0;
+            _magmaBlockId = 0;
+            _ancientDebrisId = 0;
+            _resolveNetherBlockIds();
+        }
+
+        /**
          * Destroy and free resources.
          */
         function destroy() {
             _chunkManager = null;
+            _bedrockId = 0;
+            _netherrackId = 0;
+            _soulSandId = 0;
+            _basaltId = 0;
+            _blackstoneId = 0;
+            _lavaId = 0;
+            _quartzOreId = 0;
+            _netherGoldOreId = 0;
+            _gildedBlackstoneId = 0;
+            _magmaBlockId = 0;
+            _ancientDebrisId = 0;
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The NetherGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.NetherGenerator;
         }
 
         return {
+            getInstance: getInstance,
             setChunkManager: setChunkManager,
             generateNetherTerrain: generateNetherTerrain,
             generateNetherHeightmap: generateNetherHeightmap,
             isLavaSeaLevel: isLavaSeaLevel,
             getLavaSeaLevel: getLavaSeaLevel,
+            invalidateBlockIdCache: invalidateBlockIdCache,
             destroy: destroy
         };
     })();

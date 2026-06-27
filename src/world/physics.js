@@ -23,6 +23,8 @@
         /**
          * Initialize gravity and liquid block sets from Block registry.
          * Resolves gravity-affected blocks by name from BlockRegistry for correctness.
+         * Also populates liquid block cache by checking all registered blocks.
+         * @public
          */
         function init() {
             if (_initialized) return;
@@ -38,13 +40,10 @@
                     }
                 }
 
-                // Also check blocks beyond ID 255
+                // Populate liquid block cache by checking all registered blocks
                 for (var id = 0; id < 1000; id++) {
-                    var b = Donkeycraft.BlockRegistry.getBlockById(id);
-                    if (b && Donkeycraft.BlockRegistry.isLiquid) {
-                        if (Donkeycraft.BlockRegistry.isLiquid(id)) {
-                            _liquidBlocks[id] = true;
-                        }
+                    if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(id)) {
+                        _liquidBlocks[id] = true;
                     }
                 }
             }
@@ -53,13 +52,13 @@
         }
 
         /**
-         * Apply gravity to a block at the given position.
+         * Apply gravity to a single block at the given position.
          * If the block is a gravity-affected block (sand, gravel, etc.),
-         * it will fall if there's air or liquid below it.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - Local X.
-         * @param {number} y - Local Y.
-         * @param {number} z - Local Z.
+         * it will fall downward if there's air or liquid below it.
+         * @param {Donkeycraft.Chunk} chunk - The chunk containing the block.
+         * @param {number} x - Local X coordinate [0, 15].
+         * @param {number} y - Local Y coordinate [0, 255].
+         * @param {number} z - Local Z coordinate [0, 15].
          * @returns {boolean} True if the block moved.
          */
         function applyGravity(chunk, x, y, z) {
@@ -86,7 +85,7 @@
         /**
          * Check if a block can be fallen into (air or liquid).
          * @param {number} blockId - Block ID to check.
-         * @returns {boolean}
+         * @returns {boolean} True if the block can be fallen into.
          * @private
          */
         function _canFallInto(blockId) {
@@ -96,7 +95,7 @@
         /**
          * Apply gravity to all gravity-affected blocks in a chunk.
          * Processes from bottom to top so falling blocks don't fall multiple times per tick.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to process.
          */
         function applyGravityToChunk(chunk) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
@@ -110,9 +109,9 @@
 
         /**
          * Apply gravity to a column of blocks (optimization for bulk updates).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - Local X.
-         * @param {number} z - Local Z.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to process.
+         * @param {number} x - Local X coordinate [0, 15].
+         * @param {number} z - Local Z coordinate [0, 15].
          */
         function applyGravityColumn(chunk, x, z) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
@@ -121,14 +120,14 @@
         }
 
         /**
-         * Simulate liquid flow from a block position.
-         * Liquids flow to adjacent lower blocks and spread horizontally.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - Source X.
-         * @param {number} y - Source Y.
-         * @param {number} z - Source Z.
+         * Simulate liquid flow from a single block position.
+         * Liquids flow to adjacent lower blocks and spread horizontally based on level.
+         * @param {Donkeycraft.Chunk} chunk - The chunk containing the liquid.
+         * @param {number} x - Source X coordinate [0, 15].
+         * @param {number} y - Source Y coordinate [0, 255].
+         * @param {number} z - Source Z coordinate [0, 15].
          * @param {number} sourceLevel - Original liquid level (0-8).
-         * @returns {number} Remaining unflowed liquid level.
+         * @returns {number} Remaining unflowed liquid level after processing.
          */
         function flowLiquid(chunk, x, y, z, sourceLevel) {
             var blockId = chunk.getBlock(x, y, z);
@@ -211,9 +210,9 @@
         }
 
         /**
-         * Simulate liquid flow in a chunk.
-         * Processes from lowest level upward to prevent infinite loops.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * Simulate liquid flow across all liquid blocks in a chunk.
+         * Processes from lowest Y upward to prevent cascading issues.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to process.
          */
         function simulateLiquidFlow(chunk) {
             // Find all liquid blocks
@@ -240,18 +239,18 @@
         }
 
         /**
-         * Check if a block ID is gravity-affected.
-         * @param {number} blockId - Block ID.
-         * @returns {boolean}
+         * Check if a block ID is gravity-affected (sand, gravel, etc.).
+         * @param {number} blockId - Block ID to check.
+         * @returns {boolean} True if the block is gravity-affected.
          */
         function isGravityBlock(blockId) {
             return !!_gravityBlocks[blockId];
         }
 
         /**
-         * Check if a block ID is a liquid.
-         * @param {number} blockId - Block ID.
-         * @returns {boolean}
+         * Check if a block ID is a liquid (water, lava).
+         * @param {number} blockId - Block ID to check.
+         * @returns {boolean} True if the block is a liquid.
          */
         function isLiquidBlock(blockId) {
             return !!_liquidBlocks[blockId];
@@ -259,7 +258,7 @@
 
         /**
          * Get all gravity-affected block IDs.
-         * @returns {number[]}
+         * @returns {number[]} Array of gravity-affected block IDs.
          */
         function getGravityBlockIds() {
             var result = [];
@@ -273,7 +272,7 @@
 
         /**
          * Get all liquid block IDs.
-         * @returns {number[]}
+         * @returns {number[]} Array of liquid block IDs.
          */
         function getLiquidBlockIds() {
             var result = [];
@@ -285,7 +284,25 @@
             return result;
         }
 
+        /**
+         * Destroy and free resources.
+         */
+        function destroy() {
+            _gravityBlocks = {};
+            _liquidBlocks = {};
+            _initialized = false;
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The Physics module.
+         */
+        function getInstance() {
+            return Donkeycraft.Physics;
+        }
+
         return {
+            getInstance: getInstance,
             init: init,
             applyGravity: applyGravity,
             applyGravityToChunk: applyGravityToChunk,
@@ -295,7 +312,8 @@
             isGravityBlock: isGravityBlock,
             isLiquidBlock: isLiquidBlock,
             getGravityBlockIds: getGravityBlockIds,
-            getLiquidBlockIds: getLiquidBlockIds
+            getLiquidBlockIds: getLiquidBlockIds,
+            destroy: destroy
         };
     })();
 

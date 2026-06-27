@@ -55,6 +55,13 @@
          * @type {Function|null}
          */
         this.onChunksChanged = null;
+
+        /**
+         * Whether to use the StructureGenerator full pipeline for overworld chunks.
+         * When true, delegates terrain generation to StructureGenerator.generateChunkFull.
+         * @type {boolean}
+         */
+        this.useStructureGenerator = false;
     };
 
     /**
@@ -316,6 +323,7 @@
      * Generate terrain for a chunk at the given coordinates.
      * Fills the chunk with heightmap-based terrain, ores, caves, water, and surface layers.
      * Delegates to dimension-specific generators when available.
+     * If useStructureGenerator is true, delegates overworld generation to StructureGenerator.
      * @private
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -335,17 +343,28 @@
                 _generateEndChunk(this, chunk, chunkX, chunkZ);
                 break;
             default: // Overworld
-                _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
+                    Donkeycraft.StructureGenerator.generateChunkFull) {
+                    try {
+                        Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
+                    } catch (e) {
+                        Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
+                        _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                    }
+                } else {
+                    _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                }
                 break;
         }
     };
 
     // ============================================================
-    // Overworld Terrain Generation (inline for performance)
+    // Overworld Terrain Generation
     // ============================================================
 
     /**
      * Generate overworld terrain for a chunk.
+     * Resolves block IDs from BlockRegistry by name instead of hardcoded IDs.
      * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -394,12 +413,12 @@
             return;
         }
 
-        // Resolve block references once
-        var bedrock = Donkeycraft.BlockRegistry.getBlockById(7);   // bedrock
-        var stone = Donkeycraft.BlockRegistry.getBlockById(1);     // stone
-        var dirt = Donkeycraft.BlockRegistry.getBlockById(3);      // dirt
-        var sand = Donkeycraft.BlockRegistry.getBlockById(12);     // sand
-        var grassBlock = Donkeycraft.BlockRegistry.getBlockById(2); // grass_block
+        // Resolve block references by name from BlockRegistry
+        var bedrock = Donkeycraft.BlockRegistry.getBlockByName('bedrock');
+        var stone = Donkeycraft.BlockRegistry.getBlockByName('stone');
+        var dirt = Donkeycraft.BlockRegistry.getBlockByName('dirt');
+        var sand = Donkeycraft.BlockRegistry.getBlockByName('sand');
+        var grassBlock = Donkeycraft.BlockRegistry.getBlockByName('grass_block');
 
         if (!bedrock || !stone || !dirt) {
             Donkeycraft.Logger.error('ChunkManager', 'Required blocks not found in BlockRegistry');
@@ -455,8 +474,6 @@
         // Apply cave generation if available
         if (Donkeycraft.CaveGenerator && Donkeycraft.CaveGenerator.generateCaves) {
             try { Donkeycraft.CaveGenerator.generateCaves(chunk, chunk.biomeId); } catch (e) { /* skip */ }
-        } else if (Donkeycraft.CaveGenerator && !Donkeycraft.CaveGenerator.generateCaves) {
-            // CaveGenerator exists but generateCaves not available — skip gracefully
         }
 
         // Apply ore generation if available

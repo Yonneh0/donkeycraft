@@ -342,9 +342,9 @@
                         }
                         break;
                     default: // Overworld — delegate to ChunkManager's built-in generation
-                        if (!chunk.generated && chunkManager._generateTerrain) {
+                        // ChunkManager handles generated flag internally via _generateTerrain
+                        if (chunkManager._generateTerrain) {
                             chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ);
-                            chunk.generated = true;
                         }
                         break;
                 }

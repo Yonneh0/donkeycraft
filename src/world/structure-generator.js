@@ -27,9 +27,9 @@
             if (!Donkeycraft.BlockRegistry) return;
 
             var names = [
-                'bedrock', 'stone', 'dirt', 'grass_block', 'snow',
+                'bedrock', 'stone', 'dirt', 'grass_block', 'snow_block',
                 'oak_log', 'oak_leaves', 'rose', 'tall_grass',
-                'cactus', 'snow_layer'
+                'cactus', 'snow_layer', 'sand', 'grapevine'
             ];
             for (var i = 0; i < names.length; i++) {
                 var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
@@ -170,6 +170,8 @@
         function _placeTrees(chunk, biomeId, heightmap, seed, count) {
             var logId = _getBlockId('oak_log');
             var leavesId = _getBlockId('oak_leaves');
+            var grassBlockId = _getBlockId('grass_block');
+            var snowBlockId = _getBlockId('snow_block');
 
             if (!logId || !leavesId) return;
 
@@ -182,11 +184,15 @@
                 var surfaceY = heightmap[tx + tz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 10) continue;
 
-                // Check if there's grass/air at surface
+                // Check if there's a valid surface block for trees
                 var surfaceBlock = chunk.getBlock(tx, surfaceY, tz);
-                if (surfaceBlock !== 2 && surfaceBlock !== 5 && surfaceBlock !== 32 &&
-                    surfaceBlock !== 17 && surfaceBlock !== 18) {
-                    // Not a valid surface for trees (grass, snow, tall grass, ferns, flowers)
+                var isValidSurface = surfaceBlock === logId || // log (exposed)
+                    surfaceBlock === leavesId || // leaves (exposed)
+                    surfaceBlock === (grassBlockId || 0) ||
+                    surfaceBlock === (snowBlockId || 0) ||
+                    surfaceBlock === 0; // air — can grow on underlying block
+
+                if (!isValidSurface) {
                     continue;
                 }
 
@@ -255,7 +261,8 @@
          */
         function _placeFlowers(chunk, biomeId, heightmap, seed, count) {
             var roseId = _getBlockId('rose');
-            if (!roseId) return;
+            var grassBlockId = _getBlockId('grass_block');
+            if (!roseId || !grassBlockId) return;
 
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 53 + 100, i * 97 + 200);
@@ -265,8 +272,8 @@
                 var surfaceY = heightmap[fx + fz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
-                // Place on grass/surface
-                if (chunk.getBlock(fx, surfaceY, fz) === 2) { // grass block top
+                // Place on grass block top
+                if (chunk.getBlock(fx, surfaceY, fz) === grassBlockId) {
                     if (surfaceY + 1 < WORLD_HEIGHT) {
                         chunk.setBlock(fx, surfaceY + 1, fz, roseId);
                     }
@@ -285,7 +292,8 @@
          */
         function _placeGrass(chunk, biomeId, heightmap, seed, count) {
             var tallGrassId = _getBlockId('tall_grass');
-            if (!tallGrassId) return;
+            var grassBlockId = _getBlockId('grass_block');
+            if (!tallGrassId || !grassBlockId) return;
 
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 61 + 300, i * 89 + 400);
@@ -295,7 +303,7 @@
                 var surfaceY = heightmap[gx + gz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
-                if (chunk.getBlock(gx, surfaceY, gz) === 2) { // grass block
+                if (chunk.getBlock(gx, surfaceY, gz) === grassBlockId) {
                     if (surfaceY + 1 < WORLD_HEIGHT) {
                         chunk.setBlock(gx, surfaceY + 1, gz, tallGrassId);
                     }
@@ -313,7 +321,8 @@
          */
         function _placeCacti(chunk, heightmap, seed, count) {
             var cactusId = _getBlockId('cactus');
-            if (!cactusId) return;
+            var sandId = _getBlockId('sand');
+            if (!cactusId || !sandId) return;
 
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 47 + 500, i * 73 + 600);
@@ -324,7 +333,7 @@
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
                 // Check for sand surface
-                if (chunk.getBlock(cx, surfaceY, cz) !== 12) { // sand
+                if (chunk.getBlock(cx, surfaceY, cz) !== sandId) {
                     continue;
                 }
 
@@ -351,8 +360,18 @@
             return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
         }
 
+        /**
+         * Invalidate cached block IDs and re-resolve from BlockRegistry.
+         * Call this after dynamically adding new blocks to the registry.
+         */
+        function invalidateBlockIdCache() {
+            _blocks = {};
+            _resolveBlocks();
+        }
+
         return {
-            generateChunkFull: generateChunkFull
+            generateChunkFull: generateChunkFull,
+            invalidateBlockIdCache: invalidateBlockIdCache
         };
     })();
 

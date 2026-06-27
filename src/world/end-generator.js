@@ -16,6 +16,38 @@
      */
     Donkeycraft.EndGenerator = (function() {
         var _chunkManager = null;
+        var _endStoneId = 0;
+        var _chorusPlantId = 0;
+        var _chorusFlowerId = 0;
+        var _purpurBlockId = 0;
+        var _purpurPillarId = 0;
+        var _shroomlightId = 0;
+
+        /**
+         * Resolve End dimension block IDs from BlockRegistry.
+         * @private
+         */
+        function _resolveEndBlockIds() {
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var es = Donkeycraft.BlockRegistry.getBlockByName('end_stone');
+            if (es) _endStoneId = es.id;
+
+            var cp = Donkeycraft.BlockRegistry.getBlockByName('chorus_plant');
+            if (cp) _chorusPlantId = cp.id;
+
+            var cf = Donkeycraft.BlockRegistry.getBlockByName('chorus_flower');
+            if (cf) _chorusFlowerId = cf.id;
+
+            var pb = Donkeycraft.BlockRegistry.getBlockByName('purpur_block');
+            if (pb) _purpurBlockId = pb.id;
+
+            var pp = Donkeycraft.BlockRegistry.getBlockByName('purpur_pillar');
+            if (pp) _purpurPillarId = pp.id;
+
+            var sl = Donkeycraft.BlockRegistry.getBlockByName('shroomlight');
+            if (sl) _shroomlightId = sl.id;
+        }
 
         /**
          * Set the chunk manager reference for terrain generation.
@@ -29,11 +61,17 @@
          * Generate full End terrain for a chunk.
          * Accepts either (chunk, chunkX, chunkZ) when called from ChunkManager
          * or (chunkX, chunkZ) when called directly with _chunkManager set.
+         * Resolves block IDs from BlockRegistry on first call.
          * @param {Donkeycraft.Chunk|number} chunkOrX - Chunk object or chunk X coordinate.
-         * @param {number} [chunkX] - Chunk X coordinate (when using legacy signature).
-         * @param {number} [chunkZ] - Chunk Z coordinate (when using legacy signature).
+         * @param {number} [optChunkX] - Chunk Z coordinate (when using new signature) or chunk X (legacy).
+         * @param {number} [optChunkZ] - Chunk Z coordinate (legacy unused param).
          */
         function generateEndTerrain(chunkOrX, optChunkX, optChunkZ) {
+            // Resolve block IDs on first call
+            if (!_endStoneId) {
+                _resolveEndBlockIds();
+            }
+
             var chunk;
             var cx, cz;
 
@@ -131,12 +169,7 @@
          * @private
          */
         function _generateMidlands(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
-            var chorusPlant = Donkeycraft.BlockRegistry.getBlockById(278);
-            var chorusFlower = Donkeycraft.BlockRegistry.getBlockById(279);
-
-            if (!endStone) return;
+            if (!chunk || !chunk.setBlock || !_endStoneId) return;
 
             var islandY = 49;
 
@@ -157,17 +190,16 @@
 
                         for (var y = 0; y < height; y++) {
                             var blockY = islandY + y;
-                            var blockId = endStone.id;
 
-                            if (y === height - 1 && Math.random() < 0.08 && chorusPlant) {
-                                chunk.setBlock(x, blockY, z, chorusPlant.id);
+                            if (y === height - 1 && Math.random() < 0.08 && _chorusPlantId) {
+                                chunk.setBlock(x, blockY, z, _chorusPlantId);
                             } else {
-                                chunk.setBlock(x, blockY, z, blockId);
+                                chunk.setBlock(x, blockY, z, _endStoneId);
                             }
                         }
 
-                        if (Math.random() < 0.12 && chorusFlower) {
-                            chunk.setBlock(x, islandY + height, z, chorusFlower.id);
+                        if (Math.random() < 0.12 && _chorusFlowerId) {
+                            chunk.setBlock(x, islandY + height, z, _chorusFlowerId);
                         }
                     }
                 }
@@ -182,11 +214,7 @@
          * @private
          */
         function _generateHighlands(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
-            var chorusPlant = Donkeycraft.BlockRegistry.getBlockById(278);
-
-            if (!endStone) return;
+            if (!chunk || !chunk.setBlock || !_endStoneId) return;
 
             var baseY = 55;
 
@@ -206,11 +234,11 @@
                         var height = Math.floor((heightNoise + 1) * 5 + 4); // 4-14 blocks tall
 
                         for (var y = 0; y < height; y++) {
-                            chunk.setBlock(x, baseY + y, z, endStone.id);
+                            chunk.setBlock(x, baseY + y, z, _endStoneId);
                         }
 
-                        if (Math.random() < 0.2 && chorusPlant) {
-                            chunk.setBlock(x, baseY + height, z, chorusPlant.id);
+                        if (Math.random() < 0.2 && _chorusPlantId) {
+                            chunk.setBlock(x, baseY + height, z, _chorusPlantId);
                         }
                     }
                 }
@@ -225,10 +253,7 @@
          * @private
          */
         function _generateOuterEnd(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
-
-            if (!endStone) return;
+            if (!chunk || !chunk.setBlock || !_endStoneId) return;
 
             var baseY = 45;
 
@@ -245,7 +270,7 @@
                         var height = Math.floor((noise - 0.4) * 4 + 1); // 1-3 blocks tall
 
                         for (var y = 0; y < height; y++) {
-                            chunk.setBlock(x, baseY + y, z, endStone.id);
+                            chunk.setBlock(x, baseY + y, z, _endStoneId);
                         }
                     }
                 }
@@ -260,12 +285,7 @@
          * @private
          */
         function _generateEndCity(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock) return;
-            var purpurBlock = Donkeycraft.BlockRegistry.getBlockById(280);
-            var purpurPillar = Donkeycraft.BlockRegistry.getBlockById(281);
-            var shroomlight = Donkeycraft.BlockRegistry.getBlockById(284);
-
-            if (!purpurBlock) return;
+            if (!chunk || !chunk.setBlock || !_purpurBlockId) return;
 
             // End cities are rare — ~5% chance per highlands chunk
             var cityChance = Donkeycraft.PerlinNoise.noise2D(
@@ -283,7 +303,7 @@
             var towerHeight = 8 + Math.floor(Math.random() * 6); // 8-13 blocks tall
 
             for (var y = 0; y < towerHeight; y++) {
-                // Tower walls (3×3 with hollow center)
+                // Tower walls (3x3 with hollow center)
                 for (var tx = -1; tx <= 1; tx++) {
                     for (var tz = -1; tz <= 1; tz++) {
                         if (Math.abs(tx) === 1 || Math.abs(tz) === 1) {
@@ -292,7 +312,7 @@
                             var bz = cz + tz;
 
                             if (bx >= 0 && bx < CHUNK_SIZE && by > 5 && by < WORLD_HEIGHT - 5 && bz >= 0 && bz < CHUNK_SIZE) {
-                                chunk.setBlock(bx, by, bz, purpurBlock.id);
+                                chunk.setBlock(bx, by, bz, _purpurBlockId);
                             }
                         }
                     }
@@ -300,7 +320,7 @@
 
                 // Floor
                 if (y < towerHeight - 1) {
-                    chunk.setBlock(cx, baseY + y, cz, purpurBlock.id);
+                    chunk.setBlock(cx, baseY + y, cz, _purpurBlockId);
                 }
             }
 
@@ -313,16 +333,16 @@
 
                 for (var py = 0; py < ph; py++) {
                     if (px >= 0 && px < CHUNK_SIZE && pz >= 0 && pz < CHUNK_SIZE) {
-                        var blockId = purpurBlock.id;
-                        if (purpurPillar) blockId = purpurPillar.id;
+                        var blockId = _purpurBlockId;
+                        if (_purpurPillarId) blockId = _purpurPillarId;
                         chunk.setBlock(px, baseY + towerHeight + py, pz, blockId);
                     }
                 }
             }
 
             // Add shroomlights for decoration
-            if (Math.random() < 0.5 && shroomlight) {
-                chunk.setBlock(cx + 3, baseY + 2, cz + 3, shroomlight.id);
+            if (Math.random() < 0.5 && _shroomlightId) {
+                chunk.setBlock(cx + 3, baseY + 2, cz + 3, _shroomlightId);
             }
         }
 
@@ -400,10 +420,30 @@
         }
 
         /**
+         * Invalidate cached End block IDs and re-resolve from BlockRegistry.
+         * Call this after dynamically adding new blocks to the registry.
+         */
+        function invalidateBlockIdCache() {
+            _endStoneId = 0;
+            _chorusPlantId = 0;
+            _chorusFlowerId = 0;
+            _purpurBlockId = 0;
+            _purpurPillarId = 0;
+            _shroomlightId = 0;
+            _resolveEndBlockIds();
+        }
+
+        /**
          * Destroy and free resources.
          */
         function destroy() {
             _chunkManager = null;
+            _endStoneId = 0;
+            _chorusPlantId = 0;
+            _chorusFlowerId = 0;
+            _purpurBlockId = 0;
+            _purpurPillarId = 0;
+            _shroomlightId = 0;
         }
 
         return {
@@ -413,6 +453,7 @@
             generateEndHeightmap: generateEndHeightmap,
             isIslandChunk: isIslandChunk,
             getBaseYForIslandType: getBaseYForIslandType,
+            invalidateBlockIdCache: invalidateBlockIdCache,
             destroy: destroy
         };
     })();
