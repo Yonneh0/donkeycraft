@@ -790,12 +790,19 @@
     };
 
     /**
-     * setValue — sets the input value programmatically.
+     * setValue — sets the input value programmatically and fires input events.
      * @param {string} value - New value.
      */
     Donkeycraft.GuiTextInput.prototype.setValue = function(value) {
-        if (this._element) {
-            this._element.value = value || '';
+        var newValue = value || '';
+        if (this._element && this._element.value !== newValue) {
+            this._element.value = newValue;
+            // Fire input listeners to notify the UI layer of the programmatic change
+            if (this._listeners.input) {
+                for (var i = 0; i < this._listeners.input.length; i++) {
+                    try { this._listeners.input[i](newValue); } catch (ex) {}
+                }
+            }
         }
     };
 

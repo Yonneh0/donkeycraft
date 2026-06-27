@@ -111,12 +111,24 @@
     };
 
     /**
-     * setSlot — sets the item stack in a specific slot.
+     * _isValidStack — checks if a value is a valid ItemStack or null.
+     * @param {*} val - Value to check.
+     * @returns {boolean}
+     * @private
+     */
+    Donkeycraft.ChestUI.prototype._isValidStack = function(val) {
+        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+    };
+
+    /**
+     * setSlot — sets the item stack in a specific slot with input validation.
      * @param {number} index - Slot index.
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.ChestUI.prototype.setSlot = function(index, stack) {
-        if (index < 0 || index >= this._slotCount) return;
+        if (index < 0 || index >= this._slotCount) return false;
+        if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[index];
         this._slots[index] = stack;
 

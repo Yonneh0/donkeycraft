@@ -139,12 +139,24 @@
     };
 
     /**
-     * setGridSlot — sets an ingredient in a grid slot.
+     * _isValidStack — checks if a value is a valid ItemStack or null.
+     * @param {*} val - Value to check.
+     * @returns {boolean}
+     * @private
+     */
+    Donkeycraft.CraftingGrid.prototype._isValidStack = function(val) {
+        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+    };
+
+    /**
+     * setGridSlot — sets an ingredient in a grid slot with input validation.
      * @param {number} index - Grid slot index (0-8).
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.CraftingGrid.prototype.setGridSlot = function(index, stack) {
-        if (index < 0 || index >= 9) return;
+        if (index < 0 || index >= 9) return false;
+        if (!this._isValidStack(stack)) return false;
         var oldStack = this._grid[index];
         this._grid[index] = stack;
         this._updateGridDisplay();

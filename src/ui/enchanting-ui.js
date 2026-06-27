@@ -298,15 +298,28 @@
     };
 
     /**
-     * setInputSlot — sets the input slot.
+     * _isValidStack — checks if a value is a valid ItemStack or null.
+     * @param {*} val - Value to check.
+     * @returns {boolean}
+     * @private
+     */
+    Donkeycraft.EnchantingUI.prototype._isValidStack = function(val) {
+        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+    };
+
+    /**
+     * setInputSlot — sets the input slot with input validation.
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.EnchantingUI.prototype.setInputSlot = function(stack) {
+        if (!this._isValidStack(stack)) return false;
         var oldStack = this._inputSlot;
         this._inputSlot = stack;
         this._updateSlotDisplay('input');
         this._generateEnchantmentOptions();
         this._applyEnchantment();
+        return true;
     };
 
     /**
@@ -432,23 +445,31 @@
     };
 
     /**
-     * setLapisCount — sets the lapis lazuli count.
-     * @param {number} n - New lapis count.
+     * setLapisCount — sets the lapis lazuli count with input validation.
+     * @param {number} n - New lapis count (must be a non-negative integer).
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.EnchantingUI.prototype.setLapisCount = function(n) {
-        this._lapisCount = Math.max(0, n);
+        if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return false;
+        this._lapisCount = n;
         this._updateSlotDisplay('lapis');
+        return true;
     };
 
     /**
-     * setPlayerLevels — sets the player's available XP levels.
-     * @param {number} levels - Number of XP levels.
+     * setPlayerLevels — sets the player's available XP levels with input validation.
+     * @param {number} levels - Number of XP levels (must be a non-negative integer).
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.EnchantingUI.prototype.setPlayerLevels = function(levels) {
-        this._playerLevels = Math.max(0, levels);
-        this._levelsEl.textContent = 'Levels: ' + this._playerLevels;
+        if (typeof levels !== 'number' || !Number.isInteger(levels) || levels < 0) return false;
+        this._playerLevels = levels;
+        if (this._levelsEl) {
+            this._levelsEl.textContent = 'Levels: ' + this._playerLevels;
+        }
         this._updateOptionDisplay();
         this._updateCostDisplay();
+        return true;
     };
 
     /**

@@ -199,6 +199,7 @@
         if (index === 0 || index === 1) {
             this._updateBurningState();
         }
+        return true;
     };
 
     /**
@@ -211,12 +212,13 @@
 
     /**
      * setProgress — sets the burn progress and updates the DOM with input validation.
-     * @param {number} pct - Progress value (clamped 0.0 to 1.0).
+     * @param {number} pct - Progress value (must be between 0.0 and 1.0).
      * @returns {boolean} True if progress was updated.
      */
     Donkeycraft.FurnaceUI.prototype.setProgress = function(pct) {
-        // Validate input is a finite number
+        // Validate input is a finite number within valid range
         if (typeof pct !== 'number' || !Number.isFinite(pct)) return false;
+        if (pct < 0 || pct > 1) return false;
         this._burnProgress = Math.max(0, Math.min(1, pct));
 
         if (this._progressBarEl) {
@@ -229,6 +231,7 @@
                 try { this._listeners.onProgressChange[i](this._burnProgress); } catch (e) {}
             }
         }
+        return true;
     };
 
     /**

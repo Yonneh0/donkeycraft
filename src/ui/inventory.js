@@ -116,32 +116,35 @@
     Donkeycraft.Inventory.prototype.addItem = function(stack) {
         if (!stack || stack.isEmpty()) return 0;
 
-        var remaining = stack.getCount();
+        var added = 0;
 
         // First, try to stack into existing matching slots
         for (var i = 0; i < this._slotCount; i++) {
-            if (remaining <= 0) break;
             var slot = this._slots[i];
             if (slot && slot.canStackWith(stack)) {
                 var space = 64 - slot.getCount(); // Max stack size
                 if (space > 0) {
-                    var add = Math.min(remaining, space);
-                    slot.increment(add);
-                    remaining -= add;
+                    var toAdd = Math.min(stack.getCount() - added, space);
+                    slot.increment(toAdd);
+                    added += toAdd;
+                    if (added >= stack.getCount()) break;
                 }
             }
         }
 
         // Then fill empty slots
-        for (var j = 0; j < this._slotCount && remaining > 0; j++) {
-            if (this._slots[j] === null) {
-                var count = Math.min(remaining, 64); // Max stack size
-                this._slots[j] = new Donkeycraft.ItemStack(stack.getItemId(), count, stack.getTag() ? JSON.parse(JSON.stringify(stack.getTag())) : null);
-                remaining -= count;
+        if (added < stack.getCount()) {
+            for (var j = 0; j < this._slotCount && added < stack.getCount(); j++) {
+                if (this._slots[j] === null) {
+                    var remaining = stack.getCount() - added;
+                    var count = Math.min(remaining, 64); // Max stack size
+                    this._slots[j] = new Donkeycraft.ItemStack(stack.getItemId(), count, stack.getTag() ? JSON.parse(JSON.stringify(stack.getTag())) : null);
+                    added += count;
+                }
             }
         }
 
-        return stack.getCount() - remaining;
+        return added;
     };
 
     /**

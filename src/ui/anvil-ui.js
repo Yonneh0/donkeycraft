@@ -223,36 +223,46 @@
             return;
         }
 
+        var hasRename = this._renameText && this._renameText.trim().length > 0;
+
         // If both items are the same type, combine them (repair/merge)
         if (right && right.getItemId() === left.getItemId()) {
             var combined = left.clone();
 
-            // Get durability values from tags
-            var leftDurability = left.getDurability() || 0;
-            var rightDurability = right.getDurability() || 0;
-
-            // Look up max durability: prefer tag, then tool system, then fallback defaults
-            var leftMaxDurability = this._getMaxDurability(left);
-            var rightMaxDurability = this._getMaxDurability(right);
-
-            // Use the larger maxDurability as reference (Minecraft uses the base item's max)
-            var maxDurability = Math.max(leftMaxDurability, rightMaxDurability);
-
-            // Minecraft repair formula: floor((maxDurability + A.currentDurability + B.currentDurability) / 2), capped at maxDurability
-            var repairedDurability = Math.floor((maxDurability + leftDurability + rightDurability) / 2);
-            repairedDurability = Math.min(repairedDurability, maxDurability);
-            combined.setDurability(repairedDurability);
-
-            // Merge enchantments from right to left with compatibility checking
+            // Merge enchantments from right to left first
             var rightEnchants = right.getEnchantments();
             if (rightEnchants && rightEnchants.length > 0) {
                 for (var e = 0; e < rightEnchants.length; e++) {
                     combined.addEnchantment(rightEnchants[e].id, rightEnchants[e].level);
                 }
             }
+
+            // Repair: average remaining durability + bonus, capped at max durability
+            var leftMaxDurability = 100; // Default max durability for most items
+            var leftDurability = left.getDurability() || 0;
+            var rightDurability = right.getDurability() || 0;
+
+            // Use tag.maxDurability if available, otherwise default to 100
+            var leftTag = left.getTag();
+            if (leftTag && leftTag.maxDurability !== undefined) {
+                leftMaxDurability = leftTag.maxDurability;
+            }
+
+            // Calculate repaired durability: average of both current durabilities + bonus
+            var repairedDurability = Math.floor((leftDurability + rightDurability) / 2 + leftMaxDurability * 0.25);
+            // Cap at max durability (items can't be restored beyond original condition)
+            repairedDurability = Math.min(repairedDurability, leftMaxDurability);
+            combined.setDurability(repairedDurability);
+
+            // Apply rename if present — rename takes precedence over repair
+            if (hasRename) {
+                if (!combined.getTag()) combined.setTag({});
+                combined.getTag().customName = this._renameText.trim();
+            }
+
             this._resultStack = combined;
 
-            // Calculate XP price based on enchantment levels and anvil operations
+            // Price based on enchantment levels and previous anvil uses
             var totalEnchantLevel = 0;
             if (rightEnchants) {
                 for (var e2 = 0; e2 < rightEnchants.length; e2++) {
@@ -260,7 +270,7 @@
                 }
             }
             this._price = Math.max(1, Math.min(39, totalEnchantLevel > 0 ? totalEnchantLevel : 1));
-        } else if (this._renameText && this._renameText.trim().length > 0) {
+        } else if (hasRename) {
             // Rename the left item (trim whitespace to prevent blank names)
             var renamed = left.clone();
             if (!renamed.getTag()) renamed.setTag({});
@@ -308,25 +318,41 @@
     };
 
     /**
+     * _isValidStack — checks if a value is a valid ItemStack or null.
+     * @param {*} val - Value to check.
+     * @returns {boolean}
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._isValidStack = function(val) {
+        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+    };
+
+    /**
      * setLeftSlot — sets the left input slot.
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.AnvilUI.prototype.setLeftSlot = function(stack) {
+        if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[0];
         this._slots[0] = stack;
         this._updateSlotDisplay(0);
         this._calculateResult();
+        return true;
     };
 
     /**
      * setRightSlot — sets the right input slot.
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.AnvilUI.prototype.setRightSlot = function(stack) {
+        if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[1];
         this._slots[1] = stack;
         this._updateSlotDisplay(1);
         this._calculateResult();
+        return true;
     };
 
     /**
@@ -338,15 +364,18 @@
     };
 
     /**
-     * setRenameText — sets the rename text.
+     * setRenameText — sets the rename text with input validation.
      * @param {string} text - New rename text.
+     * @returns {boolean} True if successful.
      */
     Donkeycraft.AnvilUI.prototype.setRenameText = function(text) {
-        this._renameText = text || '';
+        if (typeof text !== 'string') return false;
+        this._renameText = text;
         if (this._renameInputEl) {
             this._renameInputEl.value = this._renameText;
         }
         this._calculateResult();
+        return true;
     };
 
     /**
