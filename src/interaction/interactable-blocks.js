@@ -25,9 +25,7 @@
         BUTTON_WOOD: 147,
         DISPENSER: 23,
         DROPPER: 121,
-        NOTE_BLOCK: 25,
-        BUTTON_STONE_PRESSURE_PLATE: 70,
-        BUTTON_WOOD_PRESSURE_PLATE: 147
+        NOTE_BLOCK: 25
     };
 
     // Fast O(1) lookup set for interactive block IDs (avoids linear search per call)
@@ -38,7 +36,14 @@
     // ============================================================
 
     /**
-     * InteractableBlocks — handles right-click interactions with special blocks.
+     * InteractableBlocks — handles right-click interactions with special blocks
+     * including doors, chests, furnaces, levers, buttons, dispensers, and note blocks.
+     *
+     * Maintains persistent state for doors/levers across chunk unloads/reloads via
+     * _interactiveStateStore. Button states use tick-based auto-reset via
+     * _buttonStates with chunk-indexed cleanup for O(K) performance.
+     *
+     * @namespace
      */
     Donkeycraft.InteractableBlocks = (function() {
 
@@ -103,27 +108,28 @@
 
         /**
          * Clean up expired button states where activeUntilTick <= currentTick.
+         * Uses Object.keys() to avoid for...in mutation issues during iteration.
          * Also removes entries from the chunk index.
          * @private
          */
         function _cleanupExpiredButtons() {
-            for (var key in _buttonStates) {
-                if (_buttonStates.hasOwnProperty(key)) {
-                    if (_buttonStates[key].activeUntilTick <= _currentTick) {
-                        // Remove from chunk index
-                        var state = _buttonStates[key];
-                        var cKey = Donkeycraft.WorldUtils.makeChunkKey(state.x, state.z);
-                        if (_buttonChunkIndex[cKey]) {
-                            var idx = _buttonChunkIndex[cKey].indexOf(key);
-                            if (idx !== -1) {
-                                _buttonChunkIndex[cKey].splice(idx, 1);
-                            }
-                            if (_buttonChunkIndex[cKey].length === 0) {
-                                delete _buttonChunkIndex[cKey];
-                            }
+            var keys = Object.keys(_buttonStates);
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                if (_buttonStates[key].activeUntilTick <= _currentTick) {
+                    // Remove from chunk index
+                    var state = _buttonStates[key];
+                    var cKey = Donkeycraft.WorldUtils.makeChunkKey(state.x, state.z);
+                    if (_buttonChunkIndex[cKey]) {
+                        var idx = _buttonChunkIndex[cKey].indexOf(key);
+                        if (idx !== -1) {
+                            _buttonChunkIndex[cKey].splice(idx, 1);
                         }
-                        delete _buttonStates[key];
+                        if (_buttonChunkIndex[cKey].length === 0) {
+                            delete _buttonChunkIndex[cKey];
+                        }
                     }
+                    delete _buttonStates[key];
                 }
             }
         }

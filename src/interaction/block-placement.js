@@ -13,6 +13,12 @@
     /**
      * BlockPlacement — handles block placement with face normal handling,
      * grid snapping, and placement validation rules.
+     *
+     * Validates placements against world bounds, existing blocks, and player
+     * AABB collision. Supports both direct coordinate placement and raycast-based
+     * placement using hit position + face normal.
+     *
+     * @namespace
      */
     Donkeycraft.BlockPlacement = (function() {
 
@@ -35,7 +41,7 @@
          * @param {number} y - Global Y to place at.
          * @param {number} z - Global Z to place at.
          * @param {Donkeycraft.Player} player - The player entity.
-         * @returns {boolean}
+         * @returns {boolean} True if placement is valid (no collision).
          * @private
          */
         function _isValidPlacement(chunkManager, x, y, z, player) {
@@ -68,6 +74,7 @@
 
         /**
          * Place a block at the given global coordinates.
+         * Validates: world bounds, air check, player AABB collision.
          * @param {Donkeycraft.ChunkManager} chunkManager - The chunk manager.
          * @param {number} x - Global X coordinate.
          * @param {number} y - Global Y coordinate.
@@ -77,6 +84,10 @@
          * @returns {boolean} True if block was placed successfully.
          */
         function placeBlock(chunkManager, x, y, z, blockId, player) {
+            // Defensive null checks
+            if (!chunkManager || !player) return false;
+            if (typeof blockId !== 'number' || blockId < 0) return false;
+
             // Ensure integer coordinates for consistent chunk lookup
             var ix = Math.floor(x);
             var iy = Math.floor(y);
@@ -124,6 +135,9 @@
          * @returns {boolean} True if placed successfully.
          */
         function placeBlockFromRaycast(chunkManager, hitX, hitY, hitZ, faceNormalX, faceNormalY, faceNormalZ, blockId, player) {
+            // Defensive null checks
+            if (!chunkManager || !player || typeof blockId !== 'number') return false;
+
             // Calculate placement position by subtracting face normal from hit position
             var placeX = hitX - faceNormalX;
             var placeY = hitY - faceNormalY;
@@ -134,19 +148,20 @@
 
         /**
          * Get the placement position from hit block and face normal.
+         * Coordinates are floored to snap to integer grid for consistency.
          * @param {number} hitX - Global X of raycast hit block.
          * @param {number} hitY - Global Y of raycast hit block.
          * @param {number} hitZ - Global Z of raycast hit block.
          * @param {number} faceNormalX - X of face normal.
          * @param {number} faceNormalY - Y of face normal.
          * @param {number} faceNormalZ - Z of face normal.
-         * @returns {{x: number, y: number, z: number}} Placement position.
+         * @returns {{x: number, y: number, z: number}} Floored placement position.
          */
         function getPlacementPosition(hitX, hitY, hitZ, faceNormalX, faceNormalY, faceNormalZ) {
             return {
-                x: hitX - faceNormalX,
-                y: hitY - faceNormalY,
-                z: hitZ - faceNormalZ
+                x: Math.floor(hitX - faceNormalX),
+                y: Math.floor(hitY - faceNormalY),
+                z: Math.floor(hitZ - faceNormalZ)
             };
         }
 
@@ -157,15 +172,15 @@
          * @param {number} y - Global Y.
          * @param {number} z - Global Z.
          * @param {Donkeycraft.Player} player - The player entity.
-         * @returns {boolean}
+         * @returns {boolean} True if placement is valid (no AABB overlap).
          */
         function canPlaceAt(chunkManager, x, y, z, player) {
             return _isValidPlacement(chunkManager, x, y, z, player);
         }
 
         /**
-         * Get face normal constants for all 6 directions.
-         * @returns {Array<{x: number, y: number, z: number}>}
+         * Get face normal vectors for all 6 block face directions.
+         * @returns {Array<{x: number, y: number, z: number}>} Array of 6 face normal objects.
          */
         function getFaceNormals() {
             return [

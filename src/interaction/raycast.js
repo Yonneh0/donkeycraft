@@ -16,7 +16,11 @@
     // ============================================================
 
     /**
-     * RaycastResult — represents a successful raycast hit.
+     * RaycastResult — immutable result object from a successful DDA raycast,
+     * containing the hit block coordinates, face normal, distance, and exact
+     * 3D hit position on the block face.
+     *
+     * @constructor
      * @param {number} blockX - Global X coordinate of hit block.
      * @param {number} blockY - Global Y coordinate of hit block.
      * @param {number} blockZ - Global Z coordinate of hit block.
@@ -81,19 +85,13 @@
     // ============================================================
 
     /**
-     * Raycast — DDA voxel traversal for finding block hits.
+     * Raycast — DDA (Digital Differential Analyzer) voxel traversal for finding
+     * block hits in the world. Returns a RaycastResult with hit position, face
+     * normal, and distance when a solid block is intersected within reach.
+     *
+     * @namespace
      */
     Donkeycraft.Raycast = (function() {
-
-        // Face normal vectors for each face direction
-        var FACE_NORMALS = [
-            { x: -1, y: 0, z: 0 },  // left face
-            { x: 1, y: 0, z: 0 },   // right face
-            { x: 0, y: -1, z: 0 },  // bottom face
-            { x: 0, y: 1, z: 0 },   // top face
-            { x: 0, y: 0, z: -1 },  // front face
-            { x: 0, y: 0, z: 1 }    // back face
-        ];
 
         /**
          * Get the block ID at global coordinates using ChunkManager.
@@ -296,10 +294,11 @@
 
 
         /**
-         * Get the direction vector from player rotation.
-         * @param {number} yaw - Yaw in radians.
-         * @param {number} pitch - Pitch in radians.
-         * @returns {Donkeycraft.Vector3}
+         * Get the forward direction vector from player yaw and pitch angles.
+         * The resulting vector points in the direction the player is looking.
+         * @param {number} yaw - Yaw angle in radians (positive = turning left).
+         * @param {number} pitch - Pitch angle in radians (positive = looking up).
+         * @returns {Donkeycraft.Vector3} Direction vector (normalized).
          */
         function getDirectionFromRotation(yaw, pitch) {
             var sp = Math.sin(pitch);
@@ -315,11 +314,20 @@
         }
 
         /**
-         * Get face normal constants for all 6 directions.
-         * @returns {Array<{x: number, y: number, z: number}>}
+         * Get face normal vectors for all 6 block face directions.
+         * Used by downstream systems (block placement, HUD highlighting) to determine
+         * which face was hit for adjacency calculations.
+         * @returns {Array<{x: number, y: number, z: number}>} Array of 6 face normal objects.
          */
         function getFaceNormals() {
-            return FACE_NORMALS;
+            return [
+                { x: -1, y: 0, z: 0 },  // left face
+                { x: 1, y: 0, z: 0 },   // right face
+                { x: 0, y: -1, z: 0 },  // bottom face
+                { x: 0, y: 1, z: 0 },   // top face
+                { x: 0, y: 0, z: -1 },  // front face
+                { x: 0, y: 0, z: 1 }    // back face
+            ];
         }
 
         return {

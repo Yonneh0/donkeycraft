@@ -30,6 +30,12 @@
     /**
      * BlockAction — handles block breaking mechanics including hardness timers,
      * tool speed multipliers, and drop spawning.
+     *
+     * Maintains a break state map keyed by "x,y,z" coordinates. Tracks progress
+     * from 0→1 over time based on block hardness and tool tier. Emits progress
+     * events when visual crack stage changes (~6 events per block).
+     *
+     * @namespace
      */
     Donkeycraft.BlockAction = (function() {
         // Current break states: Map of "x,y,z" → BreakState
@@ -346,10 +352,12 @@
         }
 
         /**
-         * Clear all break states.
+         * Clear all break states and chunk indices.
+         * Must also clear _chunkBreakIndices to prevent memory leaks.
          */
         function clearAll() {
             _breakStates = {};
+            _chunkBreakIndices = {};
         }
 
         /**
@@ -362,12 +370,12 @@
         }
 
         /**
-         * Get the tool multiplier for a material tier (exported).
-         * @param {string} tier - Tool material tier.
+         * Get the tool multiplier for a material tier.
+         * @param {string} tier - Tool material tier (e.g., 'wood', 'stone', 'iron').
          * @returns {number} Speed multiplier.
          */
-        function getToolMultiplierExport(tier) {
-            return getToolMultiplier(tier);
+        function getToolMultiplier(tier) {
+            return TOOL_MULTIPLIERS[tier] || 1.0;
         }
 
         /**
@@ -397,7 +405,7 @@
             clearChunkBreakStates: clearChunkBreakStates,
             setChunkManager: setChunkManager,
             getHardness: getHardness,
-            getToolMultiplier: getToolMultiplierExport,
+            getToolMultiplier: getToolMultiplier,
             getAllToolMultipliers: getAllToolMultipliers
         };
     })();
