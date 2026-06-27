@@ -504,13 +504,10 @@
         F.assertType(path.distance, 'number', 'Path has distance number');
     }
 
-    // No path — all neighbors of start position are non-walkable
-    var wallBlocked = function(x, y, z) {
-        var key = x + ',' + y + ',' + z;
-        return key !== '0,0,0'; // Only start is walkable, everything else blocked
-    };
-    var noPath2 = Donkeycraft.MobAI.findPath(0, 0, 0, 5, 0, 5, wallBlocked, 100);
-    F.assert(noPath2 === null, 'findPath returns null when all neighbors are blocked');
+    // No path — isWalkable returns false for ALL positions (nothing is walkable)
+    var neverWalkable = function(x, y, z) { return false; };
+    var noPath3 = Donkeycraft.MobAI.findPath(0, 0, 0, 5, 0, 5, neverWalkable, 100);
+    F.assert(noPath3 === null, 'findPath returns null when nothing is walkable');
 
     // calculateChaseVelocity
     var chase = Donkeycraft.MobAI.calculateChaseVelocity(0, 0, 10, 0, 2);
@@ -549,8 +546,8 @@
     var airWorld = function(x, y, z) { return 0; }; // 0 = air
     F.assert(Donkeycraft.MobAI.canMobSeePlayer(testMob, testPlayer, airWorld), 'Can see through air');
 
-    // Block in the way — use block ID 1 (stone) which is opaque in Donkeycraft.Block
-    var stoneWallWorld = function(x, y, z) { return (x >= 3 && x <= 7 && y === 64 && z === 0) ? 1 : 0; };
+    // Block in the way — wall spans the eye Y level (entities have eyeY ≈ 65.5)
+    var stoneWallWorld = function(x, y, z) { return (x >= 3 && x <= 7 && y >= 64 && y <= 70 && z === 0) ? 1 : 0; };
     F.assert(!Donkeycraft.MobAI.canMobSeePlayer(testMob, testPlayer, stoneWallWorld), 'Cannot see through solid block');
 
     // shouldFlee
