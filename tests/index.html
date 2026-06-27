@@ -59,13 +59,57 @@
         <div class="title">Phase 6.5: Loading Screen & Initialization</div>
         <div class="desc">Async initialization pipeline (config → texture-atlas → audio → indexeddb), loading screen UI with progress bar, tips rotation, error handling</div>
     </a>
+    <a href="phase7-test.html" class="test-link">
+        <div class="title">Phase 7: Inventory & UI</div>
+        <div class="desc">Item Stacks, Inventories, GUI Manager, Hotbar, Crafting Grid, Creative Inventory, Furnace/Chest/Anvil/Enchanting UI, Debug Overlay</div>
+    </a>
+    <a href="phase9-test.html" class="test-link">
+        <div class="title">Phase 9: Entities & Mobs</div>
+        <div class="desc">Entity System, EntityManager, Passive Mobs, Hostile Mobs, Bosses, Mob AI, Projectiles, Animals, Mob Spawning</div>
+    </a>
+    <a href="phase10-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 10: Redstone (Coming Soon)</div>
+        <div class="desc">Redstone wires, repeaters, comparators, signal propagation, pistons, TNT</div>
+    </a>
+    <a href="phase12-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 12: Dimensions & Portals (Coming Soon)</div>
+        <div class="desc">Overworld, Nether, End dimensions, portal system, nether/end terrain generation</div>
+    </a>
+    <a href="phase13-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 13: Day/Night Cycle & Weather (Coming Soon)</div>
+        <div class="desc">World time cycle, moon phases, rain, thunder, snow</div>
+    </a>
+    <a href="phase14-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 14: Save/Load System (Coming Soon)</div>
+        <div class="desc">IndexedDB world storage, level data persistence</div>
+    </a>
     <a href="phase15-test.html" class="test-link">
         <div class="title">Phase 15: Game Modes & Player Stats</div>
         <div class="desc">GameMode (survival/creative/spectator permissions, creative flying), PlayerStats (block mined/placed, mobs killed, distance tracking, serialization)</div>
     </a>
+    <a href="phase16-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 16: Enchanting & Potions (Coming Soon)</div>
+        <div class="desc">Enchantment system, potion effects, brewing recipes</div>
+    </a>
+    <a href="phase17-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 17: Tools & Item Durability (Coming Soon)</div>
+        <div class="desc">Tool tiers, speed multipliers, durability system</div>
+    </a>
     <a href="phase18-test.html" class="test-link">
         <div class="title">Phase 18: Hunger & Experience</div>
         <div class="desc">HungerSystem (food level, saturation, starvation damage, auto-regeneration), Experience (XP levels, points, orb pickup, serialization)</div>
+    </a>
+    <a href="phase19-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 19: Assets (Coming Soon)</div>
+        <div class="desc">Textures and sounds — external asset files</div>
+    </a>
+    <a href="phase20-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 20: UI / HTML/CSS Layer (Coming Soon)</div>
+        <div class="desc">HTML entry point, stylesheets, DOM-based UI elements</div>
+    </a>
+    <a href="phase21-test.html" class="test-link" style="opacity:0.5">
+        <div class="title">Phase 21: Main Entry Point & Game Loop (Coming Soon)</div>
+        <div class="desc">Main game class, initialization, main loop</div>
     </a>
 </div>
 
@@ -73,12 +117,7 @@
 (function() {
     'use strict';
     // Auto-update: add links for any future test files that get created
-    var futureTests = [
-        { file: 'phase7-test.html', name: 'Phase 7: Inventory & UI', desc: 'Inventories, slots, hotbar, GUI rendering' },
-        { file: 'phase8-test.html', name: 'Phase 8: Crafting', desc: '2x2 and 3x3 shaped/shapeless recipe matching' },
-        { file: 'phase9-test.html', name: 'Phase 9: Entities & Mobs', desc: 'Entity spawning, ticking, mob AI pathfinding' },
-        { file: 'phase10-test.html', name: 'Phase 10: Redstone', desc: 'Redstone wires, repeaters, comparators, signal propagation, pistons' }
-    ];
+    var futureTests = [];
 
     var phaseCategory = document.getElementById('phase-tests');
     if (phaseCategory) {

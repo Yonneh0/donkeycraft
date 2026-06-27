@@ -218,7 +218,8 @@
      * @returns {boolean} False for creative mode.
      */
     Donkeycraft.GameMode.prototype.isVulnerable = function() {
-        return this._player.gameMode !== 'creative';
+        // Delegate to canTakeDamage() to avoid duplication
+        return this.canTakeDamage();
     };
 
     /**

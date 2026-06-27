@@ -375,7 +375,8 @@
     var serialized = stats.serialize();
     F.assertType(serialized, 'object', 'serialize() returns an object');
     F.assertType(serialized.stats, 'object', 'serialized.stats is an object');
-    F.assertType(serialized.entityKilledBy, 'object', 'serialized.entityKilledBy is an object');
+    // entityKilledBy is now part of serialized.stats (no top-level duplicate)
+    F.assertType(serialized.stats.entityKilledBy, 'object', 'serialized.stats.entityKilledBy is an object');
 
     F.assert(serialized.stats.blockMine > 0, 'serialized blockMine > 0');
     F.assert(serialized.stats.mobsKilled > 0, 'serialized mobsKilled > 0');

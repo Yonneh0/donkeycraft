@@ -205,7 +205,7 @@
         // Sprint depletes 1 food per ~2.5 blocks sprinted
         var degradation = Math.floor(distance / 2.5);
         if (degradation > 0) {
-            this._foodLevel = Math.max(0, this._foodLevel - degradation);
+            this._drainSaturationAndFood(degradation);
         }
     };
 
@@ -221,7 +221,22 @@
         // Walking depletes 1 food per ~8 blocks
         var degradation = Math.floor(distance / 8);
         if (degradation > 0) {
-            this._foodLevel = Math.max(0, this._foodLevel - degradation);
+            this._drainSaturationAndFood(degradation);
+        }
+    };
+
+    /**
+     * Drain saturation first, then reduce food level.
+     * @param {number} amount - Total degradation to apply.
+     * @private
+     */
+    Donkeycraft.Hunger.prototype._drainSaturationAndFood = function(amount) {
+        // Drain saturation first (saturation counts as half a food point per unit for drain purposes)
+        var satDrain = Math.min(this._saturation, amount * 2);
+        this._saturation -= satDrain;
+        var remainingDeg = amount - (satDrain / 2);
+        if (remainingDeg > 0) {
+            this._foodLevel = Math.max(0, this._foodLevel - Math.ceil(remainingDeg));
         }
     };
 

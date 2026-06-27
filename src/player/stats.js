@@ -165,6 +165,9 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.PlayerStats.prototype.tick = function(deltaTime) {
+        // Advance time since death counter
+        this._stats.timeSinceDeath += deltaTime;
+
         // Accumulate time (tick at 20 TPS, so deltaTime ~0.05)
         this._timeAccumulator += deltaTime;
 
@@ -242,13 +245,8 @@
     Donkeycraft.PlayerStats.prototype.recordDamageTaken = function(amount, source) {
         this.increment('damageTaken', amount);
 
-        // Track entity kills by type
-        if (source && source !== 'generic' && source !== 'fall' && source !== 'starvation') {
-            if (!this._stats.entityKilledBy[source]) {
-                this._stats.entityKilledBy[source] = 0;
-            }
-            this._stats.entityKilledBy[source]++;
-        }
+        // Note: entityKilledBy is only updated on actual kills (recordEntityKill / recordDeath),
+        // not on every damage instance. Use recordEntityKill() to track entity kills.
     };
 
     /**
@@ -284,9 +282,9 @@
      * @returns {Object} Serialized state.
      */
     Donkeycraft.PlayerStats.prototype.serialize = function() {
+        // entityKilledBy is already included in getAllStats(), no need to duplicate.
         return {
-            stats: this.getAllStats(),
-            entityKilledBy: this._stats.entityKilledBy || {}
+            stats: this.getAllStats()
         };
     };
 

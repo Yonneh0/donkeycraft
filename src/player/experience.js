@@ -215,8 +215,9 @@
         total += this._points;
 
         // Add the cumulative cost of all levels
+        // Boundary must match getLevelThreshold() which uses <= 16 for first formula
         for (var i = 0; i < this._level; i++) {
-            if (i <= 15) {
+            if (i <= 16) {
                 total += 7 + i * 2;
             } else {
                 total += 37 + (i - 16) * 3;

@@ -197,16 +197,25 @@
     // ============================================================
     F.section('4. Hunger Degradation');
 
-    hunger.setFoodLevel(20);
-
+    // With saturation at 0, degradation drains food directly.
     // Sprint degradation: 1 food per ~2.5 blocks
+    hunger.setFoodLevel(20);
+    hunger.setSaturation(0);
     hunger.applySprintDegradation(5.0);
-    F.assertEq(hunger.getFoodLevel(), 18, 'Sprint 5 blocks: food -= 2 (got ' + hunger.getFoodLevel() + ')');
+    F.assertEq(hunger.getFoodLevel(), 18, 'Sprint 5 blocks (sat=0): food -= 2 (got ' + hunger.getFoodLevel() + ')');
 
     // Walk degradation: 1 food per ~8 blocks
     hunger.setFoodLevel(20);
+    hunger.setSaturation(0);
     hunger.applyWalkDegradation(16.0);
-    F.assertEq(hunger.getFoodLevel(), 18, 'Walk 16 blocks: food -= 2 (got ' + hunger.getFoodLevel() + ')');
+    F.assertEq(hunger.getFoodLevel(), 18, 'Walk 16 blocks (sat=0): food -= 2 (got ' + hunger.getFoodLevel() + ')');
+
+    // With full saturation, degradation drains saturation first — food stays intact
+    hunger.setFoodLevel(20);
+    hunger.setSaturation(20.0);
+    hunger.applySprintDegradation(5.0); // Would drain 2 food, but sat absorbs it
+    F.assertEq(hunger.getFoodLevel(), 20, 'Sprint 5 blocks (sat=20): food unchanged (saturation drained)');
+    F.assert(hunger.getSaturation() < 20, 'Saturation decreased after sprint degradation');
 
     // No degradation when food = 0
     hunger.setFoodLevel(0);
