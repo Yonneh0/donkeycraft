@@ -1,5 +1,6 @@
 // Donkeycraft — Level Data
 // Level data: spawn position, game mode, time, seed, player data.
+// Includes periodic auto-save to WorldStore for persistent game state.
 (function() {
     'use strict';
 
@@ -13,7 +14,13 @@
     Donkeycraft.DEFAULT_SPAWN_Z = 0;
 
     /**
+     * Default auto-save interval in milliseconds (60 seconds).
+     */
+    Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL = 60000;
+
+    /**
      * LevelData — Manages world-level data: spawn, game mode, time, seed, player state.
+     * Supports periodic auto-save to WorldStore for persistent game state.
      */
     Donkeycraft.LevelData = function() {
         this._spawnX = Donkeycraft.DEFAULT_SPAWN_X;
@@ -25,6 +32,35 @@
         this._worldName = 'DefaultWorld';
         this._playerData = null;
         this._lastSaved = 0;
+
+        // Auto-save system
+        this._autoSaveTimer = 0;
+        this._autoSaveInterval = Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
+        this._worldStore = null;
+        this._worldNameRef = null;
+        this._autoSaveEnabled = false;
+    };
+
+    /**
+     * _ensurePlayerData — ensure player data object exists, initializing defaults if needed.
+     * @private
+     */
+    Donkeycraft.LevelData.prototype._ensurePlayerData = function() {
+        if (!this._playerData) {
+            this._playerData = {
+                position: { x: 0, y: 64, z: 0 },
+                rotation: { yaw: 0, pitch: 0 },
+                health: 20,
+                maxHealth: 20,
+                gameMode: this._gameMode,
+                inventory: [],
+                hunger: 20,
+                saturation: 0,
+                experience: { levels: 0, points: 0 },
+                fallDistance: 0,
+                alive: true
+            };
+        }
     };
 
     /**
@@ -153,7 +189,7 @@
                 maxHealth: data.maxHealth || 20,
                 gameMode: data.gameMode || this._gameMode,
                 inventory: data.inventory || [],
-                hunger: data.hunger || 20,
+                hunger: data.hunger !== undefined ? data.hunger : 20,
                 saturation: data.saturation || 0,
                 experience: data.experience || { levels: 0, points: 0 },
                 fallDistance: data.fallDistance || 0,
@@ -193,12 +229,21 @@
      * @param {number} z — Z coordinate.
      */
     Donkeycraft.LevelData.prototype.setPlayerPosition = function(x, y, z) {
-        if (!this._playerData) {
-            this._playerData = { position: {}, rotation: {}, health: 20, maxHealth: 20, gameMode: this._gameMode, inventory: [], hunger: 20, saturation: 0, experience: { levels: 0, points: 0 }, fallDistance: 0, alive: true };
-        }
+        this._ensurePlayerData();
         this._playerData.position.x = x;
         this._playerData.position.y = y;
         this._playerData.position.z = z;
+    };
+
+    /**
+     * Update player rotation.
+     * @param {number} yaw — Yaw angle in radians.
+     * @param {number} pitch — Pitch angle in radians.
+     */
+    Donkeycraft.LevelData.prototype.setPlayerRotation = function(yaw, pitch) {
+        this._ensurePlayerData();
+        this._playerData.rotation.yaw = yaw || 0;
+        this._playerData.rotation.pitch = pitch || 0;
     };
 
     /**
@@ -206,9 +251,7 @@
      * @param {number} health — Current health (0-20).
      */
     Donkeycraft.LevelData.prototype.setPlayerHealth = function(health) {
-        if (!this._playerData) {
-            this._playerData = { position: {}, rotation: {}, health: 20, maxHealth: 20, gameMode: this._gameMode, inventory: [], hunger: 20, saturation: 0, experience: { levels: 0, points: 0 }, fallDistance: 0, alive: true };
-        }
+        this._ensurePlayerData();
         this._playerData.health = Donkeycraft.clamp(Math.round(health || 0), 0, this._playerData.maxHealth);
         this._playerData.alive = this._playerData.health > 0;
     };
@@ -222,13 +265,28 @@
     };
 
     /**
+     * Update fall distance (for fall damage calculation).
+     * @param {number} distance — Fall distance in blocks.
+     */
+    Donkeycraft.LevelData.prototype.setFallDistance = function(distance) {
+        this._ensurePlayerData();
+        this._playerData.fallDistance = Math.max(0, distance || 0);
+    };
+
+    /**
+     * Get fall distance.
+     * @returns {number} Fall distance in blocks.
+     */
+    Donkeycraft.LevelData.prototype.getFallDistance = function() {
+        return this._playerData ? this._playerData.fallDistance : 0;
+    };
+
+    /**
      * Update hunger level.
      * @param {number} hunger — Hunger value (0-20).
      */
     Donkeycraft.LevelData.prototype.setHunger = function(hunger) {
-        if (!this._playerData) {
-            this._playerData = { position: {}, rotation: {}, health: 20, maxHealth: 20, gameMode: this._gameMode, inventory: [], hunger: 20, saturation: 0, experience: { levels: 0, points: 0 }, fallDistance: 0, alive: true };
-        }
+        this._ensurePlayerData();
         this._playerData.hunger = Donkeycraft.clamp(Math.round(hunger || 0), 0, 20);
     };
 
@@ -245,9 +303,7 @@
      * @param {number} saturation — Saturation value (0-hunger).
      */
     Donkeycraft.LevelData.prototype.setSaturation = function(saturation) {
-        if (!this._playerData) {
-            this._playerData = { position: {}, rotation: {}, health: 20, maxHealth: 20, gameMode: this._gameMode, inventory: [], hunger: 20, saturation: 0, experience: { levels: 0, points: 0 }, fallDistance: 0, alive: true };
-        }
+        this._ensurePlayerData();
         this._playerData.saturation = Donkeycraft.clamp(saturation || 0, 0, this._playerData.hunger);
     };
 
@@ -260,14 +316,21 @@
     };
 
     /**
-     * Update experience levels.
+     * Update XP levels.
      * @param {number} levels — XP level count.
      */
     Donkeycraft.LevelData.prototype.setXpLevels = function(levels) {
-        if (!this._playerData) {
-            this._playerData = { position: {}, rotation: {}, health: 20, maxHealth: 20, gameMode: this._gameMode, inventory: [], hunger: 20, saturation: 0, experience: { levels: 0, points: 0 }, fallDistance: 0, alive: true };
-        }
+        this._ensurePlayerData();
         this._playerData.experience.levels = Math.max(0, Math.round(levels || 0));
+    };
+
+    /**
+     * Update XP points (experience progress toward next level).
+     * @param {number} points — XP points (0-7 per level at current level).
+     */
+    Donkeycraft.LevelData.prototype.setXpPoints = function(points) {
+        this._ensurePlayerData();
+        this._playerData.experience.points = Math.max(0, Math.round(points || 0));
     };
 
     /**
@@ -276,6 +339,33 @@
      */
     Donkeycraft.LevelData.prototype.getXpLevels = function() {
         return this._playerData ? this._playerData.experience.levels : 0;
+    };
+
+    /**
+     * Get XP points.
+     * @returns {number} XP points.
+     */
+    Donkeycraft.LevelData.prototype.getXpPoints = function() {
+        return this._playerData ? this._playerData.experience.points : 0;
+    };
+
+    /**
+     * Update player inventory.
+     * @param {Array} inventory — Array of item stack objects.
+     */
+    Donkeycraft.LevelData.prototype.setInventory = function(inventory) {
+        this._ensurePlayerData();
+        if (Array.isArray(inventory)) {
+            this._playerData.inventory = inventory.slice();
+        }
+    };
+
+    /**
+     * Get player inventory.
+     * @returns {Array} Array of item stack objects.
+     */
+    Donkeycraft.LevelData.prototype.getInventory = function() {
+        return this._playerData ? (this._playerData.inventory ? this._playerData.inventory.slice() : []) : [];
     };
 
     /**
@@ -370,8 +460,9 @@
         if (typeof this._seed !== 'number') {
             return false;
         }
-        // Spawn must be within world bounds
-        if (this._spawnY < 0 || this._spawnY >= Donkeycraft.Config.WORLD_HEIGHT) {
+        // Spawn Y must be within world bounds
+        var worldHeight = (Donkeycraft.Config && Donkeycraft.Config.WORLD_HEIGHT) ? Donkeycraft.Config.WORLD_HEIGHT : 256;
+        if (this._spawnY < 0 || this._spawnY >= worldHeight) {
             return false;
         }
         return true;
@@ -390,6 +481,12 @@
         this._worldName = 'DefaultWorld';
         this._playerData = null;
         this._lastSaved = 0;
+
+        // Reset auto-save
+        this._autoSaveTimer = 0;
+        this._autoSaveEnabled = false;
+        this._worldStore = null;
+        this._worldNameRef = null;
     };
 
     /**
@@ -407,10 +504,102 @@
         return this._lastSaved;
     };
 
+    // ============================================================
+    // Auto-Save System
+    // ============================================================
+
+    /**
+     * Start periodic auto-save to WorldStore.
+     * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance for persistence.
+     * @param {string} worldName — World name identifier.
+     * @param {number} [intervalMs=60000] — Auto-save interval in milliseconds.
+     */
+    Donkeycraft.LevelData.prototype.startAutoSave = function(worldStore, worldName, intervalMs) {
+        if (!worldStore || !worldName) {
+            return;
+        }
+
+        this._worldStore = worldStore;
+        this._worldNameRef = worldName;
+        this._autoSaveInterval = intervalMs || Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
+        this._autoSaveEnabled = true;
+        this._autoSaveTimer = 0;
+    };
+
+    /**
+     * Stop periodic auto-save.
+     */
+    Donkeycraft.LevelData.prototype.stopAutoSave = function() {
+        this._autoSaveEnabled = false;
+        this._autoSaveTimer = 0;
+        this._worldStore = null;
+        this._worldNameRef = null;
+    };
+
+    /**
+     * Check if auto-save is enabled.
+     * @returns {boolean} True if auto-save is active.
+     */
+    Donkeycraft.LevelData.prototype.isAutoSaveEnabled = function() {
+        return this._autoSaveEnabled;
+    };
+
+    /**
+     * Tick the auto-save timer (call once per game tick).
+     * Triggers a save when the interval elapses.
+     * @param {number} dt — Delta time in seconds.
+     */
+    Donkeycraft.LevelData.prototype.tickAutoSave = function(dt) {
+        if (!this._autoSaveEnabled || !this._worldStore || !this._worldNameRef) {
+            return;
+        }
+
+        this._autoSaveTimer += dt * 1000; // Convert to ms
+
+        if (this._autoSaveTimer >= this._autoSaveInterval) {
+            this._autoSaveTimer = 0;
+            this.persistToStore().catch(function() {
+                // Silently ignore auto-save failures during gameplay
+            });
+        }
+    };
+
+    /**
+     * Persist current level data to WorldStore immediately.
+     * Saves both level data and triggers dirty chunk save.
+     * @returns {Promise<boolean>} True if persistence succeeded.
+     */
+    Donkeycraft.LevelData.prototype.persistToStore = function() {
+        if (!this._worldStore || !this._worldNameRef) {
+            return Promise.resolve(false);
+        }
+
+        this.markSaved();
+
+        var levelData = this.serialize();
+        var self = this;
+
+        return this._worldStore.saveWorld(this._worldNameRef, levelData, []).then(function(success) {
+            if (!success) {
+                return false;
+            }
+            // Also save dirty chunks if available
+            if (self._worldStore.saveDirtyChunks) {
+                return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function(count) {
+                    return true;
+                }).catch(function() {
+                    return true; // Level data saved even if chunks failed
+                });
+            }
+            return true;
+        });
+    };
+
     /**
      * Destroy the LevelData instance and free resources.
      */
     Donkeycraft.LevelData.prototype.destroy = function() {
+        this.stopAutoSave();
         this._playerData = null;
     };
 

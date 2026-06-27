@@ -89,6 +89,13 @@
             CHUNKS_PER_SAVE: 4,       // Number of chunks to save per batch
             SAVE_BATCH_DELAY: 100,    // Delay in ms between batch save operations (reserved)
 
+            // Level data auto-save interval (ms) — also available as Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL
+            LEVEL_DATA_AUTO_SAVE_INTERVAL: 60000, // Auto-save level data every 60 seconds
+
+            // Asset cache settings
+            ASSET_CACHE_VERSION: 1,   // Increment to force cache invalidation
+            ASSET_CACHE_MAX_AGE_MS: 86400000, // 24 hours — expired entries cleared on quota
+
             // Dimension settings
             NETHER_SCALE: 8,          // Overworld coords / 8 = Nether coords (and vice versa)
             END_SCALE: 1              // Overworld coords × 1 = End coords

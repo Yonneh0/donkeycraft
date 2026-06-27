@@ -226,6 +226,14 @@
     };
 
     /**
+     * setLevelData — set the LevelData instance for player state persistence.
+     * @param {Donkeycraft.LevelData} levelData — LevelData instance.
+     */
+    Donkeycraft.Game.prototype.setLevelData = function(levelData) {
+        this._levelData = levelData || null;
+    };
+
+    /**
      * setHotbar — set the hotbar UI reference for key-based slot selection.
      * @param {Donkeycraft.Hotbar} hotbar - Hotbar instance.
      */
@@ -405,6 +413,7 @@
 
         // Save chunks in batches for performance
         var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length);
+        var savedCount = 0;
 
         for (var i = 0; i < batchSize && i < dirtyChunks.length; i++) {
             var chunk = dirtyChunks[i];
@@ -418,7 +427,9 @@
                 blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
             };
 
-            this._worldStore.saveChunk(worldName, cx, cz, chunkData).catch(function() {
+            this._worldStore.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
+                if (success) savedCount++;
+            }).catch(function() {
                 // Silently ignore individual save failures
             });
         }
@@ -730,9 +741,30 @@
             this._eventBus = null;
         }
 
+        // Persist final state before shutdown
+        if (this._levelData && this._levelData.persistToStore) {
+            try {
+                this._levelData.persistToStore().then(function() {
+                    Donkeycraft.Logger.info('Game', 'Final world state saved on destroy');
+                }).catch(function() {
+                    Donkeycraft.Logger.warn('Game', 'Final world save failed on destroy');
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Final world save error: ' + e.message);
+            }
+        }
+
+        // Close WorldStore connection if active
+        if (this._worldStore && this._worldStore.destroy) {
+            try {
+                this._worldStore.destroy();
+            } catch (e) {}
+        }
+
         // Clean up auto-save timer
         this._autoSaveTimer = 0;
         this._worldStore = null;
+        this._levelData = null;
 
         Donkeycraft.Logger.info('Game', 'Game destroyed');
     };
@@ -1075,7 +1107,7 @@
         // Process interactions (block break/place)
         this._processInteractions();
 
-        // Auto-save: accumulate time and save at Config.AUTO_SAVE_INTERVAL
+        // Auto-save chunks: accumulate time and save at Config.AUTO_SAVE_INTERVAL
         if (this._worldStore && this._chunkManager) {
             this._autoSaveTimer += dt * 1000; // Convert to ms
             if (this._autoSaveTimer >= Config.AUTO_SAVE_INTERVAL) {
@@ -1085,6 +1117,15 @@
                 } catch (e) {
                     Donkeycraft.Logger.warn('Game', 'Auto-save failed: ' + e.message);
                 }
+            }
+        }
+
+        // Tick LevelData auto-save (if separate LevelData instance is active)
+        if (this._levelData && this._levelData.tickAutoSave) {
+            try {
+                this._levelData.tickAutoSave(dt);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'LevelData auto-save tick failed: ' + e.message);
             }
         }
 

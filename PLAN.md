@@ -247,14 +247,15 @@ Enchantments, potions, and tool durability.
 ---
 
 ### 12. Save/Load System
-IndexedDB world storage and level data persistence.
+IndexedDB world storage, level data persistence, and asset caching.
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 95 | `src/storage/world-store.js` | IndexedDB world storage: save/load chunks, world info, dirty chunk batching | 375 |
-| 96 | `src/storage/level-data.js` | Level data: spawn position, game mode, time, seed, player data, validation | 374 |
+| 95 | `src/storage/world-store.js` | IndexedDB world storage: save/load chunks, world info, dirty chunk batching, quota error handling, chunk format normalization | 480 |
+| 96 | `src/storage/level-data.js` | Level data: spawn position, game mode, time, seed, player data, validation, auto-save system with WorldStore integration | 590 |
+| 97 | `src/storage/cache.js` | Asset cache: IndexedDB-based persistent caching for texture atlases and sounds, quota management | 460 |
 
-**Subtotal: 2 files, ~749 lines**
+**Subtotal: 3 files, ~1,530 lines**
 
 ---
 
@@ -283,9 +284,9 @@ IndexedDB world storage and level data persistence.
 | 9. Entity & Mob System | 9 | ~2,779 |
 | 10. Redstone System | 6 | ~2,177 |
 | 11. Game Systems | 3 | ~1,267 |
-| 12. Save/Load System | 2 | ~749 |
+| 12. Save/Load System | 3 | ~1,530 |
 | 13. Main Entry Point | 1 | ~1,195 |
-| **TOTAL** | **97 files** | **~27,492 lines of JS/GLSL** |
+| **TOTAL** | **98 files** | **~28,478 lines of JS/GLSL** |
 
 ---
 
@@ -388,7 +389,8 @@ Scripts are loaded in this order in `index.html`:
 92. src/game/tool.js
 93. src/storage/world-store.js
 94. src/storage/level-data.js
-95. src/game.js                    ← loaded last
+95. src/storage/cache.js
+96. src/game.js                    ← loaded last
 ```
 
 ---

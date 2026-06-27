@@ -47,9 +47,9 @@
      * @param {Object} data - Event payload.
      */
     Donkeycraft.WorldStore.prototype._emit = function(eventName, data) {
-        if (this._eventBus && Donkeycraft.EventBus) {
+        if (this._eventBus) {
             try {
-                Donkeycraft.EventBus.emitSafe(eventName, data);
+                this._eventBus.emit(eventName, data);
             } catch (e) {
                 // EventBus may not be available in tests
             }
@@ -103,10 +103,45 @@
     };
 
     /**
+     * _normalizeChunks — normalize chunk data to internal format.
+     * Handles both old format ({ cx, cz, blockData, skyLight, blockLight }) and new format ({ cx, cz, data: { blockData, skyLight, blockLight } }).
+     * @private
+     * @param {Array} chunks — Raw chunk array from storage.
+     * @returns {Array} Normalized chunk array.
+     */
+    Donkeycraft.WorldStore.prototype._normalizeChunks = function(chunks) {
+        if (!chunks || !Array.isArray(chunks)) {
+            return [];
+        }
+
+        var normalized = [];
+        for (var i = 0; i < chunks.length; i++) {
+            var c = chunks[i];
+            if (c.data && typeof c.data === 'object') {
+                // New format: { cx, cz, data: { blockData, skyLight, blockLight } }
+                normalized.push({ cx: c.cx, cz: c.cz, data: c.data });
+            } else if (c.blockData !== undefined) {
+                // Old format: { cx, cz, blockData, skyLight, blockLight }
+                normalized.push({
+                    cx: c.cx,
+                    cz: c.cz,
+                    data: {
+                        blockData: c.blockData || null,
+                        skyLight: c.skyLight || 0,
+                        blockLight: c.blockLight || 0
+                    }
+                });
+            }
+            // Skip invalid entries
+        }
+        return normalized;
+    };
+
+    /**
      * Save a world's level data and chunks to IndexedDB.
      * @param {string} worldName — World name/identifier.
      * @param {Object} levelData — Serialized level data (spawn, game mode, time, seed).
-     * @param {Array} chunks — Array of {cx, cz, blockData, skyLight, blockLight} objects.
+     * @param {Array} chunks — Array of {cx, cz, blockData, skyLight, blockLight} or {cx, cz, data: {...}} objects.
      * @returns {Promise<boolean>} Resolves true on success.
      */
     Donkeycraft.WorldStore.prototype.saveWorld = function(worldName, levelData, chunks) {
@@ -119,6 +154,13 @@
             try {
                 var transaction = self._db.transaction([Donkeycraft.WORLD_STORE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.WORLD_STORE_STORE_NAME);
+
+                // Handle quota exceeded errors (IndexedDB storage limits)
+                transaction.onerror = function() {
+                    if (transaction.error && transaction.error.name === 'QuotaExceededError') {
+                        self._emit('storage:quota-exceeded', { worldName: worldName });
+                    }
+                };
 
                 var data = {
                     worldName: worldName,
@@ -135,6 +177,9 @@
                 };
 
                 request.onerror = function() {
+                    if (request.error && request.error.name === 'QuotaExceededError') {
+                        self._emit('storage:quota-exceeded', { worldName: worldName });
+                    }
                     self._emit('world:save-error', { worldName: worldName, error: 'Save failed' });
                     resolve(false);
                 };
@@ -146,8 +191,9 @@
 
     /**
      * Load a world's level data and chunks from IndexedDB.
+     * Normalizes chunk data to internal format ({ cx, cz, data: {...} }).
      * @param {string} worldName — World name/identifier.
-     * @returns {Promise<Object|null>} Resolves with {levelData, chunks} or null if not found.
+     * @returns {Promise<Object|null>} Resolves with {levelData, chunks, savedAt} or null if not found.
      */
     Donkeycraft.WorldStore.prototype.loadWorld = function(worldName) {
         var self = this;
@@ -166,7 +212,7 @@
                         self._emit('world:loaded', { worldName: worldName });
                         resolve({
                             levelData: request.result.levelData || {},
-                            chunks: request.result.chunks || [],
+                            chunks: self._normalizeChunks(request.result.chunks),
                             savedAt: request.result.savedAt || 0
                         });
                     } else {
@@ -359,7 +405,9 @@
     };
 
     /**
-     * Save all dirty chunks from the chunk manager.
+     * Save all dirty chunks from the chunk manager in batches.
+     * Uses Config.CHUNKS_PER_SAVE for batch size to avoid blocking the main thread.
+     * Properly serializes full blockData arrays and light data.
      * @param {string} worldName — World name.
      * @returns {Promise<number>} Number of chunks saved.
      */
@@ -369,41 +417,66 @@
             return Promise.resolve(0);
         }
 
+        var CHUNKS_PER_SAVE = (Donkeycraft.Config && Donkeycraft.Config.CHUNKS_PER_SAVE) ? Donkeycraft.Config.CHUNKS_PER_SAVE : 4;
         var dirtyChunks = this._chunkManager.getDirtyChunks();
-        var savedCount = 0;
-        var promises = [];
 
-        for (var i = 0; i < dirtyChunks.length; i++) {
-            var chunk = dirtyChunks[i];
-            if (chunk && !chunk.isDirty()) {
-                continue;
-            }
-
-            var cx = chunk.chunkX;
-            var cz = chunk.chunkZ;
-            var chunkData = {
-                blockData: chunk.getBlockData ? chunk.getBlockData() : null,
-                skyLight: chunk.getSkyLight ? chunk.getSkyLight(0, 0, 0) : 0,
-                blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
-            };
-
-            promises.push(
-                self.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
-                    if (success) savedCount++;
-                })
-            );
+        if (!dirtyChunks || dirtyChunks.length === 0) {
+            return Promise.resolve(0);
         }
 
-        return Promise.all(promises).then(function() {
-            // Mark all as clean
-            for (var j = 0; j < dirtyChunks.length; j++) {
-                if (dirtyChunks[j]) {
-                    dirtyChunks[j].markClean();
-                }
+        // Save in batches to avoid blocking the main thread
+        var totalSaved = 0;
+        var batchIndex = 0;
+
+        var saveNextBatch = function() {
+            var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length - batchIndex);
+            if (batchSize <= 0) {
+                self._emit('chunks:saved', { worldName: worldName, count: totalSaved });
+                return Promise.resolve(totalSaved);
             }
-            self._emit('chunks:saved', { worldName: worldName, count: savedCount });
-            return savedCount;
-        });
+
+            var batchPromises = [];
+            for (var i = 0; i < batchSize; i++) {
+                var idx = batchIndex + i;
+                var chunk = dirtyChunks[idx];
+                if (!chunk || !chunk.isDirty()) {
+                    continue;
+                }
+
+                var cx = chunk.chunkX;
+                var cz = chunk.chunkZ;
+                var chunkData = {
+                    blockData: chunk.getBlockData ? chunk.getBlockData() : null,
+                    skyLight: chunk.getSkyLight ? chunk.getSkyLight(0, 0, 0) : 0,
+                    blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
+                };
+
+                batchPromises.push(
+                    self.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
+                        if (success) {
+                            totalSaved++;
+                            if (chunk && chunk.markClean) {
+                                chunk.markClean();
+                            }
+                        }
+                    })
+                );
+            }
+
+            batchIndex += batchSize;
+
+            return Promise.all(batchPromises).then(function() {
+                // Small delay between batches to avoid blocking
+                if (batchIndex < dirtyChunks.length) {
+                    return new Promise(function(resolve) {
+                        setTimeout(resolve, 10);
+                    }).then(saveNextBatch);
+                }
+                return totalSaved;
+            });
+        };
+
+        return saveNextBatch();
     };
 
     /**

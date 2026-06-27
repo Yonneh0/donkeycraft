@@ -163,6 +163,7 @@
 <!-- Phase 14: Save/Load -->
 <script src="src/storage/world-store.js"></script>
 <script src="src/storage/level-data.js"></script>
+<script src="src/storage/cache.js"></script>
 
 <!-- Phase 15: Game Modes -->
 <script src="src/player/game-mode.js"></script>
@@ -423,13 +424,15 @@ void main() {
      * Start the game after async initialization completes.
      * Called by InitSequence pipeline on 'game:ready' event.
      * @private
+     * @param {Object} gameSystems - Game system constructors/options.
+     * @param {Object} initSystems - Initialization result (worldStore, assetCache, etc.).
      */
-    function startGame(systems) {
+    function startGame(gameSystems, initSystems) {
 
         // Create the game instance
         var game = new Donkeycraft.Game({
-            renderDistance: systems.renderDistance,
-            gameMode: systems.gameMode || 'survival'
+            renderDistance: gameSystems.renderDistance,
+            gameMode: gameSystems.gameMode || 'survival'
         });
 
         // Initialize all subsystems (WebGL, shaders, player, chunks, etc.)
@@ -441,15 +444,65 @@ void main() {
 
         // Wire up external systems: movement, collision, jump, flying, raycast, block actions
         game.setSystems(
-            systems.movementSystem,
-            systems.collisionSystem,
-            systems.jumpSystem,
-            systems.flyingSystem,
-            systems.raycastSystem,
-            systems.blockActionSystem,
-            systems.blockPlacementSystem,
-            systems.interactableBlocksSystem
+            gameSystems.movementSystem,
+            gameSystems.collisionSystem,
+            gameSystems.jumpSystem,
+            gameSystems.flyingSystem,
+            gameSystems.raycastSystem,
+            gameSystems.blockActionSystem,
+            gameSystems.blockPlacementSystem,
+            gameSystems.interactableBlocksSystem
         );
+
+        // Wire up storage systems (WorldStore + LevelData auto-save)
+        if (initSystems && initSystems.worldStore && initSystems.worldStore.isReady()) {
+            var worldStore = initSystems.worldStore;
+
+            // Set WorldStore on Game for auto-save
+            game.setWorldStore(worldStore);
+
+            // Create and configure LevelData
+            var levelData = new Donkeycraft.LevelData();
+            levelData.setWorldName('DefaultWorld');
+            levelData.setSpawn(0, Math.floor(Donkeycraft.Config.WORLD_HEIGHT / 2), 0);
+            levelData.setGameMode('survival');
+
+            // Connect WorldStore to LevelData for persistence
+            worldStore.setChunkManager(game.getChunkManager());
+            worldStore.setEventBus(game.getEventBus());
+
+            // Wire LevelData onto Game for auto-save tick and final persist
+            game.setLevelData(levelData);
+
+            // Try loading existing world data
+            worldStore.loadWorld('DefaultWorld').then(function(worldData) {
+                if (worldData && worldData.levelData) {
+                    levelData.deserialize(worldData.levelData);
+                    Donkeycraft.Logger.info('Game', 'World loaded from storage (saved at: ' + new Date(worldData.savedAt).toLocaleString() + ')');
+                } else {
+                    Donkeycraft.Logger.info('Game', 'New world created — no existing save found');
+                }
+
+                // Start auto-save system
+                levelData.startAutoSave(worldStore, 'DefaultWorld');
+            }).catch(function(err) {
+                Donkeycraft.Logger.warn('Game', 'Failed to load world data: ' + err.message);
+            });
+
+            // Wire up LevelData destroy to WorldStore cleanup
+            var origDestroy = game.destroy.bind(game);
+            game.destroy = function() {
+                if (levelData && levelData.destroy) {
+                    levelData.destroy();
+                }
+                origDestroy();
+            };
+        }
+
+        // AssetCache: attempt to load cached texture atlas from IndexedDB
+        if (initSystems && initSystems.assetCache && initSystems.assetCache.isReady()) {
+            Donkeycraft.Logger.info('Game', 'AssetCache initialized — checking for cached assets');
+        }
 
         // Set overlay reference for pointer lock
         game.setOverlay(document.getElementById('dk-overlay'));
@@ -614,7 +667,7 @@ void main() {
         };
 
         // Start the game with all systems wired up
-        startGame(gameSystems);
+        startGame(gameSystems, systems);
 
         // Wire up additional UI systems after game starts
         setTimeout(function() {

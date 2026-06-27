@@ -112,15 +112,95 @@
     };
 
     /**
-     * _initIndexedDB — open IndexedDB connection for world persistence.
-     * WorldStore handles its own DB initialization separately. This phase
-     * simply signals completion to maintain the pipeline structure.
+     * _initWorldStore — open IndexedDB connection for world persistence.
+     * Creates and initializes a WorldStore instance, returning it in the result object.
      * @private
-     * @returns {Promise<Object>} Resolves with DB info when ready.
+     * @returns {Promise<Object>} Resolves with { worldStore } when ready.
+     */
+    Donkeycraft.InitSequence.prototype._initWorldStore = function() {
+        var self = this;
+        return new Promise(function(resolve) {
+            try {
+                if (typeof indexedDB === 'undefined') {
+                    Donkeycraft.Logger.warn('InitSequence', 'IndexedDB not available — world persistence disabled');
+                    resolve({}); // Graceful fallback, no world store
+                    return;
+                }
+
+                var worldStore = new Donkeycraft.WorldStore();
+                worldStore.setEventBus(self._eventBus);
+
+                worldStore.init().then(function(ok) {
+                    if (ok && worldStore.isReady()) {
+                        Donkeycraft.Logger.info('InitSequence', 'WorldStore initialized successfully');
+                        resolve({ worldStore: worldStore });
+                    } else {
+                        Donkeycraft.Logger.warn('InitSequence', 'WorldStore init failed — world persistence disabled');
+                        resolve({}); // Graceful fallback
+                    }
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('InitSequence', 'WorldStore exception: ' + e.message);
+                resolve({}); // Graceful fallback
+            }
+        });
+    };
+
+    /**
+     * _initAssetCache — open IndexedDB connection for asset caching.
+     * Creates and initializes an AssetCache instance, returning it in the result object.
+     * @private
+     * @returns {Promise<Object>} Resolves with { assetCache } when ready.
+     */
+    Donkeycraft.InitSequence.prototype._initAssetCache = function() {
+        var self = this;
+        return new Promise(function(resolve) {
+            try {
+                if (typeof indexedDB === 'undefined') {
+                    Donkeycraft.Logger.warn('InitSequence', 'IndexedDB not available — asset cache disabled');
+                    resolve({}); // Graceful fallback, no asset cache
+                    return;
+                }
+
+                var assetCache = new Donkeycraft.AssetCache();
+
+                assetCache.init().then(function(ok) {
+                    if (ok && assetCache.isReady()) {
+                        Donkeycraft.Logger.info('InitSequence', 'AssetCache initialized successfully');
+                        resolve({ assetCache: assetCache });
+                    } else {
+                        Donkeycraft.Logger.warn('InitSequence', 'AssetCache init failed — asset cache disabled');
+                        resolve({}); // Graceful fallback
+                    }
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('InitSequence', 'AssetCache exception: ' + e.message);
+                resolve({}); // Graceful fallback
+            }
+        });
+    };
+
+    /**
+     * _initIndexedDB — open IndexedDB connections for world persistence and asset caching.
+     * Runs both WorldStore and AssetCache initialization sequentially.
+     * @private
+     * @returns {Promise<Object>} Resolves with { worldStore, assetCache } when ready.
      */
     Donkeycraft.InitSequence.prototype._initIndexedDB = function() {
+        var self = this;
         return new Promise(function(resolve) {
-            resolve({ name: 'indexeddb-ready' });
+            // Run both initializers in parallel since they don't depend on each other
+            var worldPromise = self._initWorldStore();
+            var cachePromise = self._initAssetCache();
+
+            Promise.all([worldPromise, cachePromise]).then(function(results) {
+                var worldResult = results[0] || {};
+                var cacheResult = results[1] || {};
+                resolve({
+                    worldStore: worldResult.worldStore || null,
+                    assetCache: cacheResult.assetCache || null
+                });
+            });
         });
     };
 
@@ -168,22 +248,40 @@
         // Chain phases sequentially, checking destroy flag between each phase
         var chain = Promise.resolve();
         for (var i = 0; i < phases.length; i++) {
-            chain = chain.then((function(phaseDef) {
-                return function() {
+            (function(idx) {
+                chain = chain.then(function(prevResult) {
                     if (self._destroyed) {
-                        return Promise.reject(new Error('InitSequence destroyed during phase: ' + phaseDef.name));
+                        return Promise.reject(new Error('InitSequence destroyed during phase: ' + phases[idx].name));
                     }
-                    return phaseDef.fn();
-                };
-            })({ name: phases[i].name, fn: phases[i].fn }));
+                    return phases[idx].fn().then(function(phaseResult) {
+                        // Store phase results for later merging
+                        self['_phaseResult' + idx] = phaseResult;
+                        return prevResult;
+                    });
+                });
+            })(i);
         }
 
-        // Collect results on successful completion
+        // Collect results on successful completion — merge all phase results
         return chain.then(function() {
             self._systems = {
                 config: self._config,
                 eventBus: self._eventBus
             };
+            // Merge indexedDB phase results (worldStore, assetCache) if available
+            var idbResult = self['_phaseResult3'];
+            if (idbResult) {
+                if (idbResult.worldStore) {
+                    self._systems.worldStore = idbResult.worldStore;
+                }
+                if (idbResult.assetCache) {
+                    self._systems.assetCache = idbResult.assetCache;
+                }
+            }
+            // Clean up temporary phase results
+            for (var k = 0; k < 4; k++) {
+                delete self['_phaseResult' + k];
+            }
             self._emit('init:complete', { systems: self._systems });
             return self._systems;
         }).catch(function(err) {
