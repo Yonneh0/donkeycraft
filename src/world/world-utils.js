@@ -95,7 +95,7 @@
          * @returns {{chunk: Donkeycraft.Chunk|null, lx: number, ly: number, lz: number}}
          */
         function getChunkAndLocalCoords(chunkManager, globalX, globalY, globalZ) {
-            if (globalY < 0 || globalY >= WORLD_HEIGHT) {
+            if (!chunkManager || globalY < 0 || globalY >= WORLD_HEIGHT) {
                 return { chunk: null, lx: 0, ly: 0, lz: 0 };
             }
 

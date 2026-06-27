@@ -371,6 +371,14 @@
         }
 
         /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The EndGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.EndGenerator;
+        }
+
+        /**
          * Destroy and free resources.
          */
         function destroy() {
@@ -378,6 +386,7 @@
         }
 
         return {
+            getInstance: getInstance,
             setChunkManager: setChunkManager,
             generateEndTerrain: generateEndTerrain,
             generateEndHeightmap: generateEndHeightmap,

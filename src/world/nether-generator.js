@@ -328,6 +328,14 @@
         }
 
         /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The NetherGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.NetherGenerator;
+        }
+
+        /**
          * Destroy and free resources.
          */
         function destroy() {
@@ -335,6 +343,7 @@
         }
 
         return {
+            getInstance: getInstance,
             setChunkManager: setChunkManager,
             generateNetherTerrain: generateNetherTerrain,
             generateNetherHeightmap: generateNetherHeightmap,

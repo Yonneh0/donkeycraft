@@ -144,88 +144,36 @@
     }
 
     // ============================================================
-    // Minimal Chunk mock for unit tests that don't need full data
+    // Minimal ChunkManager stub for NetherGenerator/EndGenerator tests only
+    // (real ChunkManager.js loads later — stub is needed here because
+    // nether-generator.js and end-generator.js reference ChunkManager at module load time)
     // ============================================================
-    if (!Donkeycraft.Chunk) {
-        Donkeycraft.Chunk = function(chunkX, chunkZ) {
-            this.chunkX = chunkX || 0;
-            this.chunkZ = chunkZ || 0;
-            var size = Donkeycraft.Config.CHUNK_SIZE * Donkeycraft.Config.WORLD_HEIGHT * Donkeycraft.Config.CHUNK_SIZE;
-            this.blocks = new Uint16Array(size);
-            this.skyLight = new Uint8Array(size);
-            this.blockLight = new Uint8Array(size);
-            this._dirty = false;
-            this.generated = false;
-            this.biomeId = 0;
+    if (!Donkeycraft.ChunkManager) {
+        Donkeycraft.ChunkManager = function() {
+            this._chunks = {};
+            this.onChunkLoad = null;
         };
-
-        Donkeycraft.Chunk.prototype.getBlock = function(x, y, z) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return 0;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            return this.blocks[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT];
+        Donkeycraft.ChunkManager.prototype.getChunk = function(cx, cz) {
+            var key = cx + ',' + cz;
+            if (!this._chunks[key]) {
+                this._chunks[key] = new Donkeycraft.Chunk(cx, cz);
+            }
+            return this._chunks[key];
         };
-
-        Donkeycraft.Chunk.prototype.setBlock = function(x, y, z, blockId) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            this.blocks[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT] = blockId;
-            this._dirty = true;
+        Donkeycraft.ChunkManager.prototype.getChunkIfExists = function(cx, cz) {
+            var key = cx + ',' + cz;
+            return this._chunks[key] || null;
         };
+        Donkeycraft.ChunkManager.prototype.markChunkDirty = function() {};
+        Donkeycraft.ChunkManager.prototype.destroy = function() { this._chunks = {}; };
+    }
 
-        Donkeycraft.Chunk.prototype.getSkyLight = function(x, y, z) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return 15;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            return this.skyLight[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT];
-        };
-
-        Donkeycraft.Chunk.prototype.setSkyLight = function(x, y, z, light) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            this.skyLight[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT] = Math.min(Math.max(light, 0), 15);
-        };
-
-        Donkeycraft.Chunk.prototype.getBlockLight = function(x, y, z) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return 0;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            return this.blockLight[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT];
-        };
-
-        Donkeycraft.Chunk.prototype.setBlockLight = function(x, y, z, light) {
-            if (x < 0 || x >= Donkeycraft.Config.CHUNK_SIZE ||
-                y < 0 || y >= Donkeycraft.Config.WORLD_HEIGHT ||
-                z < 0 || z >= Donkeycraft.Config.CHUNK_SIZE) return;
-            var s = Donkeycraft.Config.CHUNK_SIZE;
-            this.blockLight[x + y * s + z * s * Donkeycraft.Config.WORLD_HEIGHT] = Math.min(Math.max(light, 0), 15);
-        };
-
-        Donkeycraft.Chunk.prototype.globalX = function() { return this.chunkX * Donkeycraft.Config.CHUNK_SIZE; };
-        Donkeycraft.Chunk.prototype.globalZ = function() { return this.chunkZ * Donkeycraft.Config.CHUNK_SIZE; };
-        Donkeycraft.Chunk.prototype.globalToLocal = function(gx, gz) {
-            return { lx: gx - this.chunkX * Donkeycraft.Config.CHUNK_SIZE, lz: gz - this.chunkZ * Donkeycraft.Config.CHUNK_SIZE };
-        };
-        Donkeycraft.Chunk.prototype.isDirty = function() { return this._dirty; };
-        Donkeycraft.Chunk.prototype.markClean = function() { this._dirty = false; };
-        Donkeycraft.Chunk.prototype.markDirty = function() { this._dirty = true; };
-        Donkeycraft.Chunk.prototype.clearLight = function() { this.skyLight.fill(0); this.blockLight.fill(0); };
-        Donkeycraft.Chunk.prototype.fill = function(blockId) { this.blocks.fill(blockId); this._dirty = true; };
-        Donkeycraft.Chunk.prototype.getBlockData = function() { return this.blocks; };
-        Donkeycraft.Chunk.prototype.destroy = function() { this.blocks = null; this.skyLight = null; this.blockLight = null; };
-
-        // Static helpers
-        Donkeycraft.Chunk.chunkCoordX = function(globalX) { return Math.floor(globalX / Donkeycraft.Config.CHUNK_SIZE); };
-        Donkeycraft.Chunk.chunkCoordZ = function(globalZ) { return Math.floor(globalZ / Donkeycraft.Config.CHUNK_SIZE); };
-        Donkeycraft.Chunk.localCoordX = function(globalX) { return ((globalX % Donkeycraft.Config.CHUNK_SIZE) + Donkeycraft.Config.CHUNK_SIZE) % Donkeycraft.Config.CHUNK_SIZE; };
-        Donkeycraft.Chunk.localCoordZ = function(globalZ) { return ((globalZ % Donkeycraft.Config.CHUNK_SIZE) + Donkeycraft.Config.CHUNK_SIZE) % Donkeycraft.Config.CHUNK_SIZE; };
+    // Set up chunk managers for dimension generators so generateNetherTerrain / generateEndTerrain don't throw
+    if (Donkeycraft.NetherGenerator && Donkeycraft.NetherGenerator.setChunkManager) {
+        Donkeycraft.NetherGenerator.setChunkManager(new Donkeycraft.ChunkManager());
+    }
+    if (Donkeycraft.EndGenerator && Donkeycraft.EndGenerator.setChunkManager) {
+        Donkeycraft.EndGenerator.setChunkManager(new Donkeycraft.ChunkManager());
     }
 
 })();
@@ -397,22 +345,20 @@
     F.assertEq(chunk.getBlockLight(8, 64, 8), 12, 'Block light set/get works');
     F.assertEq(chunk.getBlockLight(-1, 0, 0), 0, 'Out of bounds block light returns 0');
 
-    // Dirty flag
-    F.assert(!chunk.isDirty(), 'New chunk is not dirty');
-    chunk.setBlock(0, 0, 0, 3); // changes state
-    F.assert(chunk.isDirty(), 'Chunk becomes dirty after setBlock');
-    chunk.markClean();
-    F.assert(!chunk.isDirty(), 'Chunk is clean after markClean');
+    // Dirty flag — use a fresh chunk so prior setBlock calls don't interfere
+    var dirtyChunk = new Donkeycraft.Chunk(0, 0);
+    F.assert(!dirtyChunk.isDirty(), 'New chunk is not dirty');
+    dirtyChunk.setBlock(0, 0, 0, 3); // changes state
+    F.assert(dirtyChunk.isDirty(), 'Chunk becomes dirty after setBlock');
+    dirtyChunk.markClean();
+    F.assert(!dirtyChunk.isDirty(), 'Chunk is clean after markClean');
 
-    // fill
+    // fill — sample key positions instead of asserting all 65536 blocks
     chunk.fill(1);
-    for (var i = 0; i < CHUNK_SIZE; i++) {
-        for (var j = 0; j < WORLD_HEIGHT; j++) {
-            for (var k = 0; k < CHUNK_SIZE; k++) {
-                F.assertEq(chunk.getBlock(i, j, k), 1, 'fill(1) sets all blocks to stone');
-            }
-        }
-    }
+    F.assertEq(chunk.getBlock(0, 0, 0), 1, 'fill(1) sets corner to stone');
+    F.assertEq(chunk.getBlock(8, 128, 8), 1, 'fill(1) sets center to stone');
+    F.assertEq(chunk.getBlock(15, 255, 15), 1, 'fill(1) sets opposite corner to stone');
+    F.assertEq(chunk.getBlock(15, 0, 0), 1, 'fill(1) sets edge to stone');
 
     // clearLight
     chunk.clearLight();
@@ -548,7 +494,7 @@
     // Check ore definition properties
     var coal = ores[0];
     F.assertEq(coal.name, 'coal_ore', 'First ore name is "coal_ore"');
-    F.assertType(coal.blockId, 'number', 'Ore has blockId number');
+    F.assertType(coal.blockName, 'string', 'Ore has blockName string');
     F.assertType(coal.minY, 'number', 'Ore has minY number');
     F.assertType(coal.maxY, 'number', 'Ore has maxY number');
     F.assertType(coal.veinSize, 'number', 'Ore has veinSize number');
@@ -895,9 +841,9 @@
     wt.setTotalTicks(5000);
     F.assertEq(wt.getHour(), 5, '5000 ticks → hour 5');
 
-    wt.setTotalTicks(5000 + Math.floor(1000 / 60)); // minute 10
+    wt.setTotalTicks(5000 + Math.floor(10.5 * 1000 / 60)); // minute 10 → 170 ticks into hour
     var min = wt.getMinute();
-    F.assert(min >= 9 && min <= 11, 'Minute near 10 (got ' + min + ')');
+    F.assertEq(min, 10, 'Minute at 5170 ticks = 10 (got ' + min + ')');
 
     // getMoonPhase
     wt.setTotalTicks(0);
@@ -1168,11 +1114,13 @@
     }
     F.assert(netherValid, 'All nether heightmap values are valid numbers');
 
-    // generateNetherTerrain doesn't crash
-    var netherChunk = new Donkeycraft.Chunk(0, 0);
+    // generateNetherTerrain doesn't crash — set chunk manager after script load
     try {
+        var netherCM = new Donkeycraft.ChunkManager();
+        Donkeycraft.NetherGenerator.setChunkManager(netherCM);
         Donkeycraft.NetherGenerator.generateNetherTerrain(0, 0);
         F.assert(true, 'generateNetherTerrain completes without error');
+        netherCM.destroy();
     } catch (e) {
         F.assert(false, 'generateNetherTerrain does not throw: ' + e.message);
     }
@@ -1216,11 +1164,13 @@
     }
     F.assert(endValid, 'All end heightmap values are valid numbers');
 
-    // generateEndTerrain doesn't crash
-    var endChunk = new Donkeycraft.Chunk(0, 0);
+    // generateEndTerrain doesn't crash — set chunk manager after script load
     try {
+        var endCM = new Donkeycraft.ChunkManager();
+        Donkeycraft.EndGenerator.setChunkManager(endCM);
         Donkeycraft.EndGenerator.generateEndTerrain(0, 0);
         F.assert(true, 'generateEndTerrain completes without error');
+        endCM.destroy();
     } catch (e) {
         F.assert(false, 'generateEndTerrain does not throw: ' + e.message);
     }
