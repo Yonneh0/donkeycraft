@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 17 Tools & Item Durability Test</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Phase 17: Tools & Item Durability Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: Tool Materials, Speed Multipliers, Correct-For-Drop, Durability System</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 3 Block System -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
+
+<!-- Phase 4 World Generation -->
+<script src="../src/world/biome.js"></script>
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/terrain-generator.js"></script>
+<script src="../src/world/ore-generator.js"></script>
+<script src="../src/world/cave-generator.js"></script>
+<script src="../src/world/structure-generator.js"></script>
+<script src="../src/world/water-generator.js"></script>
+<script src="../src/world/terrain-surface.js"></script>
+<script src="../src/world/lighting-engine.js"></script>
+<script src="../src/world/physics.js"></script>
+<script src="../src/world/world-utils.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Phase 17: Tools & Item Durability -->
+<script src="../src/game/tool.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: ToolRegistry — Namespace & Core
+    // ============================================================
+    F.section('1. ToolRegistry — Namespace & Core');
+
+    F.assert(typeof Donkeycraft.ToolMaterial === 'function', 'Donkeycraft.ToolMaterial constructor exists');
+    F.assert(typeof Donkeycraft.ToolRegistry === 'object', 'Donkeycraft.ToolRegistry exists');
+    F.assert(typeof Donkeycraft.Tool === 'function', 'Donkeycraft.Tool constructor exists');
+
+    F.assertType(Donkeycraft.ToolRegistry.getToolMaterial, 'function', 'getToolMaterial is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getToolMaterialByName, 'function', 'getToolMaterialByName is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getAllToolMaterials, 'function', 'getAllToolMaterials is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getMaterialCount, 'function', 'getMaterialCount is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getDurability, 'function', 'getDurability is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getSpeedMultiplier, 'function', 'getSpeedMultiplier is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getEnchantability, 'function', 'getEnchantability is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getRepairItemBlockId, 'function', 'getRepairItemBlockId is a function');
+    F.assertType(Donkeycraft.ToolRegistry.calculateBreakTime, 'function', 'calculateBreakTime is a function');
+    F.assertType(Donkeycraft.ToolRegistry.isCorrectForDrop, 'function', 'isCorrectForDrop is a function');
+    F.assertType(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe, 'function', 'isBlockMinedByPickaxe is a function');
+    F.assertType(Donkeycraft.ToolRegistry.isBlockMinedByShovel, 'function', 'isBlockMinedByShovel is a function');
+    F.assertType(Donkeycraft.ToolRegistry.isBlockMinedByAxe, 'function', 'isBlockMinedByAxe is a function');
+    F.assertType(Donkeycraft.ToolRegistry.isBlockMinedByHoe, 'function', 'isBlockMinedByHoe is a function');
+    F.assertType(Donkeycraft.ToolRegistry.getCorrectToolForBlock, 'function', 'getCorrectToolForBlock is a function');
+
+    // Tool prototype methods
+    F.assertType(Donkeycraft.Tool.prototype.takeDamage, 'function', 'takeDamage is a function');
+    F.assertType(Donkeycraft.Tool.prototype.getRemainingDurability, 'function', 'getRemainingDurability is a function');
+    F.assertType(Donkeycraft.Tool.prototype.getMaxDurability, 'function', 'getMaxDurability is a function');
+    F.assertType(Donkeycraft.Tool.prototype.getDurabilityFraction, 'function', 'getDurabilityFraction is a function');
+    F.assertType(Donkeycraft.Tool.prototype.isBroken, 'function', 'isBroken is a function');
+    F.assertType(Donkeycraft.Tool.prototype.repairWithItem, 'function', 'repairWithItem is a function');
+    F.assertType(Donkeycraft.Tool.prototype.getMaterialId, 'function', 'getMaterialId is a function');
+    F.assertType(Donkeycraft.Tool.prototype.getToolBlockId, 'function', 'getToolBlockId is a function');
+    F.assertType(Donkeycraft.Tool.prototype.destroy, 'function', 'destroy is a function');
+
+    // ============================================================
+    // Section 2: Tool Material Registration — All 6 materials + None
+    // ============================================================
+    F.section('2. Tool Material Registration');
+
+    var matCount = Donkeycraft.ToolRegistry.getMaterialCount();
+    F.assertEq(matCount, 7, '7 tool materials registered (None + 6 tiers)');
+
+    // Check each material
+    var wood = Donkeycraft.ToolRegistry.getToolMaterial(1);
+    F.assert(wood !== null, 'Wood material (ID 1) exists');
+    F.assertEq(wood.name, 'Wood', 'Wood name is correct');
+    F.assertEq(wood.durabilityCount, 60, 'Wood durability is 60');
+    F.assertEq(wood.speedMultiplier, 2.0, 'Wood speed multiplier is 2.0');
+    F.assertEq(wood.hardnessLevel, 0, 'Wood hardness level is 0');
+    F.assertEq(wood.enchantability, 15, 'Wood enchantability is 15');
+
+    var stone = Donkeycraft.ToolRegistry.getToolMaterial(2);
+    F.assert(stone !== null, 'Stone material (ID 2) exists');
+    F.assertEq(stone.durabilityCount, 132, 'Stone durability is 132');
+    F.assertEq(stone.speedMultiplier, 4.0, 'Stone speed multiplier is 4.0');
+
+    var iron = Donkeycraft.ToolRegistry.getToolMaterial(3);
+    F.assert(iron !== null, 'Iron material (ID 3) exists');
+    F.assertEq(iron.durabilityCount, 251, 'Iron durability is 251');
+    F.assertEq(iron.speedMultiplier, 6.0, 'Iron speed multiplier is 6.0');
+
+    var diamond = Donkeycraft.ToolRegistry.getToolMaterial(4);
+    F.assert(diamond !== null, 'Diamond material (ID 4) exists');
+    F.assertEq(diamond.durabilityCount, 1562, 'Diamond durability is 1562');
+    F.assertEq(diamond.speedMultiplier, 8.0, 'Diamond speed multiplier is 8.0');
+
+    var gold = Donkeycraft.ToolRegistry.getToolMaterial(5);
+    F.assert(gold !== null, 'Gold material (ID 5) exists');
+    F.assertEq(gold.durabilityCount, 196, 'Gold durability is 196');
+    F.assertEq(gold.speedMultiplier, 12.0, 'Gold speed multiplier is 12.0');
+
+    var netherite = Donkeycraft.ToolRegistry.getToolMaterial(6);
+    F.assert(netherite !== null, 'Netherite material (ID 6) exists');
+    F.assertEq(netherite.durabilityCount, 2032, 'Netherite durability is 2032');
+    F.assertEq(netherite.speedMultiplier, 9.0, 'Netherite speed multiplier is 9.0');
+
+    // None (bare hands)
+    var none = Donkeycraft.ToolRegistry.getToolMaterial(0);
+    F.assert(none !== null, 'None material (ID 0) exists');
+    F.assertEq(none.durabilityCount, 0, 'None durability is 0');
+    F.assertEq(none.speedMultiplier, 1.0, 'None speed multiplier is 1.0');
+
+    // ============================================================
+    // Section 3: Material Lookup by Name
+    // ============================================================
+    F.section('3. Material Lookup by Name');
+
+    var woodByName = Donkeycraft.ToolRegistry.getToolMaterialByName('Wood');
+    F.assert(woodByName !== null, 'Lookup by name "Wood" works');
+    F.assertEq(woodByName.id, 1, 'Name lookup returns correct ID');
+
+    var diamondByLower = Donkeycraft.ToolRegistry.getToolMaterialByName('diamond');
+    F.assert(diamondByLower !== null, 'Case-insensitive name lookup works');
+    F.assertEq(diamondByLower.id, 4, 'Lowercase lookup returns Diamond');
+
+    var unknownMat = Donkeycraft.ToolRegistry.getToolMaterialByName('NonExistent');
+    F.assert(unknownMat === null, 'Unknown material name returns null');
+
+    var unknownId = Donkeycraft.ToolRegistry.getToolMaterial(999);
+    F.assert(unknownId === null, 'Unknown material ID returns null');
+
+    // ============================================================
+    // Section 4: Speed Multiplier & Durability Queries
+    // ============================================================
+    F.section('4. Speed Multiplier & Durability Queries');
+
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(0), 1.0, 'None speed is 1.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(1), 2.0, 'Wood speed is 2.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(2), 4.0, 'Stone speed is 4.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(3), 6.0, 'Iron speed is 6.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(4), 8.0, 'Diamond speed is 8.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(5), 12.0, 'Gold speed is 12.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(6), 9.0, 'Netherite speed is 9.0');
+
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(0), 0, 'None durability is 0');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(1), 60, 'Wood durability is 60');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(2), 132, 'Stone durability is 132');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(3), 251, 'Iron durability is 251');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(4), 1562, 'Diamond durability is 1562');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(5), 196, 'Gold durability is 196');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(6), 2032, 'Netherite durability is 2032');
+
+    // Invalid material ID returns defaults
+    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(999), 1.0, 'Invalid speed returns 1.0');
+    F.assertEq(Donkeycraft.ToolRegistry.getDurability(999), 0, 'Invalid durability returns 0');
+
+    // ============================================================
+    // Section 5: Enchantability & Repair Item Queries
+    // ============================================================
+    F.section('5. Enchantability & Repair Item Queries');
+
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(1), 15, 'Wood enchantability is 15');
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(2), 5, 'Stone enchantability is 5');
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(3), 14, 'Iron enchantability is 14');
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(4), 10, 'Diamond enchantability is 10');
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(5), 22, 'Gold enchantability is 22 (highest)');
+    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(6), 15, 'Netherite enchantability is 15');
+
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(1), 5, 'Wood repair item ID is 5');
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(2), 1, 'Stone repair item ID is 1');
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(3), 221, 'Iron repair item ID is 221');
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(4), 227, 'Diamond repair item ID is 227');
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(5), 226, 'Gold repair item ID is 226');
+    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(6), 187, 'Netherite repair item ID is 187');
+
+    // ============================================================
+    // Section 6: Break Time Calculation
+    // ============================================================
+    F.section('6. Break Time Calculation');
+
+    // Stone hardness = 1.5
+    // Bare hands (speed 1.0): breakTime = 1.5 * 1.5 / 1.0 = 2.25 seconds → ~45 ticks
+    var handBreak = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 0, 'none');
+    F.assert(handBreak > 0, 'Bare hands break time > 0 (got ' + handBreak + ')');
+
+    // Wood pickaxe (speed 2.0): breakTime = 1.5 * 1.5 / 2.0 = 1.125 seconds
+    var woodPickBreak = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 1, 'pickaxe');
+    F.assert(woodPickBreak < handBreak, 'Wood pickaxe breaks faster than hands');
+
+    // Iron pickaxe (speed 6.0): much faster
+    var ironPickBreak = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 3, 'pickaxe');
+    F.assert(ironPickBreak < woodPickBreak, 'Iron pickaxe breaks faster than wood');
+
+    // Diamond pickaxe (speed 8.0): even faster
+    var diamondPickBreak = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 4, 'pickaxe');
+    F.assert(diamondPickBreak < ironPickBreak, 'Diamond pickaxe breaks faster than iron');
+
+    // Gold pickaxe (speed 12.0): fastest but low durability
+    var goldPickBreak = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 5, 'pickaxe');
+    F.assert(goldPickBreak < diamondPickBreak, 'Gold pickaxe breaks faster than diamond');
+
+    // Zero hardness block (air) should have 0 break time
+    var airBreak = Donkeycraft.ToolRegistry.calculateBreakTime(0, 4, 'pickaxe');
+    F.assertEq(airBreak, 0, 'Zero hardness block has 0 break time');
+
+    // Negative hardness clamped to 0
+    var negBreak = Donkeycraft.ToolRegistry.calculateBreakTime(-1, 4, 'pickaxe');
+    F.assertEq(negBreak, 0, 'Negative hardness block has 0 break time');
+
+    // ============================================================
+    // Section 7: Correct-For-Drop Detection
+    // ============================================================
+    F.section('7. Correct-For-Drop Detection');
+
+    // isCorrectForDrop returns tool type string when material > 0
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 3) === 'pickaxe', 'Iron pickaxe is correct tool type');
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('shovel', 3) === 'shovel', 'Iron shovel is correct tool type');
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('axe', 3) === 'axe', 'Iron axe is correct tool type');
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('hoe', 3) === 'hoe', 'Iron hoe is correct tool type');
+
+    // Bare hands (material 0) never correct
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 0) === false, 'Bare hands never correct for drop');
+
+    // Invalid material returns false
+    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 999) === false, 'Invalid material returns false');
+
+    // ============================================================
+    // Section 8: Block Type Detection (Pickaxe)
+    // ============================================================
+    F.section('8. Block Type Detection — Pickaxe Blocks');
+
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(1) === true, 'Stone requires pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(15) === true, 'Iron ore requires pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(17) === true, 'Diamond ore requires pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(46) === true, 'Obsidian requires pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(56) === true, 'Iron block requires pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(7) === false, 'Dirt does not require pickaxe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(96) === false, 'Oak planks (ID 96) do not require pickaxe');
+
+    // ============================================================
+    // Section 9: Block Type Detection (Shovel)
+    // ============================================================
+    F.section('9. Block Type Detection — Shovel Blocks');
+
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(7) === true, 'Dirt requires shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(8) === true, 'Grass block requires shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(9) === true, 'Gravel requires shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(13) === true, 'Sand requires shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(32) === true, 'Clay requires shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(1) === false, 'Stone does not require shovel');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(96) === false, 'Oak planks (ID 96) do not require shovel');
+
+    // ============================================================
+    // Section 10: Block Type Detection (Axe)
+    // ============================================================
+    F.section('10. Block Type Detection — Axe Blocks');
+
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(96) === true, 'Oak planks (ID 96) require axe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(106) === true, 'Chest (ID 106) requires axe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(107) === true, 'Ladder (ID 107) requires axe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(1) === false, 'Stone does not require axe');
+    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(7) === false, 'Dirt does not require axe');
+
+    // ============================================================
+    // Section 11: getCorrectToolForBlock
+    // ============================================================
+    F.section('11. getCorrectToolForBlock');
+
+    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(1), 'pickaxe', 'Stone → pickaxe');
+    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(7), 'shovel', 'Dirt → shovel');
+    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(96), 'axe', 'Oak planks (ID 96) → axe');
+    F.assert(Donkeycraft.ToolRegistry.getCorrectToolForBlock(999) === null, 'Unknown block ID 999 returns null');
+
+    // ============================================================
+    // Section 12: Tool — Construction & Initial State
+    // ============================================================
+    F.section('12. Tool — Construction & Initial State');
+
+    var woodTool = new Donkeycraft.Tool(1, 257); // Wood sword
+    F.assertEq(woodTool.getMaterialId(), 1, 'Wood tool material ID is 1');
+    F.assertEq(woodTool.getToolBlockId(), 257, 'Wood tool block ID is 257');
+    F.assertEq(woodTool.getMaxDurability(), 60, 'Wood tool max durability is 60');
+    F.assertEq(woodTool.getRemainingDurability(), 60, 'Wood tool remaining durability is 60 (new)');
+    F.assertEq(woodTool.getDurabilityFraction(), 1.0, 'New wood tool has durability fraction 1.0');
+    F.assert(woodTool.isBroken() === false, 'New wood tool is not broken');
+
+    var diamondTool = new Donkeycraft.Tool(4, 259); // Diamond pickaxe
+    F.assertEq(diamondTool.getMaxDurability(), 1562, 'Diamond tool max durability is 1562');
+    F.assertEq(diamondTool.getRemainingDurability(), 1562, 'Diamond tool remaining durability is 1562 (new)');
+    F.assert(diamondTool.isBroken() === false, 'New diamond tool is not broken');
+
+    var goldTool = new Donkeycraft.Tool(5, 258); // Gold sword
+    F.assertEq(goldTool.getMaxDurability(), 196, 'Gold tool max durability is 196');
+
+    // None (bare hands) — no durability
+    var handTool = new Donkeycraft.Tool(0, 0);
+    F.assertEq(handTool.getMaxDurability(), 0, 'Hand tool max durability is 0');
+    F.assertEq(handTool.getRemainingDurability(), 0, 'Hand tool remaining durability is 0');
+    F.assertEq(handTool.getDurabilityFraction(), 0, 'Hand tool durability fraction is 0');
+
+    // ============================================================
+    // Section 13: Tool — takeDamage & Break Detection
+    // ============================================================
+    F.section('13. Tool — takeDamage & Break Detection');
+
+    var testTool = new Donkeycraft.Tool(1, 257); // Wood tool (60 durability)
+
+    // Take damage in increments
+    var broke1 = testTool.takeDamage(10);
+    F.assert(broke1 === false, 'Taking 10 damage does not break wood tool');
+    F.assertEq(testTool.getRemainingDurability(), 50, 'After 10 damage, remaining is 50');
+
+    var broke2 = testTool.takeDamage(30);
+    F.assert(broke2 === false, 'Taking 30 more damage does not break wood tool');
+    F.assertEq(testTool.getRemainingDurability(), 20, 'After 40 total damage, remaining is 20');
+
+    var broke3 = testTool.takeDamage(20);
+    F.assert(broke3 === true, 'Taking 20 more damage breaks wood tool (60/60)');
+    F.assertEq(testTool.getRemainingDurability(), 0, 'Broken tool has 0 remaining durability');
+    F.assert(testTool.isBroken() === true, 'Tool is broken after durability exhausted');
+
+    // Taking more damage on broken tool returns false (already broken)
+    var broke4 = testTool.takeDamage(1);
+    F.assert(broke4 === false, 'Taking damage on already broken tool returns false');
+    F.assertEq(testTool.getRemainingDurability(), 0, 'Broken tool stays at 0 durability');
+
+    // ============================================================
+    // Section 14: Tool — Durability Fraction at Various Levels
+    // ============================================================
+    F.section('14. Tool — Durability Fraction');
+
+    var fracTool = new Donkeycraft.Tool(3, 259); // Iron tool (251 durability)
+
+    F.assertEq(fracTool.getDurabilityFraction(), 1.0, 'New iron tool fraction is 1.0');
+
+    fracTool.takeDamage(125);
+    var fracAfterHalf = fracTool.getDurabilityFraction();
+    F.assert(fracAfterHalf > 0 && fracAfterHalf < 0.6, 'Iron tool at ~50% damage has fraction around 0.5 (got ' + fracAfterHalf + ')');
+
+    fracTool.takeDamage(126);
+    F.assertEq(fracTool.getDurabilityFraction(), 0, 'Fully broken tool has fraction 0');
+
+    // ============================================================
+    // Section 15: Tool — Repair Mechanics
+    // ============================================================
+    F.section('15. Tool — Repair Mechanics');
+
+    var repairTool = new Donkeycraft.Tool(1, 257); // Wood tool (60 durability)
+    repairTool.takeDamage(40);
+    F.assertEq(repairTool.getRemainingDurability(), 20, 'Tool has 20 remaining before repair');
+
+    // Repair with correct material (ID 5 = oak plank for wood)
+    var repaired = repairTool.repairWithItem(5);
+    F.assert(repaired > 0, 'Repairing with correct material restores durability');
+    F.assert(repairTool.isBroken() === false, 'Repaired tool is not broken');
+
+    // Should not exceed max
+    F.assert(repairTool.getRemainingDurability() <= repairTool.getMaxDurability(), 'Repair does not exceed max durability');
+
+    // Repair with wrong material returns 0
+    var wrongRepair = repairTool.repairWithItem(999);
+    F.assertEq(wrongRepair, 0, 'Repairing with wrong material restores 0 durability');
+
+    // ============================================================
+    // Section 16: Tool — Edge Cases & Null Handling
+    // ============================================================
+    F.section('16. Tool — Edge Cases & Null Handling');
+
+    // Zero damage (should not break)
+    var edgeTool = new Donkeycraft.Tool(4, 259);
+    var zeroBroke = edgeTool.takeDamage(0);
+    F.assert(zeroBroke === false, 'Zero damage does not break tool');
+    F.assertEq(edgeTool.getRemainingDurability(), 1562, 'Diamond tool still at 1562 after zero damage');
+
+    // Negative damage (treated as zero via || default)
+    var negBroke = edgeTool.takeDamage(-5);
+    F.assert(negBroke === false, 'Negative damage does not break tool');
+
+    // Over-max damage (should not go below 0)
+    var overTool = new Donkeycraft.Tool(1, 257); // 60 durability
+    overTool.takeDamage(100);
+    F.assertEq(overTool.getRemainingDurability(), 0, 'Over-damaged tool stays at 0');
+
+    // Durability fraction for zero-max tool (hands)
+    var handFrac = new Donkeycraft.Tool(0, 0).getDurabilityFraction();
+    F.assertEq(handFrac, 0, 'Hand tool durability fraction is 0');
+
+    // ============================================================
+    // Section 17: Tool — getAllToolMaterials
+    // ============================================================
+    F.section('17. Tool — getAllToolMaterials');
+
+    var allMats = Donkeycraft.ToolRegistry.getAllToolMaterials();
+    F.assertEq(allMats.length, 7, 'getAllToolMaterials returns 7 materials');
+
+    // Check that all returned items have required properties
+    var validMats = true;
+    for (var i = 0; i < allMats.length; i++) {
+        if (allMats[i].id === undefined || allMats[i].name === undefined || allMats[i].durabilityCount === undefined) {
+            validMats = false;
+            break;
+        }
+    }
+    F.assert(validMats, 'All materials have id, name, and durabilityCount properties');
+
+    // ============================================================
+    // Section 18: Integration — Tool + Registry Interaction
+    // ============================================================
+    F.section('18. Integration — Tool + Registry Interaction');
+
+    // Create tool and verify registry values match
+    var intTool = new Donkeycraft.Tool(6, 260); // Netherite tool
+    var matFromRegistry = Donkeycraft.ToolRegistry.getToolMaterial(intTool.getMaterialId());
+    F.assert(matFromRegistry !== null, 'Tool material ID from instance exists in registry');
+    F.assertEq(intTool.getMaxDurability(), matFromRegistry.durabilityCount, 'Tool max durability matches registry');
+
+    // Verify repair item ID consistency
+    var expectedRepairId = Donkeycraft.ToolRegistry.getRepairItemBlockId(6);
+    F.assertEq(expectedRepairId, 187, 'Netherite repair item ID is 187 (netherite ingot)');
+
+    // ============================================================
+    // Section 19: Integration — destroy Method
+    // ============================================================
+    F.section('19. Integration — destroy Methods');
+
+    var destroyTool = new Donkeycraft.Tool(3, 259);
+    try {
+        destroyTool.destroy();
+        F.assert(true, 'Tool.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'Tool.destroy() threw: ' + e.message);
+    }
+
+    // After destroy, material ID should be 0
+    F.assertEq(destroyTool.getMaterialId(), 0, 'Destroyed tool material ID is 0');
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>

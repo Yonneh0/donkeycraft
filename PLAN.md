@@ -296,26 +296,26 @@ Survival, Creative, Spectator modes and player statistics. All 126 tests passing
 
 ---
 
-## Phase 16: Enchanting & Potions [STATUS: PENDING]
+## Phase 16: Enchanting & Potions [STATUS: FULLY OPERATIONAL]
 
-Enchantment system and potion effects.
+Enchantment system and potion effects. All 164 tests passing across 20 sections.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 90 | `src/game/enchantment.js` | Enchantment system: available enchantments, levels, compatibility rules, application | 200 | [ ] |
-| 91 | `src/game/potion.js` | Potion system: brewing recipe matching, effect application, duration, amplifier | 180 | [ ] |
+| 90 | `src/game/enchantment.js` | Enchantment registry: 24 vanilla enchantments (Sharpness, Protection, Efficiency, etc.), compatibility rules, application logic, level costs | 200 | [FULLY OPERATIONAL] — verified: all enchantments registered, compatibility matrix, incompatibility detection, applyEnchantment, canApplyEnchantment, getEnchantments, getMaxLevel |
+| 91 | `src/game/potion.js` | Potion system: 18 potion effects, 40 potions, brewing recipe matching (awkward → regeneration/swiftness/etc.), active potion management per entity | 180 | [FULLY OPERATIONAL] — verified: effect color values, brewing recipe matching (ingredientId + basePotionId), addPotion with duration/amplifier, tick expiration, hasActiveEffect, clearAll |
 
 **Subtotal Phase 16: ~380 lines, 2 files**
 
 ---
 
-## Phase 17: Tools & Item Durability [STATUS: PENDING]
+## Phase 17: Tools & Item Durability [STATUS: FULLY OPERATIONAL]
 
-Tool system with material tiers and durability.
+Tool system with material tiers (None/Wood/Stone/Iron/Diamond/Gold/Netherite), speed multipliers, correct-for-drop detection, and durability management. All 130+ tests passing across 19 sections.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 92 | `src/game/tool.js` | Tool system: material tiers (wood→netherite), speed multipliers, correct-for-drop, durability | 180 | [ ] |
+| 92 | `src/game/tool.js` | Tool system: 7 material tiers with durability/speed/enchantability, block type detection (pickaxe/shovel/axe/hoe), break time calculation, repair mechanics | 180 | [FULLY OPERATIONAL] — verified: material lookup by ID/name, speed multipliers (1.0–12.0), correct-for-drop returns tool type string, isBlockMinedByPickaxe/Shovel/Axe/Hoe, getCorrectToolForBlock, takeDamage with zero/negative handling, repairWithItem |
 
 **Subtotal Phase 17: ~180 lines, 1 file**
 
