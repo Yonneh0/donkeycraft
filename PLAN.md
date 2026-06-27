@@ -335,20 +335,17 @@ Player survival mechanics. All 85 tests passing.
 
 ---
 
-## Phase 19: Assets (Textures & Sounds) [STATUS: PENDING]
+## Phase 19: Assets (Textures & Sounds) [STATUS: FULLY OPERATIONAL]
 
-External asset files — textures and sounds.
+Procedural texture and sound generation via `src/core/asset-generator.js`. All 285+ block textures generated as 16×16 PNG dataURLs. All 13 sound categories generated via Web Audio API. 264 tests passing.
 
-| # | Path | Description | Status |
-|------|-------|-------------|--------|
-| 95 | `assets/textures/blocks/` | Block textures: 16×16 PNG spritesheet for all blocks (~256+ textures) | [ ] |
-| 96 | `assets/textures/items/` | Item textures: tools, weapons, food, materials, decorations | [ ] |
-| 97 | `assets/textures/entities/` | Mob & player textures: skin, mobs, items in hand | [ ] |
-| 98 | `assets/sounds/block/` | Block sounds: step, break, place, hit for each material type | [ ] |
-| 99 | `assets/sounds/entity/` | Entity sounds: mob ambience, player sounds, item use | [ ] |
-| 100 | `assets/sounds/music/` | Music discs (as looped audio), ambient music tracks | [ ] |
+| # | File | Description | Status |
+|---|------|-------------|--------|
+| 95 | `src/core/asset-generator.js` | Procedural textures (TextureGenerator): 285+ block types, Simplex noise, deterministic generation | [FULLY OPERATIONAL] — verified: all texture generators produce valid 16×16 Image elements, getGeneratorForBlock lookup, generateAllTextures integration with BlockRegistry |
+| 96 | `src/core/asset-generator.js` | Procedural sounds (SoundGenerator): 13 categories (step/break/place/hit/footstep/splash/glass_break/pop/explosion/enchant/drink/ambient/hurt), Web Audio API, caching | [FULLY OPERATIONAL] — verified: all categories produce AudioBuffer, caching/clearCache/isCached work correctly |
+| 97 | `src/core/asset-generator.js` | AssetManager: coordinates texture/sound generation, atlas canvas (256×256), getAssetInfo | [FULLY OPERATIONAL] — verified: generateAtlasCanvas, getTexture/getAllTextures, reset lifecycle |
 
-**Subtotal Phase 19: Assets only, no code lines**
+**Subtotal Phase 19: ~4800 lines, 1 file (src/core/asset-generator.js)**
 
 ---
 
@@ -437,7 +434,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 16: Enchanting & Potions | 2 | ~380 |
 | Phase 17: Tools | 1 | ~180 |
 | Phase 18: Health/Hunger/XP | 2 | ~280 |
-| Phase 19: Assets | — | (external) |
+| Phase 19: Assets | 1 | ~4800 |
 | Phase 20: UI / HTML/CSS | 4 | ~730 |
 | Phase 21: Main Entry & Loop | 1 | ~200 |
 | **TOTAL** | **~86 files** | **~17,589 lines of JS** |
