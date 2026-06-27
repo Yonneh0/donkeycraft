@@ -357,29 +357,39 @@
 
         /**
          * Get the texture UV for a specific block and face.
+         * Returns UV coordinates assuming a standard 16×16 texture atlas where each
+         * texture occupies a 1/16 × 1/16 cell (UV range 0-1).
          * @param {number} blockId - Block ID.
          * @param {string} faceName — Face name: "up", "down", "north", "south", "east", "west".
-         * @returns {{u: number, v: number, uSize: number, vSize: number}|null} UV coords from atlas, or null.
+         * @returns {{blockId: number, faceName: string, textureName: string, u: number, v: number, uSize: number, vSize: number}|null}
+         *   UV coords from atlas (UV normalized 0-1), or null if block not found.
          */
         function getFaceUV(blockId, faceName) {
             var model = _models[blockId];
             if (!model) return null;
 
             var textureName = model.getFaceTexture(faceName);
-            // Look up the block ID for this texture name
             var textureBlock = Donkeycraft.BlockRegistry.getBlockByName(textureName);
             var lookupId = textureBlock ? textureBlock.id : blockId;
 
-            // Try to get UVs from TextureAtlas if available
-            if (Donkeycraft.TextureAtlas && Donkeycraft.TextureAtlas.prototype) {
-                // Note: we can't call getUVs directly without an atlas instance
-                // This is just a placeholder — actual UV lookup happens at render time
-            }
+            // Calculate UV coordinates assuming a 16×16 atlas grid (each cell = 1/16)
+            // Texture ID maps to a position in the grid: col = id % 16, row = Math.floor(id / 16)
+            var textureId = lookupId >= 0 ? lookupId : 0;
+            var col = textureId % 16;
+            var row = Math.floor(textureId / 16);
+
+            // Clamp to atlas bounds (atlas has 16 columns, rows wrap as needed)
+            col = Math.max(0, Math.min(col, 15));
+            row = Math.max(0, row);
 
             return {
                 blockId: lookupId,
                 faceName: faceName,
-                textureName: textureName
+                textureName: textureName,
+                u: col / 16,
+                v: row / 16,
+                uSize: 1 / 16,
+                vSize: 1 / 16
             };
         }
 

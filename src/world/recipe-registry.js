@@ -192,24 +192,72 @@
 
         /**
          * Rotate ingredients array clockwise N times.
+         * Converts flat array → grid → rotate → flat array.
          * @param {Donkeycraft.Recipe} recipe - The recipe to rotate.
-         * @param {number} times - Number of 90° rotations.
+         * @param {number} times - Number of 90° rotations (1-4).
          * @returns {Donkeycraft.Recipe}
          * @private
          */
         function _rotateIngredients(recipe, times) {
-            var copy = new Donkeycraft.Recipe(
+            times = ((times % 4) + 4) % 4; // normalize to 0-3
+            if (times === 0) {
+                return new Donkeycraft.Recipe(
+                    recipe.id, recipe.type,
+                    recipe.ingredients.slice(),
+                    recipe.gridSize,
+                    recipe.outputBlockId,
+                    recipe.outputCount,
+                    recipe.cookingTime
+                );
+            }
+
+            var cols = recipe.gridSize;
+            var rows = recipe.ingredients.length / cols;
+            var grid = [];
+
+            // Step 1: Convert flat array to 2D grid
+            for (var r = 0; r < rows; r++) {
+                grid[r] = [];
+                for (var c = 0; c < cols; c++) {
+                    grid[r][c] = recipe.ingredients[r * cols + c];
+                }
+            }
+
+            // Step 2: Rotate the grid clockwise N times
+            var rotatedGrid = grid;
+            for (var rot = 0; rot < times; rot++) {
+                var newGrid = [];
+                for (var nr = 0; nr < cols; nr++) {
+                    newGrid[nr] = [];
+                    for (var nc = 0; nc < rows; nc++) {
+                        newGrid[nr][nc] = rotatedGrid[rows - 1 - nc][nr];
+                    }
+                }
+                rotatedGrid = newGrid;
+                // Swap rows and cols after rotation
+                var tempRows = rows;
+                rows = cols;
+                cols = tempRows;
+            }
+
+            // Step 3: Convert rotated grid back to flat array
+            var finalCols = recipe.gridSize; // preserve original gridSize for matching
+            var finalRows = rotatedGrid.length;
+            var flatIngredients = [];
+            for (var fr = 0; fr < finalRows; fr++) {
+                for (var fc = 0; fc < finalCols; fc++) {
+                    flatIngredients.push(rotatedGrid[fr] && rotatedGrid[fr][fc] !== undefined ? rotatedGrid[fr][fc] : null);
+                }
+            }
+
+            return new Donkeycraft.Recipe(
                 recipe.id, recipe.type,
-                recipe.ingredients.slice(),
+                flatIngredients,
                 recipe.gridSize,
                 recipe.outputBlockId,
                 recipe.outputCount,
                 recipe.cookingTime
             );
-            // Simple rotation: for 3×3 grids, rotate the ingredient array
-            // For 2×2 grids, same logic applies
-            // This is a simplified rotation — full implementation would need grid reshaping
-            return copy;
         }
 
         // ============================================================
@@ -337,6 +385,26 @@
             return Object.keys(_smeltRecipes).length;
         }
 
+        /**
+         * Get a recipe by its unique ID.
+         * @param {number} id - Recipe ID.
+         * @returns {Donkeycraft.Recipe|null} The recipe, or null if not found.
+         */
+        function getRecipeById(id) {
+            for (var i = 0; i < _shapedRecipes.length; i++) {
+                if (_shapedRecipes[i].id === id) return _shapedRecipes[i];
+            }
+            for (var j = 0; j < _shapelessRecipes.length; j++) {
+                if (_shapelessRecipes[j].id === id) return _shapelessRecipes[j];
+            }
+            for (var key in _smeltRecipes) {
+                if (_smeltRecipes.hasOwnProperty(key) && _smeltRecipes[key].id === id) {
+                    return _smeltRecipes[key];
+                }
+            }
+            return null;
+        }
+
         // ============================================================
         // Register all vanilla recipes
         // ============================================================
@@ -427,8 +495,8 @@
         // Hay bale
         registerShaped(17, [310, 310, 310, 310], 2, 239, 1);     // 9 sticks -> hay_block
 
-        // Ladder
-        registerShaped(18, [310, null, 310, 310, 310, 310, null, 310], 3, 311, 4);  // sticks -> ladder
+        // Ladder (3×3 grid: 2 vertical stick columns + 5 horizontal stick slots)
+        registerShaped(18, [310, null, 310, 310, 310, 310, 310, null, 310], 3, 311, 4);  // sticks -> ladder
 
         // Torch
         registerShaped(19, [310, null, 310, null, null, null], 3, 312, 4);  // coal + sticks -> torches
@@ -723,6 +791,7 @@
 
             // Utility
             getAllRecipes: getAllRecipes,
+            getRecipeById: getRecipeById,
             getShapedCount: getShapedCount,
             getShapelessCount: getShapelessCount,
             getSmeltCount: getSmeltCount

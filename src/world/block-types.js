@@ -30,12 +30,14 @@
             _transparent[id] = b.transparent;
             _opaque[id] = b.lightOpacity >= 15;
             _liquid[id] = (b.name === 'water' || b.name === 'lava');
-            _replaceable[id] = b.hardness < 0 || b.dropBlockId === -1 && b.transparent === true && b.lightOpacity === 0;
+
+            // Replaceable: unbreakable blocks (hardness < 0) or transparent decorative blocks with no drop
+            _replaceable[id] = b.hardness < 0 || (b.dropBlockId === -1 && b.transparent === true && b.lightOpacity === 0);
 
             // Solid: not transparent and has non-negative hardness
             _solid[id] = !b.transparent && b.hardness >= 0;
 
-            // Full block: solid, opaque, not a liquid, not a plant/decoration
+            // Full block: solid, opaque, not a liquid, not a plant/decoration, must have a drop
             _fullBlock[id] = _solid[id] && _opaque[id] && !_liquid[id] &&
                              b.lightOpacity >= 15 && b.dropBlockId >= 0;
         }

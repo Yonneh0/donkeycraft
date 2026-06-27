@@ -121,12 +121,13 @@
         registerBlock(23, 'cut_sandstone', 0.8, 0.8, 21, 1, false, false, 0, 15);
 
         // Wood and planks (IDs 24-39)
-        registerBlock(24, 'oak_log', 2.0, 2.0, 27, 1, false, false, 0, 15);
-        registerBlock(25, 'spruce_log', 2.0, 2.0, 28, 1, false, false, 0, 15);
-        registerBlock(26, 'birch_log', 2.0, 2.0, 29, 1, false, false, 0, 15);
-        registerBlock(27, 'jungle_log', 2.0, 2.0, 30, 1, false, false, 0, 15);
-        registerBlock(28, 'acacia_log', 2.0, 2.0, 35, 1, false, false, 0, 15);
-        registerBlock(29, 'dark_oak_log', 2.0, 2.0, 36, 1, false, false, 0, 15);
+        // Each log drops its corresponding plank type (4 planks per log)
+        registerBlock(24, 'oak_log', 2.0, 2.0, 30, 1, false, false, 0, 15);
+        registerBlock(25, 'spruce_log', 2.0, 2.0, 31, 1, false, false, 0, 15);
+        registerBlock(26, 'birch_log', 2.0, 2.0, 32, 1, false, false, 0, 15);
+        registerBlock(27, 'jungle_log', 2.0, 2.0, 33, 1, false, false, 0, 15);
+        registerBlock(28, 'acacia_log', 2.0, 2.0, 34, 1, false, false, 0, 15);
+        registerBlock(29, 'dark_oak_log', 2.0, 2.0, 35, 1, false, false, 0, 15);
         registerBlock(30, 'oak_planks', 2.0, 2.0, 31, 1, false, false, 0, 15);
         registerBlock(31, 'spruce_planks', 2.0, 2.0, 32, 1, false, false, 0, 15);
         registerBlock(32, 'birch_planks', 2.0, 2.0, 33, 1, false, false, 0, 15);
@@ -259,11 +260,11 @@
 
         // Stairs (IDs 135-142)
         registerBlock(135, 'stone_bricks_stairs', 1.5, 6.0, 40, 1, false, false, 0, 15);
-        registerBlock(136, 'oak_stairs', 2.0, 2.0, 140, 1, false, false, 0, 15);
+        registerBlock(136, 'oak_stairs', 2.0, 2.0, 136, 1, false, false, 0, 15);
         registerBlock(137, 'cobblestone_stairs', 2.0, 6.0, 138, 1, false, false, 0, 15);
         registerBlock(138, 'cobblestone', 2.0, 6.0, 138, 1, false, false, 0, 15);
         registerBlock(139, 'brick_stairs', 2.0, 6.0, 104, 1, false, false, 0, 15);
-        registerBlock(140, 'stone_bricks', 1.5, 6.0, 40, 1, false, false, 0, 15);
+        // ID 140 reserved — was duplicate stone_bricks registration (removed)
         registerBlock(141, 'smooth_stone_stairs', 2.0, 6.0, 113, 1, false, false, 0, 15);
         registerBlock(142, 'sandstone_stairs', 0.8, 0.8, 21, 1, false, false, 0, 15);
 
@@ -277,7 +278,7 @@
         // Doors (IDs 148-150) — transparent because they're half-height
         registerBlock(148, 'oak_door', 3.0, 3.0, 148, 1, true, false, 0, 0);
         registerBlock(149, 'iron_door', 5.0, 6.0, 149, 1, true, false, 0, 0);
-        registerBlock(150, 'spruce_door', 3.0, 3.0, 148, 1, true, false, 0, 0);
+        registerBlock(150, 'spruce_door', 3.0, 3.0, 150, 1, true, false, 0, 0);
 
         // Fences and walls (IDs 151-157)
         registerBlock(151, 'oak_fence', 2.0, 6.0, 151, 1, false, false, 0, 15);
@@ -298,7 +299,7 @@
         registerBlock(164, 'rose_bush', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(165, 'sunflower', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(166, 'lily_pad', 0.0, 0.0, 166, 1, true, false, 0, 0);
-        registerBlock(167, 'fern', 0.0, 0.0, -1, 0, true, false, 0, 0);
+        // ID 167 removed — was duplicate of fern (ID 160)
         registerBlock(168, 'dead_bush', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(169, 'vine', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(170, 'cave_vines', 0.0, 0.0, -1, 0, true, false, 0, 0);
@@ -372,9 +373,9 @@
         // Monster spawner (ID 211)
         registerBlock(211, 'mob_spawner', 5.0, 3600000.0, -1, 0, false, false, 0, 15);
 
-        // Water and lava (IDs 212-213) — liquids are transparent
-        registerBlock(212, 'water', 100.0, 100.0, -1, 0, true, false, 0, 1);
-        registerBlock(213, 'lava', 100.0, 100.0, -1, 0, true, true, 15, 1);
+        // Water and lava (IDs 212-213) — liquids are transparent, unbreakable (hardness=0)
+        registerBlock(212, 'water', 0.0, 100.0, -1, 0, true, false, 0, 1);
+        registerBlock(213, 'lava', 0.0, 100.0, -1, 0, true, true, 15, 1);
 
         // Coal, iron, gold, diamond, emerald, lapis (IDs 214-219) — item drops
         registerBlock(214, 'coal', 1.0, 2.0, 20, 1, false, false, 0, 15);
@@ -461,6 +462,7 @@
         registerBlock(277, 'end_portal', 0.0, 0.0, -1, 0, true, true, 15, 0);
 
         // End blocks (IDs 278-285)
+        // Note: ID 167 (fern duplicate) removed — ID 160 already covers fern
         registerBlock(278, 'chorus_plant', 0.4, 0.4, 278, 1, false, false, 0, 15);
         registerBlock(279, 'chorus_flower', 0.4, 0.4, -1, 0, false, false, 0, 15);
         registerBlock(280, 'purpur_block', 1.5, 3.0, 280, 1, false, false, 0, 15);
@@ -555,13 +557,20 @@
         }
 
         /**
-         * Check if a block ID is replaceable (grass, flowers, etc.).
+         * Check if a block ID is replaceable (grass, flowers, plants, etc.).
+         * A block is replaceable if it is unbreakable (hardness < 0) or if it is
+         * a transparent decorative block with no drop (dropBlockId === -1, transparent, lightOpacity === 0).
          * @param {number} id - Block ID.
          * @returns {boolean}
          */
         function isReplaceable(id) {
             var block = _blocks[id];
-            return block !== undefined && block.hardness < 0;
+            if (block === undefined) return false;
+            // Unbreakable blocks (air, bedrock) are replaceable
+            if (block.hardness < 0) return true;
+            // Transparent decorative blocks with no drop are replaceable (grass, flowers, plants)
+            if (block.dropBlockId === -1 && block.transparent === true && block.lightOpacity === 0) return true;
+            return false;
         }
 
         /**
