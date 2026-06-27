@@ -583,11 +583,13 @@
             'attribute vec3 aPos;',
             'uniform float uSunIntensity;',
             'uniform float uAmbient;',
+            'uniform float uLightFactor;',
             'uniform vec3 uSkyColor;',
             'uniform vec3 uSunDirection;',
             'void main() {',
             '  gl_Position = vec4(aPos, 1.0);',
             '  gl_Position += uSunIntensity * 0.0;',
+            '  gl_Position += uLightFactor * 0.0;',
             '}'
         ].join('\n');
 
@@ -595,12 +597,13 @@
             'precision mediump float;',
             'uniform float uSunIntensity;',
             'uniform float uAmbient;',
+            'uniform float uLightFactor;',
             'uniform vec3 uSkyColor;',
             'uniform vec3 uSunDirection;',
             'void main() {',
             '  vec3 dir = normalize(uSunDirection);',
             '  float dotL = max(dot(dir, vec3(0.0, 1.0, 0.0)), 0.0);',
-            '  float mixed = uSunIntensity * uAmbient * (0.5 + 0.5 * dotL);',
+            '  float mixed = uSunIntensity * uAmbient * (0.5 + 0.5 * dotL) * uLightFactor;',
             '  gl_FragColor = vec4(uSkyColor * mixed, 1.0);',
             '}'
         ].join('\n');
