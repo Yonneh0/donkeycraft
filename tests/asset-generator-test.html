@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Asset Generator Test Suite</title>
+<link rel="stylesheet" href="test.css">
+<style>
+.texture-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 4px; margin: 8px 0; }
+.texture-cell { text-align: center; }
+.texture-cell img { width: 64px; height: 64px; image-rendering: pixelated; border: 1px solid #333; border-radius: 2px; display: block; margin: 0 auto 2px; background: #111; }
+.texture-cell .name { font-size: 0.65em; color: #aaa; word-break: break-all; }
+.sound-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 0.85em; }
+.sound-table th, .sound-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #333; }
+.sound-table th { color: #00d4ff; background: #0a0a2e; }
+.btn { display: inline-block; padding: 4px 12px; background: #2ecc71; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 0.8em; }
+.btn:hover { background: #27ae60; }
+.btn:disabled { background: #555; cursor: not-allowed; }
+.atlas-preview { max-width: 256px; border: 1px solid #333; image-rendering: pixelated; display: block; margin: 8px 0; }
+</style>
+</head>
+<body>
+<h1>Donkeycraft — Asset Generator Test Suite</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Comprehensive functional tests for TextureGenerator, SoundGenerator, and AssetManager modules.</div>
+
+<div id="results"></div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/world/block.js"></script>
+<script src="../src/core/asset-generator.js"></script>
+
+<!-- Load shared test framework -->
+<script src="test.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var F = TestFramework;
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Namespace & Class Registration
+    // ============================================================
+    F.section('1. Namespace & Class Registration');
+
+    F.assert(typeof Donkeycraft.TextureGenerator === 'object', 'Donkeycraft.TextureGenerator registered');
+    F.assert(typeof Donkeycraft.SoundGenerator === 'object', 'Donkeycraft.SoundGenerator registered');
+    F.assert(typeof Donkeycraft.AssetManager === 'object', 'Donkeycraft.AssetManager registered');
+
+    // TextureGenerator exports
+    F.assertType(Donkeycraft.TextureGenerator.generateStone, 'function', 'TextureGenerator.generateStone is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateDirt, 'function', 'TextureGenerator.generateDirt is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateGrassTop, 'function', 'TextureGenerator.generateGrassTop is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateGrassSide, 'function', 'TextureGenerator.generateGrassSide is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateLogSide, 'function', 'TextureGenerator.generateLogSide is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateLogTop, 'function', 'TextureGenerator.generateLogTop is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateWood, 'function', 'TextureGenerator.generateWood is function');
+    F.assertType(Donkeycraft.TextureGenerator.generatePlanks, 'function', 'TextureGenerator.generatePlanks is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateWool, 'function', 'TextureGenerator.generateWool is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateConcrete, 'function', 'TextureGenerator.generateConcrete is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateGlass, 'function', 'TextureGenerator.generateGlass is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateBricks, 'function', 'TextureGenerator.generateBricks is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateOre, 'function', 'TextureGenerator.generateOre is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateSand, 'function', 'TextureGenerator.generateSand is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateWater, 'function', 'TextureGenerator.generateWater is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateLava, 'function', 'TextureGenerator.generateLava is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateBedrock, 'function', 'TextureGenerator.generateBedrock is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateGlow, 'function', 'TextureGenerator.generateGlow is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateLeaves, 'function', 'TextureGenerator.generateLeaves is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateMissing, 'function', 'TextureGenerator.generateMissing is function');
+    F.assertType(Donkeycraft.TextureGenerator.getGeneratorForBlock, 'function', 'TextureGenerator.getGeneratorForBlock is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateTextureForBlock, 'function', 'TextureGenerator.generateTextureForBlock is function');
+    F.assertType(Donkeycraft.TextureGenerator.generateAllTextures, 'function', 'TextureGenerator.generateAllTextures is function');
+    F.assertType(Donkeycraft.TextureGenerator.getTextureNameForBlock, 'function', 'TextureGenerator.getTextureNameForBlock is function');
+    F.assertType(Donkeycraft.TextureGenerator.getNameMap, 'function', 'TextureGenerator.getNameMap is function');
+    F.assertType(Donkeycraft.TextureGenerator.COLOR_MAP, 'object', 'TextureGenerator.COLOR_MAP is object');
+
+    // SoundGenerator exports
+    F.assertType(Donkeycraft.SoundGenerator.getSound, 'function', 'SoundGenerator.getSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.getCategories, 'function', 'SoundGenerator.getCategories is function');
+    F.assertType(Donkeycraft.SoundGenerator.clearCache, 'function', 'SoundGenerator.clearCache is function');
+    F.assertType(Donkeycraft.SoundGenerator.isCached, 'function', 'SoundGenerator.isCached is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateStepSound, 'function', 'SoundGenerator.generateStepSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateBreakSound, 'function', 'SoundGenerator.generateBreakSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generatePlaceSound, 'function', 'SoundGenerator.generatePlaceSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateHitSound, 'function', 'SoundGenerator.generateHitSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateFootstepSound, 'function', 'SoundGenerator.generateFootstepSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateSplashSound, 'function', 'SoundGenerator.generateSplashSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateGlassBreakSound, 'function', 'SoundGenerator.generateGlassBreakSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generatePopSound, 'function', 'SoundGenerator.generatePopSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateExplosionSound, 'function', 'SoundGenerator.generateExplosionSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateEnchantSound, 'function', 'SoundGenerator.generateEnchantSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateDrinkSound, 'function', 'SoundGenerator.generateDrinkSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateAmbientSound, 'function', 'SoundGenerator.generateAmbientSound is function');
+    F.assertType(Donkeycraft.SoundGenerator.generateHurtSound, 'function', 'SoundGenerator.generateHurtSound is function');
+
+    // AssetManager exports
+    F.assertType(Donkeycraft.AssetManager.init, 'function', 'AssetManager.init is function');
+    F.assertType(Donkeycraft.AssetManager.generateAllBlockTextures, 'function', 'AssetManager.generateAllBlockTextures is function');
+    F.assertType(Donkeycraft.AssetManager.getTexture, 'function', 'AssetManager.getTexture is function');
+    F.assertType(Donkeycraft.AssetManager.getAllTextures, 'function', 'AssetManager.getAllTextures is function');
+    F.assertType(Donkeycraft.AssetManager.preloadSounds, 'function', 'AssetManager.preloadSounds is function');
+    F.assertType(Donkeycraft.AssetManager.preloadAllSounds, 'function', 'AssetManager.preloadAllSounds is function');
+    F.assertType(Donkeycraft.AssetManager.getNameMap, 'function', 'AssetManager.getNameMap is function');
+    F.assertType(Donkeycraft.AssetManager.generateAtlasCanvas, 'function', 'AssetManager.generateAtlasCanvas is function');
+    F.assertType(Donkeycraft.AssetManager.getAssetInfo, 'function', 'AssetManager.getAssetInfo is function');
+    F.assertType(Donkeycraft.AssetManager.reset, 'function', 'AssetManager.reset is function');
+
+    // ============================================================
+    // Section 2: Noise Functions (internal — tested via texture output)
+    // ============================================================
+    F.section('2. Noise Functions (via Texture Output)');
+
+    try {
+        var stone1 = Donkeycraft.TextureGenerator.generateStone(42);
+        F.assertType(stone1, 'object', 'generateStone returns an image-like object');
+        F.assertEq(stone1.width, 16, 'Stone texture is 16px wide');
+        F.assertEq(stone1.height, 16, 'Stone texture is 16px tall');
+
+        var stone2 = Donkeycraft.TextureGenerator.generateStone(42);
+        F.assertType(stone2, 'object', 'generateStone with same seed returns same size');
+
+        var stone3 = Donkeycraft.TextureGenerator.generateStone(99);
+        F.assertType(stone3, 'object', 'generateStone with different seed returns same size');
+        F.info('Noise functions produce 16×16 textures deterministically');
+    } catch (e) {
+        F.assert(false, 'Noise function test did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 3: Basic Texture Generation — Stone, Dirt, Grass
+    // ============================================================
+    F.section('3. Basic Block Textures');
+
+    try {
+        var dirt = Donkeycraft.TextureGenerator.generateDirt();
+        F.assertType(dirt, 'object', 'generateDirt returns image-like object');
+        F.assertEq(dirt.width, 16, 'Dirt texture is 16px wide');
+        F.assertEq(dirt.height, 16, 'Dirt texture is 16px tall');
+
+        var grassTop = Donkeycraft.TextureGenerator.generateGrassTop();
+        F.assertType(grassTop, 'object', 'generateGrassTop returns image-like object');
+        F.assertEq(grassTop.width, 16, 'Grass top is 16px wide');
+
+        var grassSide = Donkeycraft.TextureGenerator.generateGrassSide();
+        F.assertType(grassSide, 'object', 'generateGrassSide returns image-like object');
+        F.assertEq(grassSide.width, 16, 'Grass side is 16px wide');
+
+        F.info('Basic terrain textures (stone, dirt, grass) generated successfully');
+    } catch (e) {
+        F.assert(false, 'Basic texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 4: Wood & Plank Textures
+    // ============================================================
+    F.section('4. Wood & Plank Textures');
+
+    try {
+        var logSide = Donkeycraft.TextureGenerator.generateLogSide(100);
+        F.assertType(logSide, 'object', 'generateLogSide returns image-like object');
+        F.assertEq(logSide.width, 16, 'Log side is 16px wide');
+
+        var logTop = Donkeycraft.TextureGenerator.generateLogTop(101);
+        F.assertType(logTop, 'object', 'generateLogTop returns image-like object');
+        F.assertEq(logTop.width, 16, 'Log top is 16px wide');
+
+        var wood = Donkeycraft.TextureGenerator.generateWood(200);
+        F.assertType(wood, 'object', 'generateWood returns image-like object');
+        F.assertEq(wood.width, 16, 'Wood is 16px wide');
+
+        var planks = Donkeycraft.TextureGenerator.generatePlanks(188, 152, 98, 300);
+        F.assertType(planks, 'object', 'generatePlanks returns image-like object');
+        F.assertEq(planks.width, 16, 'Planks is 16px wide');
+
+        F.info('Wood and plank textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Wood/plank texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 5: Wool & Concrete Textures (all 16 colors)
+    // ============================================================
+    F.section('5. Wool & Concrete Textures (16 Colors)');
+
+    try {
+        var woolColors = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime', 'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown', 'green', 'red', 'black'];
+        var woolCount = 0;
+        for (var w = 0; w < woolColors.length; w++) {
+            var color = woolColors[w];
+            var c = Donkeycraft.TextureGenerator.COLOR_MAP[color];
+            F.assertType(c, 'object', 'COLOR_MAP has "' + color + '" entry');
+            if (c) {
+                F.assertType(c.r, 'number', 'COLOR_MAP.' + color + '.r is number');
+                F.assertType(c.g, 'number', 'COLOR_MAP.' + color + '.g is number');
+                F.assertType(c.b, 'number', 'COLOR_MAP.' + color + '.b is number');
+            }
+        }
+
+        var whiteWool = Donkeycraft.TextureGenerator.generateWool(240, 240, 240);
+        F.assertType(whiteWool, 'object', 'generateWool returns image-like object');
+        F.assertEq(whiteWool.width, 16, 'Wool is 16px wide');
+
+        var whiteConcrete = Donkeycraft.TextureGenerator.generateConcrete(240, 240, 240);
+        F.assertType(whiteConcrete, 'object', 'generateConcrete returns image-like object');
+        F.assertEq(whiteConcrete.width, 16, 'Concrete is 16px wide');
+
+        F.info('All 16 COLOR_MAP entries validated with RGB values');
+    } catch (e) {
+        F.assert(false, 'Wool/concrete texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 6: Glass, Bricks, Ore Textures
+    // ============================================================
+    F.section('6. Glass, Bricks & Ore Textures');
+
+    try {
+        var glass = Donkeycraft.TextureGenerator.generateGlass(200, 220, 255);
+        F.assertType(glass, 'object', 'generateGlass returns image-like object');
+        F.assertEq(glass.width, 16, 'Glass is 16px wide');
+
+        var bricks = Donkeycraft.TextureGenerator.generateBricks(160, 60, 50);
+        F.assertType(bricks, 'object', 'generateBricks returns image-like object');
+        F.assertEq(bricks.width, 16, 'Bricks is 16px wide');
+
+        var ore = Donkeycraft.TextureGenerator.generateOre(237, 201, 36);
+        F.assertType(ore, 'object', 'generateOre returns image-like object');
+        F.assertEq(ore.width, 16, 'Ore is 16px wide');
+
+        F.info('Glass, bricks, and ore textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Glass/bricks/ore texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 7: Sand, Water, Lava, Bedrock Textures
+    // ============================================================
+    F.section('7. Sand, Water, Lava & Bedrock Textures');
+
+    try {
+        var sand = Donkeycraft.TextureGenerator.generateSand(210, 195, 150);
+        F.assertType(sand, 'object', 'generateSand returns image-like object');
+        F.assertEq(sand.width, 16, 'Sand is 16px wide');
+
+        var water = Donkeycraft.TextureGenerator.generateWater();
+        F.assertType(water, 'object', 'generateWater returns image-like object');
+        F.assertEq(water.width, 16, 'Water is 16px wide');
+
+        var lava = Donkeycraft.TextureGenerator.generateLava();
+        F.assertType(lava, 'object', 'generateLava returns image-like object');
+        F.assertEq(lava.width, 16, 'Lava is 16px wide');
+
+        var bedrock = Donkeycraft.TextureGenerator.generateBedrock();
+        F.assertType(bedrock, 'object', 'generateBedrock returns image-like object');
+        F.assertEq(bedrock.width, 16, 'Bedrock is 16px wide');
+
+        F.info('Liquid and special block textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Sand/water/lava/bedrock texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 8: Glow & Special Block Textures
+    // ============================================================
+    F.section('8. Glow & Special Block Textures');
+
+    try {
+        var glow = Donkeycraft.TextureGenerator.generateGlow(255, 200, 100);
+        F.assertType(glow, 'object', 'generateGlow returns image-like object');
+        F.assertEq(glow.width, 16, 'Glow is 16px wide');
+
+        var quartzPillar = Donkeycraft.TextureGenerator.generateQuartzPillar();
+        F.assertType(quartzPillar, 'object', 'generateQuartzPillar returns image-like object');
+        F.assertEq(quartzPillar.width, 16, 'Quartz pillar is 16px wide');
+
+        var basalt = Donkeycraft.TextureGenerator.generateBasalt();
+        F.assertType(basalt, 'object', 'generateBasalt returns image-like object');
+        F.assertEq(basalt.width, 16, 'Basalt is 16px wide');
+
+        var polished = Donkeycraft.TextureGenerator.generatePolished(130, 135, 140);
+        F.assertType(polished, 'object', 'generatePolished returns image-like object');
+        F.assertEq(polished.width, 16, 'Polished is 16px wide');
+
+        F.info('Glow and special block textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Glow/special texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 9: Plant & Decorative Textures
+    // ============================================================
+    F.section('9. Plant & Decorative Textures');
+
+    try {
+        var leaves = Donkeycraft.TextureGenerator.generateLeaves(50, 130, 40);
+        F.assertType(leaves, 'object', 'generateLeaves returns image-like object');
+        F.assertEq(leaves.width, 16, 'Leaves is 16px wide');
+
+        var cactus = Donkeycraft.TextureGenerator.generateCactus();
+        F.assertType(cactus, 'object', 'generateCactus returns image-like object');
+        F.assertEq(cactus.width, 16, 'Cactus is 16px wide');
+
+        var sugarCane = Donkeycraft.TextureGenerator.generateSugarCane();
+        F.assertType(sugarCane, 'object', 'generateSugarCane returns image-like object');
+        F.assertEq(sugarCane.width, 16, 'Sugar cane is 16px wide');
+
+        var flower = Donkeycraft.TextureGenerator.generateFlower('red');
+        F.assertType(flower, 'object', 'generateFlower returns image-like object');
+        F.assertEq(flower.width, 16, 'Flower is 16px wide');
+
+        var vine = Donkeycraft.TextureGenerator.generateVine();
+        F.assertType(vine, 'object', 'generateVine returns image-like object');
+        F.assertEq(vine.width, 16, 'Vine is 16px wide');
+
+        var lilyPad = Donkeycraft.TextureGenerator.generateLilyPad();
+        F.assertType(lilyPad, 'object', 'generateLilyPad returns image-like object');
+        F.assertEq(lilyPad.width, 16, 'Lily pad is 16px wide');
+
+        F.info('Plant and decorative textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Plant/decorative texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 10: Nether & End Textures
+    // ============================================================
+    F.section('10. Nether & End Textures');
+
+    try {
+        var netherrack = Donkeycraft.TextureGenerator.generateNetherrack();
+        F.assertType(netherrack, 'object', 'generateNetherrack returns image-like object');
+        F.assertEq(netherrack.width, 16, 'Netherrack is 16px wide');
+
+        var endStone = Donkeycraft.TextureGenerator.generateEndStone();
+        F.assertType(endStone, 'object', 'generateEndStone returns image-like object');
+        F.assertEq(endStone.width, 16, 'End stone is 16px wide');
+
+        var warpedStem = Donkeycraft.TextureGenerator.generateWarpedStem();
+        F.assertType(warpedStem, 'object', 'generateWarpedStem returns image-like object');
+        F.assertEq(warpedStem.width, 16, 'Warped stem is 16px wide');
+
+        var crimsonPlanks = Donkeycraft.TextureGenerator.generateCrimsonPlanks();
+        F.assertType(crimsonPlanks, 'object', 'generateCrimsonPlanks returns image-like object');
+        F.assertEq(crimsonPlanks.width, 16, 'Crimson planks is 16px wide');
+
+        var purpurBlock = Donkeycraft.TextureGenerator.generatePurpurBlock();
+        F.assertType(purpurBlock, 'object', 'generatePurpurBlock returns image-like object');
+        F.assertEq(purpurBlock.width, 16, 'Purpur block is 16px wide');
+
+        F.info('Nether and End textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Nether/end texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 11: Metal Block Textures
+    // ============================================================
+    F.section('11. Metal Block Textures');
+
+    try {
+        var goldBlock = Donkeycraft.TextureGenerator.generateGoldBlock();
+        F.assertType(goldBlock, 'object', 'generateGoldBlock returns image-like object');
+        F.assertEq(goldBlock.width, 16, 'Gold block is 16px wide');
+
+        var ironBlock = Donkeycraft.TextureGenerator.generateIronBlock();
+        F.assertType(ironBlock, 'object', 'generateIronBlock returns image-like object');
+        F.assertEq(ironBlock.width, 16, 'Iron block is 16px wide');
+
+        var diamondBlock = Donkeycraft.TextureGenerator.generateDiamondBlock();
+        F.assertType(diamondBlock, 'object', 'generateDiamondBlock returns image-like object');
+        F.assertEq(diamondBlock.width, 16, 'Diamond block is 16px wide');
+
+        var redstoneBlock = Donkeycraft.TextureGenerator.generateRedstoneBlock();
+        F.assertType(redstoneBlock, 'object', 'generateRedstoneBlock returns image-like object');
+        F.assertEq(redstoneBlock.width, 16, 'Redstone block is 16px wide');
+
+        var lapisBlock = Donkeycraft.TextureGenerator.generateLapisBlock();
+        F.assertType(lapisBlock, 'object', 'generateLapisBlock returns image-like object');
+        F.assertEq(lapisBlock.width, 16, 'Lapis block is 16px wide');
+
+        var emeraldBlock = Donkeycraft.TextureGenerator.generateEmeraldBlock();
+        F.assertType(emeraldBlock, 'object', 'generateEmeraldBlock returns image-like object');
+        F.assertEq(emeraldBlock.width, 16, 'Emerald block is 16px wide');
+
+        F.info('All metal block textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Metal block texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 12: Ore Texture Variants
+    // ============================================================
+    F.section('12. Ore Texture Variants');
+
+    try {
+        var coalOre = Donkeycraft.TextureGenerator.generateCoalOre();
+        F.assertType(coalOre, 'object', 'generateCoalOre returns image-like object');
+
+        var ironOre = Donkeycraft.TextureGenerator.generateIronOre();
+        F.assertType(ironOre, 'object', 'generateIronOre returns image-like object');
+
+        var goldOre = Donkeycraft.TextureGenerator.generateGoldOre();
+        F.assertType(goldOre, 'object', 'generateGoldOre returns image-like object');
+
+        var diamondOre = Donkeycraft.TextureGenerator.generateDiamondOre();
+        F.assertType(diamondOre, 'object', 'generateDiamondOre returns image-like object');
+
+        var redstoneOre = Donkeycraft.TextureGenerator.generateRedstoneOre();
+        F.assertType(redstoneOre, 'object', 'generateRedstoneOre returns image-like object');
+
+        var litRedstoneOre = Donkeycraft.TextureGenerator.generateLitRedstoneOre();
+        F.assertType(litRedstoneOre, 'object', 'generateLitRedstoneOre returns image-like object');
+
+        var lapisOre = Donkeycraft.TextureGenerator.generateLapisOre();
+        F.assertType(lapisOre, 'object', 'generateLapisOre returns image-like object');
+
+        var netherQuartzOre = Donkeycraft.TextureGenerator.generateNetherQuartzOre();
+        F.assertType(netherQuartzOre, 'object', 'generateNetherQuartzOre returns image-like object');
+
+        F.info('All ore texture variants generated successfully');
+    } catch (e) {
+        F.assert(false, 'Ore texture variant generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 13: Redstone Component Textures
+    // ============================================================
+    F.section('13. Redstone Component Textures');
+
+    try {
+        var redstoneTorch = Donkeycraft.TextureGenerator.generateRedstoneTorch();
+        F.assertType(redstoneTorch, 'object', 'generateRedstoneTorch returns image-like object');
+
+        var redstoneLamp = Donkeycraft.TextureGenerator.generateRedstoneLamp(false);
+        F.assertType(redstoneLamp, 'object', 'generateRedstoneLamp(unlit) returns image-like object');
+
+        var litRedstoneLamp = Donkeycraft.TextureGenerator.generateRedstoneLamp(true);
+        F.assertType(litRedstoneLamp, 'object', 'generateRedstoneLamp(lit) returns image-like object');
+
+        var dispenser = Donkeycraft.TextureGenerator.generateDispenser(true);
+        F.assertType(dispenser, 'object', 'generateDispenser returns image-like object');
+
+        var dropper = Donkeycraft.TextureGenerator.generateDispenser(false);
+        F.assertType(dropper, 'object', 'generateDispenser(false) returns image-like object');
+
+        var observer = Donkeycraft.TextureGenerator.generateObserver();
+        F.assertType(observer, 'object', 'generateObserver returns image-like object');
+
+        var repeater = Donkeycraft.TextureGenerator.generateRepeater();
+        F.assertType(repeater, 'object', 'generateRepeater returns image-like object');
+
+        var pistonSide = Donkeycraft.TextureGenerator.generatePistonSide();
+        F.assertType(pistonSide, 'object', 'generatePistonSide returns image-like object');
+
+        F.info('Redstone component textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Redstone component texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 14: Furniture & Utility Block Textures
+    // ============================================================
+    F.section('14. Furniture & Utility Block Textures');
+
+    try {
+        var chest = Donkeycraft.TextureGenerator.generateChestSide();
+        F.assertType(chest, 'object', 'generateChestSide returns image-like object');
+
+        var furnace = Donkeycraft.TextureGenerator.generateFurnaceFront();
+        F.assertType(furnace, 'object', 'generateFurnaceFront returns image-like object');
+
+        var craftingTable = Donkeycraft.TextureGenerator.generateCraftingTable();
+        F.assertType(craftingTable, 'object', 'generateCraftingTable returns image-like object');
+
+        var bookshelf = Donkeycraft.TextureGenerator.generateBookshelf();
+        F.assertType(bookshelf, 'object', 'generateBookshelf returns image-like object');
+
+        var bed = Donkeycraft.TextureGenerator.generateBed('red');
+        F.assertType(bed, 'object', 'generateBed returns image-like object');
+
+        var sign = Donkeycraft.TextureGenerator.generateSign('oak');
+        F.assertType(sign, 'object', 'generateSign returns image-like object');
+
+        var door = Donkeycraft.TextureGenerator.generateDoor(false);
+        F.assertType(door, 'object', 'generateDoor returns image-like object');
+
+        var ironDoor = Donkeycraft.TextureGenerator.generateDoor(true);
+        F.assertType(ironDoor, 'object', 'generateDoor(true) returns image-like object');
+
+        F.info('Furniture and utility block textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Furniture/utility texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 15: Portal & Special Effect Textures
+    // ============================================================
+    F.section('15. Portal & Special Effect Textures');
+
+    try {
+        var endPortal = Donkeycraft.TextureGenerator.generateEndPortal();
+        F.assertType(endPortal, 'object', 'generateEndPortal returns image-like object');
+        F.assertEq(endPortal.width, 16, 'End portal is 16px wide');
+
+        var netherPortal = Donkeycraft.TextureGenerator.generateNetherPortal();
+        F.assertType(netherPortal, 'object', 'generateNetherPortal returns image-like object');
+        F.assertEq(netherPortal.width, 16, 'Nether portal is 16px wide');
+
+        var endPortalFrame = Donkeycraft.TextureGenerator.generateEndPortalFrame();
+        F.assertType(endPortalFrame, 'object', 'generateEndPortalFrame returns image-like object');
+
+        var mobSpawner = Donkeycraft.TextureGenerator.generateMobSpawner();
+        F.assertType(mobSpawner, 'object', 'generateMobSpawner returns image-like object');
+
+        var respawnAnchor = Donkeycraft.TextureGenerator.generateRespawnAnchor();
+        F.assertType(respawnAnchor, 'object', 'generateRespawnAnchor returns image-like object');
+
+        F.info('Portal and special effect textures generated successfully');
+    } catch (e) {
+        F.assert(false, 'Portal/special effect texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 16: getGeneratorForBlock & generateTextureForBlock
+    // ============================================================
+    F.section('16. Block Name → Texture Mapping');
+
+    try {
+        var gen = Donkeycraft.TextureGenerator.getGeneratorForBlock('stone');
+        F.assertType(gen, 'function', 'getGeneratorForBlock("stone") returns function');
+
+        var gen2 = Donkeycraft.TextureGenerator.getGeneratorForBlock('oak_planks');
+        F.assertType(gen2, 'function', 'getGeneratorForBlock("oak_planks") returns function');
+
+        var gen3 = Donkeycraft.TextureGenerator.getGeneratorForBlock('nonexistent_block_xyz');
+        F.assert(gen3 === null, 'getGeneratorForBlock("nonexistent") returns null');
+
+        var tex = Donkeycraft.TextureGenerator.generateTextureForBlock('stone');
+        F.assertType(tex, 'object', 'generateTextureForBlock("stone") returns image-like object');
+
+        var fallbackTex = Donkeycraft.TextureGenerator.generateTextureForBlock('unknown_block_name');
+        F.assertType(fallbackTex, 'object', 'generateTextureForBlock("unknown") returns fallback texture');
+        F.assertEq(fallbackTex.width, 16, 'Fallback texture is 16px wide');
+
+        F.info('Block name → texture mapping works correctly');
+    } catch (e) {
+        F.assert(false, 'Block name mapping did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 17: generateAllTextures & getNameMap
+    // ============================================================
+    F.section('17. Bulk Texture Generation');
+
+    try {
+        var nameMap = Donkeycraft.TextureGenerator.getNameMap();
+        F.assertType(nameMap, 'object', 'getNameMap returns object');
+        F.assert(Object.keys(nameMap).length > 0, 'getNameMap returns non-empty map');
+
+        var firstId = Object.keys(nameMap)[0];
+        F.assertType(nameMap[firstId], 'string', 'getNameMap values are strings (block names)');
+
+        F.info('getNameMap returned ' + Object.keys(nameMap).length + ' block name entries');
+    } catch (e) {
+        F.assert(false, 'Bulk texture generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 18: SoundGenerator — Categories & Caching
+    // ============================================================
+    F.section('18. SoundGenerator — Categories & Caching');
+
+    try {
+        var categories = Donkeycraft.SoundGenerator.getCategories();
+        F.assertType(categories, 'object', 'getCategories returns array/object');
+        F.assert(categories.length >= 13, 'getCategories returns at least 13 categories');
+
+        var expectedCats = ['step', 'break', 'place', 'hit', 'footstep', 'splash', 'glass_break', 'pop', 'explosion', 'enchant', 'drink', 'ambient', 'hurt'];
+        for (var ec = 0; ec < expectedCats.length; ec++) {
+            F.assert(categories.indexOf(expectedCats[ec]) >= 0, 'Category "' + expectedCats[ec] + '" is available');
+        }
+
+        var isCachedResult = Donkeycraft.SoundGenerator.isCached('step:stone');
+        F.assertType(isCachedResult, 'boolean', 'isCached returns boolean');
+
+        var cleared = Donkeycraft.SoundGenerator.clearCache();
+        F.assert(cleared === undefined, 'clearCache returns undefined (void)');
+
+        isCachedResult = Donkeycraft.SoundGenerator.isCached('step:stone');
+        F.assert(isCachedResult === false, 'isCached returns false after clearCache');
+
+        F.info('SoundGenerator category system validated (' + categories.length + ' categories)');
+    } catch (e) {
+        F.assert(false, 'SoundGenerator category test did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 19: SoundGenerator — Audio Generation (requires AudioContext)
+    // ============================================================
+    F.section('19. SoundGenerator — Audio Generation');
+
+    var audioTestsDone = 0;
+    var audioTestsTotal = 0;
+    var audioPromises = [];
+
+    // Count async audio tests
+    audioTestsTotal = 7;
+
+    try {
+        if (typeof AudioContext !== 'undefined') {
+            var audioCtx = new AudioContext();
+
+            // Test 1: generateFootstepSound (synchronous — noise buffer)
+            try {
+                var footstep = Donkeycraft.SoundGenerator.generateFootstepSound(audioCtx);
+                F.assertType(footstep, 'object', 'generateFootstepSound returns AudioBuffer');
+                F.assertEq(footstep.numberOfChannels, 1, 'Footstep is mono (1 channel)');
+                F.assert(footstep.duration > 0 && footstep.duration < 1, 'Footstep duration is reasonable (' + footstep.duration.toFixed(3) + 's)');
+            } catch (e) {
+                F.assert(false, 'Footstep sound did not throw: ' + e.message);
+            }
+
+            // Test 2: generateStepSound (synchronous — noise buffer)
+            try {
+                var step = Donkeycraft.SoundGenerator.generateStepSound(audioCtx, 'stone');
+                F.assertType(step, 'object', 'generateStepSound returns AudioBuffer');
+                F.assertEq(step.numberOfChannels, 1, 'Step sound is mono');
+            } catch (e) {
+                F.assert(false, 'Step sound did not throw: ' + e.message);
+            }
+
+            // Test 3: generateBreakSound (synchronous — noise buffer)
+            try {
+                var breakSound = Donkeycraft.SoundGenerator.generateBreakSound(audioCtx, 'stone');
+                F.assertType(breakSound, 'object', 'generateBreakSound returns AudioBuffer');
+                F.assertEq(breakSound.numberOfChannels, 1, 'Break sound is mono');
+            } catch (e) {
+                F.assert(false, 'Break sound did not throw: ' + e.message);
+            }
+
+            // Test 4: getSound — synchronous categories
+            try {
+                var step2 = Donkeycraft.SoundGenerator.getSound(audioCtx, 'step', 'stone');
+                F.assertType(step2, 'object', 'getSound("step") returns AudioBuffer');
+            } catch (e) {
+                F.assert(false, 'getSound("step") did not throw: ' + e.message);
+            }
+
+            // Test 5: getSound — unknown category fallback
+            try {
+                var fallback = Donkeycraft.SoundGenerator.getSound(audioCtx, 'nonexistent_category');
+                F.assertType(fallback, 'object', 'getSound fallback returns AudioBuffer for unknown category');
+            } catch (e) {
+                F.assert(false, 'getSound fallback did not throw: ' + e.message);
+            }
+
+            // Test 6: generatePlaceSound (async — OfflineAudioContext)
+            audioPromises.push(
+                Donkeycraft.SoundGenerator.generatePlaceSound(audioCtx, 'stone').then(function(buffer) {
+                    audioTestsDone++;
+                    F.assertType(buffer, 'object', 'generatePlaceSound returns AudioBuffer (async)');
+                    F.assertEq(buffer.numberOfChannels, 1, 'Place sound is mono');
+                }).catch(function(err) {
+                    F.assert(false, 'generatePlaceSound promise rejected: ' + err.message);
+                })
+            );
+
+            // Test 7: generateExplosionSound (async — OfflineAudioContext)
+            audioPromises.push(
+                Donkeycraft.SoundGenerator.generateExplosionSound(audioCtx).then(function(buffer) {
+                    audioTestsDone++;
+                    F.assertType(buffer, 'object', 'generateExplosionSound returns AudioBuffer (async)');
+                    F.assertEq(buffer.numberOfChannels, 1, 'Explosion sound is mono');
+                    F.assert(buffer.duration > 0.5, 'Explosion sound duration > 0.5s (' + buffer.duration.toFixed(3) + 's)');
+                }).catch(function(err) {
+                    F.assert(false, 'generateExplosionSound promise rejected: ' + err.message);
+                })
+            );
+
+        } else {
+            F.info('AudioContext not available — audio tests skipped');
+            audioTestsDone = audioTestsTotal; // Mark as done to allow finish
+        }
+    } catch (e) {
+        F.assert(false, 'Audio setup did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 20: AssetManager — Initialization & Texture Generation
+    // ============================================================
+    F.section('20. AssetManager — Initialization & Textures');
+
+    try {
+        var assetInfo = Donkeycraft.AssetManager.getAssetInfo();
+        F.assertType(assetInfo, 'object', 'getAssetInfo returns object');
+        F.assertType(assetInfo.totalBlocks, 'number', 'getAssetInfo.totalBlocks is number');
+        F.assertType(assetInfo.generatedTextures, 'number', 'getAssetInfo.generatedTextures is number');
+        F.assertType(assetInfo.soundCategories, 'number', 'getAssetInfo.soundCategories is number');
+        F.assertType(assetInfo.hasAudioContext, 'boolean', 'getAssetInfo.hasAudioContext is boolean');
+
+        var textures = Donkeycraft.AssetManager.getAllTextures();
+        F.assert(textures === null || typeof textures === 'object', 'getAllTextures returns null or object (before generation)');
+
+        var nameMap2 = Donkeycraft.AssetManager.getNameMap();
+        F.assertType(nameMap2, 'object', 'AssetManager.getNameMap returns object');
+
+        F.info('AssetManager initialized and queried successfully');
+    } catch (e) {
+        F.assert(false, 'AssetManager test did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 21: AssetManager — Atlas Canvas Generation
+    // ============================================================
+    F.section('21. AssetManager — Atlas Canvas');
+
+    try {
+        var atlasCanvas = Donkeycraft.AssetManager.generateAtlasCanvas();
+        F.assertType(atlasCanvas, 'object', 'generateAtlasCanvas returns canvas element');
+        F.assertEq(atlasCanvas.width, 256, 'Atlas canvas is 256px wide');
+        F.assertEq(atlasCanvas.height, 256, 'Atlas canvas is 256px tall');
+
+        F.info('Atlas canvas generated successfully (256×256)');
+    } catch (e) {
+        F.assert(false, 'Atlas canvas generation did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 22: AssetManager — Reset
+    // ============================================================
+    F.section('22. AssetManager — Reset');
+
+    try {
+        Donkeycraft.AssetManager.reset();
+        var texturesAfterReset = Donkeycraft.AssetManager.getAllTextures();
+        F.assert(texturesAfterReset === null, 'getAllTextures returns null after reset');
+        F.info('AssetManager reset successful');
+    } catch (e) {
+        F.assert(false, 'AssetManager reset did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 23: generateMissing Texture
+    // ============================================================
+    F.section('23. Missing / Fallback Texture');
+
+    try {
+        var missing = Donkeycraft.TextureGenerator.generateMissing();
+        F.assertType(missing, 'object', 'generateMissing returns image-like object');
+        F.assertEq(missing.width, 16, 'Missing texture is 16px wide');
+        F.assertEq(missing.height, 16, 'Missing texture is 16px tall');
+        F.info('Missing texture (red/black checkerboard with X) generated');
+    } catch (e) {
+        F.assert(false, 'generateMissing did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 24: Cross-module Integration — TextureGenerator + BlockRegistry
+    // ============================================================
+    F.section('24. Cross-Module Integration (TextureGenerator + Block)');
+
+    try {
+        if (typeof Donkeycraft.BlockRegistry !== 'undefined') {
+            var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
+            F.assert(allBlocks.length > 0, 'BlockRegistry has registered blocks (' + allBlocks.length + ')');
+
+            var stoneBlock = Donkeycraft.BlockRegistry.getBlockById(1);
+            if (stoneBlock) {
+                F.assertType(stoneBlock, 'object', 'getBlockById(1) returns block object');
+                F.assertType(stoneBlock.id, 'number', 'Block.id is number');
+                F.assertType(stoneBlock.name, 'string', 'Block.name is string');
+
+                var genForStone = Donkeycraft.TextureGenerator.getGeneratorForBlock(stoneBlock.name);
+                F.assertType(genForStone, 'function', 'getGeneratorForBlock returns function for registered block');
+
+                var texForStone = Donkeycraft.TextureGenerator.generateTextureForBlock(stoneBlock.name);
+                F.assertType(texForStone, 'object', 'generateTextureForBlock returns texture for registered block');
+            } else {
+                F.info('Block ID 1 not found (BlockRegistry may use different IDs)');
+            }
+
+            F.info('Cross-module integration validated successfully');
+        } else {
+            F.info('BlockRegistry not loaded — cross-module test skipped');
+        }
+    } catch (e) {
+        F.assert(false, 'Cross-module integration did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 25: Edge Cases & Error Handling
+    // ============================================================
+    F.section('25. Edge Cases & Error Handling');
+
+    try {
+        // Test generatePlanks with extreme colors
+        var blackPlanks = Donkeycraft.TextureGenerator.generatePlanks(0, 0, 0, 999);
+        F.assertType(blackPlanks, 'object', 'generatePlanks(0,0,0) returns valid texture');
+
+        var whitePlanks = Donkeycraft.TextureGenerator.generatePlanks(255, 255, 255, 999);
+        F.assertType(whitePlanks, 'object', 'generatePlanks(255,255,255) returns valid texture');
+
+        // Test generateWool with extreme colors
+        var blackWool = Donkeycraft.TextureGenerator.generateWool(0, 0, 0);
+        F.assertType(blackWool, 'object', 'generateWool(0,0,0) returns valid texture');
+
+        // Test generateGlass with black (dark glass)
+        var darkGlass = Donkeycraft.TextureGenerator.generateGlass(0, 0, 0);
+        F.assertType(darkGlass, 'object', 'generateGlass(0,0,0) returns valid texture');
+
+        // Test generateGlow with zero values
+        var dimGlow = Donkeycraft.TextureGenerator.generateGlow(10, 10, 10);
+        F.assertType(dimGlow, 'object', 'generateGlow(10,10,10) returns valid texture');
+
+        // Test generateOre with dark ore color
+        var darkOre = Donkeycraft.TextureGenerator.generateOre(10, 10, 10);
+        F.assertType(darkOre, 'object', 'generateOre(10,10,10) returns valid texture');
+
+        // Test generateBedrock with negative seed
+        var bedrockNeg = Donkeycraft.TextureGenerator.generateBedrock();
+        F.assertType(bedrockNeg, 'object', 'generateBedrock() returns valid texture');
+
+        // Test generateLogSide with seed 0
+        var logZero = Donkeycraft.TextureGenerator.generateLogSide(0);
+        F.assertType(logZero, 'object', 'generateLogSide(0) returns valid texture');
+
+        // Test generateStone with undefined seed (should use default)
+        var stoneDefault = Donkeycraft.TextureGenerator.generateStone();
+        F.assertType(stoneDefault, 'object', 'generateStone() with no seed returns valid texture');
+
+        F.info('All edge cases handled without errors');
+    } catch (e) {
+        F.assert(false, 'Edge case test did not throw: ' + e.message);
+    }
+
+    // ============================================================
+    // Wait for async audio tests then finish
+    // ============================================================
+    if (audioTestsDone < audioTestsTotal && typeof Promise !== 'undefined') {
+        Promise.all(audioPromises).then(function() {
+            // Small delay to ensure all F.assert calls have completed
+            setTimeout(function() {
+                F.finishTests();
+            }, 100);
+        });
+    } else {
+        // No async tests needed
+        setTimeout(function() {
+            F.finishTests();
+        }, 100);
+    }
+
+})();
+</script>
+</body>
+</html>

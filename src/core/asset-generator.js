@@ -133,7 +133,10 @@
     Donkeycraft.TextureGenerator = (function() {
         var TEX_SIZE = 16;
 
-        // Color definitions for block families
+        /**
+         * Color definitions for block families.
+         * Maps color names to RGB values used in texture generation.
+         */
         var COLOR_MAP = {
             white:      { r: 240, g: 240, b: 240 },
             orange:     { r: 234, g: 131, b: 36  },
@@ -1530,7 +1533,12 @@
          * Generate a snow block texture.
          * @returns {HTMLImageElement}
          */
-        // Helper: convert canvas to image element
+        /**
+         * Convert a canvas element to an Image element via data URL.
+         * @param {HTMLCanvasElement} canvas - Source canvas.
+         * @returns {HTMLImageElement}
+         * @private
+         */
         function _canvasToImage(canvas) {
             var img = new Image();
             img.src = canvas.toDataURL('image/png');
@@ -3399,13 +3407,15 @@
             // Base
             ctx.fillStyle = '#556655';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Glow spots
+            // Glow spots - all directions render spread pattern for visual consistency
             ctx.fillStyle = '#88CC88';
-            if (direction === 'up' || direction === 'multiple') {
+            var isSpread = direction === 'up' || direction === 'multiple' || direction === 'down';
+            if (isSpread) {
                 for (var i = 0; i < 12; i++) {
                     ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
                 }
-            } else if (direction === 'north') {
+            } else {
+                // Directional: fill center area for cardinal directions
                 ctx.fillRect(4, 4, 8, 8);
             }
             return _canvasToImage(canvas);
@@ -4430,36 +4440,30 @@
             var key = 'place:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
 
-            var osc = ctx.createOscillator();
-            var gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(200, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.15);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+                var o2 = offline.createOscillator();
+                var g2 = offline.createGain();
+                o2.type = 'sine';
+                o2.frequency.setValueAtTime(200, offline.currentTime);
+                o2.frequency.exponentialRampToValueAtTime(100, offline.currentTime + 0.1);
+                g2.gain.setValueAtTime(0.3, offline.currentTime);
+                g2.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.1);
+                o2.connect(g2);
+                g2.connect(offline.destination);
+                o2.start(offline.currentTime);
+                o2.stop(offline.currentTime + 0.15);
 
-            // Capture to buffer via OfflineAudioContext
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
-            var o2 = offline.createOscillator();
-            var g2 = offline.createGain();
-            o2.type = 'sine';
-            o2.frequency.setValueAtTime(200, offline.currentTime);
-            o2.frequency.exponentialRampToValueAtTime(100, offline.currentTime + 0.1);
-            g2.gain.setValueAtTime(0.3, offline.currentTime);
-            g2.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.1);
-            o2.connect(g2);
-            g2.connect(offline.destination);
-            o2.start(offline.currentTime);
-            o2.stop(offline.currentTime + 0.15);
-
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(renderedBuffer) {
+                    _soundCache[key] = renderedBuffer;
+                    return renderedBuffer;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) {
+                    Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate place sound: ' + e.message);
+                }
+                return _createNoiseBuffer(ctx, 0.15);
+            }
         }
 
         /**
@@ -4472,7 +4476,8 @@
             var key = 'hit:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.08, ctx.sampleRate);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.08, ctx.sampleRate);
             var osc = offline.createOscillator();
             var gain = offline.createGain();
             osc.type = 'square';
@@ -4485,10 +4490,14 @@
             osc.start(offline.currentTime);
             osc.stop(offline.currentTime + 0.1);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate hit sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.08);
+            }
         }
 
         /**
@@ -4501,24 +4510,29 @@
             var key = 'ambient:' + (type || 'passive');
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-            var osc = offline.createOscillator();
-            var gain = offline.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(type === 'hostile' ? 150 : 300, offline.currentTime);
-            osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 100 : 250, offline.currentTime + 0.15);
-            osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 180 : 280, offline.currentTime + 0.3);
-            gain.gain.setValueAtTime(0.1, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
-            osc.connect(gain);
-            gain.connect(offline.destination);
-            osc.start(offline.currentTime);
-            osc.stop(offline.currentTime + 0.35);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+                var osc = offline.createOscillator();
+                var gain = offline.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(type === 'hostile' ? 150 : 300, offline.currentTime);
+                osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 100 : 250, offline.currentTime + 0.15);
+                osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 180 : 280, offline.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
+                osc.connect(gain);
+                gain.connect(offline.destination);
+                osc.start(offline.currentTime);
+                osc.stop(offline.currentTime + 0.35);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate ambient sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.3);
+            }
         }
 
         /**
@@ -4531,23 +4545,28 @@
             var key = 'hurt:' + (type || 'entity');
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.2, ctx.sampleRate);
-            var osc = offline.createOscillator();
-            var gain = offline.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(400, offline.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(200, offline.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.12, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.2);
-            osc.connect(gain);
-            gain.connect(offline.destination);
-            osc.start(offline.currentTime);
-            osc.stop(offline.currentTime + 0.25);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+                var osc = offline.createOscillator();
+                var gain = offline.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, offline.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, offline.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.12, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(offline.destination);
+                osc.start(offline.currentTime);
+                osc.stop(offline.currentTime + 0.25);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate hurt sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.2);
+            }
         }
 
         /**
@@ -4573,27 +4592,31 @@
             var key = 'splash';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-            // White noise with bandpass filter
-            var buffer = _createNoiseBuffer(ctx, 0.3);
-            var source = offline.createBufferSource();
-            source.buffer = buffer;
-            var filter = offline.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.setValueAtTime(1000, offline.currentTime);
-            filter.Q.setValueAtTime(2, offline.currentTime);
-            var gain = offline.createGain();
-            gain.gain.setValueAtTime(0.2, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(offline.destination);
-            source.start(offline.currentTime);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+                var buffer = _createNoiseBuffer(ctx, 0.3);
+                var source = offline.createBufferSource();
+                source.buffer = buffer;
+                var filter = offline.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(1000, offline.currentTime);
+                filter.Q.setValueAtTime(2, offline.currentTime);
+                var gain = offline.createGain();
+                gain.gain.setValueAtTime(0.2, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(offline.destination);
+                source.start(offline.currentTime);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate splash sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.3);
+            }
         }
 
         /**
@@ -4605,25 +4628,30 @@
             var key = 'glass_break';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.25, ctx.sampleRate);
-            var buffer = _createNoiseBuffer(ctx, 0.25);
-            var source = offline.createBufferSource();
-            source.buffer = buffer;
-            var filter = offline.createBiquadFilter();
-            filter.type = 'highpass';
-            filter.frequency.setValueAtTime(3000, offline.currentTime);
-            var gain = offline.createGain();
-            gain.gain.setValueAtTime(0.15, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.25);
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(offline.destination);
-            source.start(offline.currentTime);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.25, ctx.sampleRate);
+                var buffer = _createNoiseBuffer(ctx, 0.25);
+                var source = offline.createBufferSource();
+                source.buffer = buffer;
+                var filter = offline.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.setValueAtTime(3000, offline.currentTime);
+                var gain = offline.createGain();
+                gain.gain.setValueAtTime(0.15, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.25);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(offline.destination);
+                source.start(offline.currentTime);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate glass break sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.25);
+            }
         }
 
         /**
@@ -4635,24 +4663,29 @@
             var key = 'pop';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
-            var osc = offline.createOscillator();
-            var gain = offline.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, offline.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, offline.currentTime + 0.05);
-            osc.frequency.exponentialRampToValueAtTime(300, offline.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.2, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.15);
-            osc.connect(gain);
-            gain.connect(offline.destination);
-            osc.start(offline.currentTime);
-            osc.stop(offline.currentTime + 0.2);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+                var osc = offline.createOscillator();
+                var gain = offline.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, offline.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, offline.currentTime + 0.05);
+                osc.frequency.exponentialRampToValueAtTime(300, offline.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(offline.destination);
+                osc.start(offline.currentTime);
+                osc.stop(offline.currentTime + 0.2);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate pop sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.15);
+            }
         }
 
         /**
@@ -4664,26 +4697,31 @@
             var key = 'explosion';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.8, ctx.sampleRate);
-            var buffer = _createNoiseBuffer(ctx, 0.8);
-            var source = offline.createBufferSource();
-            source.buffer = buffer;
-            var filter = offline.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(500, offline.currentTime);
-            filter.frequency.exponentialRampToValueAtTime(50, offline.currentTime + 0.8);
-            var gain = offline.createGain();
-            gain.gain.setValueAtTime(0.5, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.8);
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(offline.destination);
-            source.start(offline.currentTime);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.8, ctx.sampleRate);
+                var buffer = _createNoiseBuffer(ctx, 0.8);
+                var source = offline.createBufferSource();
+                source.buffer = buffer;
+                var filter = offline.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(500, offline.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(50, offline.currentTime + 0.8);
+                var gain = offline.createGain();
+                gain.gain.setValueAtTime(0.5, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.8);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(offline.destination);
+                source.start(offline.currentTime);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate explosion sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.8);
+            }
         }
 
         /**
@@ -4695,27 +4733,32 @@
             var key = 'enchant';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.5, ctx.sampleRate);
-            for (var i = 0; i < 3; i++) {
-                var osc = offline.createOscillator();
-                var gain = offline.createGain();
-                var startTime = offline.currentTime + i * 0.12;
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(400 + i * 200, startTime);
-                osc.frequency.exponentialRampToValueAtTime(800 + i * 300, startTime + 0.2);
-                gain.gain.setValueAtTime(0, startTime);
-                gain.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-                osc.connect(gain);
-                gain.connect(offline.destination);
-                osc.start(startTime);
-                osc.stop(startTime + 0.35);
-            }
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+                for (var i = 0; i < 3; i++) {
+                    var osc = offline.createOscillator();
+                    var gain = offline.createGain();
+                    var startTime = offline.currentTime + i * 0.12;
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400 + i * 200, startTime);
+                    osc.frequency.exponentialRampToValueAtTime(800 + i * 300, startTime + 0.2);
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+                    osc.connect(gain);
+                    gain.connect(offline.destination);
+                    osc.start(startTime);
+                    osc.stop(startTime + 0.35);
+                }
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate enchant sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.5);
+            }
         }
 
         /**
@@ -4727,28 +4770,33 @@
             var key = 'drink';
             if (_soundCache[key]) return _soundCache[key];
 
-            var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.4, ctx.sampleRate);
-            var buffer = _createNoiseBuffer(ctx, 0.4);
-            var source = offline.createBufferSource();
-            source.buffer = buffer;
-            var filter = offline.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.setValueAtTime(500, offline.currentTime);
-            filter.Q.setValueAtTime(5, offline.currentTime);
-            var gain = offline.createGain();
-            gain.gain.setValueAtTime(0.15, offline.currentTime);
-            gain.gain.linearRampToValueAtTime(0.2, offline.currentTime + 0.1);
-            gain.gain.linearRampToValueAtTime(0.15, offline.currentTime + 0.3);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.4);
-            source.connect(filter);
-            filter.connect(gain);
-            gain.connect(offline.destination);
-            source.start(offline.currentTime);
+            try {
+                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+                var buffer = _createNoiseBuffer(ctx, 0.4);
+                var source = offline.createBufferSource();
+                source.buffer = buffer;
+                var filter = offline.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(500, offline.currentTime);
+                filter.Q.setValueAtTime(5, offline.currentTime);
+                var gain = offline.createGain();
+                gain.gain.setValueAtTime(0.15, offline.currentTime);
+                gain.gain.linearRampToValueAtTime(0.2, offline.currentTime + 0.1);
+                gain.gain.linearRampToValueAtTime(0.15, offline.currentTime + 0.3);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.4);
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(offline.destination);
+                source.start(offline.currentTime);
 
-            return offline.startRendering().then(function(renderedBuffer) {
-                _soundCache[key] = renderedBuffer;
-                return renderedBuffer;
-            });
+                return offline.startRendering().then(function(rb) {
+                    _soundCache[key] = rb;
+                    return rb;
+                });
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate drink sound: ' + e.message);
+                return _createNoiseBuffer(ctx, 0.4);
+            }
         }
 
         /**
