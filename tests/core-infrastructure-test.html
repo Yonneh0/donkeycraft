@@ -135,8 +135,8 @@
     F.assert(unsubListeners === undefined || unsubListeners.length === 0, 'Unsubscribe function prevents further calls (listeners=' + (unsubListeners ? unsubListeners.length : 'deleted') + ')');
 
     // off direct removal — register ONLY ONE callback so removing it leaves array empty
-    var offCb4 = function() { F.info('offTest4 fired'); };
     var offFired4 = false;
+    var offCb4 = function() { offFired4 = true; };
     bus.on('offTest5', offCb4);  // Register only this one reference
     bus.emit('offTest5');
     F.assert(offFired4, 'Listener fires before off()');
