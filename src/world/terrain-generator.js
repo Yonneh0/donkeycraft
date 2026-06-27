@@ -14,19 +14,16 @@
 
     /**
      * TerrainGenerator — generates heightmaps and terrain for chunks.
+     * This is a module object (IIFE), not a constructor. All methods are static.
      */
-    Donkeycraft.TerrainGenerator = (function() {
-        var _instance = null;
+    var _terrainGenModule = (function() {
 
         /**
-         * Get the singleton terrain generator instance.
-         * @returns {Donkeycraft.TerrainGenerator}
+         * Get the module object itself as the "instance".
+         * @returns {object} The TerrainGenerator module.
          */
         function getInstance() {
-            if (!_instance) {
-                _instance = new Donkeycraft.TerrainGenerator();
-            }
-            return _instance;
+            return _terrainGenModule;
         }
 
         /**
