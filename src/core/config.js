@@ -78,7 +78,11 @@
 
             // Chunk persistence
             CHUNKS_PER_SAVE: 4,       // Save chunks in batches
-            SAVE_BATCH_DELAY: 100     // Delay between batch saves (ms)
+            SAVE_BATCH_DELAY: 100,    // Delay between batch saves (ms)
+
+            // Dimension settings
+            NETHER_SCALE: 8,          // Overworld coords / 8 = Nether coords (and vice versa)
+            END_SCALE: 1              // Overworld coords × 1 = End coords
         };
     })();
 
