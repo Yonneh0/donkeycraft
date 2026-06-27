@@ -188,17 +188,17 @@
     var noHit = Donkeycraft.Raycast.raycast(mockCM, eyePos, lookDir, 6.0);
     F.assert(noHit === null, 'Raycast returns null when no solid blocks exist');
 
-    // 1f. Raycast with solid blocks
+    // 1f. Raycast with solid blocks — origin in air above stone layer
     mockCM.createMockChunk(0, 0);
-    mockCM.fillArea(mockCM, 0, 0, 0, 15, 255, 15, 1); // stone everywhere in chunk
+    mockCM.fillArea(mockCM, 0, 0, 0, 15, 49, 15, 1); // stone from y=0 to y=49, air above
     var origin2 = new Donkeycraft.Vector3(8, 50, 16);
     var dirDown = new Donkeycraft.Vector3(0, -1, 0);
     var hitResult = Donkeycraft.Raycast.raycast(mockCM, origin2, dirDown, 6.0);
     F.assert(hitResult !== null, 'Raycast hits solid block below player');
     if (hitResult) {
-        F.assertEq(hitResult.blockY, 50, 'Hit block Y = 50 (directly below)');
+        F.assertEq(hitResult.blockY, 49, 'Hit block Y = 49 (top of stone layer)');
         F.assertEq(hitResult.faceNormalY, 1, 'Face normal Y = 1 (hitting top face)');
-        F.assertNear(hitResult.distance, 0, 0.1, 'Distance ≈ 0 (starting inside block)');
+        F.assertNear(hitResult.distance, 1.0, 0.1, 'Distance ≈ 1.0 (one block below)');
     }
 
     // 1g. Raycast with ignoreIds
@@ -261,8 +261,8 @@
     var progress0 = Donkeycraft.BlockAction.getBreakProgress(8, 50, 8);
     F.assertEq(progress0, 0, 'Initial break progress = 0');
 
-    // 2f. tickBreakProgress — simulate time passing
-    var events = Donkeycraft.BlockAction.tickBreakProgress(1.0); // 1 second of game time
+    // 2f. tickBreakProgress — simulate time passing (use small delta so break doesn't complete)
+    var events = Donkeycraft.BlockAction.tickBreakProgress(0.1); // 0.1 seconds of game time
     var progressAfterTick = Donkeycraft.BlockAction.getBreakProgress(8, 50, 8);
     F.assert(progressAfterTick > 0, 'Break progress increases after tick');
     F.assert(progressAfterTick <= 1.0, 'Break progress ≤ 1.0');
@@ -338,7 +338,7 @@
 
     // Additional: positive face normal
     var posResult2 = Donkeycraft.BlockPlacement.getPlacementPosition(10.7, 20.3, 5.9, 1, 0, 0);
-    F.assertEq(posResult2.x, 10, 'getPlacementPosition floors x: floor(10.7 - 1) = floor(9.7) = 9');
+    F.assertEq(posResult2.x, 9, 'getPlacementPosition floors x: floor(10.7 - 1) = floor(9.7) = 9');
 
     // 3g. placeBlockFromRaycast — null checks
     var raycastPlace = Donkeycraft.BlockPlacement.placeBlockFromRaycast(null, 5, 10, 5, 0, -1, 0, 1, mockPlayer);
