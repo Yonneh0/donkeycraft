@@ -337,8 +337,9 @@
 
     /**
      * Delete a specific cached asset.
+     * Verifies the key exists before deletion; returns false if the key is not found.
      * @param {string} key — Cache key to delete.
-     * @returns {Promise<boolean>} True if deleted.
+     * @returns {Promise<boolean>} True if deleted, false if key not found.
      */
     Donkeycraft.AssetCache.prototype.delete = function(key) {
         var self = this;
@@ -346,22 +347,29 @@
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
-            try {
-                var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
-                var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
-                var request = store.delete(key);
-
-                request.onsuccess = function() {
-                    resolve(true);
-                };
-
-                request.onerror = function() {
-                    resolve(false);
-                };
-            } catch (e) {
-                resolve(false);
+        // First verify the key exists
+        return self.has(key).then(function(exists) {
+            if (!exists) {
+                return false;
             }
+
+            return new Promise(function(resolve) {
+                try {
+                    var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
+                    var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
+                    var request = store.delete(key);
+
+                    request.onsuccess = function() {
+                        resolve(true);
+                    };
+
+                    request.onerror = function() {
+                        resolve(false);
+                    };
+                } catch (e) {
+                    resolve(false);
+                }
+            });
         });
     };
 
