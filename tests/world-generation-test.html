@@ -19,10 +19,35 @@
 <script src="../src/core/config.js"></script>
 <script src="../src/core/logger.js"></script>
 
-<!-- Inline stubs: minimal BlockRegistry and Chunk mocks for unit tests -->
+<!-- Inline stubs: minimal PerlinNoise, BlockRegistry and Chunk mocks for unit tests -->
 <script>
 (function() {
     'use strict';
+
+    // ============================================================
+    // Minimal PerlinNoise stub — required by terrain-generator.js
+    // ============================================================
+    if (!Donkeycraft.PerlinNoise) {
+        Donkeycraft.PerlinNoise = (function() {
+            var _seed = 0;
+            function init(seed) { _seed = seed || 0; }
+            function noise2D(x, y) {
+                var n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+                return n - Math.floor(n);
+            }
+            function fbm(x, y, z, octaves, lacunarity, gain) {
+                var value = 0, amplitude = 1, frequency = 1, maxVal = 0;
+                for (var i = 0; i < octaves; i++) {
+                    value += noise2D(x * frequency, z * frequency) * amplitude;
+                    maxVal += amplitude;
+                    amplitude *= 0.5;
+                    frequency *= lacunarity || 2;
+                }
+                return maxVal > 0 ? (value / maxVal - 0.5) * 2 : 0;
+            }
+            return { init: init, noise2D: noise2D, fbm: fbm, _initialized: false };
+        })();
+    }
 
     // ============================================================
     // Minimal BlockRegistry stub — covers all IDs used by world gen
