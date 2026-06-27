@@ -82,6 +82,14 @@
         // Auto-save system (uses Config.AUTO_SAVE_INTERVAL, CHUNKS_PER_SAVE, SAVE_BATCH_DELAY)
         this._autoSaveTimer = 0;
         this._worldStore = null;
+
+        // Interaction cooldown tracking (prevents rapid block break/place)
+        this._lastInteractionTime = 0;
+        this._INTERACTION_COOLDOWN_MS = 150; // Minimum ms between interactions
+
+        // Player hitbox dimensions (from Config)
+        this._playerWidth = Config.PLAYER_WIDTH;
+        this._playerHeight = Config.PLAYER_HEIGHT;
     };
 
     /**
@@ -115,6 +123,9 @@
 
             // Compile shader programs from embedded script tags
             this._compileShaderPrograms();
+
+            // Initialize canvas size to window dimensions before creating other systems
+            this._resizeCanvas();
 
             // Create camera
             this._camera = new Donkeycraft.Camera(Config.FOV, 0.1, 1000);
@@ -791,14 +802,21 @@
         }
 
         if (this._redstoneEngine) {
-            this._redstoneEngine.destroy();
+            if (typeof this._redstoneEngine.destroy === 'function') {
+                try { this._redstoneEngine.destroy(); } catch (e) { Donkeycraft.Logger.warn('Game', 'Redstone engine destroy error: ' + e.message); }
+            }
             this._redstoneEngine = null;
         }
 
         if (this._eventBus) {
-            this._eventBus.clear();
+            if (typeof this._eventBus.clear === 'function') {
+                try { this._eventBus.clear(); } catch (e) { Donkeycraft.Logger.warn('Game', 'EventBus clear error: ' + e.message); }
+            }
             this._eventBus = null;
         }
+
+        // Clean up interaction cooldown state
+        this._lastInteractionTime = 0;
 
         // Persist final state before shutdown
         if (this._levelData && this._levelData.persistToStore) {
@@ -889,36 +907,28 @@
             return;
         }
 
-        // Extract individual shaders from variable declarations
-        var terrainVert = this._extractVariable(vertSrc, 'TERRAIN_VERTEX_SHADER');
-        var terrainFrag = this._extractVariable(fragSrc, 'TERRAIN_FRAGMENT_SHADER');
-        if (terrainVert && terrainFrag) {
-            this._shaderManager.createProgram('terrain', terrainVert, terrainFrag);
-        }
+        // Extract and compile individual shader programs with error handling
+        var self2 = this;
+        var _compileShaderPair = function(name, vertName, fragName) {
+            var vertSrc2 = self2._extractVariable(vertSrc, vertName);
+            var fragSrc2 = self2._extractVariable(fragSrc, fragName);
+            if (vertSrc2 && fragSrc2) {
+                try {
+                    self2._shaderManager.createProgram(name, vertSrc2, fragSrc2);
+                    Donkeycraft.Logger.info('Game', 'Shader program "' + name + '" compiled successfully');
+                } catch (e) {
+                    Donkeycraft.Logger.error('Game', 'Failed to compile "' + name + '" shader: ' + e.message);
+                }
+            } else {
+                Donkeycraft.Logger.warn('Game', 'Missing shader sources for "' + name + '" program');
+            }
+        };
 
-        var breakVert = this._extractVariable(vertSrc, 'BREAK_VERTEX_SHADER');
-        var breakFrag = this._extractVariable(fragSrc, 'PARTICLE_FRAGMENT_SHADER');
-        if (breakVert && breakFrag) {
-            this._shaderManager.createProgram('break', breakVert, breakFrag);
-        }
-
-        var guiVert = this._extractVariable(vertSrc, 'GUI_VERTEX_SHADER');
-        var guiFrag = this._extractVariable(fragSrc, 'GUI_FRAGMENT_SHADER');
-        if (guiVert && guiFrag) {
-            this._shaderManager.createProgram('gui', guiVert, guiFrag);
-        }
-
-        var skyVert = this._extractVariable(vertSrc, 'SKY_VERTEX_SHADER');
-        var skyFrag = this._extractVariable(fragSrc, 'SKY_FRAGMENT_SHADER');
-        if (skyVert && skyFrag) {
-            this._shaderManager.createProgram('sky', skyVert, skyFrag);
-        }
-
-        var handVert = this._extractVariable(vertSrc, 'HAND_VERTEX_SHADER');
-        var handFrag = this._extractVariable(fragSrc, 'HAND_FRAGMENT_SHADER');
-        if (handVert && handFrag) {
-            this._shaderManager.createProgram('hand', handVert, handFrag);
-        }
+        _compileShaderPair('terrain', 'TERRAIN_VERTEX_SHADER', 'TERRAIN_FRAGMENT_SHADER');
+        _compileShaderPair('break', 'BREAK_VERTEX_SHADER', 'PARTICLE_FRAGMENT_SHADER');
+        _compileShaderPair('gui', 'GUI_VERTEX_SHADER', 'GUI_FRAGMENT_SHADER');
+        _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
+        _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
 
         // Log compilation results
         var stats = this._shaderManager.getStats();
@@ -1237,41 +1247,50 @@
             moveZ *= invSqrt2;
         }
 
+        // Determine if player is in flying mode (creative with flight enabled or spectator)
+        var isFlying = (this._player.gameMode === 'creative' && this._player.flyEnabled) ||
+                       this._player.gameMode === 'spectator';
+
         // Apply movement based on game mode
-        if (this._player.gameMode === 'creative' && this._player.flyEnabled) {
+        if (isFlying) {
             this._updateFlyingMovement(dt, moveX, moveZ, isSprinting);
         } else {
             this._updateWalkingMovement(dt, moveX, moveZ, isSprinting);
-        }
 
-        // Handle jumping (before gravity, so jump happens before falling)
-        if (this._jumpSystem && this._input.isKeyJustPressed('Space')) {
-            if (this._jumpSystem.canJump(this._player)) {
-                this._jumpSystem.performJump(this._player);
+            // Handle jumping (before gravity, so jump happens before falling)
+            if (this._jumpSystem && this._input.isKeyJustPressed('Space')) {
+                if (this._jumpSystem.canJump(this._player)) {
+                    this._jumpSystem.performJump(this._player);
+                }
+            }
+
+            // Handle swimming upward — use Config.SWIM_BOOST for upward velocity boost
+            if (this._input.isKeyDown('Space') && this._jumpSystem && this._jumpSystem.isSwimmingUp(this._player)) {
+                vel.y += Config.SWIM_BOOST;
             }
         }
 
-        // Handle swimming upward — use Config.SWIM_BOOST for upward velocity boost
-        if (this._input.isKeyDown('Space') && this._jumpSystem && this._jumpSystem.isSwimmingUp(this._player)) {
-            vel.y += Config.SWIM_BOOST;
+        // Apply gravity only when not flying (spectator and creative-fly ignore gravity)
+        if (!isFlying) {
+            vel.y += Config.GRAVITY * dt;
+
+            // Clamp vertical velocity to terminal velocity from Config
+            if (vel.y < Config.TERMINAL_VELOCITY) vel.y = Config.TERMINAL_VELOCITY;
+        } else if (this._player.gameMode === 'creative' && this._player.flyEnabled) {
+            // Creative flying: clamp downward fly speed only
+            if (vel.y > -Config.FLYING_TERMINAL_VELOCITY) vel.y = -Config.FLYING_TERMINAL_VELOCITY;
         }
+        // Spectator mode: no velocity clamping — free movement
 
-        // Apply gravity from Config
-        vel.y += Config.GRAVITY * dt;
-
-        // Clamp vertical velocity to terminal velocities from Config
-        if (vel.y < Config.TERMINAL_VELOCITY) vel.y = Config.TERMINAL_VELOCITY;
-        if (vel.y > -Config.FLYING_TERMINAL_VELOCITY) vel.y = -Config.FLYING_TERMINAL_VELOCITY;
-
-        // Handle knockback — add to velocity instead of directly modifying position
+        // Handle knockback — modify directly on player object to ensure decay persists
         var kb = this._player.getKnockback();
-        if (kb.x !== 0 || kb.z !== 0) {
+        if (kb && (kb.x !== 0 || kb.z !== 0)) {
             vel.x += kb.x * dt;
             vel.z += kb.z * dt;
+            // Decay knockback directly on the player's knockback object
             kb.x *= 0.9;
             kb.z *= 0.9;
-            if (Math.abs(kb.x) < 0.01) kb.x = 0;
-            if (Math.abs(kb.z) < 0.01) kb.z = 0;
+            if (Math.abs(kb.x) < 0.01) { kb.x = 0; kb.z = 0; }
         }
 
         // Resolve collision if collision system is available
@@ -1385,6 +1404,69 @@
     };
 
     /**
+     * _shouldProcessInteraction — check if enough time has passed since the last interaction.
+     * @private
+     * @returns {boolean} True if the cooldown has elapsed and interactions should be processed.
+     */
+    Donkeycraft.Game.prototype._shouldProcessInteraction = function() {
+        var now = performance.now();
+        var elapsed = now - this._lastInteractionTime;
+        if (elapsed >= this._INTERACTION_COOLDOWN_MS) {
+            this._lastInteractionTime = now;
+            return true;
+        }
+        return false;
+    };
+
+    /**
+     * _wouldOverlapPlayer — check if placing a block at the given position would overlap the player's AABB.
+     * @private
+     * @param {number} bx - Block X coordinate.
+     * @param {number} by - Block Y coordinate.
+     * @param {number} bz - Block Z coordinate.
+     * @returns {boolean} True if the block would overlap the player.
+     */
+    Donkeycraft.Game.prototype._wouldOverlapPlayer = function(bx, by, bz) {
+        var pos = this._player.getPosition();
+        var halfW = this._playerWidth / 2;
+        var pxMinX = pos.x - halfW;
+        var pxMaxX = pos.x + halfW;
+        var pxMinZ = pos.z - halfW;
+        var pxMaxZ = pos.z + halfW;
+        var pxMinY = pos.y;
+        var pxMaxY = pos.y + this._playerHeight;
+
+        // Block AABB: [bx, bx+1] x [by, by+1] x [bz, bz+1]
+        return (pxMaxX > bx && pxMinX < bx + 1 &&
+                pxMaxY > by && pxMinY < by + 1 &&
+                pxMaxZ > bz && pxMinZ < bz + 1);
+    };
+
+    /**
+     * _getSelectedBlockId — get the block ID from the currently selected hotbar slot.
+     * @private
+     * @returns {number} The block ID to place, or 1 (stone) as fallback.
+     */
+    Donkeycraft.Game.prototype._getSelectedBlockId = function() {
+        // Try to get from hotbar first
+        if (this._hotbar && this._hotbar.getSelectedSlot !== undefined) {
+            var slot = this._hotbar.getSelectedSlot();
+            if (slot !== null && slot.item !== undefined && slot.item.id !== undefined) {
+                return slot.item.id;
+            }
+        }
+        // Fallback: check player inventory directly if accessible
+        if (this._player && this._player.inventory && this._player.hotbarSlot !== undefined) {
+            var hotbarSlot = this._player.inventory.slots[this._player.hotbarSlot];
+            if (hotbarSlot && hotbarSlot.item && hotbarSlot.item.id !== undefined) {
+                return hotbarSlot.item.id;
+            }
+        }
+        // Final fallback: stone block ID
+        return 1;
+    };
+
+    /**
      * Process block interactions (break/place).
      * @private
      */
@@ -1393,6 +1475,9 @@
 
         // Only process interactions when pointer is locked
         if (!this._input.isMouseCaptured()) return;
+
+        // Check interaction cooldown
+        if (!this._shouldProcessInteraction()) return;
 
         var playerPos = this._player.getEyePosition();
         var rot = this._player.getRotation();
@@ -1431,11 +1516,18 @@
             );
 
             if (this._blockPlacementSystem && this._player) {
-                // Place a stone block (ID 1) as default
+                // Skip placement if it would overlap the player
+                if (this._wouldOverlapPlayer(placePos.x, placePos.y, placePos.z)) {
+                    return;
+                }
+
+                // Get the selected block ID from hotbar
+                var blockId = this._getSelectedBlockId();
+
                 this._blockPlacementSystem.placeBlock(
                     this._chunkManager,
                     placePos.x, placePos.y, placePos.z,
-                    1, // Stone block ID
+                    blockId,
                     this._player
                 );
             }
@@ -1507,9 +1599,16 @@
             this._handRenderer.render(this._camera, this._canvas.width, this._canvas.height);
         }
 
-        // Render weather effects (tick-based, rendered via terrain fog uniforms)
-        if (this._weatherRenderer && this._running && !this._paused) {
-            this._weatherRenderer.tick(dt);
+        // Tick and render weather effects
+        if (this._weatherRenderer) {
+            try {
+                this._weatherRenderer.tick(dt);
+                if (this._camera && this._gl) {
+                    this._weatherRenderer.render(this._camera, this._canvas.width, this._canvas.height);
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Weather render error: ' + e.message);
+            }
         }
 
         // Render GUI overlay (crosshair, HUD elements)

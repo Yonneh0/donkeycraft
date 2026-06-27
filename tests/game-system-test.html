@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Game System Tests</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Game System Tests</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Comprehensive functional tests for the Donkeycraft.Game class and its subsystems.</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Load project scripts in dependency order (core infrastructure + config + game) -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/game.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Test script -->
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Game Constructor — verify all private fields initialize correctly
+    // ============================================================
+    F.section('1. Game Constructor Initialization');
+
+    // Verify Donkeycraft.Game exists as a constructor
+    F.assert(typeof Donkeycraft.Game === 'function', 'Donkeycraft.Game is a function');
+
+    // Test default options
+    var gameDefault = new Donkeycraft.Game();
+    F.assertType(gameDefault, 'object', 'Game instance created with defaults');
+    F.assertEq(gameDefault._renderDistance, Donkeycraft.Config.RENDER_DISTANCE, '_renderDistance defaults to Config.RENDER_DISTANCE');
+    F.assertEq(gameDefault._gameMode, 'survival', '_gameMode defaults to "survival"');
+    F.assertEq(gameDefault._running, false, '_running is false by default');
+    F.assertEq(gameDefault._paused, false, '_paused is false by default');
+    F.assertEq(gameDefault._cameraSyncEnabled, true, '_cameraSyncEnabled defaults to true');
+    F.assertEq(gameDefault._lastPlayerChunkX, null, '_lastPlayerChunkX is null by default');
+    F.assertEq(gameDefault._lastPlayerChunkZ, null, '_lastPlayerChunkZ is null by default');
+    F.assertEq(gameDefault._INTERACTION_COOLDOWN_MS, 150, '_INTERACTION_COOLDOWN_MS defaults to 150ms');
+    F.assertEq(gameDefault._playerWidth, Donkeycraft.Config.PLAYER_WIDTH, '_playerWidth matches Config.PLAYER_WIDTH');
+    F.assertEq(gameDefault._playerHeight, Donkeycraft.Config.PLAYER_HEIGHT, '_playerHeight matches Config.PLAYER_HEIGHT');
+
+    // Test custom options
+    var gameCustom = new Donkeycraft.Game({ renderDistance: 10, gameMode: 'creative' });
+    F.assertEq(gameCustom._renderDistance, 10, 'Custom renderDistance=10 applied');
+    F.assertEq(gameCustom._gameMode, 'creative', 'Custom gameMode="creative" applied');
+
+    // Test null/undefined options
+    var gameNull = new Donkeycraft.Game(null);
+    F.assertEq(gameNull._renderDistance, Donkeycraft.Config.RENDER_DISTANCE, 'null options uses defaults');
+
+    var gameUndef = new Donkeycraft.Game(undefined);
+    F.assertEq(gameUndef._gameMode, 'survival', 'undefined options uses defaults');
+
+    // ============================================================
+    // Section 2: Game State Transitions — start/stop/pause/resume
+    // ============================================================
+    F.section('2. Game State Transitions');
+
+    // These tests verify state flags without actually starting the timer
+    var gameState = new Donkeycraft.Game();
+
+    // Initial state
+    F.assertEq(gameState.isRunning(), false, 'isRunning() returns false before start');
+    F.assertEq(gameState.isPaused(), false, 'isPaused() returns false before start');
+
+    // Test stop when not running (should be no-op)
+    gameState.stop();
+    F.assertEq(gameState.isRunning(), false, 'stop() when not running is safe');
+
+    // Test pause when not running (should be no-op)
+    gameState.pause();
+    F.assertEq(gameState.isPaused(), false, 'pause() when not running is safe');
+
+    // Test resume when not paused (should be no-op)
+    gameState.resume();
+    F.assertEq(gameState.isPaused(), false, 'resume() when not paused is safe');
+
+    // ============================================================
+    // Section 3: Accessor Methods — getters return correct types
+    // ============================================================
+    F.section('3. Game Accessor Methods');
+
+    var gameAccess = new Donkeycraft.Game();
+
+    // These return null/0 before init — verify they don't throw
+    F.assertType(gameAccess.getPlayer, 'function', 'getPlayer is a function');
+    F.assertType(gameAccess.getCamera, 'function', 'getCamera is a function');
+    F.assertType(gameAccess.getChunkManager, 'function', 'getChunkManager is a function');
+    F.assertType(gameAccess.getInput, 'function', 'getInput is a function');
+    F.assertType(gameAccess.getTimer, 'function', 'getTimer is a function');
+    F.assertType(gameAccess.getEventBus, 'function', 'getEventBus is a function');
+
+    // FPS and tick count return 0 before init
+    F.assertEq(gameAccess.getFPS(), 0, 'getFPS() returns 0 before init');
+    F.assertEq(gameAccess.getTickCount(), 0, 'getTickCount() returns 0 before init');
+
+    // ============================================================
+    // Section 4: setSystems — validation and error handling
+    // ============================================================
+    F.section('4. setSystems Validation');
+
+    var gameSys = new Donkeycraft.Game();
+
+    // setSystems without init should fail (chunkManager not available)
+    var resultNoInit = gameSys.setSystems(null, null, null, null, null, null, null, null);
+    F.assertEq(resultNoInit, false, 'setSystems fails when chunkManager not initialized');
+
+    // Mock init for testing setSystems with valid dependencies
+    // We can't fully init without WebGL, but we can test the validation logic
+    gameSys._chunkManager = { /* mock */ };
+    gameSys._player = { /* mock */ };
+    gameSys._input = { /* mock */ };
+
+    // Passing constructor functions should attempt instantiation
+    var mockChunkManager = { getChunkIfExists: function() { return null; } };
+    var mockPlayer = { getPosition: function() { return {x:0,y:0,z:0}; }, getVelocity: function() { return {x:0,y:0,z:0}; }, getRotation: function() { return {yaw:0,pitch:0}; }, getKnockback: function() { return {x:0,z:0}; }, _notifyTick: function() {}, destroy: function() {} };
+    var mockInput = { updateKeyStates: function() {}, updateMouseButtonStates: function() {}, isKeyDown: function() { return false; }, isKeyJustPressed: function() { return false; }, isMouseButtonPressed: function() { return false; }, isMouseCaptured: function() { return true; }, destroy: function() {} };
+
+    gameSys._chunkManager = mockChunkManager;
+    gameSys._player = mockPlayer;
+    gameSys._input = mockInput;
+
+    // Pass non-constructors (objects) — should be assigned directly
+    var mockCollision = { resolveMovement: function() { return {newX:0,newY:0,newZ:0}; } };
+    var mockMovement = {};
+    var mockJump = {};
+    var mockFlying = {};
+    var mockRaycast = {};
+    var mockBlockAction = {};
+    var mockBlockPlace = {};
+    var mockInteract = {};
+
+    var resultWithDeps = gameSys.setSystems(
+        mockMovement, mockCollision, mockJump, mockFlying,
+        mockRaycast, mockBlockAction, mockBlockPlace, mockInteract
+    );
+    F.assertEq(resultWithDeps, true, 'setSystems succeeds with valid dependencies');
+    F.assertEq(gameSys._movementSystem, mockMovement, '_movementSystem assigned correctly');
+    F.assertEq(gameSys._collisionSystem, mockCollision, '_collisionSystem assigned correctly');
+    F.assertEq(gameSys._jumpSystem, mockJump, '_jumpSystem assigned correctly');
+    F.assertEq(gameSys._flyingSystem, mockFlying, '_flyingSystem assigned correctly');
+    F.assertEq(gameSys._raycastSystem, mockRaycast, '_raycastSystem assigned correctly');
+    F.assertEq(gameSys._blockActionSystem, mockBlockAction, '_blockActionSystem assigned correctly');
+    F.assertEq(gameSys._blockPlacementSystem, mockBlockPlace, '_blockPlacementSystem assigned correctly');
+    F.assertEq(gameSys._interactableBlocksSystem, mockInteract, '_interactableBlocksSystem assigned correctly');
+
+    // ============================================================
+    // Section 5: _shouldProcessInteraction — cooldown logic
+    // ============================================================
+    F.section('5. Interaction Cooldown Logic');
+
+    var gameCooldown = new Donkeycraft.Game();
+
+    // First call should always succeed (no previous interaction)
+    var firstCall = gameCooldown._shouldProcessInteraction();
+    F.assertEq(firstCall, true, 'First _shouldProcessInteraction() returns true');
+
+    // Second call immediately should be blocked by cooldown
+    var secondCall = gameCooldown._shouldProcessInteraction();
+    F.assertEq(secondCall, false, 'Second _shouldProcessInteraction() within cooldown returns false');
+
+    // Simulate time passing by manipulating _lastInteractionTime
+    gameCooldown._lastInteractionTime = performance.now() - 200; // 200ms ago
+    var afterCooldown = gameCooldown._shouldProcessInteraction();
+    F.assertEq(afterCooldown, true, '_shouldProcessInteraction() returns true after cooldown elapsed');
+
+    // ============================================================
+    // Section 6: _wouldOverlapPlayer — AABB collision detection
+    // ============================================================
+    F.section('6. Block Placement Overlap Detection');
+
+    var gameOverlap = new Donkeycraft.Game();
+    gameOverlap._player = {
+        getPosition: function() { return { x: 10.0, y: 64.0, z: 10.0 }; },
+        width: 0.6,
+        height: 1.8
+    };
+    gameOverlap._playerWidth = 0.6;
+    gameOverlap._playerHeight = 1.8;
+
+    // Block directly adjacent (should NOT overlap)
+    var adjacent = gameOverlap._wouldOverlapPlayer(11, 64, 10);
+    F.assertEq(adjacent, false, 'Block at x=11 does not overlap player at x=10');
+
+    // Block overlapping player position (SHOULD overlap)
+    var overlap = gameOverlap._wouldOverlapPlayer(9, 64, 10);
+    F.assertEq(overlap, true, 'Block at x=9 overlaps player at x=10');
+
+    // Block above player (should NOT overlap vertically)
+    var above = gameOverlap._wouldOverlapPlayer(10, 67, 10);
+    F.assertEq(above, false, 'Block above player does not overlap');
+
+    // Block below player feet (SHOULD overlap)
+    var below = gameOverlap._wouldOverlapPlayer(10, 62, 10);
+    F.assertEq(below, true, 'Block below player feet overlaps');
+
+    // ============================================================
+    // Section 7: _getSelectedBlockId — hotbar slot selection
+    // ============================================================
+    F.section('7. Hotbar Block Selection');
+
+    var gameHotbar = new Donkeycraft.Game();
+
+    // No hotbar, no player inventory — should return stone (ID 1)
+    F.assertEq(gameHotbar._getSelectedBlockId(), 1, 'No hotbar returns stone ID 1');
+
+    // With mock hotbar returning valid slot
+    gameHotbar._hotbar = {
+        getSelectedSlot: function() {
+            return { item: { id: 5 } }; // Diamond block
+        }
+    };
+    F.assertEq(gameHotbar._getSelectedBlockId(), 5, 'Hotbar with item returns correct ID');
+
+    // With mock hotbar returning null slot
+    gameHotbar._hotbar = {
+        getSelectedSlot: function() { return null; }
+    };
+    F.assertEq(gameHotbar._getSelectedBlockId(), 1, 'Hotbar with null slot returns stone');
+
+    // With mock hotbar returning slot without item
+    gameHotbar._hotbar = {
+        getSelectedSlot: function() { return {}; }
+    };
+    F.assertEq(gameHotbar._getSelectedBlockId(), 1, 'Hotbar with empty slot returns stone');
+
+    // ============================================================
+    // Section 8: _getTimeOfDay — time progression
+    // ============================================================
+    F.section('8. Time of Day Calculation');
+
+    var gameTime = new Donkeycraft.Game();
+    gameTime._timer = { getTickCount: function() { return 0; } };
+
+    // At tick 0, time of day should be 0
+    F.assertEq(gameTime._getTimeOfDay(), 0, 'Time of day at tick 0 is 0');
+
+    // At tick 72000 (half of 24000 ticks per day... actually 60*24000 = 1440000)
+    // With WORLD_TIME_SCALE=60, ticksPerDay = 60 * 24000 = 1440000
+    // At tick 720000 (half), time should be 0.5
+    gameTime._timer.getTickCount = function() { return 720000; };
+    var todHalf = gameTime._getTimeOfDay();
+    F.assertNear(todHalf, 0.5, 0.001, 'Time of day at half cycle ≈ 0.5');
+
+    // At tick 360000 (quarter), time should be 0.25
+    gameTime._timer.getTickCount = function() { return 360000; };
+    var todQuarter = gameTime._getTimeOfDay();
+    F.assertNear(todQuarter, 0.25, 0.001, 'Time of day at quarter cycle ≈ 0.25');
+
+    // Wrap-around test: tick count exceeding ticksPerDay
+    gameTime._timer.getTickCount = function() { return 1440000 + 360000; };
+    var todWrap = gameTime._getTimeOfDay();
+    F.assertNear(todWrap, 0.25, 0.001, 'Time of day wraps correctly after full cycle');
+
+    // ============================================================
+    // Section 9: _updateFlyingMovement — flying mode movement
+    // ============================================================
+    F.section('9. Flying Movement Logic');
+
+    var gameFly = new Donkeycraft.Game();
+    gameFly._player = {
+        gameMode: 'creative',
+        flyEnabled: true,
+        getVelocity: function() { return { x: 0, y: 0, z: 0 }; }
+    };
+    gameFly._input = {
+        isKeyDown: function(key) {
+            if (key === 'ShiftLeft') return false; // Not sprinting
+            return false;
+        }
+    };
+
+    // Test horizontal movement at normal speed
+    var vel = { x: 0, y: 0, z: 0 };
+    gameFly._player.getVelocity = function() { return vel; };
+    gameFly._updateFlyingMovement(1.0, 1, 0, false); // Moving forward only
+    F.assertEq(vel.x, 0, 'X velocity should be 0 (moveZ=1 affects Z)');
+    F.assertEq(vel.z, Donkeycraft.Config.PLAYER_FLY_SPEED, 'Z velocity equals PLAYER_FLY_SPEED');
+
+    // Test sprint flying speed
+    gameFly._input.isKeyDown = function(key) {
+        if (key === 'ShiftLeft') return true;
+        return false;
+    };
+    vel.x = 0; vel.z = 0;
+    gameFly._updateFlyingMovement(1.0, 1, 0, true);
+    F.assertEq(vel.z, Donkeycraft.Config.PLAYER_FLY_SPEED_BOOST, 'Sprint fly speed equals PLAYER_FLY_SPEED_BOOST');
+
+    // ============================================================
+    // Section 10: _updateWalkingMovement — walking movement
+    // ============================================================
+    F.section('10. Walking Movement Logic');
+
+    var gameWalk = new Donkeycraft.Game();
+    gameWalk._player = {
+        gameMode: 'survival',
+        getVelocity: function() { return { x: 0, y: 0, z: 0 }; }
+    };
+
+    vel.x = 0; vel.y = 0; vel.z = 0;
+    gameWalk._player.getVelocity = function() { return vel; };
+
+    // Normal walking speed
+    gameWalk._updateWalkingMovement(1.0, 1, 0, false);
+    F.assertEq(vel.x, 0, 'X velocity should be 0 (moveZ=1 affects Z)');
+    F.assertEq(vel.z, Donkeycraft.Config.PLAYER_SPEED, 'Walking speed equals PLAYER_SPEED');
+
+    // Sprinting speed
+    gameWalk._input = { isKeyDown: function(key) { return key === 'ShiftLeft'; } };
+    vel.x = 0; vel.z = 0;
+    gameWalk._updateWalkingMovement(1.0, 1, 0, true);
+    F.assertEq(vel.z, Donkeycraft.Config.PLAYER_SPRINT_SPEED, 'Sprint speed equals PLAYER_SPRINT_SPEED');
+
+    // ============================================================
+    // Section 11: _resizeCanvas — canvas sizing
+    // ============================================================
+    F.section('11. Canvas Resize Logic');
+
+    var gameResize = new Donkeycraft.Game();
+    gameResize._canvas = { width: 800, height: 600 };
+    gameResize._gl = { viewport: function(x, y, w, h) { this._vp = [x, y, w, h]; } };
+
+    // Mock window size
+    var origInnerW = window.innerWidth;
+    var origInnerH = window.innerHeight;
+    Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 768, writable: true, configurable: true });
+
+    gameResize._resizeCanvas();
+    F.assertEq(gameResize._canvas.width, 1024, 'Canvas width updated to window.innerWidth');
+    F.assertEq(gameResize._canvas.height, 768, 'Canvas height updated to window.innerHeight');
+    F.assertArrEq(gameResize._gl._vp, [0, 0, 1024, 768], 'GL viewport set correctly');
+
+    // Restore original values
+    Object.defineProperty(window, 'innerWidth', { value: origInnerW, writable: true, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: origInnerH, writable: true, configurable: true });
+
+    // Resize with no GL context should be safe
+    var gameNoGl = new Donkeycraft.Game();
+    gameNoGl._canvas = { width: 800, height: 600 };
+    gameNoGl._gl = null;
+    gameNoGl._resizeCanvas(); // Should not throw
+    F.assert(true, '_resizeCanvas with null GL is safe');
+
+    // ============================================================
+    // Section 12: setWorldStore / setLevelData / setHotbar / setGuiManager
+    // ============================================================
+    F.section('12. Setter Methods');
+
+    var gameSetters = new Donkeycraft.Game();
+
+    // setWorldStore
+    var mockWorldStore = { setChunkManager: function() {}, isReady: function() { return true; } };
+    gameSetters.setWorldStore(mockWorldStore);
+    F.assertEq(gameSetters._worldStore, mockWorldStore, 'setWorldStore assigns correctly');
+
+    // setLevelData
+    var mockLevelData = { startAutoSave: function() {} };
+    gameSetters.setLevelData(mockLevelData, 'test-world');
+    F.assert(gameSetters._levelData !== null, 'setLevelData assigns LevelData');
+
+    // setHotbar
+    var mockHotbar = { getSelectedSlot: function() { return null; } };
+    gameSetters.setHotbar(mockHotbar);
+    F.assertEq(gameSetters._hotbar, mockHotbar, 'setHotbar assigns correctly');
+
+    // setGuiManager
+    var mockGuiManager = {};
+    gameSetters.setGuiManager(mockGuiManager);
+    F.assertEq(gameSetters._guiManager, mockGuiManager, 'setGuiManager assigns correctly');
+
+    // ============================================================
+    // Section 13: toggleDebugOverlay — debug visibility toggle
+    // ============================================================
+    F.section('13. Debug Overlay Toggle');
+
+    var gameDebug = new Donkeycraft.Game();
+
+    // Initially should be false (no DOM element to check)
+    F.assertEq(gameDebug.isDebugVisible(), false, 'Debug initially invisible');
+
+    // Toggle on
+    var visible1 = gameDebug.toggleDebugOverlay();
+    F.assertEq(visible1, true, 'toggleDebugOverlay returns true after first toggle');
+    F.assertEq(gameDebug.isDebugVisible(), true, 'isDebugVisible returns true');
+
+    // Toggle off
+    var visible2 = gameDebug.toggleDebugOverlay();
+    F.assertEq(visible2, false, 'toggleDebugOverlay returns false after second toggle');
+    F.assertEq(gameDebug.isDebugVisible(), false, 'isDebugVisible returns false');
+
+    // ============================================================
+    // Section 14: destroy — resource cleanup safety
+    // ============================================================
+    F.section('14. Destroy Resource Cleanup');
+
+    var gameDestroy = new Donkeycraft.Game();
+
+    // Mock all subsystems with destroy methods
+    gameDestroy._breakParticles = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._handRenderer = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._guiRenderer = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._weatherRenderer = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._sky = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._terrainRenderer = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._chunkManager = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._player = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._shaderManager = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._glContext = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._input = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._redstoneEngine = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._eventBus = { clear: function() { this._cleared = true; } };
+    gameDestroy._worldStore = { destroy: function() { this._destroyed = true; } };
+    gameDestroy._levelData = { persistToStore: function() { return Promise.resolve(); } };
+
+    // Call destroy — should not throw and should clean up all references
+    try {
+        gameDestroy.destroy();
+        F.assert(true, 'destroy() completes without throwing');
+    } catch (e) {
+        F.assert(false, 'destroy() does not throw: ' + e.message);
+    }
+
+    // Verify all references are nulled
+    F.assertEq(gameDestroy._breakParticles, null, '_breakParticles nulled after destroy');
+    F.assertEq(gameDestroy._handRenderer, null, '_handRenderer nulled after destroy');
+    F.assertEq(gameDestroy._guiRenderer, null, '_guiRenderer nulled after destroy');
+    F.assertEq(gameDestroy._weatherRenderer, null, '_weatherRenderer nulled after destroy');
+    F.assertEq(gameDestroy._sky, null, '_sky nulled after destroy');
+    F.assertEq(gameDestroy._terrainRenderer, null, '_terrainRenderer nulled after destroy');
+    F.assertEq(gameDestroy._chunkManager, null, '_chunkManager nulled after destroy');
+    F.assertEq(gameDestroy._player, null, '_player nulled after destroy');
+    F.assertEq(gameDestroy._shaderManager, null, '_shaderManager nulled after destroy');
+    F.assertEq(gameDestroy._glContext, null, '_glContext nulled after destroy');
+    F.assertEq(gameDestroy._input, null, '_input nulled after destroy');
+    F.assertEq(gameDestroy._redstoneEngine, null, '_redstoneEngine nulled after destroy');
+    F.assertEq(gameDestroy._eventBus, null, '_eventBus nulled after destroy');
+    F.assertEq(gameDestroy._worldStore, null, '_worldStore nulled after destroy');
+    F.assertEq(gameDestroy._levelData, null, '_levelData nulled after destroy');
+    F.assertEq(gameDestroy._lastInteractionTime, 0, '_lastInteractionTime reset to 0');
+
+    // Test destroy with subsystems that lack destroy methods (defensive pattern)
+    var gameNoDestroy = new Donkeycraft.Game();
+    gameNoDestroy._redstoneEngine = { /* no destroy method */ };
+    gameNoDestroy._eventBus = { /* no clear method */ };
+    try {
+        gameNoDestroy.destroy();
+        F.assert(true, 'destroy() handles missing destroy methods gracefully');
+    } catch (e) {
+        F.assert(false, 'destroy() handles missing methods: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 15: _getBlockAt — block retrieval at world coordinates
+    // ============================================================
+    F.section('15. Block Retrieval at World Coordinates');
+
+    var gameBlock = new Donkeycraft.Game();
+
+    // Mock chunk manager with getChunkIfExists
+    var mockChunk = { getBlock: function(x, y, z) { return x * 100 + y * 10 + z; } };
+    gameBlock._chunkManager = {
+        getChunkIfExists: function(cx, cz) {
+            if (cx === 0 && cz === 0) return mockChunk;
+            return null;
+        }
+    };
+
+    // Block within chunk 0,0
+    var blockId = gameBlock._getBlockAt(5, 64, 10);
+    F.assertEq(blockId, 570, 'getBlockAt returns correct ID for valid position');
+
+    // Block outside world height (below)
+    var blockBelow = gameBlock._getBlockAt(5, -1, 10);
+    F.assertEq(blockBelow, 0, 'getBlockAt returns 0 for Y < 0');
+
+    // Block outside world height (above)
+    var blockAbove = gameBlock._getBlockAt(5, 256, 10);
+    F.assertEq(blockAbove, 0, 'getBlockAt returns 0 for Y >= WORLD_HEIGHT');
+
+    // Block in unloaded chunk
+    var blockUnloaded = gameBlock._getBlockAt(20, 64, 20);
+    F.assertEq(blockUnloaded, 0, 'getBlockAt returns 0 for unloaded chunk');
+
+    // Negative coordinates (chunk wrapping)
+    var blockNeg = gameBlock._getBlockAt(-5, 64, -10);
+    F.assertEq(blockNeg, 0, 'getBlockAt returns 0 for negative coords in unloaded chunk');
+
+    // ============================================================
+    // Section 16: EventBus integration — event emission
+    // ============================================================
+    F.section('16. EventBus Integration');
+
+    var gameBus = new Donkeycraft.Game();
+    gameBus._eventBus = new Donkeycraft.EventBus();
+
+    // Test that getEventBus returns the bus
+    F.assertEq(gameBus.getEventBus(), gameBus._eventBus, 'getEventBus returns internal bus');
+
+    // Test event emission and listening
+    var eventFired = false;
+    gameBus._eventBus.on('game:tick', function(data) {
+        eventFired = true;
+        F.assertType(data.dt, 'number', 'Tick event data has dt as number');
+        F.assertType(data.tickCount, 'number', 'Tick event data has tickCount as number');
+    });
+
+    gameBus._eventBus.emit('game:tick', { dt: 0.016, tickCount: 42 });
+    F.assert(eventFired, 'EventBus on/emit works for game:tick event');
+
+    // ============================================================
+    // Section 17: Pointer Lock Methods
+    // ============================================================
+    F.section('17. Pointer Lock Methods');
+
+    var gamePointer = new Donkeycraft.Game();
+
+    // isPointerLocked checks document.pointerLockElement
+    // We can't easily test requestPointerLock without DOM interaction,
+    // but we can verify the method exists and is a function
+    F.assertType(gamePointer.isPointerLocked, 'function', 'isPointerLocked is a function');
+    F.assertType(gamePointer.requestPointerLock, 'function', 'requestPointerLock is a function');
+    F.assertType(gamePointer.exitPointerLock, 'function', 'exitPointerLock is a function');
+
+    // setOverlay
+    var mockOverlay = { requestPointerLock: function() {} };
+    gamePointer.setOverlay(mockOverlay);
+    F.assertEq(gamePointer._overlay, mockOverlay, 'setOverlay assigns correctly');
+
+    // ============================================================
+    // Section 18: Camera Sync
+    // ============================================================
+    F.section('18. Camera Synchronization');
+
+    var gameCamSync = new Donkeycraft.Game();
+
+    F.assertEq(gameCamSync._cameraSyncEnabled, true, 'Camera sync enabled by default');
+
+    gameCamSync.setCameraSync(false);
+    F.assertEq(gameCamSync._cameraSyncEnabled, false, 'setCameraSync(false) disables sync');
+
+    gameCamSync.setCameraSync(true);
+    F.assertEq(gameCamSync._cameraSyncEnabled, true, 'setCameraSync(true) enables sync');
+
+    // Passing non-boolean should coerce to boolean
+    gameCamSync.setCameraSync(0);
+    F.assertEq(gameCamSync._cameraSyncEnabled, false, 'setCameraSync(0) coerces to false');
+
+    gameCamSync.setCameraSync('yes');
+    F.assertEq(gameCamSync._cameraSyncEnabled, true, 'setCameraSync("yes") coerces to true');
+
+    // ============================================================
+    // Finish: render summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>
