@@ -110,10 +110,10 @@
         var sinYaw = Math.sin(this._yaw);
         var cosPitch = Math.cos(this._pitch);
 
-        // Standard FPS convention: positive pitch = looking up, negative pitch = looking down.
+        // Donkeycraft convention: negative pitch = looking UP (mouse down), positive pitch = looking DOWN (mouse up).
         this._forward.set(
             -sinYaw * cosPitch,
-            Math.sin(this._pitch),
+            -Math.sin(this._pitch),
             -cosYaw * cosPitch
         ).normalize();
 
