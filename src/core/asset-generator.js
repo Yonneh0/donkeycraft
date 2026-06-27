@@ -484,14 +484,7 @@
         }
 
         /**
-         * Generate a colored wool/fabric texture.
-         * @param {number} r - Base red.
-         * @param {number} g - Base green.
-         * @param {number} b - Base blue.
-         * @returns {HTMLImageElement}
-         */
-        /**
-         * Generate a colored wool/fabric texture with seeded noise variation.
+         * Generate a colored wool/fabric texture with seeded noise variation and woven pattern.
          * @param {number} r - Base red.
          * @param {number} g - Base green.
          * @param {number} b - Base blue.
@@ -518,13 +511,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a concrete texture (smooth colored surface).
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a concrete texture (smooth colored surface) with seeded noise.
          * @param {number} r
@@ -1743,10 +1729,11 @@
                     }
                 }
             } else if (variant === 'dark') {
+                _seedRng(777);
                 var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
                 for (var y = 0; y < TEX_SIZE; y++) {
                     for (var x = 0; x < TEX_SIZE; x++) {
-                        var n = (Math.random() - 0.5) * 15;
+                        var n = (_rng() - 0.5) * 15;
                         var idx = (y * TEX_SIZE + x) * 4;
                         imgData.data[idx]     = 55 + n;
                         imgData.data[idx + 1] = 70 + n;
@@ -1756,10 +1743,11 @@
                 }
                 ctx.putImageData(imgData, 0, 0);
             } else {
+                _seedRng(42);
                 var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
                 for (var y = 0; y < TEX_SIZE; y++) {
                     for (var x = 0; x < TEX_SIZE; x++) {
-                        var n = (Math.random() - 0.5) * 15;
+                        var n = (_rng() - 0.5) * 15;
                         var idx = (y * TEX_SIZE + x) * 4;
                         imgData.data[idx]     = 85 + n;
                         imgData.data[idx + 1] = 110 + n;
@@ -1796,13 +1784,18 @@
          * Generate an ice texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate an ice texture with seeded noise variation.
+         * @returns {HTMLImageElement}
+         */
         function generateIce() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 15;
+                    var n = (_rng() - 0.5) * 15;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 180 + n;
                     imgData.data[idx + 1] = 210 + n;
@@ -1818,13 +1811,18 @@
          * Generate a blue ice texture (more opaque, deeper blue).
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a blue ice texture (more opaque, deeper blue) with seeded noise.
+         * @returns {HTMLImageElement}
+         */
         function generateBlueIce() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 8;
+                    var n = (_rng() - 0.5) * 8;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 100 + n;
                     imgData.data[idx + 1] = 160 + n;
@@ -1840,54 +1838,61 @@
          * Generate a sponge texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a sponge texture with seeded holes.
+         * @returns {HTMLImageElement}
+         */
         function generateSponge() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#DDAA33';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Sponge holes
+            // Seeded sponge holes
             for (var i = 0; i < 15; i++) {
                 ctx.fillStyle = 'rgba(180, 140, 20, 0.6)';
-                var hx = Math.floor(Math.random() * 14);
-                var hy = Math.floor(Math.random() * 14);
+                var hx = Math.floor(_rng() * 14);
+                var hy = Math.floor(_rng() * 14);
                 ctx.fillRect(hx, hy, 2, 2);
             }
             return _canvasToImage(canvas);
         }
 
         /**
-         * Generate a wet sponge texture (darker).
+         * Generate a wet sponge texture (darker) with seeded holes.
          * @returns {HTMLImageElement}
          */
         function generateWetSponge() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#668844';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Sponge holes (darker)
+            // Seeded sponge holes (darker)
             for (var i = 0; i < 15; i++) {
                 ctx.fillStyle = 'rgba(50, 70, 30, 0.6)';
-                var hx = Math.floor(Math.random() * 14);
-                var hy = Math.floor(Math.random() * 14);
+                var hx = Math.floor(_rng() * 14);
+                var hy = Math.floor(_rng() * 14);
                 ctx.fillRect(hx, hy, 2, 2);
             }
             return _canvasToImage(canvas);
         }
 
         /**
-         * Generate a terracotta texture.
+         * Generate a terracotta texture with seeded noise.
          * @param {number} r
          * @param {number} g
          * @param {number} b
          * @returns {HTMLImageElement}
          */
         function generateTerracotta(r, g, b) {
+            _seedRng(r + g + b);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 12;
+                    var n = (_rng() - 0.5) * 12;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
@@ -1911,13 +1916,18 @@
          * Generate a sandstone texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a sandstone texture with seeded noise and layer effect.
+         * @returns {HTMLImageElement}
+         */
         function generateSandstone() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 15;
+                    var n = (_rng() - 0.5) * 15;
                     var layerEffect = (y % 4 < 2) ? 5 : 0;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, 210 + n + layerEffect));
@@ -2136,15 +2146,19 @@
          * Generate a gilded blackstone texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a gilded blackstone texture with seeded noise and gold specks.
+         * @returns {HTMLImageElement}
+         */
         function generateGildedBlackstone() {
-            _shufflePerm(7777);
+            _seedRng(7777);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Blackstone background
+            // Seeded blackstone background
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 10;
+                    var n = (_rng() - 0.5) * 10;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 35 + n;
                     imgData.data[idx + 1] = 32 + n;
@@ -2153,10 +2167,10 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Gold specks
+            // Gold seeded specks
             for (var i = 0; i < 6; i++) {
                 ctx.fillStyle = 'rgba(200, 170, 50, 0.7)';
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -2185,16 +2199,17 @@
         }
 
         /**
-         * Generate a soul sand texture.
+         * Generate a soul sand texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
         function generateSoulSand() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 30;
+                    var n = (_rng() - 0.5) * 30;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 70 + n;
                     imgData.data[idx + 1] = 60 + n;
@@ -2207,16 +2222,17 @@
         }
 
         /**
-         * Generate a soul soil texture.
+         * Generate a soul soil texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
         function generateSoulSoil() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 20;
+                    var n = (_rng() - 0.5) * 20;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 55 + n;
                     imgData.data[idx + 1] = 45 + n;
@@ -2291,7 +2307,7 @@
         }
 
         /**
-         * Generate a nylium texture (netherrack with nylium growth).
+         * Generate a nylium texture (netherrack with nylium growth) using seeded noise.
          * @param {boolean} isWarped - Whether warped (blue-green) or crimson (red).
          * @returns {HTMLImageElement}
          */
@@ -2312,13 +2328,14 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Nylium growth color
+            // Nylium growth color with seeded positions
+            _seedRng(isWarped ? 2222 : 3333);
             var gr = isWarped ? 60 : 180;
             var gg = isWarped ? 170 : 50;
             var gb = isWarped ? 160 : 50;
             for (var i = 0; i < 10; i++) {
                 ctx.fillStyle = 'rgb(' + gr + ',' + gg + ',' + gb + ')';
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -2453,19 +2470,20 @@
         }
 
         /**
-         * Generate a concrete powder texture (same as concrete but rougher).
+         * Generate a concrete powder texture (same as concrete but rougher) with seeded noise.
          * @param {number} r
          * @param {number} g
          * @param {number} b
          * @returns {HTMLImageElement}
          */
         function generateConcretePowder(r, g, b) {
+            _seedRng(r + g + b);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 18; // More noise than concrete
+                    var n = (_rng() - 0.5) * 18; // More noise than concrete
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
@@ -2535,15 +2553,21 @@
          * Generate a tall grass texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a tall grass texture with seeded blade positions.
+         * @returns {HTMLImageElement}
+         */
         function generateTallGrass() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.fillStyle = '#55AA33';
-            // Blades of grass
+            // Seeded blades of grass
             for (var i = 0; i < 8; i++) {
-                var bx = 1 + Math.floor(Math.random() * 14);
-                ctx.fillRect(bx, 4 + Math.floor(Math.random() * 4), 1, 8 + Math.floor(Math.random() * 4));
+                var bx = 1 + Math.floor(_rng() * 14);
+                var by = 4 + Math.floor(_rng() * 4);
+                ctx.fillRect(bx, by, 1, 8 + Math.floor(_rng() * 4));
             }
             return _canvasToImage(canvas);
         }
@@ -2890,7 +2914,12 @@
          * Generate a wall texture (cobblestone).
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a wall texture (cobblestone) with seeded stone shades.
+         * @returns {HTMLImageElement}
+         */
         function generateWall() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             // Cobblestone pattern
@@ -2902,7 +2931,7 @@
             ];
             for (var i = 0; i < stones.length; i++) {
                 var s = stones[i];
-                var shade = 120 + Math.floor(Math.random() * 30);
+                var shade = 120 + Math.floor(_rng() * 30);
                 ctx.fillStyle = 'rgb(' + shade + ',' + shade + ',' + (shade + 5) + ')';
                 ctx.fillRect(s.x, s.y, s.w, s.h);
             }
@@ -2998,13 +3027,18 @@
          * Generate a mirror texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a mirror texture with seeded reflective noise.
+         * @returns {HTMLImageElement}
+         */
         function generateMirror() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Silver reflective surface
+            // Silver reflective surface with seeded noise
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 10;
+                    var n = (_rng() - 0.5) * 10;
                     var val = 200 + n;
                     ctx.fillStyle = 'rgb(' + val + ',' + val + ',' + (val + 5) + ')';
                     ctx.fillRect(x, y, 1, 1);
@@ -3125,15 +3159,21 @@
          * Generate an end portal texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate an end portal texture with seeded starfield positions.
+         * @returns {HTMLImageElement}
+         */
         function generateEndPortal() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             // Starfield
             ctx.fillStyle = '#110022';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < 30; i++) {
-                ctx.fillStyle = 'rgba(200, 180, 255, ' + (0.3 + Math.random() * 0.7) + ')';
-                ctx.fillRect(Math.floor(Math.random() * 16), Math.floor(Math.random() * 16), 1, 1);
+                var brightness = 0.3 + _rng() * 0.7;
+                ctx.fillStyle = 'rgba(200, 180, 255, ' + brightness + ')';
+                ctx.fillRect(Math.floor(_rng() * 16), Math.floor(_rng() * 16), 1, 1);
             }
             return _canvasToImage(canvas);
         }
@@ -3142,13 +3182,18 @@
          * Generate a nether portal texture.
          * @returns {HTMLImageElement}
          */
+        /**
+         * Generate a nether portal texture with seeded purple swirl noise.
+         * @returns {HTMLImageElement}
+         */
         function generateNetherPortal() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Purple swirl
+            // Purple swirl with seeded noise
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = Math.random();
+                    var n = _rng();
                     var idx = (y * TEX_SIZE + x) * 4;
                     var r = 80 + n * 60;
                     var g = 20 + n * 30;
