@@ -530,9 +530,20 @@
             _shufflePerm(7777);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone background
-            var stoneImg = generateStone(7777);
-            ctx.drawImage(stoneImg, 0, 0);
+            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+            // Stone background (inline to avoid re-shuffling via generateStone)
+            for (var y = 0; y < TEX_SIZE; y++) {
+                for (var x = 0; x < TEX_SIZE; x++) {
+                    var n = _fbm(x * 0.15, y * 0.15, 4, 1.0, 1.0);
+                    var base = 120 + n * 30;
+                    var idx = (y * TEX_SIZE + x) * 4;
+                    imgData.data[idx]     = base;
+                    imgData.data[idx + 1] = base;
+                    imgData.data[idx + 2] = base + 5;
+                    imgData.data[idx + 3] = 255;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
             // Place ore clusters
             var orePositions = [
                 { x: 4, y: 3 }, { x: 10, y: 5 }, { x: 6, y: 10 },
@@ -1513,26 +1524,22 @@
                 }
                 ctx.putImageData(imgData, 0, 0);
             } else {
-                var imgData2 = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-                for (var y2 = 0; y2 < TEX_SIZE; y2++) {
-                    for (var x2 = 0; x2 < TEX_SIZE; x2++) {
-                        var n2 = (Math.random() - 0.5) * 15;
-                        var idx2 = (y2 * TEX_SIZE + x2) * 4;
-                        imgData2.data[idx2]     = 85 + n2;
-                        imgData2.data[idx2 + 1] = 110 + n2;
-                        imgData2.data[idx2 + 2] = 95 + n2;
-                        imgData2.data[idx2 + 3] = 255;
+                var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+                for (var y = 0; y < TEX_SIZE; y++) {
+                    for (var x = 0; x < TEX_SIZE; x++) {
+                        var n = (Math.random() - 0.5) * 15;
+                        var idx = (y * TEX_SIZE + x) * 4;
+                        imgData.data[idx]     = 85 + n;
+                        imgData.data[idx + 1] = 110 + n;
+                        imgData.data[idx + 2] = 95 + n;
+                        imgData.data[idx + 3] = 255;
                     }
                 }
-                ctx.putImageData(imgData2, 0, 0);
+                ctx.putImageData(imgData, 0, 0);
             }
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a snow block texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Convert a canvas element to an Image element via data URL.
          * @param {HTMLCanvasElement} canvas - Source canvas.
@@ -1546,7 +1553,7 @@
         }
 
         /**
-         * Generate a snow block texture.
+         * Generate a snow block texture (solid white with slight noise).
          * @returns {HTMLImageElement}
          */
         function generateSnowBlock() {
@@ -2212,8 +2219,6 @@
             }
             return _canvasToImage(canvas);
         }
-
-        // NOTE: generateHayBale is defined earlier; this duplicate removed to prevent infinite recursion
 
         /**
          * Generate a concrete powder texture (same as concrete but rougher).
@@ -3999,8 +4004,7 @@
                 'nether_wart_block': function() { return generateBricks(100, 30, 30); },
                 'shroomlight': function() { return generateShroomlight(); },
                 'glowstone': function() { return generateGlowstone(); },
-                // End blocks
-                'end_stone_bricks': function() { return generateEndStone(); },
+                // End blocks (purpur)
                 'purpur_block': function() { return generatePurpurBlock(); },
                 'purpur_pillar': function() { return generatePurpurPillar(); },
                 // Metals
@@ -4108,7 +4112,6 @@
                 'melons': function() { return generateMelon(); },
                 'pumpkin': function() { return generatePumpkin(); },
                 'hay_block': function() { return generateHayBale(); },
-                'snow_layer': function() { return generateSnow(); },
                 // Default fallback
                 'default': function() { return generateStone(0); }
             };
