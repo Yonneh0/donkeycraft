@@ -145,12 +145,17 @@
             // 4. Pistons (mechanical action)
             // 5. Wiring (signal propagation)
 
-            var processed = [];
+            var processedKeys = [];
 
             // Process each dirty block
             while (_dirtyQueue.length > 0) {
                 var entry = _dirtyQueue.shift();
-                if (!entry || processed.indexOf(entry.chunkKey) !== -1) continue;
+                if (!entry) continue;
+
+                // Deduplicate by full position key (x,y,z), not just chunk key
+                var posKey = entry.x + ',' + entry.y + ',' + entry.z;
+                if (processedKeys.indexOf(posKey) !== -1) continue;
+                processedKeys.push(posKey);
 
                 var chunk = _getChunk(entry.chunkX, entry.chunkZ);
                 if (!chunk) continue;
@@ -161,32 +166,37 @@
                 switch (blockId) {
                     case 173: // redstone_wire
                     case 229: // redstone_dust
-                        if (_wiring) _wiring._processDirtyWire(entry, chunk);
+                        if (_wiring && _wiring._processDirtyWire) _wiring._processDirtyWire(entry, chunk);
                         break;
                     case 174: // redstone_torch
-                        if (_wiring) _wiring._processTorch(entry, chunk);
+                        if (_wiring && _wiring._processTorch) _wiring._processTorch(entry, chunk);
                         break;
                     case 180: // repeater
-                        if (_repeaterComparator) _repeaterComparator._processRepeater(entry, chunk);
+                        if (_repeaterComparator && _repeaterComparator._processRepeater) _repeaterComparator._processRepeater(entry, chunk);
+                        break;
+                    case 232: // comparator
+                        if (_repeaterComparator && _repeaterComparator._processComparator) _repeaterComparator._processComparator(entry, chunk);
                         break;
                     case 179: // observer
-                        if (_observers) _observers._processObserver(entry, chunk);
+                        if (_observers && _observers._processObserver) _observers._processObserver(entry, chunk);
                         break;
                     case 181: // piston
                     case 182: // sticky_piston
-                        if (_pistons) _pistons._processPiston(entry, chunk);
+                        if (_pistons && _pistons._processPiston) _pistons._processPiston(entry, chunk);
                         break;
                     case 183: // tnt
-                        if (_tnt) _tnt._processTNT(entry, chunk);
+                        if (_tnt && _tnt._processTNT) _tnt._processTNT(entry, chunk);
                         break;
                 }
-
-                processed.push(entry.chunkKey);
             }
 
             // Emit redstone:tick event for debugging
             if (_eventBus) {
-                _eventBus.emit('redstone:tick', _currentTick, _dirtyQueue.length);
+                try {
+                    _eventBus.emit('redstone:tick', _currentTick, _dirtyQueue.length);
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
             }
         }
 
@@ -323,6 +333,7 @@
             clearDirtyQueue: clearDirtyQueue,
             getCurrentTick: getCurrentTick,
             isRunning: isRunning,
+            _processTick: _processTick,
             destroy: destroy
         };
     })();

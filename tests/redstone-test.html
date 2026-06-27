@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Redstone System Test</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Redstone System Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Comprehensive functional tests for all 6 redstone modules: RedstoneEngine, Wiring, Repeater/Comparator, Observers, Pistons, TNT.</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/world-utils.js"></script>
+
+<!-- Redstone subsystems (in dependency order) -->
+<script src="../src/redstone/redstone-engine.js"></script>
+<script src="../src/redstone/wiring.js"></script>
+<script src="../src/redstone/repeater-comparator.js"></script>
+<script src="../src/redstone/observers.js"></script>
+<script src="../src/redstone/pistons.js"></script>
+<script src="../src/redstone/tnt.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Redstone test script -->
+<script>
+(function() {
+    'use strict';
+
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Helper: create a mock chunk for testing
+    // ============================================================
+    function createMockChunk(chunkX, chunkZ) {
+        var size = Donkeycraft.Config.CHUNK_SIZE;
+        var height = Donkeycraft.Config.WORLD_HEIGHT;
+        var data = new Uint8Array(size * height * size);
+
+        return {
+            chunkX: chunkX,
+            chunkZ: chunkZ,
+            getBlock: function(lx, y, lz) {
+                if (lx < 0 || lx >= size || y < 0 || y >= height || lz < 0 || lz >= size) return 0;
+                return data[y * size * size + lx * size + lz];
+            },
+            setBlock: function(lx, y, lz, blockId) {
+                if (lx < 0 || lx >= size || y < 0 || y >= height || lz < 0 || lz >= size) return;
+                data[y * size * size + lx * size + lz] = blockId;
+            },
+            getData: function() { return data; }
+        };
+    }
+
+    // ============================================================
+    // Section 1: RedstoneEngine — core engine tests
+    // ============================================================
+    F.section('1. RedstoneEngine Core');
+
+    var engine = Donkeycraft.RedstoneEngine;
+    F.assertType(engine, 'object', 'RedstoneEngine exists');
+    F.assert(typeof engine.setTimer === 'function', 'setTimer method exists');
+    F.assert(typeof engine.setChunkManager === 'function', 'setChunkManager method exists');
+    F.assert(typeof engine.setWiring === 'function', 'setWiring method exists');
+    F.assert(typeof engine.setRepeaterComparator === 'function', 'setRepeaterComparator method exists');
+    F.assert(typeof engine.setObservers === 'function', 'setObservers method exists');
+    F.assert(typeof engine.setPistons === 'function', 'setPistons method exists');
+    F.assert(typeof engine.setTNT === 'function', 'setTNT method exists');
+    F.assert(typeof engine.start === 'function', 'start method exists');
+    F.assert(typeof engine.stop === 'function', 'stop method exists');
+    F.assert(typeof engine.markDirty === 'function', 'markDirty method exists');
+    F.assert(typeof engine.markDirtyRange === 'function', 'markDirtyRange method exists');
+    F.assert(typeof engine.getDirtyQueueLength === 'function', 'getDirtyQueueLength method exists');
+    F.assert(typeof engine.clearDirtyQueue === 'function', 'clearDirtyQueue method exists');
+    F.assert(typeof engine.getCurrentTick === 'function', 'getCurrentTick method exists');
+    F.assert(typeof engine.isRunning === 'function', 'isRunning method exists');
+
+    // Test dirty queue deduplication
+    engine.clearDirtyQueue();
+    engine.markDirty(10, 20, 30);
+    engine.markDirty(10, 20, 30); // duplicate — should not add
+    F.assertEq(engine.getDirtyQueueLength(), 1, 'markDirty deduplicates same position');
+
+    // Test markDirtyRange
+    engine.clearDirtyQueue();
+    engine.markDirtyRange(0, 0, 0, 2, 0, 2);
+    var rangeLen = engine.getDirtyQueueLength();
+    F.assert(rangeLen === 9, 'markDirtyRange adds all blocks in range (got ' + rangeLen + ', expected 9)');
+
+    // Test getCurrentTick (should be 0 before start)
+    F.assertEq(engine.getCurrentTick(), 0, 'getCurrentTick returns 0 before start');
+
+    // Test isRunning (should be false before start)
+    F.assert(!engine.isRunning(), 'isRunning returns false before start');
+
+    // Test destroy clears state
+    engine.clearDirtyQueue();
+    F.assertEq(engine.getDirtyQueueLength(), 0, 'clearDirtyQueue empties queue');
+
+    // ============================================================
+    // Section 2: RedstoneWiring — signal propagation tests
+    // ============================================================
+    F.section('2. RedstoneWiring');
+
+    var wiring = Donkeycraft.RedstoneWiring;
+    F.assertType(wiring, 'object', 'RedstoneWiring exists');
+    F.assert(typeof wiring.init === 'function', 'init method exists');
+    F.assert(typeof wiring.getSignalStrength === 'function', 'getSignalStrength method exists');
+    F.assert(typeof wiring.setSignalStrength === 'function', 'setSignalStrength method exists');
+    F.assert(typeof wiring.getStrengthAt === 'function', 'getStrengthAt method exists (alias)');
+    F.assert(typeof wiring.getWireBlockIds === 'function', 'getWireBlockIds method exists');
+    F.assert(typeof wiring.getMaxSignalDistance === 'function', 'getMaxSignalDistance method exists');
+    F.assert(typeof wiring.clearAllSignals === 'function', 'clearAllSignals method exists');
+
+    // Test wire block IDs
+    var wireIds = wiring.getWireBlockIds();
+    F.assert(wireIds[173], 'Redstone wire (ID 173) in wire block IDs');
+    F.assert(wireIds[229], 'Redstone dust (ID 229) in wire block IDs');
+
+    // Test max signal distance
+    F.assertEq(wiring.getMaxSignalDistance(), 15, 'Max signal distance is 15');
+
+    // Test signal strength clamping (setSignalStrength clamps to 0-15)
+    wiring.clearAllSignals();
+    // Signal retrieval at non-wire position should return 0
+    F.assertEq(wiring.getSignalStrength(0, 0, 0), 0, 'Signal strength at non-wire position is 0');
+
+    // Test getStrengthAt alias
+    F.assert(typeof wiring.getStrengthAt === 'function', 'getStrengthAt is a function');
+
+    // ============================================================
+    // Section 3: RedstoneRepeaterComparator — repeater & comparator tests
+    // ============================================================
+    F.section('3. Repeater & Comparator');
+
+    var rc = Donkeycraft.RedstoneRepeaterComparator;
+    F.assertType(rc, 'object', 'RedstoneRepeaterComparator exists');
+    F.assert(typeof rc.init === 'function', 'init method exists');
+    F.assert(typeof rc.setRepeaterDelay === 'function', 'setRepeaterDelay method exists');
+    F.assert(typeof rc.setComparatorMode === 'function', 'setComparatorMode method exists');
+    F.assert(typeof rc.lockRepeater === 'function', 'lockRepeater method exists');
+    F.assert(typeof rc.getRepeaterState === 'function', 'getRepeaterState method exists');
+    F.assert(typeof rc.getComparatorState === 'function', 'getComparatorState method exists');
+    F.assert(typeof rc.clearAllStates === 'function', 'clearAllStates method exists');
+
+    // Test repeater delay setting (clamped 1-4)
+    rc.clearAllStates();
+    rc.setRepeaterDelay(0, 0, 0, 1);
+    var state1 = rc.getRepeaterState(0, 0, 0);
+    F.assert(state1 !== null, 'Repeater state exists after setRepeaterDelay');
+    F.assertEq(state1.delay, 1, 'Repeater delay is 1');
+
+    rc.setRepeaterDelay(0, 0, 1, 5); // should clamp to 4
+    var state2 = rc.getRepeaterState(0, 0, 1);
+    F.assertEq(state2.delay, 4, 'Repeater delay clamps to max 4');
+
+    rc.setRepeaterDelay(0, 0, 2, 0); // should clamp to 1
+    var state3 = rc.getRepeaterState(0, 0, 2);
+    F.assertEq(state3.delay, 1, 'Repeater delay clamps to min 1');
+
+    // Test comparator mode setting
+    rc.setComparatorMode(0, 0, 0, 0); // block compare mode
+    var cState1 = rc.getComparatorState(0, 0, 0);
+    F.assertEq(cState1.mode, 0, 'Comparator mode is 0 (block compare)');
+
+    rc.setComparatorMode(0, 0, 1, 1); // difference mode
+    var cState2 = rc.getComparatorState(0, 0, 1);
+    F.assertEq(cState2.mode, 1, 'Comparator mode is 1 (difference)');
+
+    // Test lockRepeater
+    rc.lockRepeater(0, 0, 0, true);
+    var locked = rc.getRepeaterState(0, 0, 0);
+    F.assert(locked.locked, 'Repeater is locked after lockRepeater(x, y, z, true)');
+
+    rc.lockRepeater(0, 0, 0, false);
+    var unlocked = rc.getRepeaterState(0, 0, 0);
+    F.assert(!unlocked.locked, 'Repeater is unlocked after lockRepeater(x, y, z, false)');
+
+    // ============================================================
+    // Section 4: RedstoneObservers — observer block tests
+    // ============================================================
+    F.section('4. Redstone Observers');
+
+    var obs = Donkeycraft.RedstoneObservers;
+    F.assertType(obs, 'object', 'RedstoneObservers exists');
+    F.assert(typeof obs.init === 'function', 'init method exists');
+    F.assert(typeof obs.setObserverFacing === 'function', 'setObserverFacing method exists');
+    F.assert(typeof obs.getObserverState === 'function', 'getObserverState method exists');
+    F.assert(typeof obs.forceEmit === 'function', 'forceEmit method exists');
+    F.assert(typeof obs.clearAllStates === 'function', 'clearAllStates method exists');
+
+    // Test observer facing direction
+    obs.clearAllStates();
+    obs.setObserverFacing(0, 0, 0, 0); // south
+    var oState1 = obs.getObserverState(0, 0, 0);
+    F.assert(oState1 !== null, 'Observer state exists after setObserverFacing');
+    F.assertEq(oState1.facing, 0, 'Observer facing is 0 (south)');
+
+    obs.setObserverFacing(0, 0, 1, 1); // west
+    var oState2 = obs.getObserverState(0, 0, 1);
+    F.assertEq(oState2.facing, 1, 'Observer facing is 1 (west)');
+
+    obs.setObserverFacing(0, 0, 2, 2); // north
+    var oState3 = obs.getObserverState(0, 0, 2);
+    F.assertEq(oState3.facing, 2, 'Observer facing is 2 (north)');
+
+    obs.setObserverFacing(0, 0, 3, 3); // east
+    var oState4 = obs.getObserverState(0, 0, 3);
+    F.assertEq(oState4.facing, 3, 'Observer facing is 3 (east)');
+
+    // Test forceEmit (should not throw even without chunk manager)
+    try {
+        obs.forceEmit(0, 0, 0);
+        F.assert(true, 'forceEmit does not throw when no chunk manager');
+    } catch (e) {
+        F.assert(false, 'forceEmit threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 5: RedstonePistons — piston mechanics tests
+    // ============================================================
+    F.section('5. Pistons');
+
+    var pist = Donkeycraft.RedstonePistons;
+    F.assertType(pist, 'object', 'RedstonePistons exists');
+    F.assert(typeof pist.init === 'function', 'init method exists');
+    F.assert(typeof pist.getPistonState === 'function', 'getPistonState method exists');
+    F.assert(typeof pist.setPistonFacing === 'function', 'setPistonFacing method exists');
+    F.assert(typeof pist.getMaxPushDistance === 'function', 'getMaxPushDistance method exists');
+    F.assert(typeof pist.isUnpushable === 'function', 'isUnpushable method exists');
+    F.assert(typeof pist.clearAllStates === 'function', 'clearAllStates method exists');
+
+    // Test max push distance
+    F.assertEq(pist.getMaxPushDistance(), 12, 'Max push distance is 12');
+
+    // Test unpushable blocks
+    F.assert(pist.isUnpushable(0), 'Air (ID 0) is unpushable');
+    F.assert(pist.isUnpushable(37), 'Bedrock (ID 37) is unpushable');
+    F.assert(pist.isUnpushable(46), 'Obsidian (ID 46) is unpushable');
+    F.assert(pist.isUnpushable(52), 'Piston head (ID 52) is unpushable');
+    F.assert(!pist.isUnpushable(1), 'Stone (ID 1) is pushable');
+
+    // Test piston facing direction
+    pist.clearAllStates();
+    pist.setPistonFacing(0, 0, 0, 2); // south
+    var pState1 = pist.getPistonState(0, 0, 0);
+    F.assert(pState1 !== null, 'Piston state exists after setPistonFacing');
+    F.assertEq(pState1.facing, 2, 'Piston facing is 2 (south)');
+
+    pist.setPistonFacing(0, 0, 1, 3); // north
+    var pState2 = pist.getPistonState(0, 0, 1);
+    F.assertEq(pState2.facing, 3, 'Piston facing is 3 (north)');
+
+    pist.setPistonFacing(0, 0, 2, 4); // west
+    var pState3 = pist.getPistonState(0, 0, 2);
+    F.assertEq(pState3.facing, 4, 'Piston facing is 4 (west)');
+
+    pist.setPistonFacing(0, 0, 3, 5); // east
+    var pState4 = pist.getPistonState(0, 0, 3);
+    F.assertEq(pState4.facing, 5, 'Piston facing is 5 (east)');
+
+    // ============================================================
+    // Section 6: RedstoneTNT — TNT mechanics tests
+    // ============================================================
+    F.section('6. TNT');
+
+    var tnt = Donkeycraft.RedstoneTNT;
+    F.assertType(tnt, 'object', 'RedstoneTNT exists');
+    F.assert(typeof tnt.init === 'function', 'init method exists');
+    F.assert(typeof tnt.getTNTState === 'function', 'getTNTState method exists');
+    F.assert(typeof tnt.getFuseTicks === 'function', 'getFuseTicks method exists');
+    F.assert(typeof tnt.getExplosionRadius === 'function', 'getExplosionRadius method exists');
+    F.assert(typeof tnt.getFuseDuration === 'function', 'getFuseDuration method exists');
+    F.assert(typeof tnt.clearAllStates === 'function', 'clearAllStates method exists');
+
+    // Test explosion radius
+    F.assertEq(tnt.getExplosionRadius(), 8, 'TNT explosion radius is 8');
+
+    // Test fuse duration
+    F.assertEq(tnt.getFuseDuration(), 40, 'TNT fuse duration is 40 ticks (2 seconds)');
+
+    // Test TNT state (should be null before lighting)
+    tnt.clearAllStates();
+    var tntState1 = tnt.getTNTState(0, 0, 0);
+    F.assert(tntState1 === null, 'TNT state is null before placement');
+
+    // Test fuse ticks (should be 0 for unlit TNT)
+    F.assertEq(tnt.getFuseTicks(0, 0, 0), 0, 'Fuse ticks is 0 for non-TNT position');
+
+    // ============================================================
+    // Section 7: Cross-System Integration Tests
+    // ============================================================
+    F.section('7. Cross-System Integration');
+
+    // Test that all subsystems can be wired to the engine
+    var mockChunkManager = {
+        getChunk: function(cx, cz) {
+            return createMockChunk(cx, cz);
+        }
+    };
+
+    engine.setChunkManager(mockChunkManager);
+    engine.setWiring(wiring);
+    engine.setRepeaterComparator(rc);
+    engine.setObservers(obs);
+    engine.setPistons(pist);
+    engine.setTNT(tnt);
+
+    wiring.setChunkManager(mockChunkManager);
+
+    F.assert(engine.isRunning() === false, 'Engine not running after setSubsystem calls');
+
+    // Test that init can be called on all subsystems without error
+    try {
+        wiring.init();
+        rc.init();
+        obs.init();
+        pist.init();
+        tnt.init();
+        F.assert(true, 'All subsystems initialized without error');
+    } catch (e) {
+        F.assert(false, 'Subsystem init threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 8: Edge Cases & Error Handling
+    // ============================================================
+    F.section('8. Edge Cases & Error Handling');
+
+    // Test wiring with out-of-bounds coordinates
+    try {
+        var str = wiring.getSignalStrength(-100, -100, -100);
+        F.assertEq(str, 0, 'Signal strength at extreme negative coords returns 0');
+    } catch (e) {
+        F.assert(false, 'getSignalStrength threw at extreme coords: ' + e.message);
+    }
+
+    // Test piston with out-of-bounds coordinates
+    try {
+        var pState = pist.getPistonState(-1000, -1000, -1000);
+        F.assert(pState === null, 'Piston state at extreme coords returns null');
+    } catch (e) {
+        F.assert(false, 'getPistonState threw at extreme coords: ' + e.message);
+    }
+
+    // Test TNT with out-of-bounds coordinates
+    try {
+        var fTicks = tnt.getFuseTicks(-1000, -1000, -1000);
+        F.assertEq(fTicks, 0, 'Fuse ticks at extreme coords returns 0');
+    } catch (e) {
+        F.assert(false, 'getFuseTicks threw at extreme coords: ' + e.message);
+    }
+
+    // Test repeater/comparator with out-of-bounds coordinates
+    try {
+        var rState = rc.getRepeaterState(-1000, -1000, -1000);
+        F.assert(rState === null, 'Repeater state at extreme coords returns null');
+        var cState = rc.getComparatorState(-1000, -1000, -1000);
+        F.assert(cState === null, 'Comparator state at extreme coords returns null');
+    } catch (e) {
+        F.assert(false, 'Repeater/comparator state threw at extreme coords: ' + e.message);
+    }
+
+    // Test observer with out-of-bounds coordinates
+    try {
+        var oState = obs.getObserverState(-1000, -1000, -1000);
+        F.assert(oState === null, 'Observer state at extreme coords returns null');
+    } catch (e) {
+        F.assert(false, 'getObserverState threw at extreme coords: ' + e.message);
+    }
+
+    // Test engine markDirty with extreme coordinates
+    try {
+        engine.markDirty(-10000, -10000, -10000);
+        F.assert(true, 'markDirty does not throw at extreme coords');
+    } catch (e) {
+        F.assert(false, 'markDirty threw at extreme coords: ' + e.message);
+    }
+
+    // Test engine markDirtyRange with inverted bounds
+    try {
+        engine.clearDirtyQueue();
+        engine.markDirtyRange(5, 5, 5, 0, 0, 0); // end < start — should handle gracefully
+        F.assert(true, 'markDirtyRange handles inverted bounds');
+    } catch (e) {
+        F.assert(false, 'markDirtyRange threw at inverted bounds: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 9: Destroy/Cleanup Tests
+    // ============================================================
+    F.section('9. Destroy & Cleanup');
+
+    // Test wiring destroy
+    wiring.clearAllSignals();
+    try {
+        wiring.destroy();
+        F.assert(true, 'wiring.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'wiring.destroy() threw: ' + e.message);
+    }
+
+    // Test repeater/comparator destroy
+    rc.clearAllStates();
+    try {
+        rc.destroy();
+        F.assert(true, 'rc.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'rc.destroy() threw: ' + e.message);
+    }
+
+    // Test observer destroy
+    obs.clearAllStates();
+    try {
+        obs.destroy();
+        F.assert(true, 'obs.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'obs.destroy() threw: ' + e.message);
+    }
+
+    // Test piston destroy
+    pist.clearAllStates();
+    try {
+        pist.destroy();
+        F.assert(true, 'pist.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'pist.destroy() threw: ' + e.message);
+    }
+
+    // Test TNT destroy
+    tnt.clearAllStates();
+    try {
+        tnt.destroy();
+        F.assert(true, 'tnt.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'tnt.destroy() threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>

@@ -10,11 +10,13 @@
     // Block IDs
     var OBSERVER = 179;
 
-    // Facing directions: 0=south, 1=west, 2=north, 3=east
+    // Facing directions: 0=south, 1=west, 2=north, 3=east, 4=up, 5=down
     var FACING_SOUTH = 0;
     var FACING_WEST = 1;
     var FACING_NORTH = 2;
     var FACING_EAST = 3;
+    var FACING_UP = 4;
+    var FACING_DOWN = 5;
 
     // ============================================================
     // RedstoneObservers — observer block logic
@@ -60,16 +62,10 @@
                     facing: FACING_SOUTH,
                     lastBlockId: 0,
                     lastBlockMeta: 0,
-                    cooldown: 0
+                    cooldown: 0,
+                    lastBlockIdBeforePulse: 0
                 };
                 _observerStates[key] = state;
-            }
-
-            // Check if cooldown is active
-            var currentTick = Donkeycraft.RedstoneEngine ? Donkeycraft.RedstoneEngine.getCurrentTick() : 0;
-            if (state.cooldown > 0) {
-                state.cooldown--;
-                return;
             }
 
             // Get the block being observed (in front of observer's face)
@@ -86,13 +82,22 @@
 
             var currentBlockId = obsChunk.getBlock(obsLocalX, observePos.y, obsLocalZ);
 
-            // Check for block change
-            if (currentBlockId !== state.lastBlockId || false /* metadata not tracked */) {
+            // Always update last known block to prevent stale comparisons
+            state.lastBlockId = currentBlockId;
+
+            // Check if cooldown is active — still track the block but don't re-fire
+            if (state.cooldown > 0) {
+                state.cooldown--;
+                return;
+            }
+
+            // Compare against the block ID that was present when last pulsed
+            if (currentBlockId !== state.lastBlockIdBeforePulse) {
                 // Block changed: emit pulse
                 _emitPulse(entry.x, entry.y, entry.z, state.facing);
 
-                // Update last known block
-                state.lastBlockId = currentBlockId;
+                // Store the block ID that triggered the pulse
+                state.lastBlockIdBeforePulse = currentBlockId;
 
                 // Set cooldown (1 tick)
                 state.cooldown = PULSE_DURATION_TICKS;
@@ -117,6 +122,8 @@
                 case FACING_NORTH: return { x: x, y: y, z: z - 1 };
                 case FACING_WEST:  return { x: x + 1, y: y, z: z };
                 case FACING_EAST:  return { x: x - 1, y: y, z: z };
+                case FACING_UP:    return { x: x, y: y + 1, z: z };
+                case FACING_DOWN:  return { x: x, y: y - 1, z: z };
             }
             return null;
         }
@@ -208,7 +215,7 @@
          * @param {number} x - Global X.
          * @param {number} y - Global Y.
          * @param {number} z - Global Z.
-         * @param {number} facing - Facing direction (0-3).
+         * @param {number} facing - Facing direction (0-5).
          */
         function setObserverFacing(x, y, z, facing) {
             var key = x + ',' + y + ',' + z;
@@ -217,7 +224,8 @@
                     facing: facing,
                     lastBlockId: 0,
                     lastBlockMeta: 0,
-                    cooldown: 0
+                    cooldown: 0,
+                    lastBlockIdBeforePulse: 0
                 };
             }
             _observerStates[key].facing = facing;
@@ -256,6 +264,7 @@
             getObserverState: getObserverState,
             forceEmit: forceEmit,
             clearAllStates: clearAllStates,
+            _processObserver: _processObserver,
             destroy: destroy
         };
     })();

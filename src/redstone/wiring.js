@@ -59,8 +59,7 @@
             var chunkZ = Math.floor(z / CHUNK_SIZE);
             var localZ = ((z % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
 
-            var chunk = Donkeycraft.RedstoneEngine.setChunkManager && Donkeycraft.RedstoneEngine;
-            // Use ChunkManager via RedstoneEngine's reference
+            // Use ChunkManager via global reference set by game.js
             var chunkManager = _getChunkManager();
             if (!chunkManager) return 0;
 
@@ -248,6 +247,8 @@
 
         /**
          * Check if a block is a solid power source (emits signal to adjacent wire).
+         * Redstone blocks emit constant 15-strength signals.
+         * Lit redstone lamps also count as power sources.
          * @param {number} blockId - Block ID.
          * @returns {boolean}
          * @private
@@ -256,24 +257,32 @@
             // Redstone block is a constant strong source
             if (blockId === REDSTONE_BLOCK) return true;
 
-            // Any opaque solid block can carry redstone on top
-            // This is simplified — in vanilla, most solid blocks work
+            // Lit redstone lamp emits signal
+            if (blockId === LIT_REDSTONE_LAMP) return true;
+
+            // Unlit redstone lamp does not emit to wires
+            if (blockId === REDSTONE_LAMP) return false;
+
             return false;
         }
 
         /**
-         * Get the signal strength emitted by a power source.
+         * Get the signal strength emitted by a power source block.
+         * Redstone blocks emit full 15-strength signals.
+         * Lit redstone lamps emit 15-strength signals.
          * @param {number} blockId - Block ID.
-         * @returns {number}
+         * @returns {number} Signal strength (0-15).
          * @private
          */
         function _getPowerSourceStrength(blockId) {
             if (blockId === REDSTONE_BLOCK) return 15;
+            if (blockId === LIT_REDSTONE_LAMP) return 15;
             return 0;
         }
 
         /**
          * Check if a redstone torch is properly attached to a block.
+         * Torches can attach to solid opaque blocks on any side.
          * @param {number} x - Global X.
          * @param {number} y - Global Y.
          * @param {number} z - Global Z.
@@ -293,8 +302,13 @@
             var belowBlock = chunk.getBlock(localX, y - 1, localZ);
             if (!belowBlock) return false;
 
-            // Torches can attach to most solid blocks
-            return !Donkeycraft.BlockRegistry.isTransparent(belowBlock);
+            // Torches can attach to most solid blocks (non-transparent)
+            try {
+                return !Donkeycraft.BlockRegistry.isTransparent(belowBlock);
+            } catch (e) {
+                // Fallback: assume opaque for safety
+                return true;
+            }
         }
 
         /**
@@ -524,6 +538,8 @@
             getWireBlockIds: getWireBlockIds,
             getMaxSignalDistance: getMaxSignalDistance,
             clearAllSignals: clearAllSignals,
+            _processDirtyWire: _processDirtyWire,
+            _processTorch: _processTorch,
             destroy: destroy
         };
     })();

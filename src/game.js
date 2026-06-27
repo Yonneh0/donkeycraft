@@ -406,9 +406,64 @@
             this._redstoneEngine = redstoneEngine;
         }
 
-        // Wire up timer reference for redstone engine (required for tick scheduling)
-        if (this._redstoneEngine && this._timer) {
-            this._redstoneEngine.setTimer(this._timer);
+        // ============================================================
+        // Redstone subsystem wiring: connect all subsystems to the engine
+        // ============================================================
+        if (this._redstoneEngine) {
+            // Set chunk manager reference for block access
+            if (this._chunkManager) {
+                this._redstoneEngine.setChunkManager(this._chunkManager);
+            }
+
+            // Set event bus for cross-system communication
+            if (this._eventBus) {
+                this._redstoneEngine.setEventBus(this._eventBus);
+            }
+
+            // Wire up timer reference (required for tick scheduling and cooldowns)
+            if (this._timer) {
+                this._redstoneEngine.setTimer(this._timer);
+            }
+
+            // Wire individual subsystems to the engine
+            if (Donkeycraft.RedstoneWiring) {
+                this._redstoneEngine.setWiring(Donkeycraft.RedstoneWiring);
+                Donkeycraft.RedstoneWiring.setChunkManager(this._chunkManager);
+            }
+            if (Donkeycraft.RedstoneRepeaterComparator) {
+                this._redstoneEngine.setRepeaterComparator(Donkeycraft.RedstoneRepeaterComparator);
+            }
+            if (Donkeycraft.RedstoneObservers) {
+                this._redstoneEngine.setObservers(Donkeycraft.RedstoneObservers);
+            }
+            if (Donkeycraft.RedstonePistons) {
+                this._redstoneEngine.setPistons(Donkeycraft.RedstonePistons);
+            }
+            if (Donkeycraft.RedstoneTNT) {
+                this._redstoneEngine.setTNT(Donkeycraft.RedstoneTNT);
+            }
+
+            // Initialize all subsystems
+            if (Donkeycraft.RedstoneWiring) {
+                Donkeycraft.RedstoneWiring.init();
+            }
+            if (Donkeycraft.RedstoneRepeaterComparator) {
+                Donkeycraft.RedstoneRepeaterComparator.init();
+            }
+            if (Donkeycraft.RedstoneObservers) {
+                Donkeycraft.RedstoneObservers.init();
+            }
+            if (Donkeycraft.RedstonePistons) {
+                Donkeycraft.RedstonePistons.init();
+            }
+            if (Donkeycraft.RedstoneTNT) {
+                Donkeycraft.RedstoneTNT.init();
+            }
+
+            // Start the redstone engine tick loop
+            this._redstoneEngine.start();
+
+            Donkeycraft.Logger.info('Game', 'Redstone engine initialized and started');
         }
 
         Donkeycraft.Logger.info('Game', 'Systems wired successfully');
@@ -733,6 +788,11 @@
 
         if (this._timer) {
             this._timer = null;
+        }
+
+        if (this._redstoneEngine) {
+            this._redstoneEngine.destroy();
+            this._redstoneEngine = null;
         }
 
         if (this._eventBus) {

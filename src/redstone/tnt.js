@@ -217,14 +217,15 @@
          * @private
          */
         function _explode(x, y, z) {
-            // Emit explosion event via global EventBus for game systems
+            // Emit explosion event via global EventBus for game systems (entity damage, sound playback)
             if (Donkeycraft.EventBus) {
                 try {
                     Donkeycraft.EventBus.emitSafe('tnt:explode', {
                         x: x,
                         y: y,
                         z: z,
-                        radius: EXPLOSION_RADIUS
+                        radius: EXPLOSION_RADIUS,
+                        damage: EXPLOSION_DAMAGE
                     });
                 } catch (e) {
                     // EventBus may not be available in tests
@@ -269,18 +270,18 @@
 
                 var blockId = bChunk.getBlock(bLocalX, by, bLocalZ);
 
-                // Skip unbreakable blocks
-                if (blockId === 0 || blockId === 37) continue; // air or bedrock
+                // Skip unbreakable blocks (air, bedrock)
+                if (blockId === 0 || blockId === 37) continue;
 
-                // Calculate blast strength at this position (0-1)
+                // Calculate blast strength at this position (0-1 scale)
                 var blastStrength = 1 - (block.distance / radius);
                 blastStrength = Math.max(0, blastStrength);
 
-                // Block resistance: harder blocks resist more
+                // Block resistance: harder blocks resist more damage
                 var blockResistance = _getBlockBlastResistance(blockId);
                 if (blastStrength <= blockResistance) continue;
 
-                // Block is destroyed
+                // Block is destroyed — set to air
                 bChunk.setBlock(bLocalX, by, bLocalZ, 0);
 
                 // Store blast wave data for potential rendering
@@ -291,8 +292,20 @@
                 _blastWaves[chunkKey][by * CHUNK_SIZE * CHUNK_SIZE + bLocalX * CHUNK_SIZE + bLocalZ] = blastStrength;
             }
 
-            // Emit event for entity damage calculation
-            // Entities within radius take damage based on distance
+            // Emit entity damage event — entities within radius take damage based on distance
+            if (Donkeycraft.EventBus) {
+                try {
+                    Donkeycraft.EventBus.emitSafe('tnt:entity-damage', {
+                        x: x,
+                        y: y,
+                        z: z,
+                        radius: EXPLOSION_RADIUS,
+                        maxDamage: EXPLOSION_DAMAGE
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
+            }
         }
 
         /**
@@ -373,6 +386,7 @@
             getExplosionRadius: getExplosionRadius,
             getFuseDuration: getFuseDuration,
             clearAllStates: clearAllStates,
+            _processTNT: _processTNT,
             destroy: destroy
         };
     })();

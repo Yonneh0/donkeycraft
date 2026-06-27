@@ -66,7 +66,8 @@
                     locked: false,
                     outputStrength: 0,
                     targetTick: 0,
-                    facing: FACING_SOUTH
+                    facing: FACING_SOUTH,
+                    active: false
                 };
                 _repeaterStates[key] = state;
             }
@@ -102,6 +103,10 @@
                 if (outPos) {
                     Donkeycraft.RedstoneEngine.markDirty(outPos.x, outPos.y, outPos.z);
                 }
+            } else if (inputStrength === 0) {
+                // Input lost: reset output
+                state.outputStrength = 0;
+                _emitSignal(entry.x, entry.y, entry.z, state.facing, 0);
             }
         }
 
@@ -273,6 +278,12 @@
 
                 // Emit signal in facing direction
                 _emitComparatorSignal(entry.x, entry.y, entry.z, state.facing, newOutput);
+
+                // Mark output as dirty for propagation
+                var outPos = _getOutputPosition(entry.x, entry.y, entry.z, state.facing);
+                if (outPos) {
+                    Donkeycraft.RedstoneEngine.markDirty(outPos.x, outPos.y, outPos.z);
+                }
             }
         }
 
@@ -501,6 +512,8 @@
             getRepeaterState: getRepeaterState,
             getComparatorState: getComparatorState,
             clearAllStates: clearAllStates,
+            _processRepeater: _processRepeater,
+            _processComparator: _processComparator,
             destroy: destroy
         };
     })();

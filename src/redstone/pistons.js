@@ -47,6 +47,9 @@
     TILE_ENTITY_BLOCKS[150] = true; // redstone_torch
     TILE_ENTITY_BLOCKS[151] = true; // button
     TILE_ENTITY_BLOCKS[76] = true;  // lever
+    TILE_ENTITY_BLOCKS[130] = true; // cake
+    TILE_ENTITY_BLOCKS[32] = true;  // painting
+    TILE_ENTITY_BLOCKS[90] = true;  // sign (wall)
 
     // ============================================================
     // RedstonePistons — piston and sticky piston mechanics
@@ -92,6 +95,8 @@
                 state = {
                     extended: false,
                     extending: false,
+                    retracting: false,
+                    wasExtending: false,
                     extendTick: 0,
                     facing: FACING_SOUTH,
                     isSticky: isSticky
@@ -107,7 +112,9 @@
                 if (currentTick >= state.extendTick) {
                     state.extending = false;
                     state.retracting = false;
-                    state.extended = state.wasExtending ? true : false;
+                    // Use wasExtending to determine final state
+                    state.extended = state.wasExtending;
+                    state.wasExtending = false;
                 }
                 return;
             }
@@ -202,29 +209,18 @@
 
             var frontBlockId = frontChunk.getBlock(frontLocalX, y, frontLocalZ);
 
-            // Air or replaceable blocks don't need pushing
+            // Air or replaceable blocks don't need pushing — just extend into empty space
             if (frontBlockId === 0 || Donkeycraft.BlockRegistry.isReplaceable(frontBlockId)) {
-                // Extend into empty space — just update state
                 state.extended = true;
                 state.extending = true;
+                state.wasExtending = true;
                 state.extendTick = (Donkeycraft.RedstoneEngine ? Donkeycraft.RedstoneEngine.getCurrentTick() : 0) + 1;
 
                 // Place piston head block
                 _setBlockAt(x + pushDir.dx, y, z + pushDir.dz, PISTON_HEAD);
 
-                // Emit event for redstone propagation
-                if (Donkeycraft._redstoneWiring && Donkeycraft._redstoneWiring.setSignalStrength) {
-                    var outPos = { x: x + pushDir.dx * 2, y: y, z: z + pushDir.dz * 2 };
-                    var outBlockId = _getBlockId(outPos.x, outPos.y, outPos.z);
-                    if (outBlockId === 173 || outBlockId === 229) {
-                        Donkeycraft._redstoneWiring.setSignalStrength(outPos.x, outPos.y, outPos.z, 15);
-                    }
-                }
-
-                // Mark output position as dirty
-                var outX = x + pushDir.dx * 2;
-                var outZ = z + pushDir.dz * 2;
-                Donkeycraft.RedstoneEngine.markDirty(outX, y, outZ);
+                // Emit signal to adjacent redstone wire in push direction
+                _emitPistonOutputSignal(x, y, z, pushDir, 15);
 
                 return;
             }
@@ -245,21 +241,11 @@
 
             state.extended = true;
             state.extending = true;
+            state.wasExtending = true;
             state.extendTick = (Donkeycraft.RedstoneEngine ? Donkeycraft.RedstoneEngine.getCurrentTick() : 0) + 1;
 
-            // Emit event for redstone propagation
-            if (Donkeycraft._redstoneWiring && Donkeycraft._redstoneWiring.setSignalStrength) {
-                var outPos = { x: x + pushDir.dx * 2, y: y, z: z + pushDir.dz * 2 };
-                var outBlockId = _getBlockId(outPos.x, outPos.y, outPos.z);
-                if (outBlockId === 173 || outBlockId === 229) {
-                    Donkeycraft._redstoneWiring.setSignalStrength(outPos.x, outPos.y, outPos.z, 15);
-                }
-            }
-
-            // Mark output position as dirty
-            var outX = x + pushDir.dx * (pushChain.length + 1);
-            var outZ = z + pushDir.dz * (pushChain.length + 1);
-            Donkeycraft.RedstoneEngine.markDirty(outX, y, outZ);
+            // Emit signal to adjacent redstone wire in push direction
+            _emitPistonOutputSignal(x, y, z, pushDir, 15);
         }
 
         /**
@@ -326,7 +312,7 @@
         }
 
         /**
-         * Execute a push: move all blocks in the chain.
+         * Execute a push: move all blocks in the chain from end to start.
          * @param {Array} chain - Array of {x, y, z, blockId}.
          * @param {Object} pushDir - {dx, dy, dz}.
          * @param {number} px - Piston X.
@@ -336,7 +322,7 @@
          * @private
          */
         function _executePush(chain, pushDir, px, py, pz, isSticky) {
-            // Process from end to start (last block moves first)
+            // Process from end to start (last block moves first to avoid overwriting)
             for (var i = chain.length - 1; i >= 0; i--) {
                 var block = chain[i];
                 var newX = block.x + pushDir.dx;
@@ -347,7 +333,7 @@
                 _setBlockAt(block.x, block.y, block.z, 0); // Remove from old position
             }
 
-            // Sticky piston: pull the block behind it
+            // Sticky piston: pull the block directly behind it
             if (isSticky) {
                 var behindX = px - pushDir.dx;
                 var behindY = py - pushDir.dy;
@@ -355,12 +341,11 @@
 
                 var behindBlockId = _getBlockId(behindX, behindY, behindZ);
                 if (behindBlockId !== 0 && !UNPUSHABLE_BLOCKS[behindBlockId]) {
-                    // Only pull if it's a block that sticky pistons can pull
-                    // In vanilla, sticky pistons can pull any block except certain special ones
                     var pullNewX = behindX - pushDir.dx;
                     var pullNewY = behindY - pushDir.dy;
                     var pullNewZ = behindZ - pushDir.dz;
 
+                    // Check if there's room to pull the block back
                     var pullEndBlockId = _getBlockId(pullNewX, pullNewY, pullNewZ);
                     if (pullEndBlockId === 0 || Donkeycraft.BlockRegistry.isReplaceable(pullEndBlockId)) {
                         _setBlockAt(pullNewX, pullNewY, pullNewZ, behindBlockId);
@@ -383,24 +368,24 @@
             var pushDir = _getPushDirection(state.facing);
             if (!pushDir) return;
 
-            // Remove piston head
+            // Remove piston head block
             _setBlockAt(x + pushDir.dx, y, z + pushDir.dz, 0);
 
-            // Sticky piston: pull attached block
+            // Sticky piston: pull any block directly in front of it back toward the piston
             if (isSticky) {
-                var attachedX = x + pushDir.dx * 2;
-                var attachedY = y + pushDir.dy * 2;
-                var attachedZ = z + pushDir.dz * 2;
+                var attachedX = x + pushDir.dx;
+                var attachedY = y + pushDir.dy;
+                var attachedZ = z + pushDir.dz;
 
                 var attachedBlockId = _getBlockId(attachedX, attachedY, attachedZ);
                 if (attachedBlockId !== 0 && !UNPUSHABLE_BLOCKS[attachedBlockId]) {
-                    var pullBackX = x + pushDir.dx;
-                    var pullBackY = y + pushDir.dy;
-                    var pullBackZ = z + pushDir.dz;
+                    var pullBackX = x - pushDir.dx;
+                    var pullBackY = y - pushDir.dy;
+                    var pullBackZ = z - pushDir.dz;
 
-                    // Check if there's room to pull back
-                    var spaceEmpty = _getBlockId(pullBackX, pullBackY, pullBackZ) === 0;
-                    if (spaceEmpty) {
+                    // Check if there's room to pull the block back
+                    var pullEndBlockId = _getBlockId(pullBackX, pullBackY, pullBackZ);
+                    if (pullEndBlockId === 0 || Donkeycraft.BlockRegistry.isReplaceable(pullEndBlockId)) {
                         _setBlockAt(pullBackX, pullBackY, pullBackZ, attachedBlockId);
                         _setBlockAt(attachedX, attachedY, attachedZ, 0);
                     }
@@ -409,6 +394,7 @@
 
             state.extended = false;
             state.retracting = true;
+            state.wasExtending = false;
             state.extendTick = (Donkeycraft.RedstoneEngine ? Donkeycraft.RedstoneEngine.getCurrentTick() : 0) + 1;
 
             // Mark adjacent blocks as dirty for redstone propagation
@@ -522,6 +508,29 @@
         }
 
         /**
+         * Set the facing direction of a piston at the given position.
+         * @param {number} x - Global X.
+         * @param {number} y - Global Y.
+         * @param {number} z - Global Z.
+         * @param {number} facing - Facing direction (0-5).
+         */
+        function setPistonFacing(x, y, z, facing) {
+            var key = x + ',' + y + ',' + z;
+            if (!_pistonStates[key]) {
+                _pistonStates[key] = {
+                    extended: false,
+                    extending: false,
+                    retracting: false,
+                    wasExtending: false,
+                    extendTick: 0,
+                    facing: facing,
+                    isSticky: false
+                };
+            }
+            _pistonStates[key].facing = facing;
+        }
+
+        /**
          * Clear all piston states and active pushes.
          */
         function clearAllStates() {
@@ -536,12 +545,42 @@
             clearAllStates();
         }
 
+        /**
+         * Emit a redstone signal from the piston's output face to adjacent wires.
+         * @param {number} x - Piston X.
+         * @param {number} y - Piston Y.
+         * @param {number} z - Piston Z.
+         * @param {Object} pushDir - {dx, dy, dz}.
+         * @param {number} strength - Signal strength to emit.
+         * @private
+         */
+        function _emitPistonOutputSignal(x, y, z, pushDir, strength) {
+            // Output is 2 blocks away from piston face (piston head + adjacent space)
+            var outPos = {
+                x: x + pushDir.dx * 2,
+                y: y + pushDir.dy * 2,
+                z: z + pushDir.dz * 2
+            };
+
+            if (Donkeycraft._redstoneWiring && Donkeycraft._redstoneWiring.setSignalStrength) {
+                var outBlockId = _getBlockId(outPos.x, outPos.y, outPos.z);
+                if (outBlockId === 173 || outBlockId === 229) {
+                    Donkeycraft._redstoneWiring.setSignalStrength(outPos.x, outPos.y, outPos.z, strength);
+                }
+            }
+
+            // Mark output position as dirty for redstone propagation
+            Donkeycraft.RedstoneEngine.markDirty(outPos.x, outPos.y, outPos.z);
+        }
+
         return {
             init: init,
             getPistonState: getPistonState,
+            setPistonFacing: setPistonFacing,
             getMaxPushDistance: getMaxPushDistance,
             isUnpushable: isUnpushable,
             clearAllStates: clearAllStates,
+            _processPiston: _processPiston,
             destroy: destroy
         };
     })();
