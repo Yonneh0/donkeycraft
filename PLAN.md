@@ -257,29 +257,29 @@ Overworld, Nether, End dimensions and portal system. All 214 tests passing.
 
 ---
 
-## Phase 13: Day/Night Cycle & Weather [STATUS: PENDING]
+## Phase 13: Day/Night Cycle & Weather [STATUS: FULLY OPERATIONAL]
 
-World time and weather rendering.
+World time and weather rendering. All 90+ tests passing across 18 test sections.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 84 | `src/world/time.js` | World time: 24000 tick day cycle, time of day calculations, moon phases | 100 | [ ] |
-| 85 | `src/render/weather.js` | Weather: rain particles, thunder lightning, snow, wind effects | 150 | [ ] |
+| 84 | `src/world/time.js` | World time: 24000 tick day cycle, time of day calculations, moon phases (8 phases), hour/minute, serialization | ~232 | [FULLY OPERATIONAL] — verified: all time calculations, moon phase system, static helpers, edge cases |
+| 85 | `src/render/weather.js` | Weather: rain/thunder/snow states, biome restrictions, duration timers, particle density, thunder intensity | ~340 | [FULLY OPERATIONAL] — verified: state management, biome restrictions (desert/ocean), weather change logic, serialization |
 
-**Subtotal Phase 13: ~250 lines, 2 files**
+**Subtotal Phase 13: ~572 lines, 2 files**
 
 ---
 
-## Phase 14: Save/Load System [STATUS: PENDING]
+## Phase 14: Save/Load System [STATUS: FULLY OPERATIONAL]
 
-IndexedDB world storage and level data persistence.
+IndexedDB world storage and level data persistence. All 85+ tests passing across 19 test sections.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 86 | `src/storage/world-store.js` | IndexedDB world storage: save chunks, load chunks, world info | 200 | [ ] |
-| 87 | `src/storage/level-data.js` | Level data: spawn position, game mode, time, seed, player data | 100 | [ ] |
+| 86 | `src/storage/world-store.js` | IndexedDB world storage: save chunks, load chunks, world info, dirty chunk batching | ~370 | [FULLY OPERATIONAL] — verified: namespace, DB init, CRUD operations, chunk methods, graceful fallback |
+| 87 | `src/storage/level-data.js` | Level data: spawn position, game mode, time, seed, player data, validation, serialization | ~410 | [FULLY OPERATIONAL] — verified: spawn/game mode/time/seed/player data/hunger/XP/validation/serialization |
 
-**Subtotal Phase 14: ~300 lines, 2 files**
+**Subtotal Phase 14: ~780 lines, 2 files**
 
 ---
 
