@@ -78,6 +78,7 @@
          * @private
          */
         function getBlockAt(x, y, z) {
+            if (!_chunkManager) return 0;
             return Donkeycraft.WorldUtils.getBlockAt(_chunkManager, x, y, z);
         }
 
@@ -452,9 +453,8 @@
          * @returns {boolean}
          */
         function isPortalAt(x, y, z) {
-            var localX = ((x % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-            var localZ = ((z % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-            var block = getBlockAt(localX, y, localZ);
+            if (!_chunkManager) return false;
+            var block = getBlockAt(x, y, z);
             return isPortalActive(block);
         }
 

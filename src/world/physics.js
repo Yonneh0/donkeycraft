@@ -189,19 +189,18 @@
         }
 
         /**
-         * Get the liquid level for a block (stored in metadata or default 8).
+         * Get the liquid level for a block. Since chunk data doesn't store per-block
+         * liquid levels in this minimal implementation, liquids default to level 8 (full).
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} x - Local X.
          * @param {number} y - Local Y.
          * @param {number} z - Local Z.
-         * @param {number} blockId - Expected liquid block ID.
+         * @param {number} blockId - Expected liquid block ID (unused, for signature compatibility).
          * @returns {number} Liquid level (0-8).
          * @private
          */
         function _getLiquidLevel(chunk, x, y, z, blockId) {
-            // For simplicity, liquids default to level 8 (full)
-            // In a full implementation, this would read from block metadata
-            return 8;
+            return 8; // Default full level — per-block levels not stored in chunk data
         }
 
         /**

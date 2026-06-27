@@ -35,28 +35,33 @@
          * @private
          */
         function _getBlockLightOpacity(blockId) {
+            // Air (ID 0) is fully transparent
+            if (blockId === 0) return 0;
+
             // Check extended cache first
             if (blockId > 255 && _extendedCache[blockId] !== undefined) {
                 return _extendedCache[blockId];
             }
 
             var block = Donkeycraft.BlockRegistry.getBlockById(blockId);
-            if (!block) return 0; // Air/unknown = no opacity
+            if (!block) return 0; // Unknown block = no opacity
 
             // Direct light opacity property if available
             if (block.lightOpacity !== undefined) {
-                var val = Math.min(block.lightOpacity, 15);
+                var val = Math.min(Math.max(block.lightOpacity, 0), 15);
                 if (blockId > 255) _extendedCache[blockId] = val;
                 return val;
             }
 
             // Default opacity based on block type
-            if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return 1;
-            if (Donkeycraft.BlockRegistry.isSolid && Donkeycraft.BlockRegistry.isSolid(blockId)) return 15;
-            if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return 0;
-            if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
+            try {
+                if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return 1;
+                if (Donkeycraft.BlockRegistry.isSolid && Donkeycraft.BlockRegistry.isSolid(blockId)) return 15;
+                if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return 0;
+                if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
+            } catch (e) { /* ignore registry method errors */ }
 
-            var val = 2; // Default
+            var val = 2; // Default for unknown blocks
             if (blockId > 255) _extendedCache[blockId] = val;
             return val;
         }

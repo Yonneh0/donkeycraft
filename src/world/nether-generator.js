@@ -97,7 +97,7 @@
         }
 
         /**
-         * Fill the main chunk body with netherrack.
+         * Fill the main chunk body with netherrack, leaving space for bedrock floor/ceiling.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @private
          */
@@ -105,8 +105,10 @@
             var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
             if (!netherrack) return;
 
+            // Floor bedrock occupies Y=0..~5, ceiling bedrock occupies Y=~WORLD_HEIGHT-5..end
+            // Fill netherrack in between, avoiding areas already occupied by bedrock
             for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var y = 5; y < WORLD_HEIGHT - 5; y++) {
+                for (var y = 6; y < WORLD_HEIGHT - 6; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         chunk.setBlock(x, y, z, netherrack.id);
                     }

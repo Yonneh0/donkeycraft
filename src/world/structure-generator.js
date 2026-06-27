@@ -100,8 +100,6 @@
 
             if (!bedrockId || !stoneId || !dirtId) return;
 
-            var bedrockLevel = WORLD_HEIGHT - 3;
-
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var height = heightmap[x + z * CHUNK_SIZE] || 64;
@@ -109,9 +107,6 @@
                     for (var y = 0; y <= height; y++) {
                         if (y < 3) {
                             // Bedrock layer at bottom of world
-                            chunk.setBlock(x, y, z, bedrockId);
-                        } else if (y >= bedrockLevel) {
-                            // Bedrock layer at top of world (world height boundary)
                             chunk.setBlock(x, y, z, bedrockId);
                         } else if (y < height - 3) {
                             // Stone below terrain

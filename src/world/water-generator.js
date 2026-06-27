@@ -95,6 +95,7 @@
 
         /**
          * Place surface water in low-lying areas of overworld biomes.
+         * Fills below water level with water where terrain is below sea level.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} biomeId - Biome ID.
          * @param {number[]} heightmap - Heightmap array.
@@ -104,14 +105,11 @@
             var waterId = _getWaterBlockId();
             if (!waterId) return;
 
-            // Only place water in swamp biomes (ID 4, 15)
-            if (biomeId !== 4 && biomeId !== 15) return;
-
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var surfaceY = heightmap[x + z * CHUNK_SIZE] || 63;
 
-                    // Swamps are slightly below water level — fill with water
+                    // Place water where terrain is below water level
                     if (surfaceY < _waterLevel) {
                         for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
                             var block = chunk.getBlock(x, y, z);

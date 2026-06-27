@@ -46,6 +46,9 @@
 
         /**
          * Generate a single cave layer within Y bounds.
+         * Samples at reduced Y stride for performance, then carves tunnels
+         * at each sampled level. This avoids iterating every block column
+         * through the full world height.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} density - Cave density threshold.
          * @param {number} radius - Base tunnel radius.
@@ -55,16 +58,20 @@
          * @private
          */
         function _generateCaveLayer(chunk, density, radius, minY, maxY, layerType) {
+            // Sample every 4 Y levels for performance — still produces connected caves
+            var yStride = 4;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    // Global coordinates for noise sampling — no double-counting.
-                    // worldX/worldZ already include chunk offset; PerlinNoise uses a
-                    // global seed internally, so adding extra offsets corrupts placement.
                     var worldX = chunk.chunkX * CHUNK_SIZE + x;
                     var worldZ = chunk.chunkZ * CHUNK_SIZE + z;
 
-                    // Sample 3D noise at multiple points along Y axis
-                    for (var y = minY; y < maxY; y++) {
+                    // Adjust threshold based on local X/Z noise for tunnel shapes
+                    var threshold = density + Donkeycraft.PerlinNoise.noise2D(
+                        x * 0.3, z * 0.3
+                    ) * 0.003;
+
+                    for (var y = minY; y < maxY; y += yStride) {
                         // Primary cave noise — fbm with global seed baked into PerlinNoise
                         var noiseVal = Donkeycraft.PerlinNoise.fbm(
                             worldX * 0.02,
@@ -73,18 +80,18 @@
                             3, 0.5, 2.0
                         );
 
-                        // Adjust threshold based on local X/Z noise for tunnel shapes
-                        var threshold = density + Donkeycraft.PerlinNoise.noise2D(
-                            x * 0.3, z * 0.3
-                        ) * 0.003;
-
                         if (noiseVal < -threshold) {
-                            // This is cave space — carve out a tunnel
+                            // Carve a tunnel at this position with slight Y spread
                             var tunnelRadius = radius + Donkeycraft.PerlinNoise.noise2D(
                                 y * 0.1 + x, z * 0.1 + worldZ * 0.05
                             ) * radius * 0.5;
 
                             _carveTunnel(chunk, x, y, z, tunnelRadius);
+
+                            // Also carve one block above for vertical connectivity
+                            if (y + 1 < maxY) {
+                                _carveTunnel(chunk, x, y + 1, z, tunnelRadius * 0.6);
+                            }
                         }
                     }
                 }

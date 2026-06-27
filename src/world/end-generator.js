@@ -31,6 +31,7 @@
          * @param {number} chunkZ - Chunk Z coordinate.
          */
         function generateEndTerrain(chunkX, chunkZ) {
+            if (!_chunkManager) return;
             var chunk = _chunkManager.getChunk(chunkX, chunkZ);
             if (!chunk) return;
 
