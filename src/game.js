@@ -31,6 +31,7 @@
         this._handRenderer = null;
         this._breakParticles = null;
         this._guiRenderer = null;
+        this._weather = null;
         this._weatherRenderer = null;
 
         // Game systems
@@ -140,6 +141,17 @@
             // Create lighting system
             this._lighting = new Donkeycraft.Lighting();
 
+            // Create Web Audio Context for sound generation and initialize AssetManager
+            try {
+                var AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    this._audioContext = new AudioContext();
+                    Donkeycraft.AssetManager.init(this._audioContext);
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Web Audio API not available: ' + e.message);
+            }
+
             // Create terrain renderer (pass lighting for dynamic time-of-day)
             this._terrainRenderer = new Donkeycraft.TerrainRenderer(
                 this._gl, this._shaderManager, this._fog, this._lighting
@@ -155,9 +167,12 @@
             // Create GUI renderer
             this._guiRenderer = new Donkeycraft.GUIRenderer(this._gl, this._shaderManager);
 
-            // Create weather renderer
+            // Create weather state manager and weather renderer
             if (Donkeycraft.Weather) {
-                this._weatherRenderer = new Donkeycraft.Weather(this._gl, this._shaderManager);
+                this._weather = new Donkeycraft.Weather();
+            }
+            if (Donkeycraft.WeatherRenderer) {
+                this._weatherRenderer = new Donkeycraft.WeatherRenderer(this._gl, this._shaderManager);
             }
 
             // Create player entity
@@ -322,15 +337,15 @@
 
         // Validate required systems exist before instantiation
         if (!this._chunkManager) {
-            Donkeycraft.Logger.error('Game', 'setSystems failed: chunkManager not initialized');
+            Donkeycraft.Logger.warn('Game', 'setSystems called before init: chunkManager not available');
             return false;
         }
         if (!this._player) {
-            Donkeycraft.Logger.error('Game', 'setSystems failed: player not initialized');
+            Donkeycraft.Logger.warn('Game', 'setSystems called before init: player not available');
             return false;
         }
         if (!this._input) {
-            Donkeycraft.Logger.error('Game', 'setSystems failed: input not initialized');
+            Donkeycraft.Logger.warn('Game', 'setSystems called before init: input not available');
             return false;
         }
 
@@ -504,6 +519,9 @@
 
     /**
      * Start the game loop.
+     * Pre-loads chunks around the player position BEFORE starting the timer
+     * to break the render-before-tick deadlock where terrain rendering
+     * would run with zero loaded chunks.
      */
     Donkeycraft.Game.prototype.start = function() {
         if (this._running) return;
@@ -513,6 +531,17 @@
 
         // Set canvas size to window size
         this._resizeCanvas();
+
+        // Pre-load chunks around the player position BEFORE starting the timer.
+        // This breaks the render-before-tick deadlock: terrain renderer needs chunks,
+        // but chunks only load during _tick() which runs after timer starts.
+        if (this._player && this._chunkManager) {
+            var startPos = this._player.getPosition();
+            var playerChunkX = Math.floor(startPos.x / Config.CHUNK_SIZE);
+            var playerChunkZ = Math.floor(startPos.z / Config.CHUNK_SIZE);
+            this._chunkManager.updatePlayerPosition(playerChunkX, playerChunkZ);
+            Donkeycraft.Logger.info('Game', 'Pre-loaded chunks at [' + playerChunkX + ', ' + playerChunkZ + ']');
+        }
 
         // Register tick and render callbacks
         var self = this;
@@ -750,6 +779,11 @@
             this._weatherRenderer = null;
         }
 
+        if (this._weather) {
+            this._weather.destroy();
+            this._weather = null;
+        }
+
         if (this._sky) {
             this._sky.destroy();
             this._sky = null;
@@ -907,11 +941,23 @@
             return;
         }
 
+        // Log raw source lengths for debugging
+        Donkeycraft.Logger.info('Game', 'Vertex shader source length: ' + vertSrc.length);
+        Donkeycraft.Logger.info('Game', 'Fragment shader source length: ' + fragSrc.length);
+
         // Extract and compile individual shader programs with error handling
         var self2 = this;
         var _compileShaderPair = function(name, vertName, fragName) {
             var vertSrc2 = self2._extractVariable(vertSrc, vertName);
             var fragSrc2 = self2._extractVariable(fragSrc, fragName);
+
+            // Log extraction results for debugging
+            if (!vertSrc2 || !fragSrc2) {
+                Donkeycraft.Logger.warn('Game',
+                    'Extraction failed for "' + name + '" program — vert: ' + (vertSrc2 ? 'OK (' + vertSrc2.length + ' chars)' : 'NULL') +
+                    ', frag: ' + (fragSrc2 ? 'OK (' + fragSrc2.length + ' chars)' : 'NULL'));
+            }
+
             if (vertSrc2 && fragSrc2) {
                 try {
                     self2._shaderManager.createProgram(name, vertSrc2, fragSrc2);
@@ -920,7 +966,7 @@
                     Donkeycraft.Logger.error('Game', 'Failed to compile "' + name + '" shader: ' + e.message);
                 }
             } else {
-                Donkeycraft.Logger.warn('Game', 'Missing shader sources for "' + name + '" program');
+                Donkeycraft.Logger.warn('Game', 'Missing shader sources for "' + name + '" program — will use fallback');
             }
         };
 
@@ -1414,6 +1460,29 @@
     };
 
     /**
+     * Force initial chunk load — ensures chunks exist before first render frame.
+     * Called from _render() on the very first frame to break the render-before-tick deadlock.
+     * @private
+     */
+    Donkeycraft.Game.prototype._forceChunkLoad = function() {
+        if (!this._player || !this._chunkManager || !this._terrainRenderer) return;
+
+        var pos = this._player.getPosition();
+        var chunkX = Math.floor(pos.x / Config.CHUNK_SIZE);
+        var chunkZ = Math.floor(pos.z / Config.CHUNK_SIZE);
+
+        // Force update even if player hasn't moved (first frame)
+        this._lastPlayerChunkX = chunkX;
+        this._lastPlayerChunkZ = chunkZ;
+        this._chunkManager.updatePlayerPosition(chunkX, chunkZ);
+
+        var dirtyChunks = this._chunkManager.getDirtyChunks();
+        for (var i = 0; i < dirtyChunks.length; i++) {
+            this._terrainRenderer.markChunkDirty(dirtyChunks[i].chunkX, dirtyChunks[i].chunkZ);
+        }
+    };
+
+    /**
      * _shouldProcessInteraction — check if enough time has passed since the last interaction.
      * @private
      * @returns {boolean} True if the cooldown has elapsed and interactions should be processed.
@@ -1550,14 +1619,33 @@
      * @param {number} dt - Delta time in seconds.
      */
     Donkeycraft.Game.prototype._render = function(dt) {
-        if (!this._running || !this._gl || this._paused) return;
+        // DEBUG: Log every frame to trace rendering pipeline
+        if (!this._running || !this._gl || this._paused) {
+            console.log('[Donkeycraft] _render skipped — running:', this._running, 'gl:', !!this._gl, 'paused:', this._paused);
+            return;
+        }
+        console.log('[Donkeycraft] _render frame #', this.getTickCount());
 
         // Resize canvas if needed
         this._resizeCanvas();
 
+        // Force initial chunk load on the very first render frame to break
+        // the render-before-tick deadlock. After the first frame, _lastPlayerChunkX/Z
+        // will be set and normal _updateChunks() handling takes over.
+        if (this._lastPlayerChunkX === null || this._lastPlayerChunkZ === null) {
+            this._forceChunkLoad();
+        }
+
         // Clear the screen
         this._gl.clearColor(0.53, 0.8, 0.97, 1.0); // Sky blue
         this._gl.clear(this._gl.COLOR_BUFFER_BIT | this._gl.DEPTH_BUFFER_BIT);
+
+        // Log WebGL errors after clear to detect context issues
+        var glErr = this._gl.getError();
+        if (glErr !== this._gl.NO_ERROR) {
+            Donkeycraft.Logger.error('Game', 'WebGL error after clear: 0x' + glErr.toString(16));
+        }
+
         this._gl.enable(this._gl.DEPTH_TEST);
         this._gl.enable(this._gl.CULL_FACE);
 
@@ -1586,17 +1674,26 @@
         }
 
         // Update time of day and apply lighting to sky
-        if (this._lighting) {
-            var timeOfDay = this._getTimeOfDay();
-            this._lighting.setTimeOfDay(timeOfDay);
-        }
-        if (this._sky) {
-            this._sky.render(this._camera, this._lighting);
+        try {
+            if (this._lighting) {
+                var timeOfDay = this._getTimeOfDay();
+                this._lighting.setTimeOfDay(timeOfDay);
+            }
+            if (this._sky) {
+                this._sky.render(this._camera, this._lighting);
+            }
+        } catch (e) {
+            Donkeycraft.Logger.error('Game', 'Sky render failed: ' + e.message);
         }
 
         // Render terrain (handles fog color + uLightFactor internally)
-        if (this._terrainRenderer && this._camera) {
-            this._terrainRenderer.render(this._camera);
+        try {
+            Donkeycraft.Logger.info('Game', '_render: terrainRenderer=' + !!this._terrainRenderer + ' camera=' + !!this._camera + ' chunkCount=' + (this._terrainRenderer ? this._terrainRenderer.getChunkCount() : 0));
+            if (this._terrainRenderer && this._camera) {
+                this._terrainRenderer.render(this._camera);
+            }
+        } catch (e) {
+            Donkeycraft.Logger.error('Game', 'Terrain render failed: ' + e.message);
         }
 
         // Render break particles
@@ -1610,12 +1707,18 @@
         }
 
         // Tick and render weather effects
-        if (this._weatherRenderer) {
+        if (this._weather && this._weatherRenderer) {
             try {
-                this._weatherRenderer.tick(dt);
-                if (this._camera && this._gl) {
-                    this._weatherRenderer.render(this._camera, this._canvas.width, this._canvas.height);
+                this._weather.tick();
+                var particleDensity = this._weather.getParticleDensity();
+                var particleType = this._weather.isSnowing() ? 'snow' : 'rain';
+                // Spawn particles when weather becomes active
+                if (particleDensity > 0 && this._weatherRenderer.getParticleCount() === 0) {
+                    this._weatherRenderer.spawnInitialParticles(Math.floor(500 * particleDensity));
                 }
+                this._weatherRenderer.activate();
+                this._weatherRenderer.update(dt, this._player ? this._player.getPosition() : { x: 0, y: 64, z: 0 });
+                this._weatherRenderer.render(this._camera, particleDensity, particleType);
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Weather render error: ' + e.message);
             }

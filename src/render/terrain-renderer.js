@@ -159,7 +159,14 @@
      */
     Donkeycraft.TerrainRenderer.prototype._createChunkMesh = function(chunkX, chunkZ) {
         var gl = this._gl;
-        if (!gl || !this._getBlockFunc) return;
+        if (!gl) {
+            Donkeycraft.Logger.error('TerrainRenderer', 'WebGL context is null — cannot create chunk mesh');
+            return;
+        }
+        if (!this._getBlockFunc) {
+            Donkeycraft.Logger.warn('TerrainRenderer', '_getBlockFunc not set — cannot create chunk mesh');
+            return;
+        }
 
         // Wrap world-coordinate getter into local chunk coordinates.
         var self = this;
@@ -178,8 +185,15 @@
         if (geometry.vertexCount === 0) {
             var pendingKey = chunkX + ',' + chunkZ;
             this._pendingMeshes[pendingKey] = { x: chunkX, z: chunkZ };
+            Donkeycraft.Logger.warn('TerrainRenderer',
+                'Chunk [' + chunkX + ',' + chunkZ + '] geometry has 0 vertices — deferred (retries: ' +
+                (this._pendingMeshes[pendingKey].retries || 0) + ')');
             return;
         }
+
+        // Run MeshOptimizer for vertex deduplication and back-face culling
+        var cameraPos = this._camera ? this._camera.getPosition() : null;
+        geometry = this._meshOptimizer.optimize(geometry, cameraPos);
 
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -190,6 +204,9 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
+        Donkeycraft.Logger.info('TerrainRenderer',
+            'Chunk [' + chunkX + ',' + chunkZ + '] mesh created — ' + geometry.vertexCount + ' vertices, ' +
+            geometry.indexCount + ' indices');
     };
 
     /**
@@ -467,12 +484,40 @@
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._drawChunk = function(chunkMesh) {
+        var gl = this._gl;
         if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
-        return chunkMesh.draw();
+
+        Donkeycraft.Logger.info('TerrainRenderer',
+            'Drawing chunk [' + chunkMesh._chunkX + ',' + chunkMesh._chunkZ + '] — ' +
+            chunkMesh.getIndexCount() + ' indices');
+
+        var result = chunkMesh.draw();
+
+        // Check for WebGL errors after draw
+        if (result && gl) {
+            var err = gl.getError();
+            if (err !== gl.NO_ERROR) {
+                var errNames = {
+                    0x0500: 'INVALID_ENUM',
+                    0x0501: 'INVALID_VALUE',
+                    0x0502: 'INVALID_OPERATION',
+                    0x0503: 'STACK_OVERFLOW',
+                    0x0504: 'STACK_UNDERFLOW',
+                    0x0505: 'OUT_OF_MEMORY',
+                    0x0506: 'INVALID_FRAMEBUFFER_OPERATION'
+                };
+                Donkeycraft.Logger.error('TerrainRenderer',
+                    'WebGL error after drawChunk: ' + (errNames[err] || '0x' + err.toString(16)));
+            }
+        }
+
+        return result;
     };
 
     /**
-     * Get or create a 1x1 white placeholder texture.
+     * Get or create a placeholder texture.
+     * Uses generateMissing() checkerboard if TextureGenerator is available,
+     * otherwise falls back to a 1x1 white texture.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function() {
@@ -480,13 +525,28 @@
         if (this._placeholderTexture) return this._placeholderTexture;
 
         var gl = this._gl;
-        this._placeholderTexture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+
+        // Try to use generateMissing() texture for visual consistency
+        var missingTex = Donkeycraft.TextureGenerator ?
+            Donkeycraft.TextureGenerator.generateMissing() : null;
+
+        if (missingTex && missingTex.src) {
+            // Create WebGL texture from the missing texture image
+            this._placeholderTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        } else {
+            // Fallback to white 1×1 if generateMissing not available
+            this._placeholderTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        }
 
         return this._placeholderTexture;
     };

@@ -266,11 +266,12 @@
                         g = 160 + n * 30;
                         b = 40 + n * 15;
                     } else if (y < 5) {
-                        // Transition with grass drips
+                        // Transition with grass drips — use deterministic noise instead of Math.random()
                         var drip = _noise2D(x * 0.3, y * 0.5);
                         if (drip > 0.2) {
-                            r = 76 + Math.random() * 10;
-                            g = 150 + Math.random() * 20;
+                            var dripNoise = _noise2D(x * 0.7 + 100, y * 0.7 + 100);
+                            r = 76 + (dripNoise + 1) * 5;   // range ~71-81
+                            g = 140 + (dripNoise + 1) * 10;  // range ~130-160
                             b = 40;
                         } else {
                             r = 134; g = 96; b = 60;
@@ -4807,29 +4808,32 @@
          * @param {AudioContext} ctx
          * @param {string} category - Sound category ("step", "break", "place", "hit", "footstep", "splash", "glass_break", "pop", "explosion", "enchant", "drink", "ambient", "hurt").
          * @param {string} [material] - Optional material specifier.
-         * @returns {AudioBuffer|Promise<AudioBuffer>}
+         * @returns {Promise<AudioBuffer>} Always returns a Promise for consistent API.
          */
         function getSound(ctx, category, material) {
+            var result;
             switch (category) {
-                case 'step': return generateStepSound(ctx, material);
-                case 'break': return generateBreakSound(ctx, material);
-                case 'place': return generatePlaceSound(ctx, material);
-                case 'hit': return generateHitSound(ctx, material);
-                case 'footstep': return generateFootstepSound(ctx);
-                case 'splash': return generateSplashSound(ctx);
-                case 'glass_break': return generateGlassBreakSound(ctx);
-                case 'pop': return generatePopSound(ctx);
-                case 'explosion': return generateExplosionSound(ctx);
-                case 'enchant': return generateEnchantSound(ctx);
-                case 'drink': return generateDrinkSound(ctx);
-                case 'ambient': return generateAmbientSound(ctx, material);
-                case 'hurt': return generateHurtSound(ctx, material);
+                case 'step': result = generateStepSound(ctx, material); break;
+                case 'break': result = generateBreakSound(ctx, material); break;
+                case 'place': result = generatePlaceSound(ctx, material); break;
+                case 'hit': result = generateHitSound(ctx, material); break;
+                case 'footstep': result = generateFootstepSound(ctx); break;
+                case 'splash': result = generateSplashSound(ctx); break;
+                case 'glass_break': result = generateGlassBreakSound(ctx); break;
+                case 'pop': result = generatePopSound(ctx); break;
+                case 'explosion': result = generateExplosionSound(ctx); break;
+                case 'enchant': result = generateEnchantSound(ctx); break;
+                case 'drink': result = generateDrinkSound(ctx); break;
+                case 'ambient': result = generateAmbientSound(ctx, material); break;
+                case 'hurt': result = generateHurtSound(ctx, material); break;
                 default:
                     if (Donkeycraft.Logger) {
                         Donkeycraft.Logger.warn('SoundGenerator', 'Unknown sound category: ' + category);
                     }
-                    return _createNoiseBuffer(ctx, 0.1);
+                    result = _createNoiseBuffer(ctx, 0.1);
             }
+            // Always return Promise<AudioBuffer> for consistent API
+            return Promise.resolve(result);
         }
 
         /**
@@ -4888,6 +4892,7 @@
     Donkeycraft.AssetManager = (function() {
         var _generatedTextures = null;
         var _audioContext = null;
+        var _atlasCache = null; // Cached atlas canvas
 
         /**
          * Initialize the asset manager with an AudioContext.
@@ -4965,6 +4970,9 @@
          * @returns {HTMLCanvasElement}
          */
         function generateAtlasCanvas() {
+            // Return cached atlas if available
+            if (_atlasCache) return _atlasCache;
+
             var CELL_SIZE = 80; // 5× larger than 16px
             var GRID_COLS = 16;
             var atlasCanvas = document.createElement('canvas');
@@ -5001,6 +5009,7 @@
                 }
             }
 
+            _atlasCache = atlasCanvas; // Cache for future calls
             return atlasCanvas;
         }
 
@@ -5027,6 +5036,7 @@
          */
         function reset() {
             _generatedTextures = null;
+            _atlasCache = null; // Also clear atlas cache
             Donkeycraft.SoundGenerator.clearCache();
         }
 

@@ -669,21 +669,19 @@ void main() {
         // Start the game with all systems wired up
         startGame(gameSystems, systems);
 
-        // Wire up additional UI systems after game starts
-        setTimeout(function() {
-            var game = window._dkGame;
-            if (!game) return;
-
+        // Wire up additional UI systems immediately (no setTimeout — hotbar/GUI must appear on first frame)
+        var game2 = window._dkGame;
+        if (game2) {
             // --- Wire up Hotbar UI ---
             var hotbarContainer = document.getElementById('dk-hotbar-container');
-            if (hotbarContainer && Donkeycraft.Hotbar && game._guiRenderer && game._canvas) {
-                var hotbar = new Donkeycraft.Hotbar(hotbarContainer, game._guiRenderer, game._canvas);
-                game.setHotbar(hotbar);
+            if (hotbarContainer && Donkeycraft.Hotbar && game2._guiRenderer && game2._canvas) {
+                var hotbar = new Donkeycraft.Hotbar(hotbarContainer, game2._guiRenderer, game2._canvas);
+                game2.setHotbar(hotbar);
 
                 // Sync player inventory to hotbar display
-                if (game._player && game._player.getInventory) {
+                if (game2._player && game2._player.getInventory) {
                     try {
-                        var inv = game._player.getInventory();
+                        var inv = game2._player.getInventory();
                         if (inv && typeof inv.getHotbarStacks === 'function') {
                             hotbar.setSlots(inv.getHotbarStacks());
                         }
@@ -694,20 +692,20 @@ void main() {
                 if (hotbar.onSelectedChange) {
                     hotbar.onSelectedChange(function(newSlot, oldSlot) {
                         // Sync player selected slot
-                        if (game._player && game._player.setSelectedHotbarSlot) {
-                            game._player.setSelectedHotbarSlot(newSlot);
+                        if (game2._player && game2._player.setSelectedHotbarSlot) {
+                            game2._player.setSelectedHotbarSlot(newSlot);
                         }
                     });
                 }
             }
 
-            // --- Wire up GuiManager (if available) ---
+            // --- Wire up GuiManager ---
             if (Donkeycraft.GuiManager) {
                 var guiContainer = document.getElementById('dk-gui-container');
                 var guiBackdrop = document.getElementById('dk-gui-backdrop');
                 try {
                     var guiManager = new Donkeycraft.GuiManager(guiContainer, guiBackdrop);
-                    game.setGuiManager(guiManager);
+                    game2.setGuiManager(guiManager);
 
                     // Close GUI on backdrop click
                     if (guiBackdrop) {
@@ -722,9 +720,9 @@ void main() {
                 }
             }
 
-            // Dispose loading screen after game starts
+            // Dispose loading screen after game starts and UI is wired up
             loadingScreen.dispose();
-        }, 500);
+        }
     }).catch(function(err) {
         loadingScreen.showError(err.message || 'Initialization failed');
     });

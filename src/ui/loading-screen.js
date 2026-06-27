@@ -169,8 +169,10 @@
      * dispose — remove DOM elements and free references.
      */
     Donkeycraft.LoadingScreen.prototype.dispose = function() {
-        this._disposed = true;
+        // Call hide() BEFORE setting _disposed — hide() checks _disposed flag,
+        // so if we set it first, hide() returns early without removing the element.
         this.hide();
+        this._disposed = true;
         this._element = null;
         this._progressBar = null;
         this._messageEl = null;
