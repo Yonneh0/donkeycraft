@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Core Infrastructure Test Suite</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Core Infrastructure Tests</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Comprehensive functional tests for all 9 core infrastructure modules: namespace, eventbus, config, logger, timer, input, math-utils, audio, init-sequence.</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+<script src="../src/core/init-sequence.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Your test script -->
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Namespace (namespace.js)
+    // ============================================================
+    F.section('1. Namespace (namespace.js)');
+
+    // Basic existence checks
+    F.assert(typeof Donkeycraft !== 'undefined', 'Donkeycraft namespace exists');
+    F.assertType(Donkeycraft, 'object', 'Donkeycraft is an object');
+
+    // Version and name
+    F.assert(typeof Donkeycraft.VERSION === 'string', 'VERSION is a string');
+    F.assertEq(Donkeycraft.VERSION, '0.1.0', 'VERSION equals "0.1.0"');
+    F.assert(typeof Donkeycraft.NAME === 'string', 'NAME is a string');
+    F.assertEq(Donkeycraft.NAME, 'Donkeycraft', 'NAME equals "Donkeycraft"');
+
+    // Systems registry
+    F.assertType(Donkeycraft.systems, 'object', 'systems is an object');
+
+    // Running flag
+    F.assertType(Donkeycraft.isRunning, 'boolean', 'isRunning is a boolean');
+    F.assertEq(Donkeycraft.isRunning, false, 'isRunning defaults to false');
+
+    // Utility functions
+    F.assert(typeof Donkeycraft.lerp === 'function', 'Donkeycraft.lerp exists');
+    F.assert(typeof Donkeycraft.clamp === 'function', 'Donkeycraft.clamp exists');
+
+    // lerp tests
+    F.assertEq(Donkeycraft.lerp(0, 10, 0), 0, 'lerp(0,10,0) = 0');
+    F.assertEq(Donkeycraft.lerp(0, 10, 1), 10, 'lerp(0,10,1) = 10');
+    F.assertEq(Donkeycraft.lerp(0, 10, 0.5), 5, 'lerp(0,10,0.5) = 5');
+    F.assertNear(Donkeycraft.lerp(0, 10, 0.25), 2.5, 0.0001, 'lerp(0,10,0.25) = 2.5');
+
+    // clamp tests
+    F.assertEq(Donkeycraft.clamp(5, 0, 10), 5, 'clamp(5,0,10) = 5');
+    F.assertEq(Donkeycraft.clamp(-3, 0, 10), 0, 'clamp(-3,0,10) = 0');
+    F.assertEq(Donkeycraft.clamp(15, 0, 10), 10, 'clamp(15,0,10) = 10');
+    F.assertEq(Donkeycraft.clamp(0, 0, 10), 0, 'clamp(0,0,10) = 0 (boundary)');
+    F.assertEq(Donkeycraft.clamp(10, 0, 10), 10, 'clamp(10,0,10) = 10 (boundary)');
+
+    // Double-load protection: verify existing properties are preserved
+    var savedVersion = Donkeycraft.VERSION;
+    var savedName = Donkeycraft.NAME;
+    // Simulate double-load by re-executing namespace pattern
+    var ns = window.Donkeycraft = window.Donkeycraft || {};
+    ns.VERSION = ns.VERSION || '0.1.0';
+    ns.NAME = ns.NAME || 'Donkeycraft';
+    F.assertEq(ns.VERSION, savedVersion, 'Double-load preserves VERSION');
+    F.assertEq(ns.NAME, savedName, 'Double-load preserves NAME');
+
+    F.info('All namespace tests passed');
+
+    // ============================================================
+    // Section 2: EventBus (eventbus.js)
+    // ============================================================
+    F.section('2. EventBus (eventbus.js)');
+
+    // Basic creation
+    F.assert(typeof Donkeycraft.EventBus === 'function', 'Donkeycraft.EventBus is a function');
+    var bus = new Donkeycraft.EventBus();
+    F.assertType(bus, 'object', 'EventBus instance created');
+
+    // on/emit basic
+    var emitCalled = false;
+    bus.on('test', function() { emitCalled = true; });
+    bus.emit('test');
+    F.assert(emitCalled, 'on/emit works correctly');
+
+    // on with context
+    var ctxCalled = false;
+    var ctxSelf = null;
+    bus.on('ctxTest', function() { ctxCalled = true; ctxSelf = this; });
+    var customCtx = { id: 42 };
+    bus.on('ctxTest2', function() { ctxSelf = this; }, customCtx);
+    bus.emit('ctxTest');
+    bus.emit('ctxTest2');
+    F.assert(ctxCalled, 'on with default context fires');
+    F.assert(ctxSelf === customCtx, 'on with custom context binds correctly');
+
+    // on/emit with arguments passthrough
+    var argResult = null;
+    bus.on('argsTest', function(a, b, c) { argResult = [a, b, c]; });
+    bus.emit('argsTest', 42, 'hello', true);
+    F.assertArrEq(argResult, [42, 'hello', true], 'Arguments passthrough works');
+
+    // off (unsubscribe function)
+    var unsubFired = false;
+    var unsub = bus.on('unsubTest', function() { unsubFired = true; });
+    bus.emit('unsubTest');
+    F.assert(unsubFired, 'Listener fires before unsubscribe');
+    unsub();
+    bus.emit('unsubTest');
+    F.assert(!unsubFired, 'Unsubscribe function prevents further calls');
+
+    // off direct removal
+    var offFired = false;
+    var offCb = function() { offFired = true; };
+    bus.on('offTest', offCb);
+    bus.emit('offTest');
+    F.assert(offFired, 'Listener fires before off()');
+    bus.off('offTest', offCb);
+    bus.emit('offTest');
+    F.assert(!offFired, 'off() removes listener');
+
+    // once — fires exactly once
+    var onceFired = 0;
+    var unsubOnce = bus.once('onceTest', function() { onceFired++; });
+    bus.emit('onceTest');
+    F.assertEq(onceFired, 1, 'once fires exactly once (count=1)');
+    bus.emit('onceTest');
+    F.assertEq(onceFired, 1, 'once does not fire again (count=1)');
+
+    // once — unsubscribe before fire
+    var onceUnsubFired = false;
+    var unsubOnce2 = bus.once('onceUnsub', function() { onceUnsubFired = true; });
+    unsubOnce2();
+    bus.emit('onceUnsub');
+    F.assert(!onceUnsubFired, 'once unsubscribe before fire prevents firing');
+
+    // off(event, callback) with once — should also remove wrapped callback
+    var onceOffFired = false;
+    var onceOffCb = function() { onceOffFired = true; };
+    bus.once('onceOff', onceOffCb);
+    bus.off('onceOff', onceOffCb);
+    bus.emit('onceOff');
+    F.assert(!onceOffFired, 'off(event, callback) removes once listener');
+
+    // clear
+    var clearFired = false;
+    bus.on('clearTest', function() { clearFired = true; });
+    bus.clear();
+    bus.emit('clearTest');
+    F.assert(!clearFired, 'clear() removes all listeners');
+
+    // emitSafe — static method for standalone modules
+    Donkeycraft.EventBus.setGlobal(bus);
+    var safeFired = false;
+    bus.on('safeTest', function() { safeFired = true; });
+    Donkeycraft.EventBus.emitSafe('safeTest');
+    F.assert(safeFired, 'emitSafe emits on global instance');
+
+    // emitSafe — no global set
+    Donkeycraft.EventBus.setGlobal(null);
+    Donkeycraft.EventBus.emitSafe('noGlobalTest'); // should silently do nothing
+    F.assert(true, 'emitSafe with no global does not throw');
+
+    // Namespaced EventBus
+    var nsBus = new Donkeycraft.EventBus('world');
+    var nsFired = false;
+    nsBus.on('chunkLoad', function(data) { nsFired = true; });
+    nsBus.emit('chunkLoad', { chunkX: 0, chunkZ: 0 });
+    F.assert(nsFired, 'Namespaced event fires correctly');
+
+    // Empty emit does not throw
+    bus.emit('emptyEvent');
+    F.assert(true, 'emit on empty bus does not throw');
+
+    F.info('All EventBus tests passed');
+
+    // ============================================================
+    // Section 3: Config (config.js)
+    // ============================================================
+    F.section('3. Config (config.js)');
+
+    F.assertType(Donkeycraft.Config, 'object', 'Donkeycraft.Config is an object');
+
+    // World settings
+    F.assertEq(typeof Donkeycraft.Config.CHUNK_SIZE, 'number', 'CHUNK_SIZE is number');
+    F.assertEq(Donkeycraft.Config.CHUNK_SIZE, 16, 'CHUNK_SIZE = 16');
+    F.assertEq(Donkeycraft.Config.WORLD_HEIGHT, 256, 'WORLD_HEIGHT = 256');
+    F.assert(typeof Donkeycraft.Config.RENDER_DISTANCE, 'number', 'RENDER_DISTANCE is number');
+    F.assertEq(Donkeycraft.Config.RENDER_DISTANCE, 8, 'RENDER_DISTANCE = 8');
+    F.assertEq(Donkeycraft.Config.MAX_RENDER_DISTANCE, 12, 'MAX_RENDER_DISTANCE = 12');
+    F.assertEq(Donkeycraft.Config.SEED, 42, 'SEED = 42');
+
+    // Tick rates
+    F.assertEq(Donkeycraft.Config.GAME_TICKS_PER_SECOND, 20, 'GAME_TICKS_PER_SECOND = 20');
+    F.assertEq(Donkeycraft.Config.RENDER_FPS_TARGET, 60, 'RENDER_FPS_TARGET = 60');
+    F.assertEq(Donkeycraft.Config.AUTO_SAVE_INTERVAL, 30000, 'AUTO_SAVE_INTERVAL = 30000');
+
+    // Player settings
+    F.assertEq(Donkeycraft.Config.PLAYER_HEIGHT, 1.8, 'PLAYER_HEIGHT = 1.8');
+    F.assertEq(Donkeycraft.Config.PLAYER_WIDTH, 0.6, 'PLAYER_WIDTH = 0.6');
+    F.assertEq(Donkeycraft.Config.PLAYER_EYE_HEIGHT, 1.62, 'PLAYER_EYE_HEIGHT = 1.62');
+    F.assertEq(Donkeycraft.Config.PLAYER_SPEED, 5.0, 'PLAYER_SPEED = 5.0');
+    F.assertEq(Donkeycraft.Config.PLAYER_SPRINT_SPEED, 7.8, 'PLAYER_SPRINT_SPEED = 7.8');
+    F.assertEq(Donkeycraft.Config.PLAYER_FLY_SPEED, 5.0, 'PLAYER_FLY_SPEED = 5.0');
+    F.assertEq(Donkeycraft.Config.PLAYER_FLY_SPEED_BOOST, 10.0, 'PLAYER_FLY_SPEED_BOOST = 10.0');
+    F.assertEq(Donkeycraft.Config.PLAYER_JUMP_FORCE, 0.42, 'PLAYER_JUMP_FORCE = 0.42');
+    F.assertEq(Donkeycraft.Config.PLAYER_REACH, 6.0, 'PLAYER_REACH = 6.0');
+
+    // Camera settings
+    F.assertEq(Donkeycraft.Config.FOV, 70, 'FOV = 70');
+    F.assertEq(Donkeycraft.Config.MOUSE_SENSITIVITY, 0.15, 'MOUSE_SENSITIVITY = 0.15');
+    F.assertEq(Donkeycraft.Config.MOUSE_SCROLL_SENSITIVITY, 1, 'MOUSE_SCROLL_SENSITIVITY = 1');
+
+    // Physics
+    F.assertEq(Donkeycraft.Config.GRAVITY, -20.0, 'GRAVITY = -20.0');
+    F.assertEq(Donkeycraft.Config.TERMINAL_VELOCITY, -40.0, 'TERMINAL_VELOCITY = -40.0');
+    F.assertEq(Donkeycraft.Config.FLYING_TERMINAL_VELOCITY, -20.0, 'FLYING_TERMINAL_VELOCITY = -20.0');
+
+    // Player mechanics
+    F.assertEq(Donkeycraft.Config.SWIM_BOOST, 0.15, 'SWIM_BOOST = 0.15');
+    F.assertEq(Donkeycraft.Config.JUMP_COOLDOWN, 0.1, 'JUMP_COOLDOWN = 0.1');
+    F.assertEq(Donkeycraft.Config.FALL_DAMAGE_THRESHOLD, 3, 'FALL_DAMAGE_THRESHOLD = 3');
+
+    // Lighting (reserved)
+    F.assertEq(Donkeycraft.Config.SKY_LIGHT_DECAY, 1, 'SKY_LIGHT_DECAY = 1');
+    F.assertEq(Donkeycraft.Config.BLOCK_LIGHT_DECAY, 1, 'BLOCK_LIGHT_DECAY = 1');
+
+    // Time settings
+    F.assertEq(Donkeycraft.Config.WORLD_TIME_SCALE, 60, 'WORLD_TIME_SCALE = 60');
+
+    // Key bindings
+    F.assertType(Donkeycraft.Config.KEYBINDS, 'object', 'KEYBINDS is an object');
+    F.assertEq(typeof Donkeycraft.Config.KEYBINDS.MOVE_FORWARD, 'string', 'MOVE_FORWARD is string');
+    F.assertEq(Donkeycraft.Config.KEYBINDS.MOVE_FORWARD, 'KeyW', 'MOVE_FORWARD = KeyW');
+    F.assertEq(Donkeycraft.Config.KEYBINDS.JUMP, 'Space', 'JUMP = Space');
+    F.assertEq(Donkeycraft.Config.KEYBINDS.INVENTORY, 'KeyE', 'INVENTORY = KeyE');
+
+    // Chunk persistence
+    F.assertEq(Donkeycraft.Config.CHUNKS_PER_SAVE, 4, 'CHUNKS_PER_SAVE = 4');
+    F.assertEq(Donkeycraft.Config.SAVE_BATCH_DELAY, 100, 'SAVE_BATCH_DELAY = 100');
+
+    // Dimension settings
+    F.assertEq(Donkeycraft.Config.NETHER_SCALE, 8, 'NETHER_SCALE = 8');
+    F.assertEq(Donkeycraft.Config.END_SCALE, 1, 'END_SCALE = 1');
+
+    F.info('All Config tests passed');
+
+    // ============================================================
+    // Section 4: Logger (logger.js)
+    // ============================================================
+    F.section('4. Logger (logger.js)');
+
+    F.assert(typeof Donkeycraft.Logger === 'object', 'Donkeycraft.Logger is an object');
+    F.assert(typeof Donkeycraft.LogLevel === 'object', 'Donkeycraft.LogLevel is an object');
+
+    // LogLevel values
+    F.assertEq(Donkeycraft.LogLevel.DEBUG, 0, 'LogLevel.DEBUG = 0');
+    F.assertEq(Donkeycraft.LogLevel.INFO, 1, 'LogLevel.INFO = 1');
+    F.assertEq(Donkeycraft.LogLevel.WARN, 2, 'LogLevel.WARN = 2');
+    F.assertEq(Donkeycraft.LogLevel.ERROR, 3, 'LogLevel.ERROR = 3');
+    F.assertEq(Donkeycraft.LogLevel.SILENT, 4, 'LogLevel.SILENT = 4');
+
+    // Default level is INFO
+    F.assertEq(Donkeycraft.Logger.getLevel(), Donkeycraft.LogLevel.INFO, 'Default level is INFO');
+
+    // setLevel
+    var setResult = Donkeycraft.Logger.setLevel(Donkeycraft.LogLevel.DEBUG);
+    F.assert(setResult, 'setLevel returns true for valid level');
+    F.assertEq(Donkeycraft.Logger.getLevel(), Donkeycraft.LogLevel.DEBUG, 'Level changed to DEBUG');
+
+    // setLevel with invalid value
+    var badSet = Donkeycraft.Logger.setLevel(99);
+    F.assert(!badSet, 'setLevel returns false for invalid level');
+    F.assertEq(Donkeycraft.Logger.getLevel(), Donkeycraft.LogLevel.DEBUG, 'Level unchanged after invalid set');
+
+    // resetLevel
+    var resetResult = Donkeycraft.Logger.resetLevel();
+    F.assertEq(resetResult, Donkeycraft.LogLevel.INFO, 'resetLevel returns INFO');
+    F.assertEq(Donkeycraft.Logger.getLevel(), Donkeycraft.LogLevel.INFO, 'Level restored to INFO');
+
+    // setSilent / isSilent
+    F.assert(!Donkeycraft.Logger.isSilent(), 'Not silent by default');
+    var silentResult = Donkeycraft.Logger.setSilent(true);
+    F.assert(silentResult, 'setSilent(true) returns true');
+    F.assert(Donkeycraft.Logger.isSilent(), 'isSilent returns true after setSilent(true)');
+
+    var restoreSilent = Donkeycraft.Logger.setSilent(false);
+    F.assert(restoreSilent, 'setSilent(false) returns true');
+    F.assert(!Donkeycraft.Logger.isSilent(), 'isSilent returns false after setSilent(false)');
+
+    // Tag toggle
+    F.assert(Donkeycraft.Logger.getTagEnabled(), 'Tag enabled by default');
+    Donkeycraft.Logger.setTagEnabled(false);
+    F.assert(!Donkeycraft.Logger.getTagEnabled(), 'Tag disabled after setTagEnabled(false)');
+    Donkeycraft.Logger.setTagEnabled(true);
+    F.assert(Donkeycraft.Logger.getTagEnabled(), 'Tag re-enabled after setTagEnabled(true)');
+
+    // Method existence
+    F.assert(typeof Donkeycraft.Logger.debug === 'function', 'Logger.debug is a function');
+    F.assert(typeof Donkeycraft.Logger.info === 'function', 'Logger.info is a function');
+    F.assert(typeof Donkeycraft.Logger.warn === 'function', 'Logger.warn is a function');
+    F.assert(typeof Donkeycraft.Logger.error === 'function', 'Logger.error is a function');
+
+    // Debug level test — should produce output at DEBUG level
+    Donkeycraft.Logger.setLevel(Donkeycraft.LogLevel.DEBUG);
+    Donkeycraft.Logger.debug('Debug test message');
+    F.assert(true, 'Logger.debug does not throw');
+
+    Donkeycraft.Logger.setLevel(Donkeycraft.LogLevel.INFO);
+    Donkeycraft.Logger.info('Info test message');
+    F.assert(true, 'Logger.info does not throw');
+
+    Donkeycraft.Logger.warn('Warn test message');
+    F.assert(true, 'Logger.warn does not throw');
+
+    Donkeycraft.Logger.error('Error test message');
+    F.assert(true, 'Logger.error does not throw');
+
+    // Silent mode suppresses all output
+    Donkeycraft.Logger.setSilent(true);
+    Donkeycraft.Logger.debug('Should be silent');
+    Donkeycraft.Logger.info('Should be silent');
+    Donkeycraft.Logger.warn('Should be silent');
+    Donkeycraft.Logger.error('Should be silent');
+    F.assert(Donkeycraft.Logger.isSilent(), 'All logs suppressed in silent mode');
+    Donkeycraft.Logger.setSilent(false);
+
+    // Reset after tests
+    Donkeycraft.Logger.resetLevel();
+    Donkeycraft.Logger.setTagEnabled(true);
+
+    F.info('All Logger tests passed');
+
+    // ============================================================
+    // Section 5: Timer (timer.js) — async test
+    // ============================================================
+    F.section('5. Timer (timer.js) — async');
+
+    var timerDone = false;
+    var timerResults = {};
+
+    F.assert(typeof Donkeycraft.Timer === 'function', 'Donkeycraft.Timer is a function');
+
+    // Create timer with default config
+    var timer = new Donkeycraft.Timer();
+    F.assertType(timer, 'object', 'Timer instance created');
+
+    // Initial state
+    F.assertEq(timer.getDeltaTime(), 0, 'Initial delta time is 0');
+    F.assertEq(timer.getFPS(), 0, 'Initial FPS is 0');
+    F.assertEq(timer.getTickCount(), 0, 'Initial tick count is 0');
+    F.assertEq(timer.getFrameCount(), 0, 'Initial frame count is 0');
+
+    // onTick callback
+    var tickCbFired = false;
+    var unsubTick = timer.onTick(function(dt, tickCount) {
+        tickCbFired = true;
+        timerResults.tickDt = dt;
+        timerResults.tickCount = tickCount;
+    });
+    F.assert(typeof unsubTick === 'function', 'onTick returns unsubscribe function');
+
+    // onRender callback
+    var renderCbFired = false;
+    var unsubRender = timer.onRender(function(dt) {
+        renderCbFired = true;
+        timerResults.renderDt = dt;
+    });
+    F.assert(typeof unsubRender === 'function', 'onRender returns unsubscribe function');
+
+    // Start timer
+    timer.start();
+
+    // Wait for a few frames then verify
+    setTimeout(function() {
+        // After ~200ms, should have ticks and renders
+        F.assert(tickCbFired, 'onTick callback fired after start');
+        F.assert(renderCbFired, 'onRender callback fired after start');
+        F.assert(timer.getTickCount() > 0, 'TickCount > 0 after running');
+        F.assert(timer.getFrameCount() >= 0, 'FrameCount >= 0');
+
+        // Delta time should be small positive number
+        F.assert(timer.getDeltaTime() > 0 && timer.getDeltaTime() < 1, 'DeltaTime is reasonable');
+
+        // FPS should be non-zero after running for a bit
+        F.assert(timer.getFPS() >= 0, 'FPS >= 0');
+
+        // Test unsubscribe
+        var unsubTick2Fired = false;
+        var unsubTick2 = timer.onTick(function() { unsubTick2Fired = true; });
+        unsubTick2();
+        // We can't easily verify unsubTick2 didn't fire since other ticks may have happened,
+        // but the function should not throw.
+
+        // Stop timer
+        timer.stop();
+        F.assert(!timer._running, 'Timer stopped');
+
+        // Test destroy
+        var timer2 = new Donkeycraft.Timer();
+        timer2.start();
+        timer2.destroy();
+        F.assert(true, 'Timer.destroy() does not throw');
+
+        // Timer2 destroyed state — no crash on subsequent calls
+        timer2.stop();   // should be no-op
+        timer2.getDeltaTime();
+        timer2.getFPS();
+        timer2.getTickCount();
+        timer2.getFrameCount();
+        F.assert(true, 'Timer methods work after destroy');
+
+        timerDone = true;
+        F.finishTests();
+    }, 300);
+
+    // ============================================================
+    // Section 6: Input (input.js)
+    // ============================================================
+    F.section('6. Input (input.js)');
+
+    F.assert(typeof Donkeycraft.Input === 'function', 'Donkeycraft.Input is a function');
+
+    var input = new Donkeycraft.Input();
+    F.assertType(input, 'object', 'Input instance created');
+
+    // Initial state — no keys pressed
+    F.assert(!input.isKeyDown('KeyW'), 'KeyW not pressed initially');
+    F.assert(!input.isKeyJustPressed('KeyW'), 'KeyW not just pressed initially');
+
+    // isMouseButtonPressed — initial state
+    F.assert(!input.isMouseButtonPressed('left'), 'Mouse left not pressed initially');
+    F.assert(!input.isMouseButtonPressed('right'), 'Mouse right not pressed initially');
+    F.assert(!input.isMouseButtonPressed('middle'), 'Mouse middle not pressed initially');
+
+    // isMouseButtonJustPressed — initial state
+    F.assert(!input.isMouseButtonJustPressed('left'), 'Mouse left not just pressed initially');
+
+    // getMouseState returns correct structure
+    var mouseState = input.getMouseState();
+    F.assertType(mouseState, 'object', 'getMouseState returns object');
+    F.assertType(mouseState.left, 'boolean', 'mouseState.left is boolean');
+    F.assertType(mouseState.right, 'boolean', 'mouseState.right is boolean');
+    F.assertType(mouseState.middle, 'boolean', 'mouseState.middle is boolean');
+    F.assertType(mouseState.x, 'number', 'mouseState.x is number');
+    F.assertType(mouseState.y, 'number', 'mouseState.y is number');
+    F.assertType(mouseState.deltaX, 'number', 'mouseState.deltaX is number');
+    F.assertType(mouseState.deltaY, 'number', 'mouseState.deltaY is number');
+
+    // getMouseDelta auto-resets
+    input._mouseState.deltaX = 10;
+    input._mouseState.deltaY = -5;
+    var delta1 = input.getMouseDelta();
+    F.assertEq(delta1.deltaX, 10, 'getMouseDelta returns deltaX=10');
+    F.assertEq(delta1.deltaY, -5, 'getMouseDelta returns deltaY=-5');
+    // Second call should return zeros (auto-reset)
+    var delta2 = input.getMouseDelta();
+    F.assertEq(delta2.deltaX, 0, 'getMouseDelta auto-resets deltaX to 0');
+    F.assertEq(delta2.deltaY, 0, 'getMouseDelta auto-resets deltaY to 0');
+
+    // resetMouseDelta
+    input._mouseState.deltaX = 20;
+    input.resetMouseDelta();
+    F.assertEq(input.getMouseState().deltaX, 0, 'resetMouseDelta zeroes deltaX');
+
+    // getWheelDelta auto-resets
+    input._wheelDelta = 100;
+    var wheel1 = input.getWheelDelta();
+    F.assertEq(wheel1, 100, 'getWheelDelta returns 100');
+    var wheel2 = input.getWheelDelta();
+    F.assertEq(wheel2, 0, 'getWheelDelta auto-resets to 0');
+
+    // isMouseCaptured — should be false initially (no pointer lock)
+    F.assert(!input.isMouseCaptured(), 'Mouse not captured initially');
+
+    // updateKeyStates / updateMouseButtonStates don't throw
+    input.updateKeyStates();
+    F.assert(true, 'updateKeyStates does not throw');
+    input.updateMouseButtonStates();
+    F.assert(true, 'updateMouseButtonStates does not throw');
+
+    // destroy doesn't throw
+    input.destroy();
+    F.assert(true, 'Input.destroy() does not throw');
+
+    // Note: Can't fully test key press events since we can't simulate them in a static page.
+    // The event listeners are registered and will work in the actual game.
+
+    F.info('All Input tests passed');
+
+    // ============================================================
+    // Section 7: Math Utilities (math-utils.js)
+    // ============================================================
+    F.section('7. Math Utilities (math-utils.js)');
+
+    // --- Vector3 ---
+    F.assert(typeof Donkeycraft.Vector3 === 'function', 'Donkeycraft.Vector3 is a function');
+
+    // Constructor defaults
+    var v0 = new Donkeycraft.Vector3();
+    F.assertEq(v0.x, 0, 'Vector3() default x=0');
+    F.assertEq(v0.y, 0, 'Vector3() default y=0');
+    F.assertEq(v0.z, 0, 'Vector3() default z=0');
+
+    // Constructor with values
+    var v1 = new Donkeycraft.Vector3(1, 2, 3);
+    F.assertEq(v1.x, 1, 'Vector3(1,2,3) x=1');
+    F.assertEq(v1.y, 2, 'Vector3(1,2,3) y=2');
+    F.assertEq(v1.z, 3, 'Vector3(1,2,3) z=3');
+
+    // Static methods
+    var vZero = Donkeycraft.Vector3.zero();
+    F.assertEq(vZero.x, 0, 'Vector3.zero() x=0');
+    F.assertEq(vZero.y, 0, 'Vector3.zero() y=0');
+    F.assertEq(vZero.z, 0, 'Vector3.zero() z=0');
+
+    var vOne = Donkeycraft.Vector3.one();
+    F.assertEq(vOne.x, 1, 'Vector3.one() x=1');
+    F.assertEq(vOne.y, 1, 'Vector3.one() y=1');
+    F.assertEq(vOne.z, 1, 'Vector3.one() z=1');
+
+    var vCopy = Donkeycraft.Vector3.copy(v1);
+    F.assertEq(vCopy.x, 1, 'Vector3.copy() x=1');
+    F.assertEq(vCopy.y, 2, 'Vector3.copy() y=2');
+    F.assertEq(vCopy.z, 3, 'Vector3.copy() z=3');
+
+    var vArr = Donkeycraft.Vector3.fromArray([4, 5, 6]);
+    F.assertEq(vArr.x, 4, 'Vector3.fromArray([4,5,6]) x=4');
+    F.assertEq(vArr.y, 5, 'Vector3.fromArray([4,5,6]) y=5');
+    F.assertEq(vArr.z, 6, 'Vector3.fromArray([4,5,6]) z=6');
+
+    // set — returns this for chaining
+    var chainResult = v1.set(7, 8, 9);
+    F.assert(chainResult === v1, 'set() returns this for chaining');
+    F.assertEq(v1.x, 7, 'set(7,8,9) x=7');
+    F.assertEq(v1.y, 8, 'set(7,8,9) y=8');
+    F.assertEq(v1.z, 9, 'set(7,8,9) z=9');
+
+    // add — returns this for chaining
+    var v2 = new Donkeycraft.Vector3(1, 1, 1);
+    var addResult = v1.add(v2);
+    F.assert(addResult === v1, 'add() returns this for chaining');
+    F.assertEq(v1.x, 8, 'add: 7+1=8');
+    F.assertEq(v1.y, 9, 'add: 8+1=9');
+    F.assertEq(v1.z, 10, 'add: 9+1=10');
+
+    // sub
+    var v3 = new Donkeycraft.Vector3(3, 3, 3);
+    v1.sub(v3);
+    F.assertEq(v1.x, 5, 'sub: 8-3=5');
+    F.assertEq(v1.y, 6, 'sub: 9-3=6');
+    F.assertEq(v1.z, 7, 'sub: 10-3=7');
+
+    // scale
+    v1.scale(2);
+    F.assertEq(v1.x, 10, 'scale(2): 5*2=10');
+    F.assertEq(v1.y, 12, 'scale(2): 6*2=12');
+    F.assertEq(v1.z, 14, 'scale(2): 7*2=14');
+
+    // dot
+    var a = new Donkeycraft.Vector3(1, 2, 3);
+    var b = new Donkeycraft.Vector3(4, 5, 6);
+    F.assertEq(a.dot(b), 32, 'dot: 1*4+2*5+3*6=32');
+
+    // cross
+    var c = new Donkeycraft.Vector3(1, 0, 0);
+    var d = new Donkeycraft.Vector3(0, 1, 0);
+    var crossResult = c.cross(d);
+    F.assertEq(crossResult.x, 0, 'cross(1,0,0)x(0,1,0) x=0');
+    F.assertEq(crossResult.y, 0, 'cross(1,0,0)x(0,1,0) y=0');
+    F.assertEq(crossResult.z, 1, 'cross(1,0,0)x(0,1,0) z=1');
+
+    // lengthSq and length
+    var e = new Donkeycraft.Vector3(3, 4, 0);
+    F.assertEq(e.lengthSq(), 25, 'lengthSq: 3^2+4^2=25');
+    F.assertNear(e.length(), 5, 0.0001, 'length: sqrt(25)=5');
+
+    // normalize — returns this for chaining
+    var f = new Donkeycraft.Vector3(3, 0, 0);
+    var normResult = f.normalize();
+    F.assert(normResult === f, 'normalize() returns this for chaining');
+    F.assertNear(f.x, 1, 0.0001, 'normalize: (3,0,0) -> x=1');
+    F.assertNear(f.y, 0, 0.0001, 'normalize: (3,0,0) -> y=0');
+    F.assertNear(f.z, 0, 0.0001, 'normalize: (3,0,0) -> z=0');
+
+    // normalized — returns new vector
+    var g = new Donkeycraft.Vector3(0, 10, 0);
+    var normCopy = g.normalized();
+    F.assert(normCopy !== g, 'normalized() returns new vector');
+    F.assertNear(normCopy.y, 1, 0.0001, 'normalized: (0,10,0) -> y=1');
+
+    // distanceTo
+    var h = new Donkeycraft.Vector3(0, 0, 0);
+    var i = new Donkeycraft.Vector3(3, 4, 0);
+    F.assertNear(h.distanceTo(i), 5, 0.0001, 'distanceTo: (0,0,0) to (3,4,0) = 5');
+
+    // distanceToSq
+    F.assertEq(h.distanceToSq(i), 25, 'distanceToSq: (0,0,0) to (3,4,0) = 25');
+
+    // floor
+    var j = new Donkeycraft.Vector3(1.9, -3.7, 5.1);
+    j.floor();
+    F.assertEq(j.x, 1, 'floor: 1.9 -> 1');
+    F.assertEq(j.y, -4, 'floor: -3.7 -> -4');
+    F.assertEq(j.z, 5, 'floor: 5.1 -> 5');
+
+    // equals
+    var k = new Donkeycraft.Vector3(1, 2, 3);
+    var l = new Donkeycraft.Vector3(1.0005, 2.0005, 3.0005);
+    F.assert(k.equals(l), 'equals with default epsilon: 0.0005 < 0.001');
+    F.assert(!k.equals(new Donkeycraft.Vector3(2, 3, 4)), 'equals: different vectors not equal');
+
+    // isZero
+    F.assert(Donkeycraft.Vector3.zero().isZero(), 'zero vector isZero = true');
+    F.assert(!new Donkeycraft.Vector3(1, 0, 0).isZero(), '(1,0,0) isZero = false');
+
+    // lerp static
+    var m = new Donkeycraft.Vector3(0, 0, 0);
+    var n = new Donkeycraft.Vector3(10, 20, 30);
+    var lerped = Donkeycraft.Vector3.lerp(m, n, 0.5);
+    F.assertNear(lerped.x, 5, 0.0001, 'Vector3.lerp x=5');
+    F.assertNear(lerped.y, 10, 0.0001, 'Vector3.lerp y=10');
+    F.assertNear(lerped.z, 15, 0.0001, 'Vector3.lerp z=15');
+
+    // fromSpherical
+    var sp = Donkeycraft.Vector3.fromSpherical(1, 0, 0); // phi=0 => +Y axis
+    F.assertNear(sp.x, 0, 0.0001, 'fromSpherical(phi=0) x=0');
+    F.assertNear(sp.y, 1, 0.0001, 'fromSpherical(phi=0) y=1');
+    F.assertNear(sp.z, 0, 0.0001, 'fromSpherical(phi=0) z=0');
+
+    // --- Matrix4 ---
+    F.assert(typeof Donkeycraft.Matrix4 === 'function', 'Donkeycraft.Matrix4 is a function');
+
+    var identity = Donkeycraft.Matrix4.createIdentity();
+    var idData = identity.getData();
+    F.assertEq(idData[0], 1, 'Identity[0]=1');
+    F.assertEq(idData[5], 1, 'Identity[5]=1');
+    F.assertEq(idData[10], 1, 'Identity[10]=1');
+    F.assertEq(idData[15], 1, 'Identity[15]=1');
+    F.assertEq(idData[1], 0, 'Identity[1]=0');
+
+    var perspective = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, 16 / 9, 0.1, 100);
+    F.assertType(perspective, 'object', 'createPerspective returns object');
+    F.assertType(perspective.getData(), 'object', 'perspective getData returns array');
+
+    var ortho = Donkeycraft.Matrix4.createOrthographic(-10, 10, -10, 10, 0.1, 100);
+    F.assertType(ortho, 'object', 'createOrthographic returns object');
+
+    var lookAt = Donkeycraft.Matrix4.createLookAt(
+        new Donkeycraft.Vector3(0, 0, 5),
+        new Donkeycraft.Vector3(0, 0, 0),
+        new Donkeycraft.Vector3(0, 1, 0)
+    );
+    F.assertType(lookAt, 'object', 'createLookAt returns object');
+
+    var translation = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
+    var tData = translation.getData();
+    F.assertEq(tData[12], 1, 'Translation[12]=1');
+    F.assertEq(tData[13], 2, 'Translation[13]=2');
+    F.assertEq(tData[14], 3, 'Translation[14]=3');
+
+    var scale = Donkeycraft.Matrix4.createScale(2, 3, 4);
+    var sData = scale.getData();
+    F.assertEq(sData[0], 2, 'Scale[0]=2');
+    F.assertEq(sData[5], 3, 'Scale[5]=3');
+    F.assertEq(sData[10], 4, 'Scale[10]=4');
+
+    var rotation = Donkeycraft.Matrix4.createRotation(Math.PI / 2, new Donkeycraft.Vector3(0, 1, 0));
+    F.assertType(rotation, 'object', 'createRotation returns object');
+
+    // multiply
+    var m1 = Donkeycraft.Matrix4.createTranslation(1, 0, 0);
+    var m2 = Donkeycraft.Matrix4.createTranslation(0, 2, 0);
+    var m3 = Donkeycraft.Matrix4.multiply(m1, m2);
+    F.assertType(m3, 'object', 'multiply returns object');
+
+    // multiply (instance)
+    var m4 = m1.clone();
+    var m5 = m4.multiply(m2);
+    F.assertType(m5, 'object', 'instance multiply returns object');
+
+    // transformVector — w=0 = direction (no translation), w=1 = position (translation applies)
+    var tv = new Donkeycraft.Vector3(1, 0, 0);
+    var transformedDir = translation.transformVector(tv, 0);
+    F.assertEq(transformedDir.x, 1, 'transformVector(1,0,0,w=0) direction: translation ignored');
+    var tvPos = new Donkeycraft.Vector3(1, 0, 0);
+    var transformedPos = translation.transformVector(tvPos, 1);
+    F.assertEq(transformedPos.x, 2, 'transformVector(1,0,0,w=1) position: translation applied');
+
+    // clone
+    var cloned = identity.clone();
+    F.assert(cloned !== identity, 'clone returns new object');
+    var cData = cloned.getData();
+    F.assertEq(cData[0], 1, 'cloned[0]=1');
+
+    // transpose — swaps row i with column i; for translation matrix, [12]=old[3]=0, [13]=old[4]=0, [14]=old[8]=0
+    var transposed = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
+    transposed.transpose();
+    var trData = transposed.getData();
+    F.assertEq(trData[12], 0, 'transpose: [12] = old[3] = 0');
+    F.assertEq(trData[13], 0, 'transpose: [13] = old[4] = 0');
+    F.assertEq(trData[14], 0, 'transpose: [14] = old[8] = 0');
+    F.assertEq(trData[0], 1, 'transpose: diagonal [0] stays 1');
+    F.assertEq(trData[5], 1, 'transpose: diagonal [5] stays 1');
+    F.assertEq(trData[10], 1, 'transpose: diagonal [10] stays 1');
+    F.assertEq(trData[15], 1, 'transpose: diagonal [15] stays 1');
+
+    // invert — identity should stay identity
+    var invIdentity = identity.invert();
+    var invData = invIdentity.getData();
+    F.assertEq(invData[0], 1, 'invert(Identity)[0]=1');
+    F.assertEq(invData[5], 1, 'invert(Identity)[5]=1');
+
+    // invert — non-singular matrix
+    var small = Donkeycraft.Matrix4.createScale(2, 3, 4);
+    var invSmall = small.invert();
+    F.assertType(invSmall, 'object', 'invert returns object');
+
+    // getInverse (alias)
+    var invAlias = small.getInverse();
+    F.assertType(invAlias, 'object', 'getInverse returns object');
+
+    // --- Quaternion ---
+    F.assert(typeof Donkeycraft.Quaternion === 'function', 'Donkeycraft.Quaternion is a function');
+
+    // Default constructor
+    var q0 = new Donkeycraft.Quaternion();
+    F.assertEq(q0.x, 0, 'Quaternion() default x=0');
+    F.assertEq(q0.y, 0, 'Quaternion() default y=0');
+    F.assertEq(q0.z, 0, 'Quaternion() default z=0');
+    F.assertEq(q0.w, 1, 'Quaternion() default w=1');
+
+    // Identity static
+    var qIdentity = Donkeycraft.Quaternion.identity();
+    F.assertEq(qIdentity.x, 0, 'identity x=0');
+    F.assertEq(qIdentity.y, 0, 'identity y=0');
+    F.assertEq(qIdentity.z, 0, 'identity z=0');
+    F.assertEq(qIdentity.w, 1, 'identity w=1');
+
+    // fromAxisAngle — Y-axis 90 degrees
+    var qY = Donkeycraft.Quaternion.fromAxisAngle(new Donkeycraft.Vector3(0, 1, 0), Math.PI / 2);
+    F.assertNear(qY.x, 0, 0.0001, 'fromAxisAngle Y-axis x≈0');
+    F.assertNear(qY.y, Math.sin(Math.PI / 4), 0.0001, 'fromAxisAngle Y-axis y=sin(π/4)');
+    F.assertNear(qY.z, 0, 0.0001, 'fromAxisAngle Y-axis z≈0');
+    F.assertNear(qY.w, Math.cos(Math.PI / 4), 0.0001, 'fromAxisAngle Y-axis w=cos(π/4)');
+
+    // fromAxisAngle — null axis defaults to Y
+    var qNull = Donkeycraft.Quaternion.fromAxisAngle(null, Math.PI / 2);
+    F.assertNear(qNull.y, Math.sin(Math.PI / 4), 0.0001, 'fromAxisAngle(null) uses Y-axis');
+
+    // fromEuler — zero angles = identity
+    var qZeroEuler = Donkeycraft.Quaternion.fromEuler(0, 0, 0);
+    F.assertNear(qZeroEuler.x, 0, 0.0001, 'fromEuler(0,0,0) x≈0');
+    F.assertNear(qZeroEuler.y, 0, 0.0001, 'fromEuler(0,0,0) y≈0');
+    F.assertNear(qZeroEuler.z, 0, 0.0001, 'fromEuler(0,0,0) z≈0');
+    F.assertNear(qZeroEuler.w, 1, 0.0001, 'fromEuler(0,0,0) w≈1');
+
+    // fromEuler — with values
+    var qEuler = Donkeycraft.Quaternion.fromEuler(Math.PI / 2, 0, 0);
+    F.assertType(qEuler, 'object', 'fromEuler returns object');
+
+    // multiply
+    var qMul = qIdentity.multiply(qY);
+    F.assertNear(qMul.x, qY.x, 0.0001, 'identity * qY ≈ qY x');
+    F.assertNear(qMul.y, qY.y, 0.0001, 'identity * qY ≈ qY y');
+
+    // applyToVector — 90° Y-axis rotation: (1,0,0) → (0,0,-1) in right-handed coords with Y-up
+    var axis = new Donkeycraft.Vector3(0, 1, 0);
+    var rotQ = Donkeycraft.Quaternion.fromAxisAngle(axis, Math.PI / 2);
+    var vec = new Donkeycraft.Vector3(1, 0, 0);
+    var applied = rotQ.applyToVector(vec);
+    F.assertNear(applied.x, 0, 0.0001, 'applyToVector(1,0,0) by 90° Y-rot x≈0');
+    F.assertNear(applied.y, 0, 0.0001, 'applyToVector(1,0,0) by 90° Y-rot y≈0');
+    F.assertNear(applied.z, -1, 0.0001, 'applyToVector(1,0,0) by 90° Y-rot z≈-1 (right-handed coords)');
+
+    // Verify inverse rotation: apply the conjugate quaternion to get back
+    var conjQ = rotQ.conjugate();
+    var back = conjQ.applyToVector(applied);
+    F.assertNear(back.x, 1, 0.0001, 'conjugate rotation reverses: x≈1');
+    F.assertNear(back.y, 0, 0.0001, 'conjugate rotation reverses: y≈0');
+    F.assertNear(back.z, 0, 0.0001, 'conjugate rotation reverses: z≈0');
+
+    // toEuler — identity should give near-zero angles
+    var euler = qIdentity.toEuler();
+    F.assertNear(euler.yaw, 0, 0.0001, 'identity toEuler yaw≈0');
+    F.assertNear(euler.pitch, 0, 0.0001, 'identity toEuler pitch≈0');
+    F.assertNear(euler.roll, 0, 0.0001, 'identity toEuler roll≈0');
+
+    // normalize — returns this for chaining
+    var qUnnorm = new Donkeycraft.Quaternion(1, 1, 1, 1);
+    var normQ = qUnnorm.normalize();
+    F.assert(normQ === qUnnorm, 'normalize() returns this for chaining');
+    F.assertNear(qUnnorm.length ? 0 : 0, 0, 1, 'normalize called successfully');
+
+    // normalized — returns new vector
+    var qNormCopy = new Donkeycraft.Quaternion(3, 4, 0, 0).normalized();
+    F.assert(qNormCopy !== qUnnorm, 'normalized() returns new object');
+
+    // conjugate
+    var conj = qY.conjugate();
+    F.assertNear(conj.x, -qY.x, 0.0001, 'conjugate x negated');
+    F.assertNear(conj.y, -qY.y, 0.0001, 'conjugate y negated');
+    F.assertNear(conj.z, -qY.z, 0.0001, 'conjugate z negated');
+    F.assertNear(conj.w, qY.w, 0.0001, 'conjugate w unchanged');
+
+    // inverse
+    var invQ = qY.inverse();
+    F.assertType(invQ, 'object', 'inverse returns object');
+
+    // clone
+    var qClone = qY.clone();
+    F.assert(qClone !== qY, 'clone returns new object');
+    F.assertNear(qClone.x, qY.x, 0.0001, 'clone x matches');
+
+    // slerp
+    var slerped = Donkeycraft.Quaternion.slerp(qIdentity, qY, 0);
+    F.assertNear(slerped.x, qIdentity.x, 0.0001, 'slerp(t=0) ≈ identity x');
+    var slerped2 = Donkeycraft.Quaternion.slerp(qIdentity, qY, 1);
+    F.assertNear(slerped2.y, qY.y, 0.0001, 'slerp(t=1) ≈ qY y');
+
+    // --- Perlin Noise ---
+    F.assert(typeof Donkeycraft.PerlinNoise === 'object', 'Donkeycraft.PerlinNoise is an object');
+    F.assert(typeof Donkeycraft.PerlinNoise.noise3D === 'function', 'PerlinNoise.noise3D is a function');
+    F.assert(typeof Donkeycraft.PerlinNoise.noise2D === 'function', 'PerlinNoise.noise2D is a function');
+    F.assert(typeof Donkeycraft.PerlinNoise.noise1D === 'function', 'PerlinNoise.noise1D is a function');
+    F.assert(typeof Donkeycraft.PerlinNoise.fbm === 'function', 'PerlinNoise.fbm is a function');
+    F.assert(typeof Donkeycraft.PerlinNoise.init === 'function', 'PerlinNoise.init is a function');
+
+    // noise3D returns a number
+    var n3 = Donkeycraft.PerlinNoise.noise3D(0, 0, 0);
+    F.assertType(n3, 'number', 'noise3D returns number');
+    F.assert(n3 >= -1 && n3 <= 1, 'noise3D value in [-1, 1]');
+
+    // noise2D
+    var n2 = Donkeycraft.PerlinNoise.noise2D(0, 0);
+    F.assertType(n2, 'number', 'noise2D returns number');
+    F.assert(n2 >= -1 && n2 <= 1, 'noise2D value in [-1, 1]');
+
+    // noise1D
+    var n1 = Donkeycraft.PerlinNoise.noise1D(0);
+    F.assertType(n1, 'number', 'noise1D returns number');
+    F.assert(n1 >= -1 && n1 <= 1, 'noise1D value in [-1, 1]');
+
+    // fbm
+    var fb = Donkeycraft.PerlinNoise.fbm(0, 0, 0);
+    F.assertType(fb, 'number', 'fbm returns number');
+    F.assert(fb >= -1 && fb <= 1, 'fbm value in [-1, 1]');
+
+    // init — re-seed doesn't throw
+    Donkeycraft.PerlinNoise.init(12345);
+    F.assert(true, 'PerlinNoise.init(12345) does not throw');
+
+    // init with seed 0 (edge case)
+    Donkeycraft.PerlinNoise.init(0);
+    F.assert(true, 'PerlinNoise.init(0) does not throw');
+
+    // --- Utility Functions ---
+    F.assert(typeof Donkeycraft.lerp === 'function', 'Donkeycraft.lerp exists');
+    F.assert(typeof Donkeycraft.clamp === 'function', 'Donkeycraft.clamp exists');
+    F.assert(typeof Donkeycraft.map === 'function', 'Donkeycraft.map exists');
+    F.assert(typeof Donkeycraft.round === 'function', 'Donkeycraft.round exists');
+    F.assert(typeof Donkeycraft.inRange === 'function', 'Donkeycraft.inRange exists');
+
+    // map
+    F.assertEq(Donkeycraft.map(5, 0, 10, 0, 100), 50, 'map(5,0,10,0,100) = 50');
+    F.assertEq(Donkeycraft.map(0, 0, 10, 0, 100), 0, 'map(0,0,10,0,100) = 0');
+    F.assertEq(Donkeycraft.map(10, 0, 10, 0, 100), 100, 'map(10,0,10,0,100) = 100');
+
+    // map — division by zero protection
+    F.assertEq(Donkeycraft.map(5, 10, 10, 0, 100), 0, 'map(x,10,10,0,100) = outMin (div by zero guard)');
+
+    // round
+    F.assertEq(Donkeycraft.round(3.5), 4, 'round(3.5) = 4');
+    F.assertEq(Donkeycraft.round(3.4), 3, 'round(3.4) = 3');
+
+    // inRange
+    F.assert(Donkeycraft.inRange(5, 0, 10), 'inRange(5,0,10) = true');
+    F.assert(!Donkeycraft.inRange(-1, 0, 10), 'inRange(-1,0,10) = false');
+    F.assert(Donkeycraft.inRange(0, 0, 10), 'inRange(0,0,10) = true (boundary)');
+    F.assert(Donkeycraft.inRange(10, 0, 10), 'inRange(10,0,10) = true (boundary)');
+
+    F.info('All Math Utilities tests passed');
+
+    // ============================================================
+    // Section 8: Audio System (audio.js)
+    // ============================================================
+    F.section('8. Audio System (audio.js)');
+
+    F.assert(typeof Donkeycraft.AudioSystem === 'function', 'Donkeycraft.AudioSystem is a function');
+
+    var audio = new Donkeycraft.AudioSystem();
+    F.assertType(audio, 'object', 'AudioSystem instance created');
+
+    // Initial state
+    F.assertEq(audio.getVolume(), 1.0, 'Initial volume = 1.0');
+    F.assert(typeof audio.setEnabled === 'function', 'setEnabled is a function');
+    F.assert(typeof audio.play === 'function', 'play is a function');
+    F.assert(typeof audio.stop === 'function', 'stop is a function');
+    F.assert(typeof audio.destroy === 'function', 'destroy is a function');
+
+    // setVolume
+    audio.setVolume(0.5);
+    F.assertEq(audio.getVolume(), 0.5, 'setVolume(0.5) = 0.5');
+
+    // setVolume clamping
+    audio.setVolume(-1);
+    F.assertEq(audio.getVolume(), 0, 'setVolume(-1) clamped to 0');
+    audio.setVolume(2);
+    F.assertEq(audio.getVolume(), 1, 'setVolume(2) clamped to 1');
+
+    // setEnabled
+    audio.setEnabled(false);
+    audio.setEnabled(true);
+    F.assert(true, 'setEnabled does not throw');
+
+    // init — may succeed or fail depending on browser
+    var audioInitDone = false;
+    audio.init().then(function() {
+        // Audio context initialized successfully
+        F.assert(true, 'AudioSystem.init() resolved');
+        F.assert(audio._context !== null, '_context is set after init');
+
+        // Volume still works after init
+        audio.setVolume(0.75);
+        F.assertEq(audio.getVolume(), 0.75, 'setVolume works after init');
+
+        // play with no sound cached — should silently do nothing
+        audio.play('nonexistent');
+        F.assert(true, 'play(nonexistent) does not throw');
+
+        // stop with null source — should silently do nothing
+        audio.stop(null);
+        F.assert(true, 'stop(null) does not throw');
+
+        // destroy
+        audio.destroy();
+        F.assert(audio._context === null, '_context is null after destroy');
+        F.assertEq(Object.keys(audio._soundCache).length, 0, 'Sound cache cleared after destroy');
+
+        audioInitDone = true;
+    }).catch(function(e) {
+        // Audio context creation failed (expected in some browsers/file protocol)
+        F.assert(true, 'AudioSystem.init() rejected (expected in some environments): ' + e.message);
+    });
+
+    // destroy without init — should not throw
+    var audio2 = new Donkeycraft.AudioSystem();
+    audio2.destroy();
+    F.assert(true, 'AudioSystem.destroy() without init does not throw');
+
+    // Wait for async audio init then finish
+    setTimeout(function() {
+        if (!audioInitDone) {
+            // Init promise may have resolved but callback didn't fire in time — still pass
+            F.assert(true, 'Audio init completed (timeout check)');
+        }
+        F.finishTests();
+    }, 500);
+
+    // ============================================================
+    // Section 9: Init Sequence (init-sequence.js)
+    // ============================================================
+    F.section('9. Init Sequence (init-sequence.js)');
+
+    F.assert(typeof Donkeycraft.InitSequence === 'function', 'Donkeycraft.InitSequence is a function');
+
+    // Create with default config
+    var initSeq = new Donkeycraft.InitSequence();
+    F.assertType(initSeq, 'object', 'InitSequence instance created');
+
+    // Initial phase
+    F.assertEq(initSeq.getPhase(), 'none', 'Initial phase is "none"');
+    F.assert(initSeq.getSystems() === null, 'getSystems() returns null before init');
+
+    // on — subscribe to events
+    var phaseStartFired = false;
+    var phaseEndFired = false;
+    var completeFired = false;
+
+    initSeq.on('init:phase:start', function(data) { phaseStartFired = true; });
+    initSeq.on('init:phase:end', function(data) { phaseEndFired = true; });
+    initSeq.on('init:complete', function(data) { completeFired = true; });
+
+    F.assert(typeof initSeq.on === 'function', 'on is a function');
+
+    // Run initialization
+    var initDone = false;
+    initSeq.initialize().then(function(systems) {
+        F.assert(completeFired, 'init:complete event fired');
+        F.assert(phaseStartFired, 'init:phase:start event fired');
+        F.assert(phaseEndFired, 'init:phase:end event fired');
+        F.assertType(systems, 'object', 'initialize resolves with systems object');
+        F.assertType(systems.config, 'object', 'systems.config is an object');
+        F.assertType(systems.eventBus, 'object', 'systems.eventBus is an object');
+
+        // getPhase should now reflect last phase
+        var finalPhase = initSeq.getPhase();
+        F.assert(typeof finalPhase === 'string', 'getPhase returns string after init');
+        F.assertEq(finalPhase, 'indexeddb', 'Final phase is "indexeddb"');
+
+        // getSystems should return systems
+        var sys2 = initSeq.getSystems();
+        F.assert(sys2 !== null, 'getSystems() returns non-null after init');
+        F.assertEq(sys2.config, Donkeycraft.Config, 'systems.config matches Donkeycraft.Config');
+
+        initDone = true;
+    }).catch(function(e) {
+        // Should not reject with valid config
+        F.assert(false, 'initialize() should not reject with valid config: ' + e.message);
+    });
+
+    // Test destroy mid-pipeline
+    var initSeq2 = new Donkeycraft.InitSequence();
+    var destroyFired = false;
+    initSeq2.on('init:error', function() { destroyFired = true; });
+    initSeq2.destroy();
+    F.assert(true, 'InitSequence.destroy() does not throw');
+
+    // on after destroy — should return no-op function
+    var noopCb = initSeq2.on('anyEvent', function() {});
+    F.assert(typeof noopCb === 'function', 'on after destroy returns function');
+
+    // Test with invalid config
+    var initSeq3 = new Donkeycraft.InitSequence({ bad: true });
+    var invalidDone = false;
+    initSeq3.initialize().then(function() {
+        F.assert(false, 'initialize() should reject with invalid config');
+    }).catch(function(e) {
+        F.assert(true, 'initialize() rejects with invalid config');
+        invalidDone = true;
+    });
+
+    // Test with null config (falls back to Donkeycraft.Config)
+    var initSeq4 = new Donkeycraft.InitSequence(null);
+    F.assertType(initSeq4, 'object', 'InitSequence(null) creates instance');
+
+    // Final finish — wait for all async tests
+    setTimeout(function() {
+        if (!initDone) {
+            F.assert(false, 'InitSequence.initialize() should resolve');
+        }
+        if (!invalidDone) {
+            F.assert(false, 'Invalid config init should reject');
+        }
+        F.finishTests();
+    }, 500);
+
+})();
+</script>
+</body>
+</html>

@@ -274,8 +274,14 @@
 
     /**
      * Destroy the input handler and remove all event listeners.
+     * Releases pointer lock if active, clears all internal state.
      */
     Donkeycraft.Input.prototype.destroy = function() {
+        // Release pointer lock if active to prevent browser from staying locked
+        if (this._mouseCaptured) {
+            this.releaseMouse();
+        }
+
         window.removeEventListener('keydown', this._onKeyDown);
         window.removeEventListener('keyup', this._onKeyUp);
         window.removeEventListener('mousedown', this._onMouseDown);
@@ -294,6 +300,14 @@
         this._mouseButtonJustPressedRaw = {};
         this._mouseButtonLastFrame = {};
         this._mouseState = null;
+        this._onKeyDown = null;
+        this._onKeyUp = null;
+        this._onMouseDown = null;
+        this._onMouseUp = null;
+        this._onMouseMove = null;
+        this._onWheel = null;
+        this._onContextMenu = null;
+        this._onPointerLockChange = null;
     };
 
     // ============================================================

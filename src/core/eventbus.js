@@ -86,7 +86,7 @@
         if (!this._listeners[key]) return;
 
         this._listeners[key] = this._listeners[key].filter(function(entry) {
-            return entry.callback !== callback && entry._originalCallback !== callback;
+            return !(entry.callback === callback || entry._originalCallback === callback);
         });
 
         // Clean up empty arrays to prevent memory leaks

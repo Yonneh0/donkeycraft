@@ -100,6 +100,32 @@
     };
 
     /**
+     * Get the total frame count since timer creation.
+     * @returns {number}
+     */
+    Donkeycraft.Timer.prototype.getFrameCount = function() {
+        return this._frameCount || 0;
+    };
+
+    /**
+     * Destroy the timer and free all resources.
+     * Stops the loop, clears all callbacks, and nullifies internal references.
+     */
+    Donkeycraft.Timer.prototype.destroy = function() {
+        this.stop();
+        this._tickCallbacks = [];
+        this._renderCallbacks = [];
+        this._accumulator = 0;
+        this._tickCount = 0;
+        this._deltaTime = 0;
+        this._lastFrameTime = 0;
+        this._frameCount = 0;
+        this._fps = 0;
+        this._fpsTimer = 0;
+        this._running = false;
+    };
+
+    /**
      * Main loop — called each frame by requestAnimationFrame.
      * @param {number} currentTime - performance.now() timestamp.
      * @private

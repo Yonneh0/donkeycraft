@@ -150,28 +150,40 @@
         // Positional audio: create panner if position provided and API is available
         var panner = null;
         if (options.position && this._context.createPanner) {
-            panner = this._context.createPanner();
-            panner.panningModel = 'HRTF';
-            panner.distanceModel = 'inverse';
+            try {
+                panner = this._context.createPanner();
 
-            // Use setPosition() if available (modern API), fall back to direct AudioParam access
-            if (typeof panner.setPosition === 'function') {
-                panner.setPosition(options.position.x, options.position.y, options.position.z);
-            } else if (panner.positionX) {
-                panner.positionX.value = options.position.x;
-                panner.positionY.value = options.position.y;
-                panner.positionZ.value = options.position.z;
+                // Use safe fallback values — some browsers don't support 'HRTF'/'inverse'
+                if (typeof panner.panningModel !== 'undefined') {
+                    try { panner.panningModel = 'HRTF'; } catch (e2) { panner.panningModel = 'equal-power'; }
+                }
+                if (typeof panner.distanceModel !== 'undefined') {
+                    try { panner.distanceModel = 'inverse'; } catch (e3) { panner.distanceModel = 'linear'; }
+                }
+
+                // Use setPosition() if available (modern API), fall back to direct AudioParam access
+                if (typeof panner.setPosition === 'function') {
+                    panner.setPosition(options.position.x, options.position.y, options.position.z);
+                } else if (panner.positionX) {
+                    panner.positionX.value = options.position.x;
+                    panner.positionY.value = options.position.y;
+                    panner.positionZ.value = options.position.z;
+                }
+
+                panner.maxDistance = options.maxDistance || 16;
+                panner.refDistance = 1;
+                panner.coneInnerAngle = 360;
+                panner.coneOuterAngle = 0;
+                panner.coneOuterGain = 0;
+
+                source.connect(gainNode);
+                gainNode.connect(panner);
+                panner.connect(this._masterGain);
+            } catch (e) {
+                // Panner creation failed — fall back to non-posional audio
+                source.connect(gainNode);
+                gainNode.connect(this._masterGain);
             }
-
-            panner.maxDistance = options.maxDistance || 16;
-            panner.refDistance = 1;
-            panner.coneInnerAngle = 360;
-            panner.coneOuterAngle = 0;
-            panner.coneOuterGain = 0;
-
-            source.connect(gainNode);
-            gainNode.connect(panner);
-            panner.connect(this._masterGain);
         } else {
             source.connect(gainNode);
             gainNode.connect(this._masterGain);
