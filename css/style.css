@@ -1,0 +1,256 @@
+/* Donkeycraft — Base Styles */
+/* Full-screen canvas, overlay positioning, cursor, scrollbar hiding */
+
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: #000;
+    color: #e0e0e0;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* WebGL Canvas */
+#dk-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    cursor: none;
+}
+
+/* Pointer lock indicator */
+#dk-canvas:pointer-lock {
+    cursor: none;
+}
+
+/* Game overlay container — sits on top of canvas */
+#dk-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Overlay elements that need to receive mouse events */
+#dk-overlay .dk-interactive {
+    pointer-events: auto;
+}
+
+/* Crosshair — centered on screen */
+#dk-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    z-index: 20;
+}
+
+#dk-crosshair::before,
+#dk-crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+#dk-crosshair::before {
+    top: 50%;
+    left: 2px;
+    right: 2px;
+    height: 2px;
+    transform: translateY(-50%);
+}
+
+#dk-crosshair::after {
+    left: 50%;
+    top: 2px;
+    bottom: 2px;
+    width: 2px;
+    transform: translateX(-50%);
+}
+
+/* Debug overlay (F3) */
+#dk-debug-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 12px;
+    border-radius: 4px;
+    white-space: pre;
+    display: none;
+    max-width: 400px;
+}
+
+#dk-debug-overlay.visible {
+    display: block;
+}
+
+/* Loading screen */
+#dk-loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #2c1e0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+#dk-loading-screen .dk-loading-title {
+    font-size: 2em;
+    color: #f1c40f;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#dk-loading-screen .dk-progress-bar-container {
+    width: 300px;
+    height: 20px;
+    background: #1a1a1a;
+    border: 2px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+#dk-loading-screen .dk-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    transition: width 0.3s ease;
+}
+
+#dk-loading-screen .dk-progress-text {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 16px;
+}
+
+#dk-loading-screen .dk-tip {
+    font-size: 0.85em;
+    color: #888;
+    font-style: italic;
+    max-width: 300px;
+    text-align: center;
+}
+
+#dk-loading-screen .dk-error {
+    color: #e74c3c;
+    font-size: 0.9em;
+    margin-top: 12px;
+    display: none;
+}
+
+#dk-loading-screen .dk-error.visible {
+    display: block;
+}
+
+/* GUI modal backdrop */
+#dk-gui-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    z-index: 30;
+}
+
+#dk-gui-backdrop.visible {
+    display: block;
+}
+
+/* Scrollbar hiding */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Selection prevention */
+#dk-overlay * {
+    -webkit-touch-callout: none;
+}
+
+/* Error screen */
+#dk-error-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #1a0a0a;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+#dk-error-screen.visible {
+    display: flex;
+}
+
+#dk-error-screen .dk-error-title {
+    color: #e74c3c;
+    font-size: 1.5em;
+    margin-bottom: 12px;
+}
+
+#dk-error-screen .dk-error-message {
+    color: #ccc;
+    font-size: 0.9em;
+    max-width: 500px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+#dk-error-screen .dk-retry-btn {
+    margin-top: 20px;
+    padding: 10px 30px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+#dk-error-screen .dk-retry-btn:hover {
+    background: #c0392b;
+}

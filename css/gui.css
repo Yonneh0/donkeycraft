@@ -1,0 +1,632 @@
+/* Donkeycraft — GUI Styles */
+/* Inventory grid, hotbar, buttons, text, scroll containers */
+
+/* ============================================================
+   HOTBAR
+   ============================================================ */
+
+.dk-hotbar {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dk-hotbar-slot {
+    width: 48px;
+    height: 48px;
+    background: rgba(100, 100, 100, 0.6);
+    border: 2px solid #555;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.1s ease;
+}
+
+.dk-hotbar-slot:hover {
+    border-color: #888;
+}
+
+.dk-hotbar-slot.selected {
+    border-color: #fff;
+    border-width: 3px;
+    background: rgba(150, 150, 150, 0.7);
+}
+
+.dk-slot-item {
+    font-size: 24px;
+    text-align: center;
+    line-height: 1;
+    pointer-events: none;
+}
+
+.dk-slot-count {
+    position: absolute;
+    bottom: 1px;
+    left: 3px;
+    font-size: 11px;
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+    pointer-events: none;
+}
+
+.dk-slot-number {
+    position: absolute;
+    top: 1px;
+    left: 3px;
+    font-size: 10px;
+    color: #aaa;
+    text-shadow: 1px 1px 1px #000;
+    pointer-events: none;
+}
+
+/* ============================================================
+   INVENTORY GRID
+   ============================================================ */
+
+.dk-inventory-grid {
+    display: grid;
+    gap: 2px;
+    padding: 4px;
+}
+
+.dk-inventory-grid.grid-9x1 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x3 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x4 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x5 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x6 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-slot {
+    width: 48px;
+    height: 48px;
+    background: rgba(100, 100, 100, 0.6);
+    border: 2px solid #555;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.1s ease;
+}
+
+.dk-slot:hover {
+    border-color: #888;
+    background: rgba(120, 120, 120, 0.7);
+}
+
+.dk-slot.drag-over {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.15);
+}
+
+.dk-slot.highlight {
+    border-color: #3498db;
+    background: rgba(52, 152, 219, 0.15);
+}
+
+/* ============================================================
+   GUI PANELS (Inventory, Crafting, Furnace, Chest, etc.)
+   ============================================================ */
+
+.dk-gui-panel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(30, 30, 30, 0.95);
+    border: 2px solid #666;
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 300px;
+    z-index: 50;
+    pointer-events: auto;
+}
+
+.dk-gui-panel .dk-panel-title {
+    font-size: 14px;
+    color: #ccc;
+    text-align: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+.dk-gui-panel .dk-panel-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dk-gui-panel .dk-panel-close:hover {
+    background: #e74c3c;
+}
+
+/* ============================================================
+   CRAFTING GRID
+   ============================================================ */
+
+.dk-crafting-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin: 12px 0;
+}
+
+.dk-crafting-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 48px);
+    grid-template-rows: repeat(3, 48px);
+    gap: 4px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+
+.dk-crafting-result {
+    width: 56px;
+    height: 56px;
+    background: rgba(80, 80, 80, 0.6);
+    border: 2px dashed #888;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.dk-crafting-result:hover {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.1);
+}
+
+.dk-crafting-arrow {
+    font-size: 24px;
+    color: #888;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.dk-button {
+    padding: 8px 16px;
+    background: rgba(80, 80, 80, 0.8);
+    color: #e0e0e0;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: background 0.1s, border-color 0.1s;
+    pointer-events: auto;
+}
+
+.dk-button:hover {
+    background: rgba(100, 100, 100, 0.9);
+    border-color: #888;
+    color: #fff;
+}
+
+.dk-button:active {
+    background: rgba(60, 60, 60, 0.9);
+    border-color: #444;
+}
+
+.dk-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dk-button:disabled:hover {
+    background: rgba(80, 80, 80, 0.8);
+    border-color: #555;
+    color: #e0e0e0;
+}
+
+.dk-button-primary {
+    background: rgba(46, 204, 113, 0.6);
+    border-color: #27ae60;
+}
+
+.dk-button-primary:hover {
+    background: rgba(46, 204, 113, 0.8);
+    border-color: #2ecc71;
+}
+
+.dk-button-danger {
+    background: rgba(231, 76, 60, 0.6);
+    border-color: #c0392b;
+}
+
+.dk-button-danger:hover {
+    background: rgba(231, 76, 60, 0.8);
+    border-color: #e74c3c;
+}
+
+/* ============================================================
+   TABS (Creative Inventory)
+   ============================================================ */
+
+.dk-tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #444;
+}
+
+.dk-tab {
+    padding: 6px 12px;
+    background: rgba(60, 60, 60, 0.6);
+    color: #aaa;
+    border: 1px solid #555;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: background 0.1s, color 0.1s;
+}
+
+.dk-tab:hover {
+    background: rgba(80, 80, 80, 0.7);
+    color: #ddd;
+}
+
+.dk-tab.active {
+    background: rgba(30, 30, 30, 0.95);
+    color: #fff;
+    border-color: #666;
+}
+
+.dk-tab-content {
+    min-height: 200px;
+}
+
+/* ============================================================
+   SEARCH BAR (Creative Inventory)
+   ============================================================ */
+
+.dk-search-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.dk-search-input {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(20, 20, 20, 0.9);
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+.dk-search-input:focus {
+    border-color: #3498db;
+}
+
+.dk-search-input::placeholder {
+    color: #666;
+}
+
+/* ============================================================
+   TEXT INPUT
+   ============================================================ */
+
+.dk-text-input {
+    padding: 6px 10px;
+    background: rgba(20, 20, 20, 0.9);
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+.dk-text-input:focus {
+    border-color: #3498db;
+}
+
+.dk-text-input::placeholder {
+    color: #666;
+}
+
+.dk-text-input.error {
+    border-color: #e74c3c;
+}
+
+/* ============================================================
+   SCROLL CONTAINER
+   ============================================================ */
+
+.dk-scroll-container {
+    overflow-y: auto;
+    max-height: 300px;
+    padding: 4px;
+}
+
+.dk-scroll-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dk-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.dk-scroll-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.dk-scroll-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================================
+   ITEM GRID (Creative Inventory display)
+   ============================================================ */
+
+.dk-item-grid {
+    display: grid;
+    grid-template-columns: repeat(9, 48px);
+    gap: 4px;
+    padding: 8px;
+}
+
+.dk-item-slot {
+    width: 48px;
+    height: 48px;
+    background: rgba(80, 80, 80, 0.5);
+    border: 1px solid #555;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.dk-item-slot:hover {
+    background: rgba(100, 100, 100, 0.7);
+    border-color: #888;
+}
+
+.dk-item-slot.selected {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.15);
+}
+
+/* ============================================================
+   FURNACE UI
+   ============================================================ */
+
+.dk-furnace-area {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0;
+}
+
+.dk-furnace-slot-column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+.dk-furnace-preview {
+    width: 56px;
+    height: 56px;
+    background: rgba(60, 60, 60, 0.6);
+    border: 2px dashed #666;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dk-progress-bar {
+    width: 100%;
+    height: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid #555;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.dk-progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e67e22, #f39c12);
+    transition: width 0.2s ease;
+}
+
+/* ============================================================
+   CHEST UI
+   ============================================================ */
+
+.dk-chest-grid {
+    display: grid;
+    gap: 4px;
+    margin: 12px auto;
+    max-width: 300px;
+}
+
+.dk-chest-grid.single {
+    grid-template-columns: repeat(9, 48px);
+    grid-template-rows: repeat(3, 48px);
+}
+
+.dk-chest-grid.double {
+    grid-template-columns: repeat(18, 48px);
+    grid-template-rows: repeat(3, 48px);
+}
+
+/* ============================================================
+   ENCHANTING UI
+   ============================================================ */
+
+.dk-enchant-options {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.dk-enchant-option {
+    flex: 1;
+    padding: 12px;
+    background: rgba(50, 30, 80, 0.7);
+    border: 2px solid #6a3cab;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.1s, background 0.1s;
+}
+
+.dk-enchant-option:hover {
+    border-color: #9b59b6;
+    background: rgba(70, 40, 110, 0.8);
+}
+
+.dk-enchant-option.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dk-enchant-name {
+    font-size: 13px;
+    color: #9b59b6;
+    margin-bottom: 4px;
+}
+
+.dk-enchant-level {
+    font-size: 11px;
+    color: #888;
+}
+
+.dk-enchant-cost {
+    font-size: 12px;
+    color: #f1c40f;
+    margin-top: 6px;
+}
+
+/* ============================================================
+   ANVIL UI
+   ============================================================ */
+
+.dk-anvil-rename {
+    margin: 12px 0;
+}
+
+.dk-anvil-result {
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(60, 60, 60, 0.4);
+    border: 1px dashed #666;
+    border-radius: 4px;
+    text-align: center;
+}
+
+/* ============================================================
+   DEBUG OVERLAY
+   ============================================================ */
+
+.dk-debug-info {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #fff;
+}
+
+.dk-debug-info .dk-debug-line {
+    white-space: nowrap;
+}
+
+.dk-debug-info .dk-debug-label {
+    color: #aaa;
+}
+
+.dk-debug-info .dk-debug-value {
+    color: #2ecc71;
+}
+
+/* ============================================================
+   LOADING SCREEN (internal GUI styles)
+   ============================================================ */
+
+.dk-loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.dk-loading-steps {
+    margin-top: 20px;
+    width: 300px;
+}
+
+.dk-loading-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12px;
+    color: #888;
+}
+
+.dk-loading-step.complete {
+    color: #2ecc71;
+}
+
+.dk-loading-step.error {
+    color: #e74c3c;
+}
+
+.dk-loading-step-icon {
+    width: 16px;
+    text-align: center;
+}

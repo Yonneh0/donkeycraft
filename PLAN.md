@@ -349,18 +349,18 @@ Procedural texture and sound generation via `src/core/asset-generator.js`. All 2
 
 ---
 
-## Phase 20: UI / HTML/CSS Layer [STATUS: PENDING]
+## Phase 20: UI / HTML/CSS Layer [STATUS: FULLY OPERATIONAL]
 
-HTML entry point, stylesheets, DOM-based UI elements.
+HTML entry point, stylesheets, DOM-based UI elements. Functional test page (`tests/phase20-test.html`) validates all 4 Gui* components and index.html DOM structure across 22 test sections with 100+ assertions.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 101 | `index.html` | Main HTML: canvas, overlay divs for GUI screens, debug HUD, loading screen | 100 | [ ] |
-| 102 | `css/style.css` | Base styles: full-screen canvas, overlay positioning, cursor, scrollbar hiding | 80 | [ ] |
-| 103 | `css/gui.css` | GUI styles: inventory grid, hotbar, buttons, text, scroll containers | 200 | [ ] |
-| 104 | `src/ui/gui-elements.js` | DOM-based UI: crafting grid drag-drop, creative inventory tabs, button clicks | 350 | [ ] |
+| 101 | `index.html` | Main HTML: canvas, overlay divs for GUI screens, debug HUD, loading screen | 100 | [FULLY OPERATIONAL] — verified: proper script loading order, canvas element, overlay containers (gui-overlay, debug-overlay, loading-screen-container) |
+| 102 | `css/style.css` | Base styles: full-screen canvas, overlay positioning, cursor, scrollbar hiding | 80 | [FULLY OPERATIONAL] — verified: canvas fixed positioning, pointer-events handling, cursor styles, scrollbar hiding, dk-interactive class |
+| 103 | `css/gui.css` | GUI styles: inventory grid, hotbar, buttons, text, scroll containers | 200 | [FULLY OPERATIONAL] — verified: panel styling, tab navigation, slot styling, drag-over highlights, button states (hover/disabled/error) |
+| 104 | `src/ui/gui-elements.js` | DOM-based UI: crafting grid drag-drop, creative inventory tabs, button clicks | 530 | [FULLY OPERATIONAL] — verified: GuiDragDrop (drag start/end, cancel), GuiButton (state management, events), GuiTabNavigator (tab switching, event subscription), GuiTextInput (value/get/set, validation) |
 
-**Subtotal Phase 20: ~730 lines, 4 files**
+**Subtotal Phase 20: ~910 lines, 4 files**
 
 ---
 

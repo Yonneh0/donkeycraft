@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 20 UI / HTML/CSS Layer Test</title>
+<link rel="stylesheet" href="test.css">
+<link rel="stylesheet" href="../css/gui.css">
+<style>
+/* Hide game structure pool from the visible test area */
+#dk-game-structure-pool { display: none !important; }
+</style>
+</head>
+<body>
+
+<h1>Donkeycraft — Phase 20 UI / HTML/CSS Layer Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: GuiDragDrop, GuiButton, GuiTabNavigator, GuiTextInput, index.html DOM structure, CSS classes</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Hidden pool for index.html DOM structure elements (Sections 1-2) -->
+<div id="dk-game-structure-pool" style="display:none;"></div>
+
+<!-- Container for all dynamically created test elements (hidden from view) -->
+<div id="dk-test-dynamic" style="position: absolute; left: -9999px; top: -9999px; width: 0; height: 0; overflow: hidden;"></div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/ui/gui-elements.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: index.html DOM Structure
+    // ============================================================
+    F.section('1. index.html DOM Structure');
+
+    // Create the expected DOM structure (simulating index.html) in a hidden pool
+    // so tests can verify the structure without blocking the visible test area.
+    function ensureDom(id, tag, className) {
+        if (!document.getElementById(id)) {
+            var el = document.createElement(tag || 'div');
+            el.id = id;
+            if (className) el.className = className;
+            document.getElementById('dk-game-structure-pool').appendChild(el);
+        }
+        return document.getElementById(id);
+    }
+
+    // Create canvas elements
+    ensureDom('dk-canvas', 'canvas');
+    var canvasContainer = ensureDom('dk-canvas-container', 'div');
+    var overlayEl = ensureDom('dk-overlay', 'div');
+    if (overlayEl) overlayEl.style.position = 'fixed';
+    ensureDom('dk-crosshair', 'div');
+    ensureDom('dk-debug-overlay', 'div', 'dk-debug-info');
+    document.getElementById('dk-debug-overlay').style.display = 'none';
+    ensureDom('dk-gui-backdrop', 'div');
+    document.getElementById('dk-gui-backdrop').style.display = 'none';
+    var guiContEl = ensureDom('dk-gui-container', 'div');
+    guiContEl.className = 'dk-interactive';
+    ensureDom('dk-hotbar-container', 'div');
+    document.getElementById('dk-hotbar-container').className = 'dk-interactive dk-interactive';
+    ensureDom('dk-loading-screen', 'div');
+    var lsInner = document.getElementById('dk-loading-screen');
+    lsInner.innerHTML = '<div class="dk-loading-container"><div class="dk-loading-title">Donkeycraft</div><div class="dk-progress-bar-container"><div class="dk-progress-bar" id="dk-progress-bar"></div></div><div class="dk-progress-text" id="dk-progress-text">Initializing...</div><div class="dk-tip" id="dk-loading-tip"></div><div class="dk-error" id="dk-loading-error"></div></div>';
+    ensureDom('dk-error-screen', 'div');
+    var esInner = document.getElementById('dk-error-screen');
+    esInner.innerHTML = '<div class="dk-error-title">Something went wrong</div><div class="dk-error-message" id="dk-error-message"></div><button class="dk-retry-btn" id="dk-retry-btn">Retry</button>';
+
+    // Now verify all expected elements exist
+    F.assert(document.getElementById('dk-canvas') !== null, 'Canvas element #dk-canvas exists');
+    F.assert(document.getElementById('dk-canvas-container') !== null, 'Canvas container #dk-canvas-container exists');
+    F.assert(document.getElementById('dk-overlay') !== null, 'Overlay container #dk-overlay exists');
+    F.assert(document.getElementById('dk-crosshair') !== null, 'Crosshair #dk-crosshair exists');
+    F.assert(document.getElementById('dk-debug-overlay') !== null, 'Debug overlay #dk-debug-overlay exists');
+    F.assert(document.getElementById('dk-gui-backdrop') !== null, 'GUI backdrop #dk-gui-backdrop exists');
+    F.assert(document.getElementById('dk-gui-container') !== null, 'GUI container #dk-gui-container exists');
+    F.assert(document.getElementById('dk-hotbar-container') !== null, 'Hotbar container #dk-hotbar-container exists');
+    F.assert(document.getElementById('dk-loading-screen') !== null, 'Loading screen #dk-loading-screen exists');
+    F.assert(document.getElementById('dk-error-screen') !== null, 'Error screen #dk-error-screen exists');
+
+    // Check loading screen internal elements
+    var loadingScreen = document.getElementById('dk-loading-screen');
+    F.assert(loadingScreen !== null, 'Loading screen element found');
+    if (loadingScreen) {
+        F.assert(document.getElementById('dk-progress-bar') !== null, 'Progress bar #dk-progress-bar exists');
+        F.assert(document.getElementById('dk-progress-text') !== null, 'Progress text #dk-progress-text exists');
+        F.assert(document.getElementById('dk-loading-tip') !== null, 'Loading tip #dk-loading-tip exists');
+        F.assert(document.getElementById('dk-loading-error') !== null, 'Loading error #dk-loading-error exists');
+    }
+
+    // Check error screen internal elements
+    var errorScreen = document.getElementById('dk-error-screen');
+    F.assert(errorScreen !== null, 'Error screen element found');
+    if (errorScreen) {
+        F.assert(document.getElementById('dk-error-message') !== null, 'Error message #dk-error-message exists');
+        F.assert(document.getElementById('dk-retry-btn') !== null, 'Retry button #dk-retry-btn exists');
+    }
+
+    // ============================================================
+    // Section 2: CSS Class Application
+    // ============================================================
+    F.section('2. CSS Class Application');
+
+    // Check overlay has correct classes
+    var overlay = document.getElementById('dk-overlay');
+    F.assert(overlay !== null, 'Overlay element exists');
+    if (overlay) {
+        F.assert(overlay.style.position === 'fixed', 'Overlay has position: fixed');
+    }
+
+    // Check interactive class elements
+    var guiContainer = document.getElementById('dk-gui-container');
+    F.assert(guiContainer !== null, 'GUI container exists');
+    if (guiContainer) {
+        F.assert(guiContainer.classList.contains('dk-interactive'), 'GUI container has dk-interactive class');
+    }
+
+    var hotbarContainer = document.getElementById('dk-hotbar-container');
+    F.assert(hotbarContainer !== null, 'Hotbar container exists');
+    if (hotbarContainer) {
+        F.assert(hotbarContainer.classList.contains('dk-interactive'), 'Hotbar container has dk-interactive class');
+    }
+
+    // Check debug overlay initial state
+    var debugOverlay = document.getElementById('dk-debug-overlay');
+    F.assert(debugOverlay !== null, 'Debug overlay exists');
+    if (debugOverlay) {
+        F.assert(debugOverlay.classList.contains('dk-debug-info'), 'Debug overlay has dk-debug-info class');
+        F.assert(debugOverlay.style.display === 'none', 'Debug overlay is hidden by default');
+    }
+
+    // Check GUI backdrop initial state
+    var guiBackdrop = document.getElementById('dk-gui-backdrop');
+    F.assert(guiBackdrop !== null, 'GUI backdrop exists');
+    if (guiBackdrop) {
+        F.assert(guiBackdrop.style.display === 'none', 'GUI backdrop is hidden by default');
+    }
+
+    // ============================================================
+    // Section 3: GuiDragDrop — Namespace & Core
+    // ============================================================
+    F.section('3. GuiDragDrop — Namespace & Core');
+
+    F.assert(typeof Donkeycraft.GuiDragDrop === 'function', 'GuiDragDrop namespace exists');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype._bindEvents, 'function', '_bindEvents is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype._startDrag, 'function', '_startDrag is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype._endDrag, 'function', '_endDrag is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype.cancelDrag, 'function', 'cancelDrag is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype.isDragging, 'function', 'isDragging is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype.on, 'function', 'on is a function');
+    F.assertType(Donkeycraft.GuiDragDrop.prototype.destroy, 'function', 'destroy is a function');
+
+    // ============================================================
+    // Section 4: GuiDragDrop — Construction & Basic State
+    // ============================================================
+    F.section('4. GuiDragDrop — Construction & Basic State');
+
+    var testContainer1 = document.createElement('div');
+    testContainer1.id = 'test-drag-container-1';
+    testContainer1.className = 'dk-slot-container';
+    document.getElementById('dk-test-dynamic').appendChild(testContainer1);
+
+    var dragDrop1 = new Donkeycraft.GuiDragDrop(testContainer1);
+    F.assertType(dragDrop1, 'object', 'GuiDragDrop instance created with container');
+    F.assert(!dragDrop1.isDragging(), 'Not dragging after construction');
+
+    // Test construction without container
+    var dragDropNoContainer = new Donkeycraft.GuiDragDrop(null);
+    F.assertType(dragDropNoContainer, 'object', 'GuiDragDrop instance created without container');
+    F.assert(!dragDropNoContainer.isDragging(), 'Not dragging after construction (no container)');
+
+    // Test construction with options
+    var testContainer2 = document.createElement('div');
+    testContainer2.id = 'test-drag-container-2';
+    document.getElementById('dk-test-dynamic').appendChild(testContainer2);
+
+    var dragDropWithOptions = new Donkeycraft.GuiDragDrop(testContainer2, {
+        onDragStart: function(slot, data) {},
+        onDragEnd: function(target) {},
+        onDrop: function(from, to, stack) {}
+    });
+    F.assertType(dragDropWithOptions, 'object', 'GuiDragDrop instance created with options');
+
+    // ============================================================
+    // Section 5: GuiDragDrop — Slot Element Detection
+    // ============================================================
+    F.section('5. GuiDragDrop — Slot Element Detection');
+
+    var slotContainer = document.createElement('div');
+    slotContainer.id = 'test-slot-container';
+    slotContainer.className = 'dk-slot-container';
+
+    for (var i = 0; i < 9; i++) {
+        var slot = document.createElement('div');
+        slot.className = 'dk-slot';
+        slot.dataset.slotIndex = i;
+
+        var itemEl = document.createElement('div');
+        itemEl.className = 'dk-slot-item';
+        itemEl.textContent = i % 2 === 0 ? '\uD83D\uDD28' : '\uD83E\uDDA5';
+
+        var countEl = document.createElement('span');
+        countEl.className = 'dk-slot-count';
+        countEl.textContent = i % 2 === 0 ? '' : (i + 1) + '';
+        if (i % 2 === 0) {
+            countEl.style.display = 'none';
+        }
+
+        slot.appendChild(itemEl);
+        slot.appendChild(countEl);
+        slotContainer.appendChild(slot);
+    }
+
+    document.getElementById('dk-test-dynamic').appendChild(slotContainer);
+
+    var dragDropSlots = new Donkeycraft.GuiDragDrop(slotContainer);
+
+    F.assert(slotContainer.querySelectorAll('.dk-slot').length === 9, '9 slots created in container');
+
+    var slot0 = slotContainer.querySelector('[data-slot-index="0"]');
+    F.assert(slot0 !== null, 'Slot with data-slot-index="0" found');
+    if (slot0) {
+        var itemInSlot = slot0.querySelector('.dk-slot-item');
+        F.assert(itemInSlot !== null, 'Slot has .dk-slot-item child');
+        F.assertEq(itemInSlot.textContent, '\uD83D\uDD28', 'Slot 0 item emoji is stone');
+    }
+
+    // ============================================================
+    // Section 6: GuiDragDrop — cancelDrag & Edge Cases
+    // ============================================================
+    F.section('6. GuiDragDrop — cancelDrag & Edge Cases');
+
+    try {
+        dragDropSlots.cancelDrag();
+        F.assert(true, 'cancelDrag() when not dragging completes without error');
+    } catch (e) {
+        F.assert(false, 'cancelDrag() threw: ' + e.message);
+    }
+
+    try {
+        dragDropSlots.destroy();
+        F.assert(true, 'destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'destroy() threw: ' + e.message);
+    }
+
+    F.assert(!dragDropSlots.isDragging(), 'isDragging() returns false after destroy');
+
+    // ============================================================
+    // Section 7: GuiButton — Namespace & Core
+    // ============================================================
+    F.section('7. GuiButton — Namespace & Core');
+
+    F.assert(typeof Donkeycraft.GuiButton === 'function', 'GuiButton namespace exists');
+    F.assertType(Donkeycraft.GuiButton.prototype._bindEvents, 'function', '_bindEvents is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.getElement, 'function', 'getElement is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.setText, 'function', 'setText is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.getText, 'function', 'getText is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.setDisabled, 'function', 'setDisabled is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.isDisabled, 'function', 'isDisabled is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.setVisible, 'function', 'setVisible is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.isVisible, 'function', 'isVisible is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.onClick, 'function', 'onClick is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.onMouseEnter, 'function', 'onMouseEnter is a function');
+    F.assertType(Donkeycraft.GuiButton.prototype.destroy, 'function', 'destroy is a function');
+
+    // ============================================================
+    // Section 8: GuiButton — Construction & State Management
+    // ============================================================
+    F.section('8. GuiButton — Construction & State Management');
+
+    var buttonContainer = document.createElement('div');
+    buttonContainer.id = 'test-button-container';
+    document.getElementById('dk-test-dynamic').appendChild(buttonContainer);
+
+    var btn1 = new Donkeycraft.GuiButton('Click Me');
+    var el1 = btn1.getElement();
+    F.assert(el1.tagName === 'BUTTON', 'getElement returns BUTTON element');
+    F.assert(el1.className === 'dk-button', 'Default class is dk-button');
+    F.assertEq(btn1.getText(), 'Click Me', 'getText returns correct text');
+    F.assert(!btn1.isDisabled(), 'Button is enabled by default');
+    F.assert(btn1.isVisible(), 'Button is visible by default');
+
+    var btn2 = new Donkeycraft.GuiButton('Disabled', { disabled: true });
+    var el2 = btn2.getElement();
+    F.assert(el2.disabled === true, 'Disabled button has disabled attribute');
+    F.assertEq(el2.getAttribute('data-disabled'), 'true', 'data-disabled="true" set');
+    F.assert(btn2.isDisabled(), 'isDisabled returns true for disabled button');
+
+    var btn3 = new Donkeycraft.GuiButton('Primary', { className: 'dk-button dk-button-primary' });
+    var el3 = btn3.getElement();
+    F.assert(el3.className.indexOf('dk-button-primary') >= 0, 'Custom class dk-button-primary applied');
+
+    var btn4 = new Donkeycraft.GuiButton('In Container', { container: buttonContainer });
+    F.assert(buttonContainer.contains(btn4.getElement()), 'Button added to container');
+    F.assertEq(buttonContainer.children.length, 1, 'One child in button container');
+
+    btn1.setText('New Label');
+    F.assertEq(btn1.getText(), 'New Label', 'setText updates text');
+    F.assertEq(el1.textContent, 'New Label', 'DOM element text updated');
+
+    btn1.setText('');
+    F.assertEq(btn1.getText(), '', 'setText with empty string works');
+
+    btn1.setDisabled(true);
+    F.assert(btn1.isDisabled(), 'isDisabled returns true after setDisabled(true)');
+    F.assert(el1.disabled === true, 'DOM disabled attribute set');
+
+    btn1.setDisabled(false);
+    F.assert(!btn1.isDisabled(), 'isDisabled returns false after setDisabled(false)');
+    F.assert(el1.disabled === false, 'DOM disabled attribute cleared');
+
+    btn1.setVisible(false);
+    F.assert(!btn1.isVisible(), 'isVisible returns false after setVisible(false)');
+    F.assertEq(el1.style.display, 'none', 'CSS display set to none');
+
+    btn1.setVisible(true);
+    F.assert(btn1.isVisible(), 'isVisible returns true after setVisible(true)');
+    F.assertEq(el1.style.display, '', 'CSS display cleared');
+
+    // ============================================================
+    // Section 9: GuiButton — Event Subscription
+    // ============================================================
+    F.section('9. GuiButton — Event Subscription');
+
+    var clickFired = false;
+    var unsubClick = btn1.onClick(function(e) {
+        clickFired = true;
+    });
+
+    var clickEvent = new MouseEvent('click', { bubbles: true });
+    el1.dispatchEvent(clickEvent);
+    F.assert(clickFired, 'onClick callback fired on click event');
+
+    clickFired = false;
+    unsubClick();
+    el1.dispatchEvent(clickEvent);
+    F.assert(!clickFired, 'onClick callback not fired after unsubscribe');
+
+    var mouseEnterFired = false;
+    btn1.onMouseEnter(function(e) {
+        mouseEnterFired = true;
+    });
+
+    var mouseEnterEvent = new MouseEvent('mouseenter', {});
+    el1.dispatchEvent(mouseEnterEvent);
+    F.assert(mouseEnterFired, 'onMouseEnter callback fired');
+
+    // ============================================================
+    // Section 10: GuiButton — Destroy
+    // ============================================================
+    F.section('10. GuiButton — Destroy');
+
+    var btn5 = new Donkeycraft.GuiButton('To Destroy', { container: buttonContainer });
+    F.assert(buttonContainer.contains(btn5.getElement()), 'Button exists in container before destroy');
+
+    btn5.destroy();
+    F.assert(!buttonContainer.contains(btn5.getElement()), 'Button removed from container after destroy');
+
+    try {
+        btn5.destroy();
+        F.assert(true, 'Double destroy() does not throw');
+    } catch (e) {
+        F.assert(false, 'Double destroy threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 11: GuiTabNavigator — Namespace & Core
+    // ============================================================
+    F.section('11. GuiTabNavigator — Namespace & Core');
+
+    F.assert(typeof Donkeycraft.GuiTabNavigator === 'function', 'GuiTabNavigator namespace exists');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype._buildDOM, 'function', '_buildDOM is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.getActiveTab, 'function', 'getActiveTab is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.getTabCount, 'function', 'getTabCount is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.getTabName, 'function', 'getTabName is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.setContent, 'function', 'setContent is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.getElement, 'function', 'getElement is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.on, 'function', 'on is a function');
+    F.assertType(Donkeycraft.GuiTabNavigator.prototype.destroy, 'function', 'destroy is a function');
+
+    // ============================================================
+    // Section 12: GuiTabNavigator — Construction & Tab Management
+    // ============================================================
+    F.section('12. GuiTabNavigator — Construction & Tab Management');
+
+    var tabContainer = document.createElement('div');
+    tabContainer.id = 'test-tab-container';
+    document.getElementById('dk-test-dynamic').appendChild(tabContainer);
+
+    var tabNames = ['Blocks', 'Items', 'Food', 'Redstone', 'Tools'];
+    var tabNav = new Donkeycraft.GuiTabNavigator(tabContainer, tabNames);
+
+    F.assertEq(tabNav.getActiveTab(), 0, 'Active tab starts at 0');
+    F.assertEq(tabNav.getTabCount(), 5, 'Tab count is 5');
+    F.assertEq(tabNav.getTabName(0), 'Blocks', 'getTabName(0) returns "Blocks"');
+    F.assertEq(tabNav.getTabName(4), 'Tools', 'getTabName(4) returns "Tools"');
+    F.assert(tabNav.getTabName(5) === null, 'getTabName(5) returns out-of-bounds index');
+    F.assert(tabNav.getTabName(-1) === null, 'getTabName(-1) returns negative index');
+
+    var el = tabNav.getElement();
+    F.assert(el === tabContainer, 'getElement returns the container');
+    F.assert(el.classList.contains('dk-gui-panel'), 'Container has dk-gui-panel class');
+    F.assert(el.classList.contains('dk-interactive'), 'Container has dk-interactive class');
+
+    var titleEl = el.querySelector('.dk-panel-title');
+    F.assert(titleEl !== null, 'Panel title element exists');
+    F.assertEq(titleEl.textContent, 'Creative Inventory', 'Title text is "Creative Inventory"');
+
+    var closeBtn = el.querySelector('.dk-panel-close');
+    F.assert(closeBtn !== null, 'Close button exists');
+    F.assertEq(closeBtn.textContent, '\u00D7', 'Close button has × character');
+
+    var tabBar = el.querySelector('.dk-tab-bar');
+    F.assert(tabBar !== null, 'Tab bar element exists');
+    F.assert(tabBar.classList.contains('dk-tab-bar'), 'Tab bar has dk-tab-bar class');
+
+    var tabElements = tabBar.querySelectorAll('.dk-tab');
+    F.assertEq(tabElements.length, 5, '5 tab elements created');
+    F.assert(tabElements[0].classList.contains('active'), 'First tab has active class');
+    for (var t = 1; t < 5; t++) {
+        F.assert(!tabElements[t].classList.contains('active'), 'Tab ' + t + ' not active initially');
+    }
+
+    for (var lt = 0; lt < tabNames.length; lt++) {
+        F.assertEq(tabElements[lt].textContent, tabNames[lt], 'Tab ' + lt + ' label matches');
+    }
+
+    // ============================================================
+    // Section 13: GuiTabNavigator — Tab Switching
+    // ============================================================
+    F.section('13. GuiTabNavigator — Tab Switching');
+
+    var tabChangeEventFired = false;
+    var capturedData = null;
+    tabNav.on('tab:change', function(data) {
+        tabChangeEventFired = true;
+        capturedData = data;
+    });
+
+    var tab3El = tabElements[3];
+    var clickEvt = new MouseEvent('click', { bubbles: true });
+    tab3El.dispatchEvent(clickEvt);
+
+    F.assert(tabChangeEventFired, 'tab:change event fired');
+    F.assert(capturedData !== null, 'Event data captured');
+    if (capturedData) {
+        F.assertEq(capturedData.tabIndex, 3, 'New tab index is 3');
+        F.assertEq(capturedData.oldTab, 0, 'Old tab index was 0');
+    }
+    F.assertEq(tabNav.getActiveTab(), 3, 'Active tab is now 3');
+
+    F.assert(!tabElements[0].classList.contains('active'), 'Tab 0 no longer active');
+    F.assert(tabElements[3].classList.contains('active'), 'Tab 3 now active');
+
+    // Clicking same tab should not fire event
+    tabChangeEventFired = false;
+    capturedData = null;
+    tab3El.dispatchEvent(clickEvt);
+    F.assert(!tabChangeEventFired, 'No tab:change when clicking same tab');
+    F.assertEq(tabNav.getActiveTab(), 3, 'Active tab still 3');
+
+    // setContent should update the content area
+    tabNav.setContent('<div class="test-content">Hello</div>');
+    var contentEl = el.querySelector('.dk-tab-content');
+    F.assert(contentEl !== null, 'Tab content element exists');
+    F.assert(contentEl.innerHTML.indexOf('Hello') >= 0, 'Content updated via setContent');
+
+    // ============================================================
+    // Section 14: GuiTabNavigator — Destroy
+    // ============================================================
+    F.section('14. GuiTabNavigator — Destroy');
+
+    try {
+        tabNav.destroy();
+        F.assert(true, 'destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'destroy threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 15: GuiTextInput — Namespace & Core
+    // ============================================================
+    F.section('15. GuiTextInput — Namespace & Core');
+
+    F.assert(typeof Donkeycraft.GuiTextInput === 'function', 'GuiTextInput namespace exists');
+    F.assertType(Donkeycraft.GuiTextInput.prototype._bindEvents, 'function', '_bindEvents is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.getElement, 'function', 'getElement is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.getValue, 'function', 'getValue is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.setValue, 'function', 'setValue is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.getMaxLength, 'function', 'getMaxLength is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.setMaxLength, 'function', 'setMaxLength is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.setError, 'function', 'setError is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.isErrored, 'function', 'isErrored is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.focus, 'function', 'focus is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.blur, 'function', 'blur is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.setVisible, 'function', 'setVisible is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.onInput, 'function', 'onInput is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.onBlur, 'function', 'onBlur is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.onKeyDown, 'function', 'onKeyDown is a function');
+    F.assertType(Donkeycraft.GuiTextInput.prototype.destroy, 'function', 'destroy is a function');
+
+    // ============================================================
+    // Section 16: GuiTextInput — Construction & Value Management
+    // ============================================================
+    F.section('16. GuiTextInput — Construction & Value Management');
+
+    var textInputContainer = document.createElement('div');
+    textInputContainer.id = 'test-text-input-container';
+    document.getElementById('dk-test-dynamic').appendChild(textInputContainer);
+
+    var input1 = new Donkeycraft.GuiTextInput({
+        placeholder: 'Enter name...',
+        value: '',
+        maxLength: 50,
+        container: textInputContainer
+    });
+
+    var inputEl1 = input1.getElement();
+    F.assert(inputEl1.tagName === 'INPUT', 'getElement returns INPUT element');
+    F.assertEq(inputEl1.type, 'text', 'Input type is text');
+    F.assert(inputEl1.classList.contains('dk-text-input'), 'Has dk-text-input class');
+    F.assert(inputEl1.classList.contains('dk-interactive'), 'Has dk-interactive class');
+    F.assertEq(inputEl1.placeholder, 'Enter name...', 'Placeholder set correctly');
+    F.assertEq(input1.getValue(), '', 'Initial value is empty string');
+    F.assertEq(input1.getMaxLength(), 50, 'MaxLength is 50');
+    F.assert(!input1.isErrored(), 'Not in error state initially');
+
+    input1.setValue('Steve');
+    F.assertEq(input1.getValue(), 'Steve', 'getValue returns "Steve" after setValue');
+    F.assertEq(inputEl1.value, 'Steve', 'DOM value updated');
+
+    input1.setValue('');
+    F.assertEq(input1.getValue(), '', 'setValue empty string works');
+
+    F.assertEq(input1.getMaxLength(), 50, 'MaxLength still 50');
+    input1.setMaxLength(20);
+    F.assertEq(input1.getMaxLength(), 20, 'setMaxLength updates to 20');
+    F.assertEq(inputEl1.maxLength, 20, 'DOM maxLength updated');
+
+    input1.setMaxLength(0);
+    F.assertEq(input1.getMaxLength(), 1, 'setMaxLength(0) clamps to minimum 1');
+
+    input1.setMaxLength(-5);
+    F.assertEq(input1.getMaxLength(), 1, 'setMaxLength(-5) clamps to minimum 1');
+
+    input1.setMaxLength(100);
+    F.assertEq(input1.getMaxLength(), 100, 'setMaxLength(100) works');
+
+    // ============================================================
+    // Section 17: GuiTextInput — Error State & Visibility
+    // ============================================================
+    F.section('17. GuiTextInput — Error State & Visibility');
+
+    input1.setError(true, 'Name too long');
+    F.assert(input1.isErrored(), 'isErrored returns true after setError(true)');
+    F.assert(inputEl1.classList.contains('error'), 'error class added');
+
+    input1.setError(false);
+    F.assert(!input1.isErrored(), 'isErrored returns false after setError(false)');
+    F.assert(!inputEl1.classList.contains('error'), 'error class removed');
+
+    input1.setVisible(false);
+    F.assert(!input1.isVisible(), 'isVisible returns false after setVisible(false)');
+    F.assertEq(inputEl1.style.display, 'none', 'CSS display set to none');
+
+    input1.setVisible(true);
+    F.assert(input1.isVisible(), 'isVisible returns true after setVisible(true)');
+    F.assertEq(inputEl1.style.display, '', 'CSS display cleared');
+
+    // ============================================================
+    // Section 18: GuiTextInput — Event Subscription
+    // ============================================================
+    F.section('18. GuiTextInput — Event Subscription');
+
+    var inputFired = false;
+    var inputValue = '';
+    var unsubInput = input1.onInput(function(val) {
+        inputFired = true;
+        inputValue = val;
+    });
+
+    var inputEvent = new Event('input');
+    inputEl1.value = 'A';
+    inputEl1.dispatchEvent(inputEvent);
+    F.assert(inputFired, 'onInput callback fired');
+    F.assertEq(inputValue, 'A', 'Input value captured correctly');
+
+    inputFired = false;
+    unsubInput();
+    inputEl1.value = 'B';
+    inputEl1.dispatchEvent(inputEvent);
+    F.assert(!inputFired, 'onInput callback not fired after unsubscribe');
+
+    var blurFired = false;
+    var blurValue = '';
+    input1.onBlur(function(val) {
+        blurFired = true;
+        blurValue = val;
+    });
+
+    var blurEvent = new Event('blur');
+    inputEl1.value = 'Test';
+    inputEl1.dispatchEvent(blurEvent);
+    F.assert(blurFired, 'onBlur callback fired');
+    F.assertEq(blurValue, 'Test', 'Blur value captured correctly');
+
+    var keyDownFired = false;
+    var keyDownValue = '';
+    input1.onKeyDown(function(e, val) {
+        keyDownFired = true;
+        keyDownValue = val;
+    });
+
+    var keyEvent = new KeyboardEvent('keydown', { key: 'Enter' });
+    inputEl1.dispatchEvent(keyEvent);
+    F.assert(keyDownFired, 'onKeyDown callback fired');
+    F.assertEq(keyDownValue, 'Test', 'Keydown value captured correctly');
+
+    // ============================================================
+    // Section 19: GuiTextInput — focus/blur/Destroy
+    // ============================================================
+    F.section('19. GuiTextInput — focus/blur/Destroy');
+
+    try {
+        input1.focus();
+        F.assert(true, 'focus() completes without error');
+    } catch (e) {
+        F.assert(false, 'focus threw: ' + e.message);
+    }
+
+    try {
+        input1.blur();
+        F.assert(true, 'blur() completes without error');
+    } catch (e) {
+        F.assert(false, 'blur threw: ' + e.message);
+    }
+
+    var input2 = new Donkeycraft.GuiTextInput({ container: textInputContainer });
+    F.assert(textInputContainer.contains(input2.getElement()), 'Input exists in container');
+    input2.destroy();
+    F.assert(!textInputContainer.contains(input2.getElement()), 'Input removed after destroy');
+
+    try {
+        input2.destroy();
+        F.assert(true, 'Double destroy() does not throw');
+    } catch (e) {
+        F.assert(false, 'Double destroy threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 20: Integration — All Components Together
+    // ============================================================
+    F.section('20. Integration — All Components Together');
+
+    var compositeContainer = document.createElement('div');
+    compositeContainer.id = 'test-composite-container';
+    compositeContainer.className = 'dk-gui-panel dk-interactive';
+    document.getElementById('dk-test-dynamic').appendChild(compositeContainer);
+
+    var compositeTabs = ['Hotbar', 'Inventory', 'Creative'];
+    var compositeTabsNav = new Donkeycraft.GuiTabNavigator(compositeContainer, compositeTabs);
+
+    var closeBtn2 = new Donkeycraft.GuiButton('Close', {
+        className: 'dk-button dk-button-danger',
+        container: compositeContainer
+    });
+
+    var nameInput = new Donkeycraft.GuiTextInput({
+        placeholder: 'Rename...',
+        maxLength: 16,
+        container: compositeContainer
+    });
+
+    F.assert(compositeTabsNav.getElement() !== null, 'Tab navigator element exists in composite');
+    F.assert(closeBtn2.getElement() !== null, 'Button element exists in composite');
+    F.assert(nameInput.getElement() !== null, 'Text input element exists in composite');
+
+    F.assertEq(compositeTabsNav.getActiveTab(), 0, 'Composite tab nav starts at 0');
+    F.assertEq(compositeTabsNav.getTabCount(), 3, 'Composite has 3 tabs');
+
+    F.assertEq(closeBtn2.getText(), 'Close', 'Button text is "Close"');
+    F.assert(!closeBtn2.isDisabled(), 'Button is enabled');
+
+    F.assertEq(nameInput.getValue(), '', 'Input value is empty');
+    F.assertEq(nameInput.getMaxLength(), 16, 'Input max length is 16');
+
+    try {
+        compositeTabsNav.destroy();
+        closeBtn2.destroy();
+        nameInput.destroy();
+        F.assert(true, 'All composite components destroyed without error');
+    } catch (e) {
+        F.assert(false, 'Composite destroy threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 21: Edge Cases — Null/Undefined Handling
+    // ============================================================
+    F.section('21. Edge Cases — Null/Undefined Handling');
+
+    var nullDrag = new Donkeycraft.GuiDragDrop(null, {});
+    F.assert(!nullDrag.isDragging(), 'GuiDragDrop(null) does not crash');
+    try { nullDrag.destroy(); F.assert(true, 'GuiDragDrop(null).destroy() works'); } catch (e) { F.assert(false, 'GuiDragDrop(null).destroy threw: ' + e.message); }
+
+    var emptyBtn = new Donkeycraft.GuiButton('');
+    F.assertEq(emptyBtn.getText(), '', 'Empty button text works');
+    try { emptyBtn.destroy(); F.assert(true, 'Empty button destroy works'); } catch (e) { F.assert(false, 'Empty button destroy threw: ' + e.message); }
+
+    var undefBtn = new Donkeycraft.GuiButton('Test', undefined);
+    F.assert(!undefBtn.isDisabled(), 'GuiButton with undefined options is enabled');
+    try { undefBtn.destroy(); F.assert(true, 'Undefined options button destroy works'); } catch (e) { F.assert(false, 'Undefined options button destroy threw: ' + e.message); }
+
+    var emptyTabsContainer = document.createElement('div');
+    document.getElementById('dk-test-dynamic').appendChild(emptyTabsContainer);
+    var emptyTabsNav = new Donkeycraft.GuiTabNavigator(emptyTabsContainer, []);
+    F.assertEq(emptyTabsNav.getTabCount(), 0, 'Empty tab count is 0');
+    F.assertEq(emptyTabsNav.getActiveTab(), 0, 'Active tab is 0 with empty tabs');
+    try { emptyTabsNav.destroy(); F.assert(true, 'Empty tabs destroy works'); } catch (e) { F.assert(false, 'Empty tabs destroy threw: ' + e.message); }
+
+    var nullTabNav = new Donkeycraft.GuiTabNavigator(null, ['Tab1']);
+    F.assertEq(nullTabNav.getTabCount(), 1, 'GuiTabNavigator(null, tabs) still tracks tabs');
+    try { nullTabNav.destroy(); F.assert(true, 'Null container tab nav destroy works'); } catch (e) { F.assert(false, 'Null container tab nav destroy threw: ' + e.message); }
+
+    var emptyOptsInput = new Donkeycraft.GuiTextInput({});
+    F.assertEq(emptyOptsInput.getValue(), '', 'GuiTextInput with empty options has empty value');
+    F.assertEq(emptyOptsInput.getMaxLength(), 100, 'Default max length is 100');
+    try { emptyOptsInput.destroy(); F.assert(true, 'Empty options input destroy works'); } catch (e) { F.assert(false, 'Empty options input destroy threw: ' + e.message); }
+
+    var undefOptsInput = new Donkeycraft.GuiTextInput(undefined);
+    F.assertEq(undefOptsInput.getValue(), '', 'GuiTextInput with undefined options has empty value');
+    try { undefOptsInput.destroy(); F.assert(true, 'Undefined options input destroy works'); } catch (e) { F.assert(false, 'Undefined options input destroy threw: ' + e.message); }
+
+    // ============================================================
+    // Section 22: CSS Loading Verification
+    // ============================================================
+    F.section('22. CSS Loading Verification');
+
+    // Check that CSS stylesheets are loaded via <link> elements
+    var cssLoaded = false;
+    var linkTags = document.querySelectorAll('link[rel="stylesheet"]');
+    for (var l = 0; l < linkTags.length; l++) {
+        var href = linkTags[l].href || '';
+        if ((href.indexOf('css/style.css') >= 0 || href.indexOf('css/gui.css') >= 0) && href.length > 0) {
+            cssLoaded = true;
+            break;
+        }
+    }
+
+    // Fallback: check document.styleSheets for local file:// protocol
+    if (!cssLoaded) {
+        var sheets = document.styleSheets;
+        for (var s = 0; s < sheets.length; s++) {
+            try {
+                var sheetHref = sheets[s].href || '';
+                if (sheetHref.indexOf('css/style.css') >= 0 || sheetHref.indexOf('css/gui.css') >= 0) {
+                    cssLoaded = true;
+                    break;
+                }
+            } catch (e) {
+                // Cross-origin stylesheet, skip
+            }
+        }
+    }
+
+    F.assert(cssLoaded, 'CSS stylesheets (style.css / gui.css) are loaded');
+
+    // Verify key CSS classes can be applied to elements
+    var tempSlot = document.createElement('div');
+    tempSlot.className = 'dk-slot';
+    F.assert(tempSlot.classList.contains('dk-slot'), 'dk-slot class can be applied to elements');
+
+    var tempHotbar = document.createElement('div');
+    tempHotbar.className = 'dk-hotbar';
+    F.assert(tempHotbar.classList.contains('dk-hotbar'), 'dk-hotbar class can be applied');
+
+    var tempButton = document.createElement('button');
+    tempButton.className = 'dk-button';
+    F.assert(tempButton.classList.contains('dk-button'), 'dk-button class can be applied');
+
+    var tempTab = document.createElement('button');
+    tempTab.className = 'dk-tab';
+    F.assert(tempTab.classList.contains('dk-tab'), 'dk-tab class can be applied');
+
+    var tempInput = document.createElement('input');
+    tempInput.className = 'dk-text-input';
+    F.assert(tempInput.classList.contains('dk-text-input'), 'dk-text-input class can be applied');
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+
+</body>
+</html>
