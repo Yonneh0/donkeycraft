@@ -4956,14 +4956,17 @@
         }
 
         /**
-         * Generate a procedural texture atlas image (256×256 canvas).
+         * Generate a procedural texture atlas image (1280×1280 canvas — ~500% larger than original 256×256).
+         * Each texture cell is 80×80 pixels instead of 16×16.
          * Useful for debugging or saving to disk.
          * @returns {HTMLCanvasElement}
          */
         function generateAtlasCanvas() {
+            var CELL_SIZE = 80; // 5× larger than 16px
+            var GRID_COLS = 16;
             var atlasCanvas = document.createElement('canvas');
-            atlasCanvas.width = 256;
-            atlasCanvas.height = 256;
+            atlasCanvas.width = CELL_SIZE * GRID_COLS;  // 1280
+            atlasCanvas.height = CELL_SIZE * GRID_COLS; // 1280
             var ctx = atlasCanvas.getContext('2d');
 
             var textures = generateAllBlockTextures();
@@ -4974,23 +4977,23 @@
                 var id = block.id;
                 if (id >= 256) continue; // Skip IDs beyond atlas grid
 
-                var col = id % 16;
-                var row = Math.floor(id / 16);
+                var col = id % GRID_COLS;
+                var row = Math.floor(id / GRID_COLS);
                 var tex = textures[id];
 
                 if (tex) {
-                    ctx.drawImage(tex, col * 16, row * 16, 16, 16);
+                    ctx.drawImage(tex, col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 } else {
                     // Missing texture placeholder
                     ctx.fillStyle = '#FF00FF';
-                    ctx.fillRect(col * 16, row * 16, 16, 16);
+                    ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                     ctx.strokeStyle = '#000000';
-                    ctx.lineWidth = 1;
+                    ctx.lineWidth = 2;
                     ctx.beginPath();
-                    ctx.moveTo(col * 16 + 2, row * 16 + 2);
-                    ctx.lineTo(col * 16 + 14, row * 16 + 14);
-                    ctx.moveTo(col * 16 + 14, row * 16 + 2);
-                    ctx.lineTo(col * 16 + 2, row * 16 + 14);
+                    ctx.moveTo(col * CELL_SIZE + 4, row * CELL_SIZE + 4);
+                    ctx.lineTo(col * CELL_SIZE + CELL_SIZE - 4, row * CELL_SIZE + CELL_SIZE - 4);
+                    ctx.moveTo(col * CELL_SIZE + CELL_SIZE - 4, row * CELL_SIZE + 4);
+                    ctx.lineTo(col * CELL_SIZE + 4, row * CELL_SIZE + CELL_SIZE - 4);
                     ctx.stroke();
                 }
             }

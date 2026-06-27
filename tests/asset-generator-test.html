@@ -5,7 +5,7 @@
 <title>Donkeycraft — Asset Generator Test Suite</title>
 <link rel="stylesheet" href="test.css">
 <style>
-body { max-width: 1400px; }
+body { max-width: 1600px; }
 .subtitle { margin-bottom: 20px; }
 
 /* Table layout for texture display */
@@ -28,11 +28,19 @@ body { max-width: 1400px; }
     vertical-align: middle;
 }
 .texture-preview {
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     border: 1px solid #333;
+    background: #111;
+}
+.atlas-preview {
+    max-width: 100%;
+    max-height: 960px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 2px solid #00d4ff;
     background: #111;
 }
 .texture-name {
@@ -266,66 +274,101 @@ body { max-width: 1400px; }
     F.assertType(assetMgr.reset, 'function', 'AssetManager.reset is function');
 
     // ============================================================
-    // SECTION 2: Basic Terrain Textures (with visual display)
+    // SECTION 2: All Textures — Complete Visual Display
     // ============================================================
     totalSections++;
-    F.section('2. Basic Terrain Textures');
+    F.section('2. All Textures — Complete Visual Display');
 
-    var terrainTests = [
+    // Consolidated texture list: one row per texture
+    var allTextures = [
+        // Terrain
         { name: 'Stone', fn: function() { return Donkeycraft.TextureGenerator.generateStone(42); } },
         { name: 'Dirt', fn: function() { return Donkeycraft.TextureGenerator.generateDirt(); } },
         { name: 'Grass Top', fn: function() { return Donkeycraft.TextureGenerator.generateGrassTop(); } },
-        { name: 'Grass Side', fn: function() { return Donkeycraft.TextureGenerator.generateGrassSide(); } }
-    ];
-
-    var terrainTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var t = 0; t < terrainTests.length; t++) {
-        var test = terrainTests[t];
-        var img = test.fn();
-        var pass = isImageLike(img);
-        if (pass) passedSections++; else failedSections++;
-        terrainTable += '<tr>';
-        terrainTable += '<td class="texture-name">' + test.name + '</td>';
-        terrainTable += '<td><img src="' + img.src + '" class="texture-preview" title="' + test.name + '"></td>';
-        terrainTable += '<td class="' + (pass ? 'pass-cell' : 'fail-cell') + '">' + (pass ? '✓ PASS' : '✗ FAIL') + '</td>';
-        terrainTable += '</tr>';
-    }
-    terrainTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', terrainTable);
-
-    // ============================================================
-    // SECTION 3: Wood & Plank Textures
-    // ============================================================
-    totalSections++;
-    F.section('3. Wood & Plank Textures');
-
-    var woodTests = [
+        { name: 'Grass Side', fn: function() { return Donkeycraft.TextureGenerator.generateGrassSide(); } },
+        // Wood
         { name: 'Oak Log Side', fn: function() { return Donkeycraft.TextureGenerator.generateLogSide(100); } },
         { name: 'Log Top', fn: function() { return Donkeycraft.TextureGenerator.generateLogTop(888); } },
         { name: 'Wood', fn: function() { return Donkeycraft.TextureGenerator.generateWood(999); } },
-        { name: 'Planks (Oak)', fn: function() { return Donkeycraft.TextureGenerator.generatePlanks(188, 152, 98, 100); } }
+        { name: 'Planks (Oak)', fn: function() { return Donkeycraft.TextureGenerator.generatePlanks(188, 152, 98, 100); } },
+        // Wool & Concrete samples
+        { name: 'White Wool', fn: function() { return Donkeycraft.TextureGenerator.generateWool(240, 240, 240); } },
+        { name: 'Red Wool', fn: function() { return Donkeycraft.TextureGenerator.generateWool(183, 52, 55); } },
+        { name: 'Blue Concrete', fn: function() { return Donkeycraft.TextureGenerator.generateConcrete(53, 96, 186); } },
+        { name: 'Green Concrete', fn: function() { return Donkeycraft.TextureGenerator.generateConcrete(87, 134, 63); } },
+        // Glass & Bricks
+        { name: 'Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(200, 220, 255); } },
+        { name: 'Tinted Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(60, 50, 80); } },
+        { name: 'Bricks (Red)', fn: function() { return Donkeycraft.TextureGenerator.generateBricks(160, 60, 50); } },
+        { name: 'Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateNetherBrick(); } },
+        { name: 'Red Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateRedNetherBrick(); } },
+        { name: 'Prismarine (normal)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('normal'); } },
+        { name: 'Prismarine (bricks)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('bricks'); } },
+        { name: 'Prismarine (dark)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('dark'); } },
+        // Ores (12)
+        { name: 'Coal Ore', fn: function() { return Donkeycraft.TextureGenerator.generateCoalOre(); } },
+        { name: 'Iron Ore', fn: function() { return Donkeycraft.TextureGenerator.generateIronOre(); } },
+        { name: 'Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateGoldOre(); } },
+        { name: 'Diamond Ore', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondOre(); } },
+        { name: 'Emerald Ore', fn: function() { return Donkeycraft.TextureGenerator.generateEmeraldOre(); } },
+        { name: 'Redstone Ore (unlit)', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneOre(); } },
+        { name: 'Lit Redstone Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLitRedstoneOre(); } },
+        { name: 'Lapis Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLapisOre(); } },
+        { name: 'Nether Quartz Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherQuartzOre(); } },
+        { name: 'Nether Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherGoldOre(); } },
+        { name: 'Ancient Debris', fn: function() { return Donkeycraft.TextureGenerator.generateAncientDebris(); } },
+        { name: 'Gilded Blackstone', fn: function() { return Donkeycraft.TextureGenerator.generateGildedBlackstone(); } },
+        // Liquids & Special
+        { name: 'Water', fn: function() { return Donkeycraft.TextureGenerator.generateWater(); } },
+        { name: 'Lava', fn: function() { return Donkeycraft.TextureGenerator.generateLava(); } },
+        { name: 'Bedrock', fn: function() { return Donkeycraft.TextureGenerator.generateBedrock(); } },
+        { name: 'Glow (purple)', fn: function() { return Donkeycraft.TextureGenerator.generateGlow(80, 20, 140); } },
+        // Metal Blocks
+        { name: 'Gold Block', fn: function() { return Donkeycraft.TextureGenerator.generateGoldBlock(); } },
+        { name: 'Iron Block', fn: function() { return Donkeycraft.TextureGenerator.generateIronBlock(); } },
+        { name: 'Diamond Block', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondBlock(); } },
+        { name: 'Emerald Block', fn: function() { return Donkeycraft.TextureGenerator.generateEmeraldBlock(); } },
+        // Nether & End
+        { name: 'Netherrack', fn: function() { return Donkeycraft.TextureGenerator.generateNetherrack(); } },
+        { name: 'End Stone', fn: function() { return Donkeycraft.TextureGenerator.generateEndStone(); } },
+        { name: 'Warped Stem', fn: function() { return Donkeycraft.TextureGenerator.generateWarpedStem(); } },
+        { name: 'Crimson Planks', fn: function() { return Donkeycraft.TextureGenerator.generateCrimsonPlanks(); } },
+        // Plants & Decorative
+        { name: 'Leaves', fn: function() { return Donkeycraft.TextureGenerator.generateLeaves(50, 130, 40); } },
+        { name: 'Cactus', fn: function() { return Donkeycraft.TextureGenerator.generateCactus(); } },
+        { name: 'Flower (red)', fn: function() { return Donkeycraft.TextureGenerator.generateFlower('red'); } },
+        { name: 'Lily Pad', fn: function() { return Donkeycraft.TextureGenerator.generateLilyPad(); } },
+        // Redstone Components
+        { name: 'Redstone Torch', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneTorch(); } },
+        { name: 'Redstone Lamp (unlit)', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneLamp(false); } },
+        { name: 'Dispenser', fn: function() { return Donkeycraft.TextureGenerator.generateDispenser(true); } },
+        { name: 'Piston', fn: function() { return Donkeycraft.TextureGenerator.generatePistonSide(); } },
+        // Furniture & Utility
+        { name: 'Chest', fn: function() { return Donkeycraft.TextureGenerator.generateChestSide(); } },
+        { name: 'Furnace', fn: function() { return Donkeycraft.TextureGenerator.generateFurnaceFront(); } },
+        { name: 'Crafting Table', fn: function() { return Donkeycraft.TextureGenerator.generateCraftingTable(); } },
+        { name: 'Bed (Red)', fn: function() { return Donkeycraft.TextureGenerator.generateBed('red'); } },
+        // Portal & Special Effects
+        { name: 'End Portal', fn: function() { return Donkeycraft.TextureGenerator.generateEndPortal(); } },
+        { name: 'Nether Portal', fn: function() { return Donkeycraft.TextureGenerator.generateNetherPortal(); } },
+        { name: 'End Portal Frame', fn: function() { return Donkeycraft.TextureGenerator.generateEndPortalFrame(); } },
+        { name: 'Mob Spawner', fn: function() { return Donkeycraft.TextureGenerator.generateMobSpawner(); } }
     ];
 
-    var woodTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var w = 0; w < woodTests.length; w++) {
-        var test2 = woodTests[w];
-        var img2 = test2.fn();
-        var pass2 = isImageLike(img2);
-        if (pass2) passedSections++; else failedSections++;
-        woodTable += '<tr>';
-        woodTable += '<td class="texture-name">' + test2.name + '</td>';
-        woodTable += '<td><img src="' + img2.src + '" class="texture-preview" title="' + test2.name + '"></td>';
-        woodTable += '<td class="' + (pass2 ? 'pass-cell' : 'fail-cell') + '">' + (pass2 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        woodTable += '</tr>';
+    var texTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (80×80)</th><th>Status</th></tr>';
+    for (var ti = 0; ti < allTextures.length; ti++) {
+        var t = allTextures[ti];
+        var imgT = t.fn();
+        var passT = isImageLike(imgT);
+        if (passT) passedSections++; else failedSections++;
+        texTable += '<tr>';
+        texTable += '<td class="texture-name">' + t.name + '</td>';
+        texTable += '<td><img src="' + imgT.src + '" class="texture-preview" title="' + t.name + '"></td>';
+        texTable += '<td class="' + (passT ? 'pass-cell' : 'fail-cell') + '">' + (passT ? '✓ PASS' : '✗ FAIL') + '</td>';
+        texTable += '</tr>';
     }
-    woodTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', woodTable);
-
-    // ============================================================
-    // SECTION 4: Wool & Concrete (16 Colors)
-    // ============================================================
-    totalSections++;
-    F.section('4. Wool & Concrete Textures (16 Colors)');
+    texTable += '</table>';
+    document.getElementById('results').insertAdjacentHTML('beforeend', texTable);
 
     // COLOR_MAP validation
     var colorMap = Donkeycraft.TextureGenerator.COLOR_MAP;
@@ -341,364 +384,8 @@ body { max-width: 1400px; }
     F.assert(colorPass, 'All 16 COLOR_MAP entries have valid RGB values');
     if (colorPass) passedSections++; else failedSections++;
 
-    // Sample texture display
-    var woolTests = [
-        { name: 'White Wool', fn: function() { return Donkeycraft.TextureGenerator.generateWool(240, 240, 240); } },
-        { name: 'Red Wool', fn: function() { return Donkeycraft.TextureGenerator.generateWool(183, 52, 55); } },
-        { name: 'Blue Concrete', fn: function() { return Donkeycraft.TextureGenerator.generateConcrete(53, 96, 186); } },
-        { name: 'Green Concrete', fn: function() { return Donkeycraft.TextureGenerator.generateConcrete(87, 134, 63); } }
-    ];
-
-    var woolTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var wl = 0; wl < woolTests.length; wl++) {
-        var test3 = woolTests[wl];
-        var img3 = test3.fn();
-        var pass3 = isImageLike(img3);
-        if (pass3) passedSections++; else failedSections++;
-        woolTable += '<tr>';
-        woolTable += '<td class="texture-name">' + test3.name + '</td>';
-        woolTable += '<td><img src="' + img3.src + '" class="texture-preview" title="' + test3.name + '"></td>';
-        woolTable += '<td class="' + (pass3 ? 'pass-cell' : 'fail-cell') + '">' + (pass3 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        woolTable += '</tr>';
-    }
-    woolTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', woolTable);
-
-    // ============================================================
-    // SECTION 5: Glass & Bricks
-    // ============================================================
-    totalSections++;
-    F.section('5. Glass & Brick Textures');
-
-    var glassBrickTests = [
-        { name: 'Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(200, 220, 255); } },
-        { name: 'Tinted Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(60, 50, 80); } },
-        { name: 'Bricks (Red)', fn: function() { return Donkeycraft.TextureGenerator.generateBricks(160, 60, 50); } },
-        { name: 'Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateNetherBrick(); } },
-        { name: 'Red Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateRedNetherBrick(); } },
-        { name: 'Prismarine (normal)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('normal'); } },
-        { name: 'Prismarine (bricks)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('bricks'); } },
-        { name: 'Prismarine (dark)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('dark'); } }
-    ];
-
-    var glassBrickTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var gb = 0; gb < glassBrickTests.length; gb++) {
-        var testGB = glassBrickTests[gb];
-        var imgGB = testGB.fn();
-        var passGB = isImageLike(imgGB);
-        if (passGB) passedSections++; else failedSections++;
-        glassBrickTable += '<tr>';
-        glassBrickTable += '<td class="texture-name">' + testGB.name + '</td>';
-        glassBrickTable += '<td><img src="' + imgGB.src + '" class="texture-preview" title="' + testGB.name + '"></td>';
-        glassBrickTable += '<td class="' + (passGB ? 'pass-cell' : 'fail-cell') + '">' + (passGB ? '✓ PASS' : '✗ FAIL') + '</td>';
-        glassBrickTable += '</tr>';
-    }
-    glassBrickTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', glassBrickTable);
-
-    // ============================================================
-    // SECTION 5B: ALL Ore Textures (12 variations)
-    // ============================================================
-    totalSections++;
-    F.section('5B. All Ore Textures (Complete Variations)');
-
-    var oreTests = [
-        { name: 'Coal Ore', fn: function() { return Donkeycraft.TextureGenerator.generateCoalOre(); } },
-        { name: 'Iron Ore', fn: function() { return Donkeycraft.TextureGenerator.generateIronOre(); } },
-        { name: 'Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateGoldOre(); } },
-        { name: 'Diamond Ore', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondOre(); } },
-        { name: 'Emerald Ore', fn: function() { return Donkeycraft.TextureGenerator.generateEmeraldOre(); } },
-        { name: 'Redstone Ore (unlit)', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneOre(); } },
-        { name: 'Lit Redstone Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLitRedstoneOre(); } },
-        { name: 'Lapis Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLapisOre(); } },
-        { name: 'Nether Quartz Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherQuartzOre(); } },
-        { name: 'Nether Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherGoldOre(); } },
-        { name: 'Ancient Debris', fn: function() { return Donkeycraft.TextureGenerator.generateAncientDebris(); } },
-        { name: 'Gilded Blackstone', fn: function() { return Donkeycraft.TextureGenerator.generateGildedBlackstone(); } }
-    ];
-
-    var oreTable = '<table class="texture-table"><tr><th>Ore Type</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var ot = 0; ot < oreTests.length; ot++) {
-        var testOT = oreTests[ot];
-        var imgOT = testOT.fn();
-        var passOT = isImageLike(imgOT);
-        if (passOT) passedSections++; else failedSections++;
-        oreTable += '<tr>';
-        oreTable += '<td class="texture-name">' + testOT.name + '</td>';
-        oreTable += '<td><img src="' + imgOT.src + '" class="texture-preview" title="' + testOT.name + '"></td>';
-        oreTable += '<td class="' + (passOT ? 'pass-cell' : 'fail-cell') + '">' + (passOT ? '✓ PASS' : '✗ FAIL') + '</td>';
-        oreTable += '</tr>';
-    }
-    oreTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', oreTable);
-
-    // ============================================================
-    // SECTION 6: Liquids & Special Blocks
-    // ============================================================
-    totalSections++;
-    F.section('6. Liquids & Special Block Textures');
-
-    var liquidTests = [
-        { name: 'Water', fn: function() { return Donkeycraft.TextureGenerator.generateWater(); } },
-        { name: 'Lava', fn: function() { return Donkeycraft.TextureGenerator.generateLava(); } },
-        { name: 'Bedrock', fn: function() { return Donkeycraft.TextureGenerator.generateBedrock(); } },
-        { name: 'Glow (purple)', fn: function() { return Donkeycraft.TextureGenerator.generateGlow(80, 20, 140); } }
-    ];
-
-    var liquidTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var li = 0; li < liquidTests.length; li++) {
-        var test5 = liquidTests[li];
-        var img5 = test5.fn();
-        var pass5 = isImageLike(img5);
-        if (pass5) passedSections++; else failedSections++;
-        liquidTable += '<tr>';
-        liquidTable += '<td class="texture-name">' + test5.name + '</td>';
-        liquidTable += '<td><img src="' + img5.src + '" class="texture-preview" title="' + test5.name + '"></td>';
-        liquidTable += '<td class="' + (pass5 ? 'pass-cell' : 'fail-cell') + '">' + (pass5 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        liquidTable += '</tr>';
-    }
-    liquidTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', liquidTable);
-
-    // ============================================================
-    // SECTION 7: Metal Blocks
-    // ============================================================
-    totalSections++;
-    F.section('7. Metal Block Textures');
-
-    var metalTests = [
-        { name: 'Gold Block', fn: function() { return Donkeycraft.TextureGenerator.generateGoldBlock(); } },
-        { name: 'Iron Block', fn: function() { return Donkeycraft.TextureGenerator.generateIronBlock(); } },
-        { name: 'Diamond Block', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondBlock(); } },
-        { name: 'Emerald Block', fn: function() { return Donkeycraft.TextureGenerator.generateEmeraldBlock(); } }
-    ];
-
-    var metalTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var me = 0; me < metalTests.length; me++) {
-        var test6 = metalTests[me];
-        var img6 = test6.fn();
-        var pass6 = isImageLike(img6);
-        if (pass6) passedSections++; else failedSections++;
-        metalTable += '<tr>';
-        metalTable += '<td class="texture-name">' + test6.name + '</td>';
-        metalTable += '<td><img src="' + img6.src + '" class="texture-preview" title="' + test6.name + '"></td>';
-        metalTable += '<td class="' + (pass6 ? 'pass-cell' : 'fail-cell') + '">' + (pass6 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        metalTable += '</tr>';
-    }
-    metalTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', metalTable);
-
-    // ============================================================
-    // SECTION 8: Nether & End Textures
-    // ============================================================
-    totalSections++;
-    F.section('8. Nether & End Textures');
-
-    var netherTests = [
-        { name: 'Netherrack', fn: function() { return Donkeycraft.TextureGenerator.generateNetherrack(); } },
-        { name: 'End Stone', fn: function() { return Donkeycraft.TextureGenerator.generateEndStone(); } },
-        { name: 'Warped Stem', fn: function() { return Donkeycraft.TextureGenerator.generateWarpedStem(); } },
-        { name: 'Crimson Planks', fn: function() { return Donkeycraft.TextureGenerator.generateCrimsonPlanks(); } }
-    ];
-
-    var netherTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var ne = 0; ne < netherTests.length; ne++) {
-        var test7 = netherTests[ne];
-        var img7 = test7.fn();
-        var pass7 = isImageLike(img7);
-        if (pass7) passedSections++; else failedSections++;
-        netherTable += '<tr>';
-        netherTable += '<td class="texture-name">' + test7.name + '</td>';
-        netherTable += '<td><img src="' + img7.src + '" class="texture-preview" title="' + test7.name + '"></td>';
-        netherTable += '<td class="' + (pass7 ? 'pass-cell' : 'fail-cell') + '">' + (pass7 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        netherTable += '</tr>';
-    }
-    netherTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', netherTable);
-
-    // ============================================================
-    // SECTION 9: Plant & Decorative Textures
-    // ============================================================
-    totalSections++;
-    F.section('9. Plant & Decorative Textures');
-
-    var plantTests = [
-        { name: 'Leaves', fn: function() { return Donkeycraft.TextureGenerator.generateLeaves(50, 130, 40); } },
-        { name: 'Cactus', fn: function() { return Donkeycraft.TextureGenerator.generateCactus(); } },
-        { name: 'Flower (red)', fn: function() { return Donkeycraft.TextureGenerator.generateFlower('red'); } },
-        { name: 'Lily Pad', fn: function() { return Donkeycraft.TextureGenerator.generateLilyPad(); } }
-    ];
-
-    var plantTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var pl = 0; pl < plantTests.length; pl++) {
-        var test8 = plantTests[pl];
-        var img8 = test8.fn();
-        var pass8 = isImageLike(img8);
-        if (pass8) passedSections++; else failedSections++;
-        plantTable += '<tr>';
-        plantTable += '<td class="texture-name">' + test8.name + '</td>';
-        plantTable += '<td><img src="' + img8.src + '" class="texture-preview" title="' + test8.name + '"></td>';
-        plantTable += '<td class="' + (pass8 ? 'pass-cell' : 'fail-cell') + '">' + (pass8 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        plantTable += '</tr>';
-    }
-    plantTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', plantTable);
-
-    // ============================================================
-    // SECTION 10: Redstone Components
-    // ============================================================
-    totalSections++;
-    F.section('10. Redstone Component Textures');
-
-    var redstoneTests = [
-        { name: 'Redstone Torch', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneTorch(); } },
-        { name: 'Redstone Lamp (unlit)', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneLamp(false); } },
-        { name: 'Dispenser', fn: function() { return Donkeycraft.TextureGenerator.generateDispenser(true); } },
-        { name: 'Piston', fn: function() { return Donkeycraft.TextureGenerator.generatePistonSide(); } }
-    ];
-
-    var redstoneTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var rs = 0; rs < redstoneTests.length; rs++) {
-        var test9 = redstoneTests[rs];
-        var img9 = test9.fn();
-        var pass9 = isImageLike(img9);
-        if (pass9) passedSections++; else failedSections++;
-        redstoneTable += '<tr>';
-        redstoneTable += '<td class="texture-name">' + test9.name + '</td>';
-        redstoneTable += '<td><img src="' + img9.src + '" class="texture-preview" title="' + test9.name + '"></td>';
-        redstoneTable += '<td class="' + (pass9 ? 'pass-cell' : 'fail-cell') + '">' + (pass9 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        redstoneTable += '</tr>';
-    }
-    redstoneTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', redstoneTable);
-
-    // ============================================================
-    // SECTION 11: Furniture & Utility Blocks
-    // ============================================================
-    totalSections++;
-    F.section('11. Furniture & Utility Block Textures');
-
-    var furnitureTests = [
-        { name: 'Chest', fn: function() { return Donkeycraft.TextureGenerator.generateChestSide(); } },
-        { name: 'Furnace', fn: function() { return Donkeycraft.TextureGenerator.generateFurnaceFront(); } },
-        { name: 'Crafting Table', fn: function() { return Donkeycraft.TextureGenerator.generateCraftingTable(); } },
-        { name: 'Bed (Red)', fn: function() { return Donkeycraft.TextureGenerator.generateBed('red'); } }
-    ];
-
-    var furnitureTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var fu = 0; fu < furnitureTests.length; fu++) {
-        var test10 = furnitureTests[fu];
-        var img10 = test10.fn();
-        var pass10 = isImageLike(img10);
-        if (pass10) passedSections++; else failedSections++;
-        furnitureTable += '<tr>';
-        furnitureTable += '<td class="texture-name">' + test10.name + '</td>';
-        furnitureTable += '<td><img src="' + img10.src + '" class="texture-preview" title="' + test10.name + '"></td>';
-        furnitureTable += '<td class="' + (pass10 ? 'pass-cell' : 'fail-cell') + '">' + (pass10 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        furnitureTable += '</tr>';
-    }
-    furnitureTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', furnitureTable);
-
-    // ============================================================
-    // SECTION 12: Portal & Special Effect Textures
-    // ============================================================
-    totalSections++;
-    F.section('12. Portal & Special Effect Textures');
-
-    var portalTests = [
-        { name: 'End Portal', fn: function() { return Donkeycraft.TextureGenerator.generateEndPortal(); } },
-        { name: 'Nether Portal', fn: function() { return Donkeycraft.TextureGenerator.generateNetherPortal(); } },
-        { name: 'End Portal Frame', fn: function() { return Donkeycraft.TextureGenerator.generateEndPortalFrame(); } },
-        { name: 'Mob Spawner', fn: function() { return Donkeycraft.TextureGenerator.generateMobSpawner(); } }
-    ];
-
-    var portalTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var po = 0; po < portalTests.length; po++) {
-        var test11 = portalTests[po];
-        var img11 = test11.fn();
-        var pass11 = isImageLike(img11);
-        if (pass11) passedSections++; else failedSections++;
-        portalTable += '<tr>';
-        portalTable += '<td class="texture-name">' + test11.name + '</td>';
-        portalTable += '<td><img src="' + img11.src + '" class="texture-preview" title="' + test11.name + '"></td>';
-        portalTable += '<td class="' + (pass11 ? 'pass-cell' : 'fail-cell') + '">' + (pass11 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        portalTable += '</tr>';
-    }
-    portalTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', portalTable);
-
-    // ============================================================
-    // SECTION 13: Block Name → Texture Mapping
-    // ============================================================
-    totalSections++;
-    F.section('13. Block Name → Texture Mapping');
-
-    F.assertType(texGen.getGeneratorForBlock, 'function', 'getGeneratorForBlock is function');
-    F.assertType(texGen.getGeneratorForBlock('stone'), 'function', 'getGeneratorForBlock("stone") returns function');
-    F.assert(texGen.getGeneratorForBlock('nonexistent_block_xyz') === null, 'getGeneratorForBlock("unknown") returns null');
-
-    var fallbackImg = texGen.generateTextureForBlock('stone');
-    F.assert(isImageLike(fallbackImg), 'generateTextureForBlock("stone") returns image-like object');
-
-    var fallbackUnknown = texGen.generateTextureForBlock('totally_unknown_block');
-    F.assert(isImageLike(fallbackUnknown), 'generateTextureForBlock("unknown") returns fallback texture');
-    if (isImageLike(fallbackUnknown)) passedSections++; else failedSections++;
-
-    // ============================================================
-    // SECTION 14: Bulk Texture Generation
-    // ============================================================
-    totalSections++;
-    F.section('14. Bulk Texture Generation (getNameMap)');
-
-    var nameMap = texGen.getNameMap();
-    F.assertType(nameMap, 'object', 'getNameMap returns object');
-    F.assert(Object.keys(nameMap).length > 0, 'getNameMap returns non-empty map');
-    F.assert(typeof nameMap[1] === 'string', 'getNameMap[1] is a string (block name)');
-    F.info('getNameMap returned ' + Object.keys(nameMap).length + ' block name entries');
-    if (Object.keys(nameMap).length > 0) passedSections++; else failedSections++;
-
-    // ============================================================
-    // SECTION 15: Missing / Fallback Texture
-    // ============================================================
-    totalSections++;
-    F.section('15. Missing / Fallback Texture');
-
-    var missingImg = texGen.generateMissing();
-    F.assert(isImageLike(missingImg), 'generateMissing returns image-like object');
-    if (isImageLike(missingImg)) passedSections++; else failedSections++;
-
-    // ============================================================
-    // SECTION 16: Cross-Module Integration
-    // ============================================================
-    totalSections++;
-    F.section('16. Cross-Module Integration (TextureGenerator + BlockRegistry)');
-
-    var allBlocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
-    F.assert(allBlocks.length > 0, 'BlockRegistry has registered blocks (' + allBlocks.length + ')');
-    if (allBlocks.length > 0) passedSections++; else failedSections++;
-
-    var block1 = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockById(1) : null;
-    F.assert(block1 !== null, 'getBlockById(1) returns block object');
-    F.assertType(block1 && block1.name, 'string', 'Block.name is string');
-
-    if (block1 && block1.name) {
-        var gen = texGen.getGeneratorForBlock(block1.name);
-        F.assertType(gen, 'function', 'getGeneratorForBlock returns function for registered block');
-        if (gen) passedSections++; else failedSections++;
-
-        var tex = texGen.generateTextureForBlock(block1.name);
-        F.assert(isImageLike(tex), 'generateTextureForBlock returns texture for registered block');
-        if (isImageLike(tex)) passedSections++; else failedSections++;
-    }
-
-    // ============================================================
-    // SECTION 17: Edge Cases
-    // ============================================================
-    totalSections++;
-    F.section('17. Edge Cases & Error Handling');
-
-    var edgeTests = [
+    // Edge cases (no display, just assertions)
+    var edgeTests2 = [
         { name: 'generatePlanks(0,0,0)', fn: function() { return Donkeycraft.TextureGenerator.generatePlanks(0, 0, 0, 0); } },
         { name: 'generatePlanks(255,255,255)', fn: function() { return Donkeycraft.TextureGenerator.generatePlanks(255, 255, 255, 999); } },
         { name: 'generateWool(0,0,0)', fn: function() { return Donkeycraft.TextureGenerator.generateWool(0, 0, 0); } },
@@ -709,29 +396,60 @@ body { max-width: 1400px; }
         { name: 'generateLogSide(0)', fn: function() { return Donkeycraft.TextureGenerator.generateLogSide(0); } },
         { name: 'generateStone() no seed', fn: function() { return Donkeycraft.TextureGenerator.generateStone(); } }
     ];
-
-    var edgeTable = '<table class="texture-table"><tr><th>Test</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var ed = 0; ed < edgeTests.length; ed++) {
-        var testEdge = edgeTests[ed];
+    for (var ei = 0; ei < edgeTests2.length; ei++) {
         try {
-            var imgEdge = testEdge.fn();
-            var passEdge = isImageLike(imgEdge);
-            if (passEdge) passedSections++; else failedSections++;
-            edgeTable += '<tr>';
-            edgeTable += '<td class="texture-name">' + testEdge.name + '</td>';
-            edgeTable += '<td><img src="' + imgEdge.src + '" class="texture-preview" title="' + testEdge.name + '"></td>';
-            edgeTable += '<td class="' + (passEdge ? 'pass-cell' : 'fail-cell') + '">' + (passEdge ? '✓ PASS' : '✗ FAIL') + '</td>';
-            edgeTable += '</tr>';
-        } catch(e) {
+            var eImg = edgeTests2[ei].fn();
+            F.assert(isImageLike(eImg), 'Edge: ' + edgeTests2[ei].name + ' returns image');
+            if (isImageLike(eImg)) passedSections++; else failedSections++;
+        } catch(e2) {
             failedSections++;
-            edgeTable += '<tr>';
-            edgeTable += '<td class="texture-name">' + testEdge.name + '</td>';
-            edgeTable += '<td colspan="2" class="fail-cell">ERROR: ' + e.message + '</td>';
-            edgeTable += '</tr>';
+            F.assert(false, 'Edge: ' + edgeTests2[ei].name + ' threw: ' + e2.message);
         }
     }
-    edgeTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', edgeTable);
+
+    // Block name → texture mapping
+    F.assertType(texGen.getGeneratorForBlock, 'function', 'getGeneratorForBlock is function');
+    F.assertType(texGen.getGeneratorForBlock('stone'), 'function', 'getGeneratorForBlock("stone") returns function');
+    F.assert(texGen.getGeneratorForBlock('nonexistent_block_xyz') === null, 'getGeneratorForBlock("unknown") returns null');
+
+    var fallbackImg2 = texGen.generateTextureForBlock('stone');
+    F.assert(isImageLike(fallbackImg2), 'generateTextureForBlock("stone") returns image-like object');
+
+    var fallbackUnknown2 = texGen.generateTextureForBlock('totally_unknown_block');
+    F.assert(isImageLike(fallbackUnknown2), 'generateTextureForBlock("unknown") returns fallback texture');
+    if (isImageLike(fallbackUnknown2)) passedSections++; else failedSections++;
+
+    // Missing texture
+    var missingImg2 = texGen.generateMissing();
+    F.assert(isImageLike(missingImg2), 'generateMissing returns image-like object');
+    if (isImageLike(missingImg2)) passedSections++; else failedSections++;
+
+    // Cross-module integration
+    var allBlocks2 = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
+    F.assert(allBlocks2.length > 0, 'BlockRegistry has registered blocks (' + allBlocks2.length + ')');
+    if (allBlocks2.length > 0) passedSections++; else failedSections++;
+
+    var block1b = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockById(1) : null;
+    F.assert(block1b !== null, 'getBlockById(1) returns block object');
+    F.assertType(block1b && block1b.name, 'string', 'Block.name is string');
+
+    if (block1b && block1b.name) {
+        var gen2 = texGen.getGeneratorForBlock(block1b.name);
+        F.assertType(gen2, 'function', 'getGeneratorForBlock returns function for registered block');
+        if (gen2) passedSections++; else failedSections++;
+
+        var tex2 = texGen.generateTextureForBlock(block1b.name);
+        F.assert(isImageLike(tex2), 'generateTextureForBlock returns texture for registered block');
+        if (isImageLike(tex2)) passedSections++; else failedSections++;
+    }
+
+    // getNameMap
+    var nameMap3 = texGen.getNameMap();
+    F.assertType(nameMap3, 'object', 'getNameMap returns object');
+    F.assert(Object.keys(nameMap3).length > 0, 'getNameMap returns non-empty map (' + Object.keys(nameMap3).length + ' entries)');
+    F.assert(typeof nameMap3[1] === 'string', 'getNameMap[1] is a string (block name)');
+    F.info('getNameMap returned ' + Object.keys(nameMap3).length + ' block name entries');
+    if (Object.keys(nameMap3).length > 0) passedSections++; else failedSections++;
 
     // ============================================================
     // Sound Tests (run separately after AudioContext init)
@@ -745,12 +463,54 @@ body { max-width: 1400px; }
         F.assert(categories.length >= 13, 'getCategories returns at least 13 categories (' + categories.length + ')');
         F.assert(categories.indexOf('step') >= 0, 'Category "step" is available');
         F.assert(categories.indexOf('explosion') >= 0, 'Category "explosion" is available');
-        F.assert(sndGen.isCached('test_key_xyz'), 'isCached returns false for uncached key (returns false)');
+        F.assert(!sndGen.isCached('test_key_xyz'), 'isCached returns false for uncached key');
 
         var clearResult = sndGen.clearCache();
         F.assertType(clearResult, 'undefined', 'clearCache returns undefined');
         F.assert(!sndGen.isCached('test_key_xyz'), 'isCached returns false after clearCache');
         if (categories.length >= 13) passedSections++; else failedSections++;
+
+        // Helper: convert AudioBuffer to WAV data URL (for play buttons)
+        function audioBufferToWavUrl(buffer) {
+            var numChannels = buffer.numberOfChannels;
+            var sampleRate = buffer.sampleRate;
+            var length = buffer.length;
+            var bytesPerSample = 2;
+            var blockAlign = numChannels * bytesPerSample;
+            var dataSize = length * blockAlign;
+            var headerSize = 44;
+            var totalSize = headerSize + dataSize;
+            var arrayBuffer = new ArrayBuffer(totalSize);
+            var view = new DataView(arrayBuffer);
+
+            function writeString(offset, str) {
+                for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+            }
+            writeString(0, 'RIFF');
+            view.setUint32(4, totalSize - 8, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * blockAlign, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bytesPerSample * 8, true);
+            writeString(36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            var offset = 44;
+            for (var ch = 0; ch < numChannels; ch++) {
+                var channelData = buffer.getChannelData(ch);
+                for (var i = 0; i < length; i++) {
+                    var sample = Math.max(-1, Math.min(1, channelData[i]));
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+            return 'data:audio/wav;base64,' + btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+        }
 
         // Sound display table
         totalSections++;
@@ -773,48 +533,6 @@ body { max-width: 1400px; }
             var breakSnd = sndGen.generateBreakSound(audioCtx, 'stone');
             F.assertType(breakSnd, 'object', 'generateBreakSound returns AudioBuffer');
             F.assert(breakSnd instanceof AudioBuffer, 'Break is AudioBuffer');
-
-            // Play buttons for sync sounds
-            function audioBufferToWavUrl(buffer) {
-                var numChannels = buffer.numberOfChannels;
-                var sampleRate = buffer.sampleRate;
-                var length = buffer.length;
-                var bytesPerSample = 2;
-                var blockAlign = numChannels * bytesPerSample;
-                var dataSize = length * blockAlign;
-                var headerSize = 44;
-                var totalSize = headerSize + dataSize;
-                var arrayBuffer = new ArrayBuffer(totalSize);
-                var view = new DataView(arrayBuffer);
-
-                function writeString(offset, str) {
-                    for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-                }
-                writeString(0, 'RIFF');
-                view.setUint32(4, totalSize - 8, true);
-                writeString(8, 'WAVE');
-                writeString(12, 'fmt ');
-                view.setUint32(16, 16, true);
-                view.setUint16(20, 1, true);
-                view.setUint16(22, numChannels, true);
-                view.setUint32(24, sampleRate, true);
-                view.setUint32(28, sampleRate * blockAlign, true);
-                view.setUint16(32, blockAlign, true);
-                view.setUint16(34, bytesPerSample * 8, true);
-                writeString(36, 'data');
-                view.setUint32(40, dataSize, true);
-
-                var offset = 44;
-                for (var ch = 0; ch < numChannels; ch++) {
-                    var channelData = buffer.getChannelData(ch);
-                    for (var i = 0; i < length; i++) {
-                        var sample = Math.max(-1, Math.min(1, channelData[i]));
-                        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-                        offset += 2;
-                    }
-                }
-                return 'data:audio/wav;base64,' + btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
-            }
 
             // Add play buttons and rows for sync sounds
             var syncSounds = [
@@ -841,11 +559,20 @@ body { max-width: 1400px; }
             F.assert(false, 'Sync sound tests failed: ' + e.message);
         }
 
-        // Async sounds
+        // Async sounds (all remaining categories)
         (function asyncSoundTest() {
             var asyncTests = [
-                { name: 'Place', fn: function() { return sndGen.generatePlaceSound(audioCtx, 'stone'); } },
-                { name: 'Explosion', fn: function() { return sndGen.generateExplosionSound(audioCtx); } }
+                { name: 'Hit (stone)', fn: function() { return sndGen.generateHitSound(audioCtx, 'stone'); } },
+                { name: 'Splash', fn: function() { return sndGen.generateSplashSound(audioCtx); } },
+                { name: 'Glass Break', fn: function() { return sndGen.generateGlassBreakSound(audioCtx); } },
+                { name: 'Pop', fn: function() { return sndGen.generatePopSound(audioCtx); } },
+                { name: 'Explosion', fn: function() { return sndGen.generateExplosionSound(audioCtx); } },
+                { name: 'Enchant', fn: function() { return sndGen.generateEnchantSound(audioCtx); } },
+                { name: 'Drink', fn: function() { return sndGen.generateDrinkSound(audioCtx); } },
+                { name: 'Place (stone)', fn: function() { return sndGen.generatePlaceSound(audioCtx, 'stone'); } },
+                { name: 'Ambient (passive)', fn: function() { return sndGen.generateAmbientSound(audioCtx, 'passive'); } },
+                { name: 'Ambient (hostile)', fn: function() { return sndGen.generateAmbientSound(audioCtx, 'hostile'); } },
+                { name: 'Hurt (entity)', fn: function() { return sndGen.generateHurtSound(audioCtx, 'entity'); } }
             ];
 
             var promiseChain = Promise.resolve();
@@ -906,19 +633,19 @@ body { max-width: 1400px; }
 
                 var atlasCanvas = assetMgr.generateAtlasCanvas();
                 F.assertType(atlasCanvas, 'object', 'generateAtlasCanvas returns canvas element');
-                F.assert(atlasCanvas.width === 256, 'Atlas canvas is 256px wide (' + atlasCanvas.width + ')');
-                F.assert(atlasCanvas.height === 256, 'Atlas canvas is 256px tall (' + atlasCanvas.height + ')');
+                F.assert(atlasCanvas.width === 1280, 'Atlas canvas is 1280px wide (' + atlasCanvas.width + ')');
+                F.assert(atlasCanvas.height === 1280, 'Atlas canvas is 1280px tall (' + atlasCanvas.height + ')');
 
                 // Display atlas
                 var atlasTable = '<table class="texture-table"><tr><th>Atlas</th><th>Preview</th><th>Status</th></tr>';
                 atlasTable += '<tr>';
-                atlasTable += '<td class="texture-name">Texture Atlas (256×256)</td>';
-                atlasTable += '<td><img src="' + atlasCanvas.toDataURL('image/png') + '" class="texture-preview" style="width:128px;height:128px;" title="Full Texture Atlas"></td>';
+                atlasTable += '<td class="texture-name">Texture Atlas (1280×1280)</td>';
+                atlasTable += '<td><img src="' + atlasCanvas.toDataURL('image/png') + '" class="atlas-preview" title="Full Texture Atlas"></td>';
                 atlasTable += '<td class="pass-cell">✓ PASS</td>';
                 atlasTable += '</tr></table>';
                 document.getElementById('results').insertAdjacentHTML('beforeend', atlasTable);
 
-                if (atlasCanvas.width === 256 && atlasCanvas.height === 256) passedSections++; else failedSections++;
+                if (atlasCanvas.width === 1280 && atlasCanvas.height === 1280) passedSections++; else failedSections++;
 
                 // Reset
                 totalSections++;
