@@ -68,6 +68,10 @@
 
         // Overlay elements
         this._overlay = null;
+
+        // Auto-save system (uses Config.AUTO_SAVE_INTERVAL, CHUNKS_PER_SAVE, SAVE_BATCH_DELAY)
+        this._autoSaveTimer = 0;
+        this._worldStore = null;
     };
 
     /**
@@ -186,6 +190,14 @@
     };
 
     /**
+     * Set the world store for auto-save persistence.
+     * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance.
+     */
+    Donkeycraft.Game.prototype.setWorldStore = function(worldStore) {
+        this._worldStore = worldStore;
+    };
+
+    /**
      * Set external system references (called after Game.init()).
      * If constructor functions are passed instead of instances, they will be instantiated
      * using the systems created during Game.init() (input, player, collision, chunkManager).
@@ -252,6 +264,47 @@
     };
 
     /**
+     * Save dirty chunks to IndexedDB using Config.CHUNKS_PER_SAVE batching.
+     * @private
+     * @param {string} worldName - World name identifier.
+     */
+    Donkeycraft.Game.prototype._saveDirtyChunks = function(worldName) {
+        if (!this._worldStore || !this._worldStore.isReady()) return;
+
+        var self = this;
+        var CHUNKS_PER_SAVE = Config.CHUNKS_PER_SAVE;
+        var SAVE_BATCH_DELAY = Config.SAVE_BATCH_DELAY;
+        var dirtyChunks = this._chunkManager ? this._chunkManager.getDirtyChunks() : [];
+
+        if (dirtyChunks.length === 0) return;
+
+        // Save chunks in batches for performance
+        var savedCount = 0;
+        var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length);
+
+        for (var i = 0; i < batchSize && i < dirtyChunks.length; i++) {
+            var chunk = dirtyChunks[i];
+            if (!chunk || !chunk.isDirty()) continue;
+
+            var cx = chunk.chunkX;
+            var cz = chunk.chunkZ;
+            var chunkData = {
+                blockData: chunk.getBlockData ? chunk.getBlockData() : null,
+                skyLight: chunk.getSkyLight ? chunk.getSkyLight(0, 0, 0) : 0,
+                blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
+            };
+
+            this._worldStore.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
+                if (success) savedCount++;
+            }).catch(function() {
+                // Silently ignore individual save failures
+            });
+        }
+
+        Donkeycraft.Logger.info('Game', 'Auto-saved ' + batchSize + ' chunks to world: ' + worldName);
+    };
+
+    /**
      * Start the game loop.
      */
     Donkeycraft.Game.prototype.start = function() {
@@ -275,6 +328,15 @@
 
         // Start the timer
         this._timer.start();
+
+        // Emit ready event for external initialization (e.g., loading screen)
+        if (this._eventBus) {
+            try {
+                this._eventBus.emit('game:ready', {});
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Ready event error: ' + e.message);
+            }
+        }
 
         Donkeycraft.Logger.info('Game', 'Game loop started');
     };
@@ -529,6 +591,10 @@
             this._eventBus.clear();
             this._eventBus = null;
         }
+
+        // Clean up auto-save timer
+        this._autoSaveTimer = 0;
+        this._worldStore = null;
 
         Donkeycraft.Logger.info('Game', 'Game destroyed');
     };
@@ -857,6 +923,19 @@
         // Process interactions (block break/place)
         this._processInteractions();
 
+        // Auto-save: accumulate time and save at Config.AUTO_SAVE_INTERVAL
+        if (this._worldStore && this._chunkManager) {
+            this._autoSaveTimer += dt * 1000; // Convert to ms
+            if (this._autoSaveTimer >= Config.AUTO_SAVE_INTERVAL) {
+                this._autoSaveTimer = 0;
+                try {
+                    this._saveDirtyChunks('default');
+                } catch (e) {
+                    Donkeycraft.Logger.warn('Game', 'Auto-save failed: ' + e.message);
+                }
+            }
+        }
+
         // Emit tick event
         if (this._eventBus) {
             try {
@@ -910,17 +989,17 @@
             }
         }
 
-        // Handle swimming upward
+        // Handle swimming upward — use Config.SWIM_BOOST for upward velocity boost
         if (this._input.isKeyDown('Space') && this._jumpSystem && this._jumpSystem.isSwimmingUp(this._player)) {
-            vel.y += 0.05;
+            vel.y += Config.SWIM_BOOST;
         }
 
-        // Apply gravity
-        vel.y -= 9.8 * dt;
+        // Apply gravity from Config
+        vel.y += Config.GRAVITY * dt;
 
-        // Clamp vertical velocity to prevent extreme speeds
-        if (vel.y < -50) vel.y = -50;
-        if (vel.y > 50) vel.y = 50;
+        // Clamp vertical velocity to terminal velocities from Config
+        if (vel.y < Config.TERMINAL_VELOCITY) vel.y = Config.TERMINAL_VELOCITY;
+        if (vel.y > -Config.FLYING_TERMINAL_VELOCITY) vel.y = -Config.FLYING_TERMINAL_VELOCITY;
 
         // Handle knockback — add to velocity instead of directly modifying position
         var kb = this._player.getKnockback();
@@ -973,13 +1052,13 @@
     Donkeycraft.Game.prototype._updateWalkingMovement = function(dt, moveX, moveZ, isSprinting) {
         var vel = this._player.getVelocity();
 
-        // Get movement speed based on game mode and sprint state
-        var speed = 5.0; // Survival walking speed
+        // Get movement speed from Config based on game mode and sprint state
+        var speed = Config.PLAYER_SPEED; // Survival walking speed
         if (this._player.gameMode === 'creative') {
-            speed = 5.0; // Creative walking speed
+            speed = Config.PLAYER_FLY_SPEED; // Creative walking speed (uses same base)
         }
         if (isSprinting) {
-            speed *= 1.3; // Sprint speed multiplier
+            speed = Config.PLAYER_SPRINT_SPEED; // Sprint speed from Config
         }
 
         // Apply horizontal movement
@@ -998,11 +1077,8 @@
     Donkeycraft.Game.prototype._updateFlyingMovement = function(dt, moveX, moveZ, isSprinting) {
         var vel = this._player.getVelocity();
 
-        // Get flying speed based on game mode and sprint state
-        var speed = 5.0; // Normal fly speed
-        if (isSprinting) {
-            speed = 10.0; // Sprint fly speed
-        }
+        // Get flying speed from Config based on sprint state
+        var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
 
         // Apply horizontal movement
         vel.x = moveX * speed;
@@ -1061,7 +1137,7 @@
 
         // Calculate raycast direction from camera rotation
         var direction = this._raycastSystem.getDirectionFromRotation(rot.yaw, rot.pitch);
-        var reach = 6.0;
+        var reach = Config.PLAYER_REACH;
 
         // Perform raycast using the chunk manager
         var ignoreIds = [0]; // Ignore air

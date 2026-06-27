@@ -1,5 +1,6 @@
 // Donkeycraft — Configuration
-// Game configuration: render distance, chunk size, tick rates, keybinds.
+// Game configuration: render distance, chunk size, tick rates, keybinds, physics, and persistence.
+// All values are constants — do not modify at runtime.
 (function() {
     'use strict';
 
@@ -7,6 +8,11 @@
 
     /**
      * Config — global game configuration object.
+     *
+     * This object is loaded once during initialization and provides constants
+     * used throughout the game engine. All properties are read-only after creation.
+     *
+     * @namespace
      */
     Donkeycraft.Config = (function() {
         return {
@@ -48,9 +54,9 @@
             JUMP_COOLDOWN: 0.1,          // Cooldown between jumps (seconds)
             FALL_DAMAGE_THRESHOLD: 3,    // Blocks of free fall before damage begins
 
-            // Lighting
-            SKY_LIGHT_DECAY: 1,         // Light decay per block
-            BLOCK_LIGHT_DECAY: 1,       // Block light decay per tick
+            // Lighting (reserved for future use — current implementation uses block lightOpacity/lightLevel properties)
+            SKY_LIGHT_DECAY: 1,         // Sky light decay per block (unused)
+            BLOCK_LIGHT_DECAY: 1,       // Block light decay per tick (unused)
 
             // Key bindings (keyboard only — mouse buttons are accessed via Input.getMouseState())
             KEYBINDS: {
@@ -76,9 +82,9 @@
                 DROP_ITEM: 'KeyQ'
             },
 
-            // Chunk persistence
-            CHUNKS_PER_SAVE: 4,       // Save chunks in batches
-            SAVE_BATCH_DELAY: 100,    // Delay between batch saves (ms)
+            // Chunk persistence (used by Game._saveDirtyChunks for auto-save batching)
+            CHUNKS_PER_SAVE: 4,       // Number of chunks to save per batch
+            SAVE_BATCH_DELAY: 100,    // Delay in ms between batch save operations (reserved)
 
             // Dimension settings
             NETHER_SCALE: 8,          // Overworld coords / 8 = Nether coords (and vice versa)
