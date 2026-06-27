@@ -91,13 +91,13 @@
 
         /**
          * Check if a block ID is portal-related (obsidian, crying obsidian).
-         * Re-resolves IDs if any are 0 (defensive against timing issues).
+         * Re-resolves IDs individually if any are 0 (defensive against timing issues).
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block can be used for portal frames.
          */
         function isPortalBlock(blockId) {
-            // Defensive: re-resolve if cached IDs are 0
-            if (_obsidianId === 0 && _cryingObsidianId === 0) {
+            // Defensive: re-resolve each ID individually if 0
+            if (_obsidianId === 0 || _cryingObsidianId === 0) {
                 _resolvePortalBlockIds();
             }
             return blockId === _obsidianId || blockId === _cryingObsidianId;
@@ -105,13 +105,13 @@
 
         /**
          * Check if a block ID is an active portal block (nether_portal, end_portal).
-         * Re-resolves IDs if any are 0 (defensive against timing issues).
+         * Re-resolves IDs individually if any are 0 (defensive against timing issues).
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block is a portal block.
          */
         function isPortalActive(blockId) {
-            // Defensive: re-resolve if cached IDs are 0
-            if (_netherPortalId === 0 && _endPortalId === 0) {
+            // Defensive: re-resolve each ID individually if 0
+            if (_netherPortalId === 0 || _endPortalId === 0) {
                 _resolvePortalBlockIds();
             }
             return blockId === _netherPortalId || blockId === _endPortalId;
