@@ -61,14 +61,20 @@ Foundation layer — event system, math utilities, input handling, audio, config
 
 ---
 
-### 2. Asset Generation
-Procedural texture and sound generation.
+### 2. Asset Generation (`src/gen/`)
+Procedural texture and sound generation — refactored into modular files.
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 10 | `src/core/asset-generator.js` | Procedural textures (285+ block types via Simplex noise), procedural sounds (13 categories via Web Audio API), texture atlas canvas generation | 4,732 |
+| 10 | `src/gen/noise.js` | Shared noise utilities: Permutation table, shuffle, fade, lerp, grad, 2D Perlin noise, Mulberry32 PRNG, FBM | ~140 |
+| 11 | `src/gen/texture-core.js` | TextureGenerator core: IIFE wrapper, canvas creation, cache management, color map, base generators (stone, dirt, grass, wood, planks, wool) | ~850 |
+| 12 | `src/gen/texture-terrain.js` | Terrain textures: sand, snow, red sand, gravel, ice, blue ice, water, lava, bedrock, glow, slime, honey, hay bale, melon, pumpkin | ~450 |
+| 13 | `src/gen/texture-blocks.js` | Block textures: glass variants, bricks (standard/nether/red), ores (coal/iron/gold/diamond/emerald/redstone/lapis/quartz), metal blocks, concrete/wool 16-color families, terracotta, sandstone family, prismarine family | ~700 |
+| 14 | `src/gen/texture-special.js` | Special/nether/end textures: netherrack, end stone, basalt family, blackstone family, ancient debris, gilded blackstone, magma, soul sand/soil, nylium, warped/crimson stems, chorus plant, quartz blocks, purpur, redstone lamp, TNT, storage blocks | ~650 |
+| 15 | `src/gen/texture-decorative.js` | Decorative/plant/redstone textures + block mapping: plants (grass, fern, flowers, bushes, vines, cactus), redstone components (wire, torch, repeater, observer, piston), furniture (chest, furnace, crafting table, doors, fences, buttons), portals, GUI elements, getGeneratorForBlock map | ~1050 |
+| 16 | `src/gen/sound-manager.js` | SoundGenerator (5 categories via Web Audio API), AssetManager (texture coordination, atlas canvas), AssetGenerator (Promise wrapper) | ~340 |
 
-**Subtotal: 1 file, ~4,732 lines**
+**Subtotal: 7 files, ~4,180 lines**
 
 ---
 
@@ -274,7 +280,7 @@ IndexedDB world storage, level data persistence, and asset caching.
 | Module Group | Files | Estimated Lines |
 |--------------|-------|-----------------|
 | 1. Core Infrastructure | 9 | ~2,308 |
-| 2. Asset Generation | 1 | ~4,732 |
+| 2. Asset Generation | 7 | ~4,180 |
 | 3. WebGL Rendering Engine | 15 | ~3,404 |
 | 4. Block System | 6 | ~2,436 |
 | 5. World Generation & Management | 17 | ~4,323 |
@@ -286,7 +292,7 @@ IndexedDB world storage, level data persistence, and asset caching.
 | 11. Game Systems | 3 | ~1,267 |
 | 12. Storage System | 3 | ~1,530 |
 | 13. Main Entry Point | 1 | ~1,195 |
-| **TOTAL** | **98 files** | **~28,478 lines of JS/GLSL** |
+| **TOTAL** | **103 files** | **~28,928 lines of JS/GLSL** |
 
 ---
 
@@ -295,102 +301,107 @@ IndexedDB world storage, level data persistence, and asset caching.
 Scripts are loaded in this order in `index.html`:
 
 ```
-1.  src/core/namespace.js          ← must be first
-2.  src/core/eventbus.js
-3.  src/core/config.js
-4.  src/core/logger.js
-5.  src/core/timer.js
-6.  src/core/input.js
-7.  src/core/math-utils.js
-8.  src/core/audio.js
-9.  src/core/init-sequence.js
-10. src/core/asset-generator.js
-11. src/render/gl-context.js
-12. src/render/shader-manager.js
-13. src/render/geometry-builder.js
-14. src/render/mesh-optimizer.js
-15. src/render/chunk-mesh.js
-16. src/render/terrain-renderer.js
-17. src/render/camera.js
-18. src/render/fog.js
-19. src/render/sky.js
-20. src/render/lighting.js
-21. src/render/hand-renderer.js
-22. src/render/break-particles.js
-23. src/render/gui-renderer.js
-24. src/render/weather.js
-25. src/world/block.js
-26. src/world/block-state.js
-27. src/world/block-types.js
-28. src/world/texture-atlas.js
-29. src/world/block-models.js
-30. src/world/recipe-registry.js
-31. src/world/chunk.js
-32. src/world/chunk-manager.js
-33. src/world/biome.js
-34. src/world/terrain-generator.js
-35. src/world/ore-generator.js
-36. src/world/cave-generator.js
-37. src/world/structure-generator.js
-38. src/world/water-generator.js
-39. src/world/terrain-surface.js
-40. src/world/lighting-engine.js
-41. src/world/physics.js
-42. src/world/world-utils.js
-43. src/world/dimension.js
-44. src/world/portal.js
-45. src/world/nether-generator.js
-46. src/world/end-generator.js
-47. src/world/time.js
-48. src/player/player.js
-49. src/player/movement.js
-50. src/player/collision.js
-51. src/player/jumping.js
-52. src/player/flying.js
-53. src/player/hurt-box.js
-54. src/player/game-mode.js
-55. src/player/stats.js
-56. src/player/hunger.js
-57. src/player/experience.js
-58. src/interaction/raycast.js
-59. src/interaction/block-action.js
-60. src/interaction/block-placement.js
-61. src/interaction/interactable-blocks.js
-62. src/ui/item-stack.js
-63. src/ui/inventory.js
-64. src/ui/gui-manager.js
-65. src/ui/hotbar.js
-66. src/ui/crafting-grid.js
-67. src/ui/creative-inventory.js
-68. src/ui/furnace-ui.js
-69. src/ui/chest-ui.js
-70. src/ui/anvil-ui.js
-71. src/ui/enchanting-ui.js
-72. src/ui/debug-overlay.js
-73. src/ui/gui-elements.js
-74. src/ui/loading-screen.js
-75. src/entity/entity.js
-76. src/entity/entity-manager.js
-77. src/entity/passive-mobs.js
-78. src/entity/hostile-mobs.js
-79. src/entity/boss-mobs.js
-80. src/entity/mob-ai.js
-81. src/entity/projectiles.js
-82. src/entity/animals.js
-83. src/entity/mob-spawning.js
-84. src/redstone/redstone-engine.js
-85. src/redstone/repeater-comparator.js
-86. src/redstone/observers.js
-87. src/redstone/tnt.js
-88. src/redstone/pistons.js
-89. src/redstone/wiring.js
-90. src/game/enchantment.js
-91. src/game/potion.js
-92. src/game/tool.js
-93. src/storage/world-store.js
-94. src/storage/level-data.js
-95. src/storage/cache.js
-96. src/game.js                    ← loaded last
+ 1.  src/core/namespace.js          ← must be first
+ 2.  src/core/eventbus.js
+ 3.  src/core/config.js
+ 4.  src/core/logger.js
+ 5.  src/core/timer.js
+ 6.  src/core/input.js
+ 7.  src/core/math-utils.js
+ 8.  src/core/audio.js
+ 9.  src/core/init-sequence.js
+10.  src/gen/noise.js
+11.  src/gen/texture-core.js
+12.  src/gen/texture-terrain.js
+13.  src/gen/texture-blocks.js
+14.  src/gen/texture-special.js
+15.  src/gen/texture-decorative.js
+16.  src/gen/sound-manager.js
+17.  src/render/gl-context.js
+18.  src/render/shader-manager.js
+19.  src/render/geometry-builder.js
+20.  src/render/mesh-optimizer.js
+21.  src/render/chunk-mesh.js
+22.  src/render/terrain-renderer.js
+23.  src/render/camera.js
+24.  src/render/fog.js
+25.  src/render/sky.js
+26.  src/render/lighting.js
+27.  src/render/hand-renderer.js
+28.  src/render/break-particles.js
+29.  src/render/gui-renderer.js
+30.  src/render/weather.js
+31.  src/world/block.js
+32.  src/world/block-state.js
+33.  src/world/block-types.js
+34.  src/world/texture-atlas.js
+35.  src/world/block-models.js
+36.  src/world/recipe-registry.js
+37.  src/world/chunk.js
+38.  src/world/chunk-manager.js
+39.  src/world/biome.js
+40.  src/world/terrain-generator.js
+41.  src/world/ore-generator.js
+42.  src/world/cave-generator.js
+43.  src/world/water-generator.js
+44.  src/world/terrain-surface.js
+45.  src/world/lighting-engine.js
+46.  src/world/physics.js
+47.  src/world/world-utils.js
+48.  src/world/dimension.js
+49.  src/world/portal.js
+50.  src/world/nether-generator.js
+51.  src/world/end-generator.js
+52.  src/world/time.js
+53.  src/player/player.js
+54.  src/player/movement.js
+55.  src/player/collision.js
+56.  src/player/jumping.js
+57.  src/player/flying.js
+58.  src/player/hurt-box.js
+59.  src/player/game-mode.js
+60.  src/player/stats.js
+61.  src/player/hunger.js
+62.  src/player/experience.js
+63.  src/interaction/raycast.js
+64.  src/interaction/block-action.js
+65.  src/interaction/block-placement.js
+66.  src/interaction/interactable-blocks.js
+67.  src/ui/item-stack.js
+68.  src/ui/inventory.js
+69.  src/ui/gui-manager.js
+70.  src/ui/hotbar.js
+71.  src/ui/crafting-grid.js
+72.  src/ui/creative-inventory.js
+73.  src/ui/furnace-ui.js
+74.  src/ui/chest-ui.js
+75.  src/ui/anvil-ui.js
+76.  src/ui/enchanting-ui.js
+77.  src/ui/debug-overlay.js
+78.  src/ui/gui-elements.js
+79.  src/ui/loading-screen.js
+80.  src/entity/entity.js
+81.  src/entity/entity-manager.js
+82.  src/entity/passive-mobs.js
+83.  src/entity/hostile-mobs.js
+84.  src/entity/boss-mobs.js
+85.  src/entity/mob-ai.js
+86.  src/entity/projectiles.js
+87.  src/entity/animals.js
+88.  src/entity/mob-spawning.js
+89.  src/redstone/redstone-engine.js
+90.  src/redstone/repeater-comparator.js
+91.  src/redstone/observers.js
+92.  src/redstone/tnt.js
+93.  src/redstone/pistons.js
+94.  src/redstone/wiring.js
+95.  src/game/enchantment.js
+96.  src/game/potion.js
+97.  src/game/tool.js
+98.  src/storage/world-store.js
+99.  src/storage/level-data.js
+100. src/storage/cache.js
+101. src/game.js                    ← loaded last
 ```
 
 ---
@@ -401,7 +412,7 @@ Scripts are loaded in this order in `index.html`:
 WebGL 1.0 does not support `gl.drawElementsInstanced`. To batch chunk meshes, you must either merge all chunk vertex buffers into one massive buffer (extremely slow to update when a single block changes) or issue one draw call per chunk (256 draw calls per frame). 256 draw calls is acceptable for WebGL 1.0 but requires careful state management.
 
 ### Runtime Texture Atlas Generation
-Compiling 256+ 16x16 textures into a single atlas at runtime will cause a significant hitch on load. Consider pre-generating the atlas as a single image file, or using a Web Worker to generate it asynchronously. The current implementation uses `asset-generator.js` for procedural generation during the init sequence.
+Compiling 256+ 16x16 textures into a single atlas at runtime will cause a significant hitch on load. Consider pre-generating the atlas as a single image file, or using a Web Worker to generate it asynchronously. The current implementation uses `src/gen/texture-decorative.js` (getGeneratorForBlock) and `src/gen/sound-manager.js` (AssetManager.generateAtlasCanvas) for procedural generation during the init sequence.
 
 ### Async Chunk Loading
 IndexedDB is asynchronous. The chunk manager needs to handle missing chunks gracefully. If a chunk isn't loaded yet, the renderer must skip it or render a placeholder to prevent rendering gaps.

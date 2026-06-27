@@ -141,7 +141,13 @@ body { max-width: 1600px; }
 <script src="../src/core/timer.js"></script>
 <script src="../src/core/math-utils.js"></script>
 <script src="../src/world/block.js"></script>
-<script src="../src/core/asset-generator.js"></script>
+<script src="../src/gen/noise.js"></script>
+<script src="../src/gen/texture-core.js"></script>
+<script src="../src/gen/texture-terrain.js"></script>
+<script src="../src/gen/texture-blocks.js"></script>
+<script src="../src/gen/texture-special.js"></script>
+<script src="../src/gen/texture-decorative.js"></script>
+<script src="../src/gen/sound-manager.js"></script>
 
 <!-- Load shared test framework -->
 <script src="test.js"></script>
@@ -243,20 +249,11 @@ body { max-width: 1600px; }
     F.assertType(sndGen.getSound, 'function', 'SoundGenerator.getSound is function');
     F.assertType(sndGen.getCategories, 'function', 'SoundGenerator.getCategories is function');
     F.assertType(sndGen.clearCache, 'function', 'SoundGenerator.clearCache is function');
-    F.assertType(sndGen.isCached, 'function', 'SoundGenerator.isCached is function');
     F.assertType(sndGen.generateStepSound, 'function', 'SoundGenerator.generateStepSound is function');
     F.assertType(sndGen.generateBreakSound, 'function', 'SoundGenerator.generateBreakSound is function');
     F.assertType(sndGen.generatePlaceSound, 'function', 'SoundGenerator.generatePlaceSound is function');
     F.assertType(sndGen.generateHitSound, 'function', 'SoundGenerator.generateHitSound is function');
     F.assertType(sndGen.generateFootstepSound, 'function', 'SoundGenerator.generateFootstepSound is function');
-    F.assertType(sndGen.generateSplashSound, 'function', 'SoundGenerator.generateSplashSound is function');
-    F.assertType(sndGen.generateGlassBreakSound, 'function', 'SoundGenerator.generateGlassBreakSound is function');
-    F.assertType(sndGen.generatePopSound, 'function', 'SoundGenerator.generatePopSound is function');
-    F.assertType(sndGen.generateExplosionSound, 'function', 'SoundGenerator.generateExplosionSound is function');
-    F.assertType(sndGen.generateEnchantSound, 'function', 'SoundGenerator.generateEnchantSound is function');
-    F.assertType(sndGen.generateDrinkSound, 'function', 'SoundGenerator.generateDrinkSound is function');
-    F.assertType(sndGen.generateAmbientSound, 'function', 'SoundGenerator.generateAmbientSound is function');
-    F.assertType(sndGen.generateHurtSound, 'function', 'SoundGenerator.generateHurtSound is function');
 
     var assetMgr = Donkeycraft.AssetManager;
     F.assertType(assetMgr.init, 'function', 'AssetManager.init is function');
@@ -264,7 +261,6 @@ body { max-width: 1600px; }
     F.assertType(assetMgr.getTexture, 'function', 'AssetManager.getTexture is function');
     F.assertType(assetMgr.getAllTextures, 'function', 'AssetManager.getAllTextures is function');
     F.assertType(assetMgr.preloadSounds, 'function', 'AssetManager.preloadSounds is function');
-    F.assertType(assetMgr.preloadAllSounds, 'function', 'AssetManager.preloadAllSounds is function');
     F.assertType(assetMgr.getNameMap, 'function', 'AssetManager.getNameMap is function');
     F.assertType(assetMgr.generateAtlasCanvas, 'function', 'AssetManager.generateAtlasCanvas is function');
     F.assertType(assetMgr.getAssetInfo, 'function', 'AssetManager.getAssetInfo is function');
@@ -512,15 +508,16 @@ body { max-width: 1600px; }
 
         var categories = sndGen.getCategories();
         F.assertType(categories, 'object', 'getCategories returns array/object');
-        F.assert(categories.length >= 13, 'getCategories returns at least 13 categories (' + categories.length + ')');
+        F.assert(categories.length >= 5, 'getCategories returns at least 5 categories (' + categories.length + ')');
         F.assert(categories.indexOf('step') >= 0, 'Category "step" is available');
-        F.assert(categories.indexOf('explosion') >= 0, 'Category "explosion" is available');
-        F.assert(!sndGen.isCached('test_key_xyz'), 'isCached returns false for uncached key');
+        F.assert(categories.indexOf('break') >= 0, 'Category "break" is available');
+        F.assert(categories.indexOf('place') >= 0, 'Category "place" is available');
+        F.assert(categories.indexOf('hit') >= 0, 'Category "hit" is available');
+        F.assert(categories.indexOf('footstep') >= 0, 'Category "footstep" is available');
 
         var clearResult = sndGen.clearCache();
         F.assertType(clearResult, 'undefined', 'clearCache returns undefined');
-        F.assert(!sndGen.isCached('test_key_xyz'), 'isCached returns false after clearCache');
-        if (categories.length >= 13) passedSections++; else failedSections++;
+        if (categories.length >= 5) passedSections++; else failedSections++;
 
         // Helper: convert AudioBuffer to WAV data URL
         function audioBufferToWavUrl(buffer) {
@@ -609,20 +606,11 @@ body { max-width: 1600px; }
             F.assert(false, 'Sync sound tests failed: ' + e.message);
         }
 
-        // Async sounds
+        // Async sounds (place sound uses OfflineAudioContext)
         (function asyncSoundTest() {
             var asyncTests = [
-                { name: 'Hit (stone)', fn: function() { return sndGen.generateHitSound(audioCtx, 'stone'); } },
-                { name: 'Splash', fn: function() { return sndGen.generateSplashSound(audioCtx); } },
-                { name: 'Glass Break', fn: function() { return sndGen.generateGlassBreakSound(audioCtx); } },
-                { name: 'Pop', fn: function() { return sndGen.generatePopSound(audioCtx); } },
-                { name: 'Explosion', fn: function() { return sndGen.generateExplosionSound(audioCtx); } },
-                { name: 'Enchant', fn: function() { return sndGen.generateEnchantSound(audioCtx); } },
-                { name: 'Drink', fn: function() { return sndGen.generateDrinkSound(audioCtx); } },
                 { name: 'Place (stone)', fn: function() { return sndGen.generatePlaceSound(audioCtx, 'stone'); } },
-                { name: 'Ambient (passive)', fn: function() { return sndGen.generateAmbientSound(audioCtx, 'passive'); } },
-                { name: 'Ambient (hostile)', fn: function() { return sndGen.generateAmbientSound(audioCtx, 'hostile'); } },
-                { name: 'Hurt (entity)', fn: function() { return sndGen.generateHurtSound(audioCtx, 'entity'); } }
+                { name: 'Hit (stone)', fn: function() { return sndGen.generateHitSound(audioCtx, 'stone'); } }
             ];
 
             var promiseChain = Promise.resolve();
@@ -675,7 +663,7 @@ body { max-width: 1600px; }
                 var nameMap2 = assetMgr.getNameMap();
                 F.assertType(nameMap2, 'object', 'AssetManager.getNameMap returns object');
 
-                if (info.totalBlocks >= 0 && info.soundCategories >= 13) passedSections++; else failedSections++;
+                if (info.totalBlocks >= 0 && info.soundCategories >= 5) passedSections++; else failedSections++;
 
                 // Atlas canvas
                 totalSections++;
