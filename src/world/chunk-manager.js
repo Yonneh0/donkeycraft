@@ -314,6 +314,7 @@
     /**
      * Generate terrain for a chunk at the given coordinates.
      * Fills the chunk with heightmap-based terrain, ores, caves, water, and surface layers.
+     * Delegates to dimension-specific generators when available.
      * @private
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -323,27 +324,53 @@
         var chunk = this._chunks.get(key);
         if (!chunk) return;
 
-        // Get terrain generator
+        var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
+
+        switch (currentDim) {
+            case 1: // Nether
+                _generateNetherChunk(this, chunk, chunkX, chunkZ);
+                break;
+            case 2: // End
+                _generateEndChunk(this, chunk, chunkX, chunkZ);
+                break;
+            default: // Overworld
+                _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                break;
+        }
+    };
+
+    // ============================================================
+    // Overworld Terrain Generation (inline for performance)
+    // ============================================================
+
+    /**
+     * Generate overworld terrain for a chunk.
+     * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @private
+     */
+    function _generateOverworldChunk(manager, chunk, chunkX, chunkZ) {
         var terrainGen = Donkeycraft.TerrainGenerator;
         if (!terrainGen || !terrainGen.generateHeightmap) {
             Donkeycraft.Logger.warn('ChunkManager', 'TerrainGenerator not available');
             return;
         }
 
-        // Get biome for this chunk (use plains as default since BiomeRegistry has no getBiomeForChunk)
+        // Get biome for this chunk
         var biome = null;
         if (Donkeycraft.BiomeRegistry) {
             biome = Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
         }
         chunk.biomeId = biome ? biome.id : 1;
 
-        Donkeycraft.Logger.info('ChunkManager', 'Generating terrain for chunk [' + chunkX + ',' + chunkZ + ']');
+        Donkeycraft.Logger.info('ChunkManager', 'Generating overworld terrain for chunk [' + chunkX + ',' + chunkZ + ']');
 
         // Generate heightmap
         var heightmap = null;
         try {
             heightmap = terrainGen.generateHeightmap(chunkX, chunkZ, biome);
-            Donkeycraft.Logger.info('ChunkManager', 'Heightmap generated, length=' + (heightmap ? heightmap.length : 'null'));
         } catch (e) {
             Donkeycraft.Logger.error('ChunkManager', 'Heightmap generation failed: ' + e.message);
             return;
@@ -354,63 +381,56 @@
             return;
         }
 
-        // Fill chunk blocks based on heightmap
-        var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-        var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+        // Resolve block references once
+        var bedrock = Donkeycraft.BlockRegistry.getBlockById(7);   // bedrock
+        var stone = Donkeycraft.BlockRegistry.getBlockById(1);     // stone
+        var dirt = Donkeycraft.BlockRegistry.getBlockById(3);      // dirt
+        var sand = Donkeycraft.BlockRegistry.getBlockById(12);     // sand
+        var grassBlock = Donkeycraft.BlockRegistry.getBlockById(2); // grass_block
 
-        // Helper to look up block by name (returns block or null)
-        function getBlock(name) {
-            return Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockByName(name) : null;
+        if (!bedrock || !stone || !dirt) {
+            Donkeycraft.Logger.error('ChunkManager', 'Required blocks not found in BlockRegistry');
+            return;
         }
 
+        var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+        var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+        var isDesert = !!biome.isDesert;
+        var hasSnow = !!biome.hasSnow;
+        var isOcean = !!biome.isOcean;
+
+        // Fill chunk blocks based on heightmap
         for (var localX = 0; localX < CHUNK_SIZE; localX++) {
             for (var localZ = 0; localZ < CHUNK_SIZE; localZ++) {
                 var height = heightmap[localX + localZ * CHUNK_SIZE] || 64;
-
-                // Determine surface type based on biome
-                var isDesert = !!biome.isDesert;
-                var hasSnow = !!biome.hasSnow;
-                var isOcean = !!biome.isOcean;
 
                 for (var y = 0; y < WORLD_HEIGHT; y++) {
                     var blockId = 0; // Air by default
 
                     if (y === 0) {
                         // Bedrock layer
-                        var bedrock = getBlock('bedrock');
-                        blockId = bedrock ? bedrock.id : 7;
+                        blockId = bedrock.id;
                     } else if (y < height - 4) {
                         // Stone base
-                        var stone = getBlock('stone');
-                        blockId = stone ? stone.id : 1;
+                        blockId = stone.id;
                     } else if (y < height) {
                         // Sub-surface layer
-                        if (isDesert) {
-                            var sandstone = getBlock('sandstone');
-                            blockId = sandstone ? sandstone.id : 2;
-                        } else if (hasSnow) {
-                            var snowBlock = getBlock('snow_block');
-                            blockId = snowBlock ? snowBlock.id : 80;
-                        } else {
-                            var dirt = getBlock('dirt');
-                            blockId = dirt ? dirt.id : 3;
+                        if (isDesert && sand) {
+                            blockId = sand.id;
+                        } else if (hasSnow && grassBlock) {
+                            blockId = grassBlock.id; // snow_block or grass_block
+                        } else if (dirt) {
+                            blockId = dirt.id;
                         }
                     } else if (y === height) {
                         // Surface layer
-                        if (isDesert) {
-                            var sand = getBlock('sand');
-                            blockId = sand ? sand.id : 12;
-                        } else if (hasSnow) {
-                            var snowBlock = getBlock('snow_block');
-                            blockId = snowBlock ? snowBlock.id : 80;
-                        } else {
-                            var grassBlock = getBlock('grass_block');
-                            blockId = grassBlock ? grassBlock.id : 2;
+                        if (isDesert && sand) {
+                            blockId = sand.id;
+                        } else if (hasSnow && grassBlock) {
+                            blockId = grassBlock.id;
+                        } else if (grassBlock) {
+                            blockId = grassBlock.id;
                         }
-                    } else if (y >= 62 && isOcean) {
-                        // Water in oceans
-                        var water = getBlock('water');
-                        blockId = water ? water.id : 9;
                     }
 
                     if (blockId > 0) {
@@ -422,16 +442,82 @@
 
         // Apply cave generation if available
         if (Donkeycraft.CaveGenerator && Donkeycraft.CaveGenerator.generateCaves) {
-            try { Donkeycraft.CaveGenerator.generateCaves(chunk, chunkX, chunkZ); } catch (e) { /* skip */ }
+            try { Donkeycraft.CaveGenerator.generateCaves(chunk, chunk.biomeId); } catch (e) { /* skip */ }
         }
 
         // Apply ore generation if available
-        if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.generateOres) {
-            try { Donkeycraft.OreGenerator.generateOres(chunk, chunkX, chunkZ, biome); } catch (e) { /* skip */ }
+        if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.placeOres) {
+            try { Donkeycraft.OreGenerator.placeOres(chunk, chunk.biomeId); } catch (e) { /* skip */ }
+        }
+
+        // Apply water placement if available
+        if (Donkeycraft.WaterGenerator && Donkeycraft.WaterGenerator.placeWater) {
+            try { Donkeycraft.WaterGenerator.placeWater(chunk, chunk.biomeId, heightmap); } catch (e) { /* skip */ }
+        }
+
+        // Apply surface layer if available
+        if (Donkeycraft.TerrainSurface && Donkeycraft.TerrainSurface.applySurfaceLayer) {
+            try { Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, chunk.biomeId, heightmap); } catch (e) { /* skip */ }
         }
 
         // Mark chunk as needing mesh regeneration
         chunk._dirty = true;
-    };
+    }
+
+    // ============================================================
+    // Nether Terrain Generation
+    // ============================================================
+
+    /**
+     * Generate nether terrain for a chunk.
+     * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @private
+     */
+    function _generateNetherChunk(manager, chunk, chunkX, chunkZ) {
+        if (!Donkeycraft.NetherGenerator || !Donkeycraft.NetherGenerator.generateNetherTerrain) {
+            Donkeycraft.Logger.warn('ChunkManager', 'NetherGenerator not available');
+            return;
+        }
+
+        chunk.biomeId = 1; // Nether has no biomes
+        Donkeycraft.Logger.info('ChunkManager', 'Generating nether terrain for chunk [' + chunkX + ',' + chunkZ + ']');
+
+        try {
+            Donkeycraft.NetherGenerator.generateNetherTerrain(chunkX, chunkZ);
+        } catch (e) {
+            Donkeycraft.Logger.error('ChunkManager', 'Nether terrain generation failed: ' + e.message);
+        }
+    }
+
+    // ============================================================
+    // End Terrain Generation
+    // ============================================================
+
+    /**
+     * Generate End terrain for a chunk.
+     * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @private
+     */
+    function _generateEndChunk(manager, chunk, chunkX, chunkZ) {
+        if (!Donkeycraft.EndGenerator || !Donkeycraft.EndGenerator.generateEndTerrain) {
+            Donkeycraft.Logger.warn('ChunkManager', 'EndGenerator not available');
+            return;
+        }
+
+        chunk.biomeId = 1; // End has no biomes
+        Donkeycraft.Logger.info('ChunkManager', 'Generating End terrain for chunk [' + chunkX + ',' + chunkZ + ']');
+
+        try {
+            Donkeycraft.EndGenerator.generateEndTerrain(chunkX, chunkZ);
+        } catch (e) {
+            Donkeycraft.Logger.error('ChunkManager', 'End terrain generation failed: ' + e.message);
+        }
+    }
 
 })();

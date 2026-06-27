@@ -1,5 +1,5 @@
 // Donkeycraft — Structure Generator
-// Structure placement: ore veins, underground caves (noise-based), surface structures.
+// Structure placement: ore veins, underground caves (noise-based), surface decoration.
 (function() {
     'use strict';
 
@@ -15,6 +15,42 @@
      * StructureGenerator — orchestrates full chunk generation pipeline.
      */
     Donkeycraft.StructureGenerator = (function() {
+        // Cached block references
+        var _blocks = {};
+
+        /**
+         * Resolve all surface block IDs from BlockRegistry and cache them.
+         * @private
+         */
+        function _resolveBlocks() {
+            if (_blocks.resolved) return;
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var names = [
+                'bedrock', 'stone', 'dirt', 'grass_block', 'snow',
+                'oak_log', 'oak_leaves', 'rose', 'tall_grass',
+                'cactus', 'snow_layer'
+            ];
+            for (var i = 0; i < names.length; i++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
+                if (block) {
+                    _blocks[names[i]] = block.id;
+                }
+            }
+            _blocks.resolved = true;
+        }
+
+        /**
+         * Get a cached block ID by name.
+         * @param {string} name - Block name.
+         * @returns {number} Block ID, or 0 if not found.
+         * @private
+         */
+        function _getBlockId(name) {
+            _resolveBlocks();
+            return _blocks[name] || 0;
+        }
+
         /**
          * Generate a complete chunk: terrain, ores, caves, water, surface decoration.
          * @param {Donkeycraft.Chunk} chunk - The chunk to generate.
@@ -58,6 +94,12 @@
          * @private
          */
         function _placeTerrain(chunk, heightmap, biomeId) {
+            var bedrockId = _getBlockId('bedrock');
+            var stoneId = _getBlockId('stone');
+            var dirtId = _getBlockId('dirt');
+
+            if (!bedrockId || !stoneId || !dirtId) return;
+
             var bedrockLevel = WORLD_HEIGHT - 3;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -67,19 +109,19 @@
                     for (var y = 0; y <= height; y++) {
                         if (y < 3) {
                             // Bedrock layer at bottom of world
-                            chunk.setBlock(x, y, z, 7); // bedrock
+                            chunk.setBlock(x, y, z, bedrockId);
                         } else if (y >= bedrockLevel) {
                             // Bedrock layer at top of world (world height boundary)
-                            chunk.setBlock(x, y, z, 7); // bedrock
+                            chunk.setBlock(x, y, z, bedrockId);
                         } else if (y < height - 3) {
                             // Stone below terrain
-                            chunk.setBlock(x, y, z, 1); // stone
+                            chunk.setBlock(x, y, z, stoneId);
                         } else if (y < height) {
                             // Dirt layer near surface
-                            chunk.setBlock(x, y, z, 3); // dirt
+                            chunk.setBlock(x, y, z, dirtId);
                         } else {
                             // Surface block (will be overwritten by terrain-surface.js)
-                            chunk.setBlock(x, y, z, 1); // temporary: stone
+                            chunk.setBlock(x, y, z, stoneId); // temporary: stone
                         }
                     }
                 }
@@ -131,10 +173,15 @@
          * @private
          */
         function _placeTrees(chunk, biomeId, heightmap, seed, count) {
+            var logId = _getBlockId('oak_log');
+            var leavesId = _getBlockId('oak_leaves');
+
+            if (!logId || !leavesId) return;
+
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 37, i * 71);
                 var tx = hash % CHUNK_SIZE;
-                var tz = (hash >> 8) % CHUNK_SIZE;
+                var tz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
                 // Find surface Y
                 var surfaceY = heightmap[tx + tz * CHUNK_SIZE];
@@ -156,7 +203,7 @@
                     treeHeight = 5 + ((hash >> 16) % 2);
                 }
 
-                _placeOakTree(chunk, tx, surfaceY + 1, tz, treeHeight);
+                _placeOakTree(chunk, tx, surfaceY + 1, tz, treeHeight, logId, leavesId);
             }
         }
 
@@ -167,13 +214,15 @@
          * @param {number} y - Y coordinate (top of trunk base).
          * @param {number} z - Z coordinate.
          * @param {number} height - Trunk height.
+         * @param {number} logId - Log block ID.
+         * @param {number} leavesId - Leaves block ID.
          * @private
          */
-        function _placeOakTree(chunk, x, y, z, height) {
+        function _placeOakTree(chunk, x, y, z, height, logId, leavesId) {
             // Trunk: logs from y to y+height-1
             for (var ty = 0; ty < height; ty++) {
                 if (y + ty < WORLD_HEIGHT) {
-                    chunk.setBlock(x, y + ty, z, 24); // oak_log (axis y)
+                    chunk.setBlock(x, y + ty, z, logId); // oak_log (axis y)
                 }
             }
 
@@ -192,7 +241,7 @@
 
                         if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE && ly >= 0) {
                             if (chunk.getBlock(bx, ly, bz) === 0) { // Only replace air
-                                chunk.setBlock(bx, ly, bz, 18); // oak_leaves
+                                chunk.setBlock(bx, ly, bz, leavesId);
                             }
                         }
                     }
@@ -202,7 +251,7 @@
 
         /**
          * Place flowers in a chunk.
-         @param {Donkeycraft.Chunk} chunk - The chunk.
+         * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} biomeId - Biome ID.
          * @param {number[]} heightmap - Heightmap array.
          * @param {number} seed - Random seed.
@@ -210,10 +259,13 @@
          * @private
          */
         function _placeFlowers(chunk, biomeId, heightmap, seed, count) {
+            var roseId = _getBlockId('rose');
+            if (!roseId) return;
+
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 53 + 100, i * 97 + 200);
                 var fx = hash % CHUNK_SIZE;
-                var fz = (hash >> 8) % CHUNK_SIZE;
+                var fz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
                 var surfaceY = heightmap[fx + fz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
@@ -221,7 +273,7 @@
                 // Place on grass/surface
                 if (chunk.getBlock(fx, surfaceY, fz) === 2) { // grass block top
                     if (surfaceY + 1 < WORLD_HEIGHT) {
-                        chunk.setBlock(fx, surfaceY + 1, fz, 36); // rose
+                        chunk.setBlock(fx, surfaceY + 1, fz, roseId);
                     }
                 }
             }
@@ -237,17 +289,20 @@
          * @private
          */
         function _placeGrass(chunk, biomeId, heightmap, seed, count) {
+            var tallGrassId = _getBlockId('tall_grass');
+            if (!tallGrassId) return;
+
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 61 + 300, i * 89 + 400);
                 var gx = hash % CHUNK_SIZE;
-                var gz = (hash >> 8) % CHUNK_SIZE;
+                var gz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
                 var surfaceY = heightmap[gx + gz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
                 if (chunk.getBlock(gx, surfaceY, gz) === 2) { // grass block
                     if (surfaceY + 1 < WORLD_HEIGHT) {
-                        chunk.setBlock(gx, surfaceY + 1, gz, 31); // tall grass
+                        chunk.setBlock(gx, surfaceY + 1, gz, tallGrassId);
                     }
                 }
             }
@@ -262,10 +317,13 @@
          * @private
          */
         function _placeCacti(chunk, heightmap, seed, count) {
+            var cactusId = _getBlockId('cactus');
+            if (!cactusId) return;
+
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 47 + 500, i * 73 + 600);
                 var cx = hash % CHUNK_SIZE;
-                var cz = (hash >> 8) % CHUNK_SIZE;
+                var cz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
                 var surfaceY = heightmap[cx + cz * CHUNK_SIZE];
                 if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
@@ -278,7 +336,7 @@
                 // Place cactus (1-3 blocks tall)
                 var cactusHeight = 1 + ((hash >> 16) % 3);
                 for (var cy = 0; cy < cactusHeight && surfaceY + 1 + cy < WORLD_HEIGHT; cy++) {
-                    chunk.setBlock(cx, surfaceY + 1 + cy, cz, 131); // cactus
+                    chunk.setBlock(cx, surfaceY + 1 + cy, cz, cactusId);
                 }
             }
         }
@@ -287,13 +345,15 @@
          * Simple 2D hash for deterministic randomness.
          * @param {number} x
          * @param {number} y
-         * @returns {number}
+         * @returns {number} Positive 32-bit integer.
          * @private
          */
         function _hash2D(x, y) {
+            x = x | 0;
+            y = y | 0;
             var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
-            h = ((h >> 13) ^ h) * 0x5bd1e995;
-            return (h ^ (h >> 15)) >>> 0;
+            h = ((h >>> 13) ^ h) * 0x5bd1e995;
+            return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
         }
 
         return {

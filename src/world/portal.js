@@ -82,15 +82,15 @@
         }
 
         /**
-         * Detect a nether portal frame at the given position.
+         * Detect a nether portal frame at the given global position.
          * Searches for a valid 4×5 obsidian frame (minimum 3-wide × 4-tall interior).
-         * @param {number} chunkX - Local X within chunk [0, 15].
-         * @param {number} chunkY - Local Y within chunk [0, 255].
-         * @param {number} chunkZ - Local Z within chunk [0, 15].
+         * @param {number} globalX - Global X coordinate.
+         * @param {number} globalY - Global Y coordinate.
+         * @param {number} globalZ - Global Z coordinate.
          * @returns {{valid: boolean, direction: number, width: number, height: number}|null} Portal info or null.
          */
-        function detectNetherPortal(chunkX, chunkY, chunkZ) {
-            var block = getBlockAt(chunkX, chunkY, chunkZ);
+        function detectNetherPortal(globalX, globalY, globalZ) {
+            var block = getBlockAt(globalX, globalY, globalZ);
 
             // Check if this is obsidian or crying obsidian (frame material)
             if (!isPortalBlock(block)) {
@@ -99,24 +99,24 @@
 
             // Try all 4 horizontal directions for frame orientation
             var directions = [
-                { dx: 1, dz: 0 },  // East-West
-                { dx: -1, dz: 0 }, // West-East
-                { dx: 0, dz: 1 },  // North-South
-                { dx: 0, dz: -1 }  // South-North
+                { dx: 1, dz: 0 },  // East-West oriented frame
+                { dx: -1, dz: 0 }, // West-East oriented frame
+                { dx: 0, dz: 1 },  // North-South oriented frame
+                { dx: 0, dz: -1 }  // South-North oriented frame
             ];
 
             for (var d = 0; d < directions.length; d++) {
                 var dir = directions[d];
-                var frameWidth = _countFrameLength(chunkX, chunkZ, dir.dx, dir.dz);
+                var frameWidth = _countFrameLength(globalX, globalZ, dir.dx, dir.dz, globalY);
 
                 if (frameWidth >= 3) {
                     // Try to build a 4-tall frame from the bottom
                     for (var startX = 0; startX < frameWidth - 2; startX++) {
                         var result = _verifyFrame(
-                            chunkX + startX * dir.dx,
-                            chunkZ + startX * dir.dz,
+                            globalX + startX * dir.dx,
+                            globalZ + startX * dir.dz,
                             dir.dx, dir.dz,
-                            chunkY
+                            globalY
                         );
                         if (result) {
                             return result;
@@ -129,20 +129,21 @@
         }
 
         /**
-         * Count the length of a continuous obsidian line from a position.
+         * Count the length of a continuous obsidian line from a position at a given Y level.
          * @param {number} startX - Starting X.
          * @param {number} startZ - Starting Z.
          * @param {number} dx - X direction.
          * @param {number} dz - Z direction.
+         * @param {number} baseY - Y level to check at.
          * @returns {number} Frame length.
          * @private
          */
-        function _countFrameLength(startX, startZ, dx, dz) {
+        function _countFrameLength(startX, startZ, dx, dz, baseY) {
             var count = 0;
             for (var i = 0; i < 6; i++) {
                 var bx = startX + i * dx;
                 var bz = startZ + i * dz;
-                if (isPortalBlock(getBlockAt(bx, 0, bz))) {
+                if (isPortalBlock(getBlockAt(bx, baseY, bz))) {
                     count++;
                 } else {
                     break;
@@ -163,25 +164,25 @@
          */
         function _verifyFrame(startX, startZ, dx, dz, startY) {
             // Need at least 4 tall (startY to startY+3)
-            if (startY < 0 || startY + 3 >= WORLD_HEIGHT) {
+            if (startY < 1 || startY + 3 >= WORLD_HEIGHT) {
                 return null;
             }
 
-            // Count width from this corner
-            var width = _countFrameLength(startX, startZ, dx, dz);
+            // Count width from this corner along the base Y
+            var width = _countFrameLength(startX, startZ, dx, dz, startY);
             if (width < 3) {
                 return null;
             }
 
-            // Check vertical edges (left and right)
-            var leftValid = _checkVerticalEdge(startX, startY, startZ, dx, dz, width - 1);
-            var rightValid = _checkVerticalEdge(startX, startY, startZ, dx, dz, 0);
+            // Check vertical edges (both corners at all 4 heights)
+            var leftValid = _checkVerticalEdge(startX, startY, startZ, dx, dz, width - 1, startY);
+            var rightValid = _checkVerticalEdge(startX, startY, startZ, dx, dz, 0, startY);
 
             if (!leftValid || !rightValid) {
                 return null;
             }
 
-            // Check top bar
+            // Check top bar at startY + 3
             var topValid = _checkTopBar(startX, startZ, startY + 3, dx, dz, width);
 
             if (!topValid) {
@@ -199,15 +200,16 @@
         /**
          * Check a vertical edge of the portal frame.
          * @param {number} baseX - Base X.
-         * @param {number} baseY - Base Y.
+         * @param {number} baseY - Base Y (bottom corner).
          * @param {number} baseZ - Base Z.
          * @param {number} dx - Frame direction X.
          * @param {number} dz - Frame direction Z.
          * @param {number} offset - Position along frame (0 or width-1).
+         * @param {number} startY - Bottom Y of the frame for direction calculation.
          * @returns {{valid: boolean, direction: number}}
          * @private
          */
-        function _checkVerticalEdge(baseX, baseY, baseZ, dx, dz, offset) {
+        function _checkVerticalEdge(baseX, baseY, baseZ, dx, dz, offset, startY) {
             var fx = baseX + offset * dx;
             var fz = baseZ + offset * dz;
 
@@ -280,11 +282,11 @@
                 for (var i = 0; i < width; i++) {
                     // Bottom and top bars
                     if (y === 0 || y === height - 1) {
-                        setBlockAt(worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
+                        Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
                     } else {
                         // Side pillars (only corners)
                         if (i === 0 || i === width - 1) {
-                            setBlockAt(worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
+                            Donkeycraft.WorldUtils.setBlockAt(_chunkManager, worldX + i * dx, worldY + y, worldZ + i * dz, OBSIDIAN_ID);
                         }
                     }
                 }
@@ -293,7 +295,8 @@
             // Fill interior with portal blocks
             for (var py = 1; py < height - 1; py++) {
                 for (var pi = 1; pi < width - 1; pi++) {
-                    setBlockAt(
+                    Donkeycraft.WorldUtils.setBlockAt(
+                        _chunkManager,
                         worldX + pi * dx,
                         worldY + py,
                         worldZ + pi * dz,
@@ -316,23 +319,11 @@
         }
 
         /**
-         * Set a block at global coordinates (via WorldUtils).
-         * @param {number} x - Global X.
-         * @param {number} y - Global Y.
-         * @param {number} z - Global Z.
-         * @param {number} blockId - Block ID to set.
-         * @private
-         */
-        function setBlockAt(x, y, z, blockId) {
-            Donkeycraft.WorldUtils.setBlockAt(_chunkManager, x, y, z, blockId);
-        }
-
-        /**
          * Find an existing portal near the given coordinates.
-         * Searches within a 16-block radius for matching portal positions.
-         * @param {number} x - X coordinate.
-         * @param {number} y - Y coordinate.
-         * @param {number} z - Z coordinate.
+         * Searches within a 16-block radius for portal blocks.
+         * @param {number} x - Global X coordinate.
+         * @param {number} y - Global Y coordinate.
+         * @param {number} z - Global Z coordinate.
          * @param {number} dimensionType - Dimension type to search in.
          * @returns {{x: number, y: number, z: number, type: string}|null} Portal info or null.
          */
@@ -348,11 +339,10 @@
                         var by = Math.round(y + sy);
                         var bz = Math.round(z + sz);
 
-                        var block = getBlockAt(
-                            ((bx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE,
-                            by,
-                            ((bz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE
-                        );
+                        // Skip if out of world bounds
+                        if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                        var block = getBlockAt(bx, by, bz);
 
                         if (isPortalActive(block)) {
                             return {
@@ -380,6 +370,10 @@
          * @returns {{x: number, y: number, z: number, dimension: number}|null} Destination coords or null.
          */
         function travelToDimension(fromDimension, toDimension, x, y, z) {
+            if (!Donkeycraft.Dimensions || !Donkeycraft.Dimensions.transformCoordinates) {
+                return null;
+            }
+
             var transformed = Donkeycraft.Dimensions.transformCoordinates(
                 fromDimension, toDimension, x, y, z
             );
@@ -394,7 +388,6 @@
             } else {
                 // Auto-create portal at destination if going to Nether
                 if (toDimension === Donkeycraft.DimensionType.NETHER) {
-                    // Find surface level in nether
                     var netherHeight = _findNetherSurfaceY(Math.round(transformed.x), Math.round(transformed.z));
                     if (netherHeight > 0) {
                         transformed.y = netherHeight + 2;
@@ -404,7 +397,7 @@
             }
 
             // Emit travel event via global EventBus
-            if (Donkeycraft.EventBus) {
+            if (Donkeycraft.EventBus && Donkeycraft.EventBus.emitSafe) {
                 try {
                     Donkeycraft.EventBus.emitSafe('portal:travel', {
                         fromDimension: fromDimension,
@@ -417,7 +410,9 @@
             }
 
             // Update current dimension
-            Donkeycraft.Dimensions.setCurrentDimension(toDimension);
+            if (Donkeycraft.Dimensions && Donkeycraft.Dimensions.setCurrentDimension) {
+                Donkeycraft.Dimensions.setCurrentDimension(toDimension);
+            }
 
             return {
                 x: transformed.x,
@@ -428,20 +423,19 @@
         }
 
         /**
-         * Find surface Y level in the Nether at given chunk coordinates.
+         * Find surface Y level in a dimension at given global coordinates.
+         * Searches downward from max height for the first non-transparent block.
          * @param {number} worldX - Global X.
          * @param {number} worldZ - Global Z.
+         * @param {number} [maxY=80] - Maximum Y to search from.
          * @returns {number} Surface Y, or 64 if not found.
          * @private
          */
-        function _findNetherSurfaceY(worldX, worldZ) {
-            // Nether surface is typically around Y=32 (lava seas)
-            // Search downward from Y=80 for non-air blocks
-            var startX = ((worldX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
-            var startZ = ((worldZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+        function _findNetherSurfaceY(worldX, worldZ, maxY) {
+            maxY = maxY !== undefined ? maxY : 80;
 
-            for (var y = 80; y >= 10; y--) {
-                var block = getBlockAt(startX, y, startZ);
+            for (var y = maxY; y >= 10; y--) {
+                var block = getBlockAt(worldX, y, worldZ);
                 if (block !== 0 && !Donkeycraft.BlockRegistry.isTransparent(block)) {
                     return y + 1;
                 }

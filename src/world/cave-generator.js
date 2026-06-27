@@ -55,26 +55,25 @@
          * @private
          */
         function _generateCaveLayer(chunk, density, radius, minY, maxY, layerType) {
-            var seedX = chunk.chunkX * 1000;
-            var seedZ = chunk.chunkZ * 1000;
-
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    // Global coordinates for noise sampling
+                    // Global coordinates for noise sampling — no double-counting.
+                    // worldX/worldZ already include chunk offset; PerlinNoise uses a
+                    // global seed internally, so adding extra offsets corrupts placement.
                     var worldX = chunk.chunkX * CHUNK_SIZE + x;
                     var worldZ = chunk.chunkZ * CHUNK_SIZE + z;
 
                     // Sample 3D noise at multiple points along Y axis
                     for (var y = minY; y < maxY; y++) {
-                        // Primary cave noise
+                        // Primary cave noise — fbm with global seed baked into PerlinNoise
                         var noiseVal = Donkeycraft.PerlinNoise.fbm(
-                            worldX * 0.02 + seedX,
+                            worldX * 0.02,
                             y * 0.02,
-                            worldZ * 0.02 + seedZ,
+                            worldZ * 0.02,
                             3, 0.5, 2.0
                         );
 
-                        // Adjust threshold based on noise value for tunnel shapes
+                        // Adjust threshold based on local X/Z noise for tunnel shapes
                         var threshold = density + Donkeycraft.PerlinNoise.noise2D(
                             x * 0.3, z * 0.3
                         ) * 0.003;
@@ -113,16 +112,18 @@
                             var by = cy + dy;
                             var bz = cz + dz;
 
-                            // Check bounds
-                            if (bx >= 0 && bx < CHUNK_SIZE &&
-                                by >= 0 && by < WORLD_HEIGHT &&
-                                bz >= 0 && bz < CHUNK_SIZE) {
-                                var currentBlock = chunk.getBlock(bx, by, bz);
-                                // Only carve air and water/lava (not solid blocks)
-                                if (currentBlock === 0 || currentBlock === 212 || currentBlock === 213) {
-                                    chunk.setBlock(bx, by, bz, 0); // Air
-                                }
+                        // Check bounds
+                        if (bx >= 0 && bx < CHUNK_SIZE &&
+                            by >= 0 && by < WORLD_HEIGHT &&
+                            bz >= 0 && bz < CHUNK_SIZE) {
+                            var currentBlock = chunk.getBlock(bx, by, bz);
+                            // Only carve air and liquids (not solid blocks).
+                            // Block IDs resolved via BlockRegistry for correctness.
+                            if (currentBlock === 0 ||
+                                Donkeycraft.BlockRegistry.isLiquid(currentBlock)) {
+                                chunk.setBlock(bx, by, bz, 0); // Air
                             }
+                        }
                         }
                     }
                 }

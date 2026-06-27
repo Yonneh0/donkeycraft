@@ -8,9 +8,6 @@
     var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
     var SEED = Donkeycraft.Config.SEED;
 
-    // Initialize noise with the world seed
-    Donkeycraft.PerlinNoise.init(SEED);
-
     // ============================================================
     // TerrainGenerator
     // ============================================================
@@ -33,6 +30,17 @@
         }
 
         /**
+         * Ensure PerlinNoise is initialized before terrain generation.
+         * @private
+         */
+        function _ensureNoiseInit() {
+            if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init && !Donkeycraft.PerlinNoise._initialized) {
+                Donkeycraft.PerlinNoise.init(SEED);
+                Donkeycraft.PerlinNoise._initialized = true;
+            }
+        }
+
+        /**
          * Generate a heightmap for a chunk at the given world coordinates.
          * @param {number} chunkX - Chunk X coordinate (in chunks).
          * @param {number} chunkZ - Chunk Z coordinate (in chunks).
@@ -40,6 +48,7 @@
          * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE with height values.
          */
         function generateHeightmap(chunkX, chunkZ, biome) {
+            _ensureNoiseInit();
             biome = biome || Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
             var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
 
@@ -134,6 +143,7 @@
          * @returns {number[]} Heightmap array.
          */
         function generate(chunkX, chunkZ) {
+            _ensureNoiseInit();
             return generateHeightmap(chunkX, chunkZ);
         }
 

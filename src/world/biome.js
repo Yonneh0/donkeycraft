@@ -271,15 +271,40 @@
             return id in _biomes;
         }
 
-        /**
-         * Get a random biome (for testing).
-         * @returns {Donkeycraft.Biome}
-         */
-        function getRandomBiome() {
-            var keys = Object.keys(_biomes);
-            var key = keys[Math.floor(Math.random() * keys.length)];
-            return _biomes[key];
+    /**
+     * Get a random biome (for testing).
+     * @returns {Donkeycraft.Biome}
+     */
+    function getRandomBiome() {
+        var allBiomes = getAllBiomes();
+        return allBiomes[Math.floor(Math.random() * allBiomes.length)];
+    }
+
+    /**
+     * Find a biome by temperature and rainfall ranges.
+     * Useful for dynamic biome assignment based on world generation.
+     * @param {number} temperature - Temperature value [0, 1].
+     * @param {number} rainfall - Rainfall value [0, 1].
+     * @returns {Donkeycraft.Biome|null} The closest matching biome, or null.
+     */
+    function getBiomeByClimate(temperature, rainfall) {
+        var closest = null;
+        var minDistance = Infinity;
+
+        for (var i = 0; i < _allBiomes.length; i++) {
+            var b = _allBiomes[i];
+            var tempDist = Math.abs(b.temperature - temperature);
+            var rainDist = Math.abs(b.rainfall - rainfall);
+            var distance = tempDist + rainDist;
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closest = b;
+            }
         }
+
+        return closest;
+    }
 
         // Initialize on load
         init();
@@ -290,7 +315,8 @@
             getAllBiomes: getAllBiomes,
             getBiomeCount: getBiomeCount,
             hasBiome: hasBiome,
-            getRandomBiome: getRandomBiome
+            getRandomBiome: getRandomBiome,
+            getBiomeByClimate: getBiomeByClimate
         };
     })();
 

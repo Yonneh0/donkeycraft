@@ -15,33 +15,40 @@
      * Physics — handles block physics simulations.
      */
     Donkeycraft.Physics = (function() {
-        // Block IDs that are affected by gravity
+        // Block sets for gravity-affected and liquid blocks
         var _gravityBlocks = {};
-
-        // Block IDs that are liquids
         var _liquidBlocks = {};
+        var _initialized = false;
 
-        // Initialize gravity and liquid block sets from Block registry
+        /**
+         * Initialize gravity and liquid block sets from Block registry.
+         */
         function init() {
-            // Hardcoded gravity-affected blocks (Minecraft behavior)
-            var gravityBlockIds = [12, 9]; // sand, gravel
+            if (_initialized) return;
 
-            for (var id = 0; id < 256; id++) {
-                // Check gravity-affected
-                if (gravityBlockIds.indexOf(id) !== -1) {
-                    _gravityBlocks[id] = true;
-                }
-                // Check liquid via BlockRegistry
-                if (Donkeycraft.BlockRegistry.isLiquid(id)) {
-                    _liquidBlocks[id] = true;
+            // Hardcoded gravity-affected blocks (Minecraft behavior: sand, gravel, concrete powder)
+            var gravityBlockIds = [12, 9, 2804, 2805, 2806, 2807]; // sand, gravel, colored concrete powders
+
+            for (var i = 0; i < gravityBlockIds.length; i++) {
+                _gravityBlocks[gravityBlockIds[i]] = true;
+            }
+
+            // Check liquid via BlockRegistry
+            if (Donkeycraft.BlockRegistry) {
+                for (var id = 0; id < 256; id++) {
+                    if (Donkeycraft.BlockRegistry.isLiquid(id)) {
+                        _liquidBlocks[id] = true;
+                    }
                 }
             }
+
+            _initialized = true;
         }
 
         /**
          * Apply gravity to a block at the given position.
          * If the block is a gravity-affected block (sand, gravel, etc.),
-         * it will fall if there's air below it.
+         * it will fall if there's air or liquid below it.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} x - Local X.
          * @param {number} y - Local Y.
@@ -54,7 +61,7 @@
             // Check if this is a gravity-affected block
             if (!_gravityBlocks[blockId]) return false;
 
-            // Check block below
+            // Can't fall below world bottom
             if (y <= 0) return false;
 
             var belowBlockId = chunk.getBlock(x, y - 1, z);
@@ -76,7 +83,7 @@
          * @private
          */
         function _canFallInto(blockId) {
-            return !blockId || _liquidBlocks[blockId] || false;
+            return !blockId || !!_liquidBlocks[blockId];
         }
 
         /**
@@ -155,7 +162,7 @@
                         newLevel = Math.max(newLevel - 1, 0);
                     }
                 }
-                // Flow into lower liquid level
+                // Flow into lower liquid level (different liquid type)
                 else if (_liquidBlocks[neighborId]) {
                     var lowerLevel = _getLiquidLevel(chunk, nx, y, nz, neighborId);
                     if (lowerLevel < sourceLevel - 1) {

@@ -7,21 +7,6 @@
     var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
     var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
 
-    // Block IDs for nether terrain
-    var NETHERRACK_ID = 257;
-    var BEDROCK_ID = 37;
-    var LAVA_ID = 213;
-    var SOUL_SAND_ID = 258;
-    var SOUL_SOIL_ID = 259;
-    var NETHER_QUARTZ_ORE_ID = 238;
-    var NETHER_GOLD_ORE_ID = 272;
-    var ANCIENT_DEBRIS_ID = 273;
-    var GILDED_BLACKSTONE_ID = 260;
-    var MAGMA_ID = 274;
-    var NETHER_WART_BLOCK_ID = 263;
-    var BASALT_ID = 110;
-    var BLACKSTONE_ID = 112;
-
     // ============================================================
     // NetherGenerator
     // ============================================================
@@ -30,19 +15,7 @@
      * NetherGenerator — generates terrain for the Nether dimension.
      */
     Donkeycraft.NetherGenerator = (function() {
-        var _instance = null;
         var _chunkManager = null;
-
-        /**
-         * Get the singleton nether generator instance.
-         * @returns {Donkeycraft.NetherGenerator}
-         */
-        function getInstance() {
-            if (!_instance) {
-                _instance = new Donkeycraft.NetherGenerator();
-            }
-            return _instance;
-        }
 
         /**
          * Set the chunk manager reference for terrain generation.
@@ -79,20 +52,23 @@
         }
 
         /**
-         * Generate bedrock floor layers (Y=0 to Y=3).
+         * Generate bedrock floor layers (Y=0 to Y=4).
+         * Thickness is 3-5 blocks based on noise variation.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @private
          */
         function _generateBedrockFloor(chunk) {
+            var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
+            if (!bedrock) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    // Bedrock floor: 3-5 blocks thick
-                    var thickness = 3 + Math.floor(Donkeycraft.PerlinNoise.noise2D(
-                        x * 0.1, z * 0.1
-                    ) * 1 + 2);
+                    // noise2D returns [-1, 1]; map to [0, 1] then scale to 3-5
+                    var n = (Donkeycraft.PerlinNoise.noise2D(x * 0.1, z * 0.1) + 1) * 0.5;
+                    var thickness = Math.floor(n * 3) + 3; // 3 to 5
 
-                    for (var y = 0; y < Math.min(thickness, 5); y++) {
-                        chunk.setBlock(x, y, z, BEDROCK_ID);
+                    for (var y = 0; y < thickness && y < WORLD_HEIGHT; y++) {
+                        chunk.setBlock(x, y, z, bedrock.id);
                     }
                 }
             }
@@ -104,15 +80,17 @@
          * @private
          */
         function _generateBedrockCeiling(chunk) {
+            var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
+            if (!bedrock) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var thickness = 3 + Math.floor(Donkeycraft.PerlinNoise.noise2D(
-                        x * 0.15 + 100, z * 0.15 + 100
-                    ) * 1 + 2);
+                    var n = (Donkeycraft.PerlinNoise.noise2D(x * 0.15 + 100, z * 0.15 + 100) + 1) * 0.5;
+                    var thickness = Math.floor(n * 3) + 3; // 3 to 5
 
-                    for (var y = 0; y < Math.min(thickness, 5); y++) {
+                    for (var y = 0; y < thickness && WORLD_HEIGHT - 1 - y >= 0; y++) {
                         var ceilingY = WORLD_HEIGHT - 1 - y;
-                        chunk.setBlock(x, ceilingY, z, BEDROCK_ID);
+                        chunk.setBlock(x, ceilingY, z, bedrock.id);
                     }
                 }
             }
@@ -124,10 +102,13 @@
          * @private
          */
         function _fillNetherrack(chunk) {
+            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
+            if (!netherrack) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var y = 5; y < WORLD_HEIGHT - 5; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
-                        chunk.setBlock(x, y, z, NETHERRACK_ID);
+                        chunk.setBlock(x, y, z, netherrack.id);
                     }
                 }
             }
@@ -139,18 +120,21 @@
          * @private
          */
         function _generateLavaSeas(chunk) {
+            var lava = Donkeycraft.BlockRegistry.getBlockById(213);
+            if (!lava) return;
+
             var lavaY = 31;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     // Place lava at sea level
-                    chunk.setBlock(x, lavaY, z, LAVA_ID);
-                    chunk.setBlock(x, lavaY + 1, z, LAVA_ID);
+                    chunk.setBlock(x, lavaY, z, lava.id);
+                    chunk.setBlock(x, lavaY + 1, z, lava.id);
 
                     // Add some variation
                     var variation = Donkeycraft.PerlinNoise.noise2D(x * 0.05, z * 0.05);
                     if (variation > 0.3) {
-                        chunk.setBlock(x, lavaY - 1, z, LAVA_ID);
+                        chunk.setBlock(x, lavaY - 1, z, lava.id);
                     }
                 }
             }
@@ -164,6 +148,13 @@
          * @private
          */
         function _generateNetherFeatures(chunk, chunkX, chunkZ) {
+            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
+            var soulSand = Donkeycraft.BlockRegistry.getBlockById(258);
+            var basalt = Donkeycraft.BlockRegistry.getBlockById(110);
+            var blackstone = Donkeycraft.BlockRegistry.getBlockById(112);
+
+            if (!netherrack) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var worldX = chunkX * CHUNK_SIZE + x;
@@ -173,11 +164,11 @@
                     var soulSandNoise = Donkeycraft.PerlinNoise.fbm(
                         worldX * 0.03, 0, worldZ * 0.03, 3, 0.5, 2.0
                     );
-                    if (soulSandNoise > 0.4) {
+                    if (soulSandNoise > 0.4 && soulSand) {
                         for (var y = 18; y <= 42; y++) {
                             var block = chunk.getBlock(x, y, z);
-                            if (block === NETHERRACK_ID) {
-                                chunk.setBlock(x, y, z, SOUL_SAND_ID);
+                            if (block === netherrack.id) {
+                                chunk.setBlock(x, y, z, soulSand.id);
                             }
                         }
                     }
@@ -186,11 +177,11 @@
                     var basaltNoise = Donkeycraft.PerlinNoise.fbm(
                         worldX * 0.02 + 50, 0, worldZ * 0.02 + 50, 2, 0.6, 2.0
                     );
-                    if (basaltNoise > 0.5) {
+                    if (basaltNoise > 0.5 && basalt) {
                         for (var y2 = 40; y2 <= 70; y2++) {
                             var bBlock = chunk.getBlock(x, y2, z);
-                            if (bBlock === NETHERRACK_ID) {
-                                chunk.setBlock(x, y2, z, BASALT_ID);
+                            if (bBlock === netherrack.id) {
+                                chunk.setBlock(x, y2, z, basalt.id);
                             }
                         }
                     }
@@ -199,7 +190,7 @@
                     var blackstoneNoise = Donkeycraft.PerlinNoise.noise2D(
                         worldX * 0.08 + 200, worldZ * 0.08 + 200
                     );
-                    if (blackstoneNoise > 0.6) {
+                    if (blackstoneNoise > 0.6 && blackstone) {
                         var clusterSize = 2 + Math.floor(Math.random() * 3);
                         for (var cx = 0; cx < clusterSize; cx++) {
                             for (var cy = 0; cy < clusterSize; cy++) {
@@ -208,8 +199,8 @@
                                     var ny = 50 + cy - Math.floor(clusterSize / 2);
                                     var nz = z + cz - Math.floor(clusterSize / 2);
                                     if (nx >= 0 && nx < CHUNK_SIZE && ny > 5 && ny < WORLD_HEIGHT - 5 && nz >= 0 && nz < CHUNK_SIZE) {
-                                        if (chunk.getBlock(nx, ny, nz) === NETHERRACK_ID) {
-                                            chunk.setBlock(nx, ny, nz, BLACKSTONE_ID);
+                                        if (chunk.getBlock(nx, ny, nz) === netherrack.id) {
+                                            chunk.setBlock(nx, ny, nz, blackstone.id);
                                         }
                                     }
                                 }
@@ -228,11 +219,20 @@
          * @private
          */
         function _generateOreVeins(chunk, chunkX, chunkZ) {
+            var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
+            var quartzOre = Donkeycraft.BlockRegistry.getBlockById(238);
+            var goldOre = Donkeycraft.BlockRegistry.getBlockById(272);
+            var gildedBlackstone = Donkeycraft.BlockRegistry.getBlockById(260);
+            var magmaBlock = Donkeycraft.BlockRegistry.getBlockById(274);
+            var ancientDebris = Donkeycraft.BlockRegistry.getBlockById(273);
+
+            if (!netherrack) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var y = 5; y < WORLD_HEIGHT - 5; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         var block = chunk.getBlock(x, y, z);
-                        if (block !== NETHERRACK_ID) continue;
+                        if (block !== netherrack.id) continue;
 
                         var worldX = chunkX * CHUNK_SIZE + x;
                         var worldY = y;
@@ -242,41 +242,41 @@
                         var quartzNoise = Donkeycraft.PerlinNoise.noise2D(
                             worldX * 0.1 + 300, worldZ * 0.1 + 300
                         );
-                        if (quartzNoise > 0.7 && Math.random() < 0.15) {
-                            chunk.setBlock(x, y, z, NETHER_QUARTZ_ORE_ID);
+                        if (quartzNoise > 0.7 && Math.random() < 0.15 && quartzOre) {
+                            chunk.setBlock(x, y, z, quartzOre.id);
                         }
 
                         // Nether gold ore
                         var goldNoise = Donkeycraft.PerlinNoise.noise2D(
                             worldX * 0.12 + 400, worldY * 0.1 + 400
                         );
-                        if (goldNoise > 0.6 && Math.random() < 0.1) {
-                            chunk.setBlock(x, y, z, NETHER_GOLD_ORE_ID);
+                        if (goldNoise > 0.6 && Math.random() < 0.1 && goldOre) {
+                            chunk.setBlock(x, y, z, goldOre.id);
                         }
 
                         // Gilded blackstone
                         var gildedNoise = Donkeycraft.PerlinNoise.noise2D(
                             worldX * 0.09 + 500, worldZ * 0.09 + 500
                         );
-                        if (gildedNoise > 0.75 && Math.random() < 0.08) {
-                            chunk.setBlock(x, y, z, GILDED_BLACKSTONE_ID);
+                        if (gildedNoise > 0.75 && Math.random() < 0.08 && gildedBlackstone) {
+                            chunk.setBlock(x, y, z, gildedBlackstone.id);
                         }
 
                         // Magma blocks (rare)
                         var magmaNoise = Donkeycraft.PerlinNoise.noise2D(
                             worldX * 0.06 + 600, worldY * 0.06 + 600
                         );
-                        if (magmaNoise > 0.8 && Math.random() < 0.05) {
-                            chunk.setBlock(x, y, z, MAGMA_ID);
+                        if (magmaNoise > 0.8 && Math.random() < 0.05 && magmaBlock) {
+                            chunk.setBlock(x, y, z, magmaBlock.id);
                         }
 
                         // Ancient debris (extremely rare, Y=8-22)
-                        if (y >= 8 && y <= 22) {
+                        if (y >= 8 && y <= 22 && ancientDebris) {
                             var debrisNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.04 + 700, worldZ * 0.04 + 700
                             );
                             if (debrisNoise > 0.9 && Math.random() < 0.01) {
-                                chunk.setBlock(x, y, z, ANCIENT_DEBRIS_ID);
+                                chunk.setBlock(x, y, z, ancientDebris.id);
                             }
                         }
                     }
@@ -335,7 +335,6 @@
         }
 
         return {
-            getInstance: getInstance,
             setChunkManager: setChunkManager,
             generateNetherTerrain: generateNetherTerrain,
             generateNetherHeightmap: generateNetherHeightmap,

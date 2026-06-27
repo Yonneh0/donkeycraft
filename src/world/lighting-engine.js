@@ -15,14 +15,14 @@
      * LightingEngine — manages light propagation in chunks.
      */
     Donkeycraft.LightingEngine = (function() {
-        // Light opacity values for block types
-        var _lightOpacityCache = {};
+        // Light opacity cache: Uint8Array for IDs 0-255, with lazy-loaded entries beyond that.
+        var _lightOpacityCache = new Uint8Array(256);
+        var _extendedCache = {}; // For IDs > 255
 
         /**
          * Initialize the lighting engine with known block light opacities.
          */
         function init() {
-            // Build cache from Block registry
             for (var id = 0; id < 256; id++) {
                 _lightOpacityCache[id] = _getBlockLightOpacity(id);
             }
@@ -35,21 +35,30 @@
          * @private
          */
         function _getBlockLightOpacity(blockId) {
+            // Check extended cache first
+            if (blockId > 255 && _extendedCache[blockId] !== undefined) {
+                return _extendedCache[blockId];
+            }
+
             var block = Donkeycraft.BlockRegistry.getBlockById(blockId);
-            if (!block) return 0; // Air = no opacity
+            if (!block) return 0; // Air/unknown = no opacity
 
             // Direct light opacity property if available
             if (block.lightOpacity !== undefined) {
-                return Math.min(block.lightOpacity, 15);
+                var val = Math.min(block.lightOpacity, 15);
+                if (blockId > 255) _extendedCache[blockId] = val;
+                return val;
             }
 
             // Default opacity based on block type
-            if (Donkeycraft.BlockRegistry.isTransparent(blockId)) return 1;
-            if (Donkeycraft.BlockRegistry.isSolid(blockId)) return 15;
-            if (Donkeycraft.BlockRegistry.isLiquid(blockId)) return 0;
-            if (Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
+            if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return 1;
+            if (Donkeycraft.BlockRegistry.isSolid && Donkeycraft.BlockRegistry.isSolid(blockId)) return 15;
+            if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return 0;
+            if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
 
-            return 2; // Default
+            var val = 2; // Default
+            if (blockId > 255) _extendedCache[blockId] = val;
+            return val;
         }
 
         /**
@@ -70,8 +79,7 @@
 
                         // Fill sky light from surface down with constant light=15
                         for (var y = surfaceY; y >= 0 && y < WORLD_HEIGHT; y--) {
-                            var light = 15;
-                            chunk.setSkyLight(x, y, z, light);
+                            chunk.setSkyLight(x, y, z, 15);
                         }
                     }
                 }
@@ -83,7 +91,7 @@
 
                         for (var y = WORLD_HEIGHT - 1; y >= 0; y--) {
                             var blockId = chunk.getBlock(x, y, z);
-                            var opacity = _lightOpacityCache[blockId] || 0;
+                            var opacity = getLightOpacity(blockId);
 
                             chunk.setSkyLight(x, y, z, light);
                             light = Math.max(0, light - opacity);
@@ -179,7 +187,7 @@
                     if (visited[idx]) continue;
 
                     var neighborBlockId = chunk.getBlock(n.x, n.y, n.z);
-                    var opacity = _lightOpacityCache[neighborBlockId] || 0;
+                    var opacity = getLightOpacity(neighborBlockId);
 
                     var newLight = currentLight - opacity;
                     if (newLight <= 0) continue;
@@ -226,7 +234,7 @@
 
             for (var y = WORLD_HEIGHT - 1; y >= 0; y--) {
                 var blockId = chunk.getBlock(x, y, z);
-                var opacity = _lightOpacityCache[blockId] || 0;
+                var opacity = getLightOpacity(blockId);
 
                 chunk.setSkyLight(x, y, z, light);
                 light = Math.max(0, light - opacity);
@@ -243,12 +251,22 @@
         }
 
         /**
-         * Get the light opacity for a block type (cached).
+         * Get the light opacity for a block type (cached, supports full Uint16 range).
          * @param {number} blockId - Block ID.
          * @returns {number} Light opacity (0-15).
          */
         function getLightOpacity(blockId) {
-            return _lightOpacityCache[blockId] || 0;
+            if (blockId <= 255) {
+                return _lightOpacityCache[blockId];
+            }
+            // Check extended cache
+            if (_extendedCache[blockId] !== undefined) {
+                return _extendedCache[blockId];
+            }
+            // Compute and cache
+            var opacity = _getBlockLightOpacity(blockId);
+            _extendedCache[blockId] = opacity;
+            return opacity;
         }
 
         /**
@@ -257,6 +275,12 @@
         function invalidateCache() {
             for (var id = 0; id < 256; id++) {
                 _lightOpacityCache[id] = _getBlockLightOpacity(id);
+            }
+            // Clear extended cache
+            for (var key in _extendedCache) {
+                if (_extendedCache.hasOwnProperty(key)) {
+                    delete _extendedCache[key];
+                }
             }
         }
 

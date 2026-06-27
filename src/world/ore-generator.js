@@ -13,17 +13,51 @@
 
     /**
      * Ore definitions with Y-level ranges, vein size, rarity, and biome restrictions.
-     * @type {Array<{blockId: number, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
+     * Block IDs resolved at runtime via BlockRegistry.
+     * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
      */
     var ORE_DEFS = [
-        { blockId: 16,   name: 'coal_ore',       minY: 0,   maxY: 160, veinSize: 8,  rarity: 12, biomes: null },       // null = all biomes
-        { blockId: 15,   name: 'iron_ore',       minY: 0,   maxY: 164, veinSize: 6,  rarity: 10, biomes: null },
-        { blockId: 21,   name: 'gold_ore',       minY: 0,   maxY: 64,  veinSize: 4,  rarity: 20, biomes: null },
-        { blockId: 14,   name: 'diamond_ore',    minY: 0,   maxY: 32,  veinSize: 3,  rarity: 28, biomes: null },
-        { blockId: 176,  name: 'redstone_ore',   minY: 0,   maxY: 32,  veinSize: 5,  rarity: 16, biomes: null },
-        { blockId: 22,   name: 'lapis_ore',      minY: 0,   maxY: 64,  veinSize: 4,  rarity: 18, biomes: null },
-        { blockId: 126,  name: 'emerald_ore',    minY: 0,   maxY: 32,  veinSize: 2,  rarity: 30, biomes: [7] }              // Only in extreme hills
+        { blockName: 'coal_ore',      name: 'coal_ore',       minY: 0,   maxY: 160, veinSize: 8,  rarity: 12, biomes: null },
+        { blockName: 'iron_ore',      name: 'iron_ore',       minY: 0,   maxY: 164, veinSize: 6,  rarity: 10, biomes: null },
+        { blockName: 'gold_ore',      name: 'gold_ore',       minY: 0,   maxY: 64,  veinSize: 4,  rarity: 20, biomes: null },
+        { blockName: 'diamond_ore',   name: 'diamond_ore',    minY: 0,   maxY: 32,  veinSize: 3,  rarity: 28, biomes: null },
+        { blockName: 'redstone_ore',  name: 'redstone_ore',   minY: 0,   maxY: 32,  veinSize: 5,  rarity: 16, biomes: null },
+        { blockName: 'lapis_ore',     name: 'lapis_ore',      minY: 0,   maxY: 64,  veinSize: 4,  rarity: 18, biomes: null },
+        { blockName: 'emerald_ore',   name: 'emerald_ore',    minY: 0,   maxY: 32,  veinSize: 2,  rarity: 30, biomes: [7] }
     ];
+
+    // Cache for resolved block IDs to avoid repeated lookups.
+    var _blockCache = null;
+
+    /**
+     * Resolve all ore block IDs from BlockRegistry and cache them.
+     * @private
+     */
+    function _resolveBlockIds() {
+        _blockCache = {};
+        if (!Donkeycraft.BlockRegistry) return;
+
+        for (var i = 0; i < ORE_DEFS.length; i++) {
+            var def = ORE_DEFS[i];
+            var block = Donkeycraft.BlockRegistry.getBlockByName(def.blockName);
+            if (block) {
+                _blockCache[def.name] = block.id;
+            }
+        }
+    }
+
+    /**
+     * Get a resolved block ID by ore name.
+     * @param {string} oreName - Ore definition name.
+     * @returns {number|null} Block ID or null if not found.
+     * @private
+     */
+    function _getBlockId(oreName) {
+        if (!_blockCache && Donkeycraft.BlockRegistry) {
+            _resolveBlockIds();
+        }
+        return _blockCache ? _blockCache[oreName] : null;
+    }
 
     // ============================================================
     // OreGenerator
@@ -34,15 +68,29 @@
      */
     Donkeycraft.OreGenerator = (function() {
         /**
+         * Initialize the ore generator by resolving block IDs.
+         */
+        function init() {
+            _resolveBlockIds();
+        }
+
+        /**
          * Place ore veins in a chunk.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
          * @param {number} biomeId - Biome ID for this chunk.
          */
         function placeOres(chunk, biomeId) {
-            var seed = chunk.chunkX * 31241 + chunk.chunkZ * 57832 + 12345;
+            // Ensure block IDs are resolved
+            if (!_blockCache && Donkeycraft.BlockRegistry) {
+                _resolveBlockIds();
+            }
 
             for (var i = 0; i < ORE_DEFS.length; i++) {
                 var oreDef = ORE_DEFS[i];
+                var blockId = _getBlockId(oreDef.name);
+
+                // Skip if block not found in registry
+                if (blockId === null) continue;
 
                 // Check biome restriction
                 if (oreDef.biomes && oreDef.biomes.length > 0) {
@@ -57,7 +105,7 @@
                 }
 
                 // Place veins for this ore type
-                _placeOreVeins(chunk, oreDef, seed);
+                _placeOreVeins(chunk, oreDef, blockId);
             }
         }
 
@@ -65,33 +113,28 @@
          * Place veins for a single ore type in a chunk.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {object} oreDef - Ore definition.
-         * @param {number} seed - Random seed.
+         * @param {number} blockId - Resolved block ID.
          * @private
          */
-        function _placeOreVeins(chunk, oreDef, seed) {
-            var veinCount = 0;
+        function _placeOreVeins(chunk, oreDef, blockId) {
+            // Determine how many vein placement attempts based on rarity
+            var attempts = Math.floor((CHUNK_SIZE * CHUNK_SIZE) / oreDef.rarity);
 
-            // Determine how many veins to place based on rarity
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var hash = _hash2D(x + chunk.chunkX * CHUNK_SIZE, z + chunk.chunkZ * CHUNK_SIZE);
-                    if ((hash % oreDef.rarity) === 0) {
-                        veinCount++;
-                    }
-                }
-            }
+            for (var v = 0; v < attempts; v++) {
+                // Random position in the chunk using deterministic hash
+                var seedX = _hash2D(v, 0x7F3A + oreDef.minY);
+                var seedZ = _hash2D(v, 0xB4C1 + oreDef.maxY);
 
-            // Place each vein
-            for (var v = 0; v < veinCount; v++) {
-                // Find a random position in the chunk
-                var vx = _randomInRange(seed, v, 0, CHUNK_SIZE - 1);
-                var vz = _randomInRange(seed, v, 1, CHUNK_SIZE - 1);
+                var vx = seedX % CHUNK_SIZE;
+                if (vx < 0) vx += CHUNK_SIZE; // Handle negative modulo
+                var vz = seedZ % CHUNK_SIZE;
+                if (vz < 0) vz += CHUNK_SIZE;
 
                 // Random Y level within ore's range
-                var vy = _randomInRange(seed, v, oreDef.minY, oreDef.maxY);
+                var vy = _randomInRange(v, oreDef.minY, oreDef.maxY);
 
                 // Place the vein (simple sphere shape)
-                _placeVein(chunk, vx, vy, vz, oreDef.blockId, oreDef.veinSize, seed, v);
+                _placeVein(chunk, vx, vy, vz, blockId, oreDef.veinSize, v);
             }
         }
 
@@ -103,11 +146,10 @@
          * @param {number} cz - Center Z.
          * @param {number} blockId - Ore block ID.
          * @param {number} radius - Vein radius.
-         * @param {number} seed - Random seed.
-         * @param {number} veinIndex - Index of this vein.
+         * @param {number} veinIndex - Index of this vein for variation.
          * @private
          */
-        function _placeVein(chunk, cx, cy, cz, blockId, radius, seed, veinIndex) {
+        function _placeVein(chunk, cx, cy, cz, blockId, radius, veinIndex) {
             var halfRadius = Math.floor(radius / 2) + 1;
 
             for (var dx = -halfRadius; dx <= halfRadius; dx++) {
@@ -118,6 +160,11 @@
                             var bx = cx + dx;
                             var by = cy + dy;
                             var bz = cz + dz;
+
+                            // Check bounds
+                            if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz >= CHUNK_SIZE) {
+                                continue;
+                            }
 
                             // Add some randomness to shape
                             if (dist < halfRadius - 0.5) {
@@ -186,33 +233,33 @@
          * Simple 2D hash for deterministic randomness.
          * @param {number} x
          * @param {number} y
-         * @returns {number}
+         * @returns {number} Positive 32-bit integer.
          * @private
          */
         function _hash2D(x, y) {
+            // FNV-1a inspired hash — produces consistent positive results
+            x = x | 0;
+            y = y | 0;
             var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
-            h = ((h >> 13) ^ h) * 0x5bd1e995;
-            return (h ^ (h >> 15)) >>> 0; // Unsigned 32-bit
+            h = ((h >>> 13) ^ h) * 0x5bd1e995;
+            return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
         }
 
         /**
-         * Generate a pseudo-random number in a range using a simple LCG.
-         * @param {number} seed - Base seed.
+         * Generate a pseudo-random number in a range using deterministic hashing.
          * @param {number} index - Variation index.
          * @param {number} min - Minimum value.
          * @param {number} max - Maximum value.
-         * @returns {number}
+         * @returns {number} Integer in [min, max].
          * @private
          */
-        function _randomInRange(seed, index, min, max) {
-            var s = (seed + index * 6364136223846793005 + 1442695040888963407);
-            s = ((s >> 16) ^ s) * 0x45d9f3b;
-            s = ((s >> 16) ^ s);
-            s = ((s >> 16) ^ s);
-            return min + (Math.abs(s) % (max - min + 1));
+        function _randomInRange(index, min, max) {
+            var hash = _hash2D(index, (min + max) | 0);
+            return min + (hash % (max - min + 1));
         }
 
         return {
+            init: init,
             placeOres: placeOres,
             getMinY: getMinY,
             getMaxY: getMaxY,

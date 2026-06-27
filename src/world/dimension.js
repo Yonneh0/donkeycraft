@@ -294,7 +294,7 @@
          * Get or create a ChunkManager for a specific dimension.
          * Each dimension has its own isolated chunk data.
          * @param {number} type - Dimension type constant.
-         * @param {object} [options] - ChunkManager options.
+         * @param {object} [options] - ChunkManager options (renderDistance, etc.).
          * @returns {Donkeycraft.ChunkManager} The chunk manager for this dimension.
          */
         function getChunkManagerForDimension(type, options) {
@@ -303,7 +303,7 @@
             }
 
             if (!_chunkManagers[type]) {
-                _chunkManagers[type] = new Donkeycraft.ChunkManager(options);
+                _chunkManagers[type] = new Donkeycraft.ChunkManager(options || {});
             }
 
             return _chunkManagers[type];

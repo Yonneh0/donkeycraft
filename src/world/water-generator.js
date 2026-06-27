@@ -16,6 +16,34 @@
      */
     Donkeycraft.WaterGenerator = (function() {
         var _waterLevel = 63; // Default sea level
+        var _waterBlockId = null; // Cached water block ID from BlockRegistry
+
+        /**
+         * Resolve the water block ID from BlockRegistry.
+         * @private
+         */
+        function _resolveWaterBlockId() {
+            if (_waterBlockId !== null) return; // Already resolved
+            if (!Donkeycraft.BlockRegistry) return;
+
+            var water = Donkeycraft.BlockRegistry.getBlockByName('water');
+            if (water) {
+                _waterBlockId = water.id;
+            } else {
+                // Fallback: try common IDs
+                _waterBlockId = 9;
+            }
+        }
+
+        /**
+         * Get the water block ID.
+         * @returns {number} Water block ID, or 0 if not found.
+         * @private
+         */
+        function _getWaterBlockId() {
+            _resolveWaterBlockId();
+            return _waterBlockId || 0;
+        }
 
         /**
          * Place water sources in a chunk.
@@ -47,6 +75,9 @@
          * @private
          */
         function _placeOceanWater(chunk, biomeId, heightmap) {
+            var waterId = _getWaterBlockId();
+            if (!waterId) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var surfaceY = heightmap[x + z * CHUNK_SIZE] || 20;
@@ -55,7 +86,7 @@
                     for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
                         var block = chunk.getBlock(x, y, z);
                         if (block === 0) { // Only replace air
-                            chunk.setBlock(x, y, z, 213); // water
+                            chunk.setBlock(x, y, z, waterId);
                         }
                     }
                 }
@@ -70,8 +101,11 @@
          * @private
          */
         function _placeSurfaceWater(chunk, biomeId, heightmap) {
-            // Only place water in swamp biomes (ID 4, 11)
-            if (biomeId !== 4 && biomeId !== 11) return;
+            var waterId = _getWaterBlockId();
+            if (!waterId) return;
+
+            // Only place water in swamp biomes (ID 4, 15)
+            if (biomeId !== 4 && biomeId !== 15) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -82,7 +116,7 @@
                         for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
                             var block = chunk.getBlock(x, y, z);
                             if (block === 0) { // Only replace air
-                                chunk.setBlock(x, y, z, 213); // water
+                                chunk.setBlock(x, y, z, waterId);
                             }
                         }
                     }
@@ -97,6 +131,9 @@
          * @private
          */
         function _placeUndergroundLakes(chunk, biomeId) {
+            var waterId = _getWaterBlockId();
+            if (!waterId) return;
+
             var seed = chunk.chunkX * 45671 + chunk.chunkZ * 89013;
 
             // Try to place 1-3 underground lakes
@@ -105,7 +142,9 @@
             for (var i = 0; i < lakeCount; i++) {
                 var hash = _hash2D(seed + i * 73, i * 97);
                 var lx = hash % CHUNK_SIZE;
-                var lz = (hash >> 8) % CHUNK_SIZE;
+                if (lx < 0) lx += CHUNK_SIZE;
+                var lz = ((hash >> 8) % CHUNK_SIZE);
+                if (lz < 0) lz += CHUNK_SIZE;
 
                 // Random Y level below surface
                 var surfaceY = 40 + ((hash >> 16) % 60); // Y: 40-100
@@ -114,7 +153,7 @@
                 // Lake radius
                 var radius = 2 + ((hash >> 24) % 4);
 
-                _placeLake(chunk, lx, surfaceY, lz, radius);
+                _placeLake(chunk, lx, surfaceY, lz, radius, waterId);
             }
         }
 
@@ -125,9 +164,10 @@
          * @param {number} cy - Center Y.
          * @param {number} cz - Center Z.
          * @param {number} radius - Lake radius.
+         * @param {number} waterId - Water block ID.
          * @private
          */
-        function _placeLake(chunk, cx, cy, cz, radius) {
+        function _placeLake(chunk, cx, cy, cz, radius, waterId) {
             var r = Math.ceil(radius);
 
             for (var dx = -r; dx <= r; dx++) {
@@ -139,11 +179,12 @@
                             var by = cy + dy;
                             var bz = cz + dz;
 
+                            // Check bounds
                             if (bx >= 0 && bx < CHUNK_SIZE &&
                                 by >= 0 && by < WORLD_HEIGHT &&
                                 bz >= 0 && bz < CHUNK_SIZE) {
                                 if (chunk.getBlock(bx, by, bz) === 0) { // Air only
-                                    chunk.setBlock(bx, by, bz, 213); // water
+                                    chunk.setBlock(bx, by, bz, waterId);
                                 }
                             }
                         }
@@ -172,13 +213,15 @@
          * Simple 2D hash for deterministic randomness.
          * @param {number} x
          * @param {number} y
-         * @returns {number}
+         * @returns {number} Positive 32-bit integer.
          * @private
          */
         function _hash2D(x, y) {
+            x = x | 0;
+            y = y | 0;
             var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
-            h = ((h >> 13) ^ h) * 0x5bd1e995;
-            return (h ^ (h >> 15)) >>> 0;
+            h = ((h >>> 13) ^ h) * 0x5bd1e995;
+            return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
         }
 
         return {
