@@ -263,7 +263,7 @@
 
     /**
      * Check if a coordinate range overlaps with any solid block.
-     * Avoids object allocation by passing raw coordinates directly.
+     * Returns true on first match (early exit) for performance.
      * @param {number} minX - Minimum X of the range.
      * @param {number} minY - Minimum Y of the range.
      * @param {number} minZ - Minimum Z of the range.
@@ -274,7 +274,24 @@
      * @private
      */
     Donkeycraft.Collision.prototype._checkAABBAgainstBlocks = function(minX, minY, minZ, maxX, maxY, maxZ) {
-        return this.getOverlappingBlocks(minX, minY, minZ, maxX, maxY, maxZ).length > 0;
+        var startX = Math.floor(minX);
+        var endX = Math.ceil(maxX);
+        var startY = Math.floor(minY);
+        var endY = Math.ceil(maxY);
+        var startZ = Math.floor(minZ);
+        var endZ = Math.ceil(maxZ);
+
+        for (var y = startY; y < endY; y++) {
+            for (var x = startX; x < endX; x++) {
+                for (var z = startZ; z < endZ; z++) {
+                    if (this.isBlockSolid(x, y, z)) {
+                        return true; // Early exit on first solid block
+                    }
+                }
+            }
+        }
+
+        return false;
     };
 
     /**

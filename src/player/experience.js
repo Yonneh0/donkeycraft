@@ -207,15 +207,13 @@
 
     /**
      * Get the total XP value of current levels + points.
+     * Calculates cumulative cost of all levels plus current points.
      * @returns {number} Total XP value.
      */
     Donkeycraft.Experience.prototype.getTotalXPValue = function() {
-        // Convert points to equivalent XP value using inverse of level formula
-        var total = this._level * 7; // Each level is worth ~7 XP on average
-        total += this._points;
+        var total = this._points;
 
-        // Add the cumulative cost of all levels
-        // Boundary must match getLevelThreshold() which uses <= 16 for first formula
+        // Sum the threshold cost for each level earned
         for (var i = 0; i < this._level; i++) {
             if (i <= 16) {
                 total += 7 + i * 2;

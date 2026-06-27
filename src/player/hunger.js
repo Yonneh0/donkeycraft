@@ -117,6 +117,7 @@
 
     /**
      * Tick the hunger system — handle starvation damage and auto-regeneration.
+     * This is the authoritative source for health regeneration based on hunger state.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Hunger.prototype.tick = function(deltaTime) {
@@ -126,7 +127,7 @@
 
         var gameMode = this._player.getGameMode();
 
-        // Creative mode: no hunger mechanics
+        // Creative mode: no hunger mechanics, full food and saturation
         if (gameMode === 'creative') {
             this._foodLevel = 20;
             this._saturation = 20.0;
@@ -135,14 +136,13 @@
 
         // Auto-regeneration: when saturation > 0 and health < max
         if (this._saturation > 0 && this._foodLevel > 0) {
-            // Drain saturation first
-            this._saturation -= deltaTime * 1.0; // Drain 1 saturation per second
+            // Drain saturation first (~1 per second)
+            this._saturation -= deltaTime * 1.0;
             if (this._saturation < 0) {
                 this._saturation = 0;
             }
 
-            // Regenerate when health is below max - 4 (slow regen)
-            // or above max - 4 (faster regen, but still limited)
+            // Regenerate when health is below max
             if (this._hurtBox && this._hurtBox.getHealth() < this._hurtBox.getMaxHealth()) {
                 // Regen chance: ~25% per second when health < max-4
                 // ~50% per second when health >= max-4
@@ -161,14 +161,14 @@
         }
 
         // Starvation damage: when food level = 0
+        // Vanilla Minecraft deals 1 HP damage every ~2 seconds at low health when food = 0
         if (this._foodLevel <= 0) {
             this._starvationTimer += deltaTime;
-            // Deal 1 HP of damage every 8 seconds (40 ticks at 20 TPS)
-            if (this._starvationTimer >= 8.0) {
+            if (this._starvationTimer >= 4.0) {
                 this._starvationTimer = 0;
 
                 if (this._hurtBox) {
-                    // Only take starvation damage if health <= 5 (or half max)
+                    // Only take starvation damage if health <= 5 (or half max, whichever is lower)
                     var currentHealth = this._hurtBox.getHealth();
                     var threshold = Math.min(5, this._hurtBox.getMaxHealth() / 2);
                     if (currentHealth <= threshold) {

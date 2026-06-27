@@ -149,9 +149,12 @@
         // Update onGround state
         player.onGround = result.onGround;
 
-        // Track fall distance
+        // Track fall distance (vy is negative when falling, so negate to get positive displacement)
         if (!result.onGround && !inWater) {
-            player.trackFallDistance(-player.getVelocity().y * deltaTime);
+            var vy = player.getVelocity().y;
+            if (vy < 0) {
+                player.trackFallDistance(-vy * deltaTime);
+            }
         } else if (result.onGround) {
             // Reset fall distance when landing on solid ground
             player.maxFallDistance = 0;
@@ -344,33 +347,38 @@
     };
 
     /**
-     * Check if the player is in lava.
+     * Check if the player is in lava by sampling multiple body positions.
      * @returns {boolean}
      */
     Donkeycraft.Movement.prototype.isInLava = function() {
         var pos = this._player.getPosition();
-        var globalY = Math.floor(pos.y);
 
-        var chunkX = Donkeycraft.Chunk.chunkCoordX(pos.x);
-        var chunkZ = Donkeycraft.Chunk.chunkCoordZ(pos.z);
-        var localX = Donkeycraft.Chunk.localCoordX(pos.x);
-        var localZ = Donkeycraft.Chunk.localCoordZ(pos.z);
+        // Check at feet, mid-body, and head height
+        var checkYs = [pos.y, pos.y + 0.5, pos.y + 1.2];
 
-        var chunk = this._chunkManager.getChunkIfExists(chunkX, chunkZ);
-        if (!chunk) return false;
+        for (var i = 0; i < checkYs.length; i++) {
+            var globalY = Math.floor(checkYs[i]);
+            var chunkX = Donkeycraft.Chunk.chunkCoordX(pos.x);
+            var chunkZ = Donkeycraft.Chunk.chunkCoordZ(pos.z);
+            var localX = Donkeycraft.Chunk.localCoordX(pos.x);
+            var localZ = Donkeycraft.Chunk.localCoordZ(pos.z);
 
-        var blockId = chunk.getBlock(localX, globalY, localZ);
+            var chunk = this._chunkManager.getChunkIfExists(chunkX, chunkZ);
+            if (!chunk) continue;
 
-        // Lava block ID is 10 or 213 (check both variants)
-        if (blockId === 10 || blockId === 213) {
-            return true;
-        }
+            var blockId = chunk.getBlock(localX, globalY, localZ);
 
-        // Also check via BlockRegistry if available
-        if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isLiquid) {
-            var lavaId = Donkeycraft.BlockRegistry.getBlockIdByName ? Donkeycraft.BlockRegistry.getBlockIdByName('lava') : 0;
-            if (lavaId > 0 && blockId === lavaId) {
+            // Lava block ID is 10 or 213 (check both variants)
+            if (blockId === 10 || blockId === 213) {
                 return true;
+            }
+
+            // Also check via BlockRegistry if available
+            if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isLiquid) {
+                var lavaId = Donkeycraft.BlockRegistry.getBlockIdByName ? Donkeycraft.BlockRegistry.getBlockIdByName('lava') : 0;
+                if (lavaId > 0 && blockId === lavaId) {
+                    return true;
+                }
             }
         }
 

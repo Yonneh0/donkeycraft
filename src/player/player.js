@@ -58,31 +58,34 @@
         this.width = Config.PLAYER_WIDTH;
 
         /**
-         * Current game mode.
+         * Current game mode: 'survival', 'creative', or 'spectator'.
          * @type {string}
          */
         this.gameMode = config.gameMode || 'survival';
 
         /**
          * Whether the player is currently on the ground.
+         * Updated by collision resolution each tick.
          * @type {boolean}
          */
         this.onGround = false;
 
         /**
          * Whether flying mode is enabled (creative/spectator only).
+         * Controlled by Flying system or GameMode system.
          * @type {boolean}
          */
         this.flyEnabled = false;
 
         /**
-         * Maximum distance fallen before taking damage.
+         * Maximum distance fallen before taking fall damage.
+         * Reset when landing on solid ground.
          * @type {number}
          */
         this.maxFallDistance = 0;
 
         /**
-         * Current knockback velocity.
+         * Current knockback velocity vector.
          * @type {Donkeycraft.Vector3}
          * @private
          */
@@ -90,6 +93,7 @@
 
         /**
          * Whether the player is alive.
+         * Set to false on death, checked before most game logic.
          * @type {boolean}
          */
         this.alive = true;
@@ -323,13 +327,14 @@
 
     /**
      * Track maximum fall distance for fall damage calculation.
-     * @param {number} deltaY - Vertical movement (negative = falling).
+     * Call with negative deltaY values (downward movement) to accumulate.
+     * @param {number} deltaY - Downward displacement in blocks (positive value = falling down).
      */
     Donkeycraft.Player.prototype.trackFallDistance = function(deltaY) {
-        if (deltaY < 0) {
-            this.maxFallDistance -= deltaY;
-        } else if (this.onGround) {
-            // Reset when landing
+        if (deltaY > 0) {
+            this.maxFallDistance += deltaY;
+        } else if (this.onGround && this.maxFallDistance > 0) {
+            // Reset when landing after a fall
             this.maxFallDistance = 0;
         }
     };

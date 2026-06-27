@@ -1,5 +1,6 @@
 // Donkeycraft — Flying System
-// Creative/spectator flying: up/down, speed boost (shift), collision in creative.
+// Creative/spectator flying state management: enable/disable fly mode, speed queries.
+// Physics application is handled by Movement._tickCreativeFly() to avoid duplicate velocity writes.
 (function() {
     'use strict';
 
@@ -16,7 +17,8 @@
         this._input = input;
 
         /**
-         * Whether flying mode is currently enabled.
+         * Whether flying mode is currently enabled (creative only).
+         * Spectator mode always flies without needing this flag.
          * @type {boolean}
          * @private
          */
@@ -25,74 +27,11 @@
 
     /**
      * Main flying tick — called every game tick.
+     * State management only; physics is handled by Movement.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Flying.prototype.tick = function(deltaTime) {
-        var player = this._player;
-
-        // Only creative/spectator can fly
-        var gameMode = player.getGameMode();
-        if (gameMode !== 'creative' && gameMode !== 'spectator') {
-            return;
-        }
-
-        // Spectator always flies, creative needs fly mode enabled
-        if (gameMode === 'spectator' || this._flyEnabled) {
-            this._applyFlying(deltaTime);
-        }
-    };
-
-    /**
-     * Apply flying movement to the player.
-     * @param {number} deltaTime - Time since last tick in seconds.
-     * @private
-     */
-    Donkeycraft.Flying.prototype._applyFlying = function(deltaTime) {
-        var player = this._player;
-        var input = this._input;
-
-        // Get fly speed (boosted with sprint)
-        var isSprinting = input.isKeyDown(Config.KEYBINDS.SPRINT);
-        var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
-
-        // Compute horizontal movement direction from input
-        var forward = input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) ? 1 : (input.isKeyDown(Config.KEYBINDS.MOVE_BACKWARD) ? -1 : 0);
-        var strafe = input.isKeyDown(Config.KEYBINDS.MOVE_RIGHT) ? 1 : (input.isKeyDown(Config.KEYBINDS.MOVE_LEFT) ? -1 : 0);
-
-        // Convert to world-space direction based on player yaw
-        var yaw = player.getRotation().yaw;
-        var moveX = 0;
-        var moveZ = 0;
-
-        if (forward !== 0 || strafe !== 0) {
-            var sinYaw = Math.sin(yaw);
-            var cosYaw = Math.cos(yaw);
-            moveX -= sinYaw * forward;
-            moveZ -= cosYaw * forward;
-            moveX += cosYaw * strafe;
-            moveZ -= sinYaw * strafe;
-        }
-
-        // Normalize horizontal movement
-        var mag = Math.sqrt(moveX * moveX + moveZ * moveZ);
-        if (mag > 0) {
-            moveX = (moveX / mag) * speed;
-            moveZ = (moveZ / mag) * speed;
-        } else {
-            moveX = 0;
-            moveZ = 0;
-        }
-
-        // Vertical movement: Space = up, Shift = down (vanilla Minecraft allows descending while moving horizontally)
-        var flyVy = 0;
-        if (input.isKeyDown(Config.KEYBINDS.JUMP)) {
-            flyVy = speed;
-        } else if (input.isKeyDown(Config.KEYBINDS.SPRINT)) {
-            flyVy = -Config.FLYING_TERMINAL_VELOCITY;
-        }
-
-        // Apply velocity directly (no gravity in flying mode)
-        player.setVelocity(moveX, flyVy, moveZ);
+        // No physics here. Movement._tickCreativeFly() and _tickSpectator() handle velocity.
     };
 
     /**
@@ -106,40 +45,52 @@
 
     /**
      * Toggle flying mode on/off.
+     * @returns {boolean} True if toggled successfully.
      */
     Donkeycraft.Flying.prototype.toggleFlyMode = function() {
         var gameMode = this._player.getGameMode();
 
         // Only creative and spectator can toggle flying
         if (gameMode !== 'creative' && gameMode !== 'spectator') {
-            return;
+            return false;
         }
 
         this._flyEnabled = !this._flyEnabled;
-        this._player.flyEnabled = this._flyEnabled;
+        if (this._player) {
+            this._player.flyEnabled = this._flyEnabled;
+        }
+        return true;
     };
 
     /**
      * Enable flying mode.
+     * @returns {boolean} True if enabled successfully.
      */
     Donkeycraft.Flying.prototype.enableFlyMode = function() {
         var gameMode = this._player.getGameMode();
 
         // Only creative and spectator can fly
         if (gameMode !== 'creative' && gameMode !== 'spectator') {
-            return;
+            return false;
         }
 
         this._flyEnabled = true;
-        this._player.flyEnabled = true;
+        if (this._player) {
+            this._player.flyEnabled = true;
+        }
+        return true;
     };
 
     /**
      * Disable flying mode.
+     * @returns {boolean} True if disabled successfully.
      */
     Donkeycraft.Flying.prototype.disableFlyMode = function() {
         this._flyEnabled = false;
-        this._player.flyEnabled = false;
+        if (this._player) {
+            this._player.flyEnabled = false;
+        }
+        return true;
     };
 
     /**
@@ -147,7 +98,9 @@
      * @returns {number} Speed in blocks per second.
      */
     Donkeycraft.Flying.prototype.getFlySpeed = function() {
-        var isSprinting = this._input.isKeyDown(Config.KEYBINDS.SPRINT);
+        var isSprinting = this._input && typeof this._input.isKeyDown === 'function'
+            ? this._input.isKeyDown(Config.KEYBINDS.SPRINT)
+            : false;
         return isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
     };
 
@@ -188,14 +141,19 @@
         }
 
         this._flyEnabled = !!enabled;
-        this._player.flyEnabled = !!enabled;
+        if (this._player) {
+            this._player.flyEnabled = !!enabled;
+        }
     };
 
     /**
      * Destroy the flying system and free resources.
      */
     Donkeycraft.Flying.prototype.destroy = function() {
-        this._player = null;
+        if (this._player) {
+            this._player.flyEnabled = false;
+            this._player = null;
+        }
         this._input = null;
     };
 

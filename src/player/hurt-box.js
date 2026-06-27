@@ -326,7 +326,8 @@
     };
 
     /**
-     * Tick the hurt box system — handles fire damage and starvation.
+     * Tick the hurt box system — handles fire damage only.
+     * Auto-regeneration is handled by Hunger.tick() to avoid duplicate healing.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.HurtBox.prototype.tick = function(deltaTime) {
@@ -341,7 +342,7 @@
             return;
         }
 
-        // Fire damage
+        // Fire damage — 1 HP per second while on fire
         if (this._onFire) {
             this._fireDamageTimer += deltaTime;
             if (this._fireDamageTimer >= 1.0) {
@@ -350,27 +351,6 @@
             }
         } else {
             this._fireDamageTimer = 0;
-        }
-
-        // Auto-regeneration when saturation > 0 and health < max
-        if (this._saturation > 0 && this._health < this.maxHealth) {
-            this._saturation -= deltaTime * 0.5; // Drain saturation
-            if (this._saturation <= 0) {
-                this._saturation = 0;
-            }
-
-            // Regenerate when saturation is sufficient
-            if (this._health < this.maxHealth - 4) {
-                // Only regenerate every 4 ticks (~2 seconds)
-                if (Math.random() < deltaTime * 0.25) {
-                    this.heal(1);
-                }
-            } else if (this._saturation > 0 && this._health < this.maxHealth) {
-                // Faster regen near full health
-                if (Math.random() < deltaTime * 0.5) {
-                    this.heal(1);
-                }
-            }
         }
     };
 
