@@ -124,6 +124,10 @@
             registerEffect(new Donkeycraft.PotionEffect(16, 'DolphinsGrace', 50, 200, 255, 600, 1800, 4));
             registerEffect(new Donkeycraft.PotionEffect(17, 'BadOmen', 100, 50, 0, 1200, 3600, 4));
             registerEffect(new Donkeycraft.PotionEffect(18, 'HeroOfTheVillage', 255, 255, 255, 1200, 3600, 0));
+            // Additional effects needed for potions
+            registerEffect(new Donkeycraft.PotionEffect(19, 'Weakness', 50, 50, 50, 300, 900, 4));
+            registerEffect(new Donkeycraft.PotionEffect(20, 'Absorption', 248, 192, 60, 600, 1800, 4));
+            registerEffect(new Donkeycraft.PotionEffect(21, 'Saturation', 248, 160, 60, 300, 600, 0));
             return Object.keys(_effects).length;
         }
 
@@ -235,7 +239,7 @@
 
             // Weakness: Fermented Spider Eye (240) + Awkward (2)
             registerPotion(new Donkeycraft.Potion(31, 'Potion of Weakness', 240, 2,
-                [{ effectId: 7, amplifier: 0, duration: 240 }], false, '5C5C5C'));
+                [{ effectId: 19, amplifier: 0, duration: 240 }], false, '5C5C5C'));
 
             // Poison: Spider Eye (239) + Awkward (2)
             registerPotion(new Donkeycraft.Potion(32, 'Potion of Poison', 239, 2,
@@ -371,6 +375,26 @@
             return _brewingRecipes.slice();
         }
 
+        /**
+         * isInstant — checks if a potion is an instant-effect potion.
+         * @param {number} potionId - Potion ID.
+         * @returns {boolean} True if the potion is instant-effect.
+         */
+        function isInstant(potionId) {
+            var potion = _potions[potionId];
+            return potion ? potion.isInstant : false;
+        }
+
+        /**
+         * getPotionBucketColor — gets the custom bucket color for a potion.
+         * @param {number} potionId - Potion ID.
+         * @returns {string|null} Hex color string or null for default.
+         */
+        function getPotionBucketColor(potionId) {
+            var potion = _potions[potionId];
+            return potion ? potion.bucketColor : null;
+        }
+
         // Auto-register all effects and potions on initialization
         registerEffects();
         registerPotions();
@@ -384,7 +408,9 @@
             getAllPotions: getAllPotions,
             getPotionCount: getPotionCount,
             getEffectCount: getEffectCount,
-            getBrewingRecipes: getBrewingRecipes
+            getBrewingRecipes: getBrewingRecipes,
+            isInstant: isInstant,
+            getPotionBucketColor: getPotionBucketColor
         };
     })();
 

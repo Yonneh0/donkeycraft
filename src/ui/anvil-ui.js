@@ -140,11 +140,16 @@
         }
 
         // Look up from tool system if available
+        // Note: ToolRegistry.getDurability() expects a materialId (0-6), not an item block ID.
+        // The fallback map below handles actual item-based lookups.
         var itemId = stack.getItemId();
-        if (Donkeycraft.ToolRegistry && typeof Donkeycraft.ToolRegistry.getMaxDurability === 'function') {
+        if (Donkeycraft.ToolRegistry && typeof Donkeycraft.ToolRegistry.getDurability === 'function') {
             try {
-                var maxDur = Donkeycraft.ToolRegistry.getMaxDurability(itemId);
-                if (maxDur > 0) return maxDur;
+                // Try material IDs 1-6 (skip 0 = None) to find a matching durability
+                for (var m = 1; m <= 6; m++) {
+                    var matDur = Donkeycraft.ToolRegistry.getDurability(m);
+                    if (matDur > 0) return matDur;
+                }
             } catch (e) {}
         }
 

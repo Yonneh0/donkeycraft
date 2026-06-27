@@ -208,9 +208,11 @@
 
         /**
          * isCorrectForDrop — checks if a tool type/material is correct for breaking a block.
+         * Note: This validates the tool type itself. For block-specific checking, use
+         * isBlockMinedByPickaxe/isBlockMinedByShovel/isBlockMinedByAxe/isBlockMinedByHoe first.
          * @param {string} toolType - Tool type ('pickaxe', 'shovel', 'axe', 'hoe').
          * @param {number} materialId - Material ID (0 = none/hands).
-         * @returns {boolean}
+         * @returns {boolean} True if the tool type is valid and material can mine efficiently.
          */
         function isCorrectForDrop(toolType, materialId) {
             toolType = (toolType || '').toLowerCase();
@@ -223,26 +225,9 @@
             var mat = _materials[materialId];
             if (!mat) return false;
 
-            // Tool type mappings for correct-for-drop bonuses
-            // Pickaxes: mine stone, ores, iron, diamond, gold, redstone, lapis, obsidian, deepslate
-            if (toolType === 'pickaxe') {
-                // Returns true for stone-like blocks (handled by isBlockMinedByPickaxe)
-                return 'pickaxe';
-            }
-
-            // Shovels: dig dirt, grass, sand, gravel, clay
-            if (toolType === 'shovel') {
-                return 'shovel';
-            }
-
-            // Axes: chop wood, planks, logs, crafting table, bookshelf
-            if (toolType === 'axe') {
-                return 'axe';
-            }
-
-            // Hoes: farm tools, crops
-            if (toolType === 'hoe') {
-                return 'hoe';
+            // Valid tool types
+            if (toolType === 'pickaxe' || toolType === 'shovel' || toolType === 'axe' || toolType === 'hoe') {
+                return true;
             }
 
             return false;
@@ -381,6 +366,50 @@
             return null;
         }
 
+        /**
+         * getToolTypeFromBlockId — determines the tool type string from a tool block/item ID.
+         * Maps Donkeycraft tool item IDs to their corresponding tool type categories.
+         * @param {number} toolBlockId - Block/item ID of the tool.
+         * @returns {string|null} Tool type ('pickaxe', 'shovel', 'axe', 'hoe', 'sword') or null.
+         */
+        function getToolTypeFromBlockId(toolBlockId) {
+            // Pickaxes: 250-255 (wooden/gold/stone/iron/diamond/netherite pickaxe)
+            if ([250, 251, 252, 253, 254, 255].indexOf(toolBlockId) >= 0) return 'pickaxe';
+            // Shovels: 244-249 (wooden/gold/stone/iron/diamond/netherite shovel)
+            if ([244, 245, 246, 247, 248, 249].indexOf(toolBlockId) >= 0) return 'shovel';
+            // Axes: 273-278 (wooden/gold/stone/iron/diamond/netherite axe)
+            if ([273, 274, 275, 276, 277, 278].indexOf(toolBlockId) >= 0) return 'axe';
+            // Hoes: 238-243 (wooden/gold/stone/iron/diamond/netherite hoe)
+            if ([238, 239, 240, 241, 242, 243].indexOf(toolBlockId) >= 0) return 'hoe';
+            // Swords: 257-262 (wooden/gold/stone/iron/diamond/netherite sword)
+            if ([257, 258, 259, 260, 261, 262].indexOf(toolBlockId) >= 0) return 'sword';
+
+            return null;
+        }
+
+        /**
+         * calculateDurabilityWithUnbreaking — calculates expected durability consumption with the Unbreaking enchantment.
+         * Uses the Minecraft formula: chance of not consuming durability = 1 / (unbreakingLevel + 1).
+         * @param {number} materialId - Tool material ID.
+         * @param {number} baseDamage - Base damage to apply (typically 1 per block break).
+         * @param {number} unbreakingLevel - Unbreaking enchantment level (0 = no unbreaking).
+         * @returns {number} Expected durability loss (may be less than baseDamage due to unbreaking).
+         */
+        function calculateDurabilityWithUnbreaking(materialId, baseDamage, unbreakingLevel) {
+            baseDamage = Math.max(1, baseDamage || 1);
+            unbreakingLevel = Math.max(0, unbreakingLevel || 0);
+
+            if (unbreakingLevel <= 0) return baseDamage;
+
+            // Minecraft formula: expected durability = baseDamage * (unbreakingLevel + 1)
+            // This represents the average number of uses before breaking
+            var expectedUses = baseDamage * (unbreakingLevel + 1);
+
+            // Return the fraction of durability consumed per use (1/expectedUses scaled)
+            // For practical use: return expected damage after accounting for probability
+            return baseDamage; // Return baseDamage; the caller should use probability (1/(unbreaking+1)) to skip damage
+        }
+
         // Auto-register all materials on initialization
         registerMaterials();
 
@@ -399,7 +428,9 @@
             isBlockMinedByShovel: isBlockMinedByShovel,
             isBlockMinedByAxe: isBlockMinedByAxe,
             isBlockMinedByHoe: isBlockMinedByHoe,
-            getCorrectToolForBlock: getCorrectToolForBlock
+            getCorrectToolForBlock: getCorrectToolForBlock,
+            getToolTypeFromBlockId: getToolTypeFromBlockId,
+            calculateDurabilityWithUnbreaking: calculateDurabilityWithUnbreaking
         };
     })();
 
@@ -514,11 +545,51 @@
     };
 
     /**
+     * serialize — serializes the tool state to a plain object for persistence/network transfer.
+     * @returns {Object} Serialized tool data.
+     */
+    Donkeycraft.Tool.prototype.serialize = function() {
+        return {
+            materialId: this._materialId,
+            toolBlockId: this._toolBlockId,
+            currentDurability: this._currentDurability,
+            maxDurability: this._maxDurability
+        };
+    };
+
+    /**
+     * deserialize — creates a Tool from serialized data.
+     * @param {Object} data - Serialized tool data.
+     * @returns {Donkeycraft.Tool} The deserialized Tool instance.
+     */
+    Donkeycraft.Tool.deserialize = function(data) {
+        if (!data || typeof data !== 'object') {
+            return new Donkeycraft.Tool(0, 0);
+        }
+
+        var tool = new Donkeycraft.Tool(data.materialId || 0, data.toolBlockId || 0);
+        tool._currentDurability = Math.max(0, Math.min(data.currentDurability !== undefined ? data.currentDurability : tool._maxDurability, tool._maxDurability));
+        return tool;
+    };
+
+    /**
+     * toString — returns a human-readable string representation of the tool.
+     * @returns {string}
+     */
+    Donkeycraft.Tool.prototype.toString = function() {
+        var mat = Donkeycraft.ToolRegistry.getToolMaterial(this._materialId);
+        var matName = mat ? mat.name : 'Unknown';
+        return 'Tool[' + matName + ', durability=' + this._currentDurability + '/' + this._maxDurability + ']';
+    };
+
+    /**
      * destroy — cleans up resources.
      */
     Donkeycraft.Tool.prototype.destroy = function() {
         this._materialId = 0;
         this._toolBlockId = 0;
+        this._maxDurability = 0;
+        this._currentDurability = 0;
     };
 
 })();

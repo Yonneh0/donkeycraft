@@ -119,8 +119,8 @@
                 [], [], 1));              // compatible with everything
             register(new Donkeycraft.Enchantment(18, 'FeatherFalling', 4, 5, ['armor'],
                 [], [], 1));              // compatible with everything
-            register(new Donkeycraft.Enchantment(19, 'LootBonus', 3, 2, ['weapon'],
-                [], [], 1));              // compatible with everything (old name: SilkTouch/LootBonus)
+            register(new Donkeycraft.Enchantment(19, 'Looting', 3, 2, ['weapon'],
+                [], [], 1));              // compatible with everything
 
             // Fishing rod enchantments
             register(new Donkeycraft.Enchantment(20, 'Lure', 3, 5, ['weapon'],
@@ -226,6 +226,13 @@
                 }
             }
 
+            // Books accept any enchantment valid for weapon or armor slots
+            if (itemCategory === 'book') {
+                for (var b = 0; b < slots.length; b++) {
+                    if (slots[b] === 'weapon' || slots[b] === 'armor') return true;
+                }
+            }
+
             return false;
         }
 
@@ -237,7 +244,7 @@
          */
         function _getItemCategory(itemBlockId) {
             // Tools/weapons (tool material items by ID in Donkeycraft)
-            if ([257, 258, 259, 260, 261].indexOf(itemBlockId) >= 0) return 'sword';     // wooden/gold/stone/iron/diamond/netherite sword
+            if ([257, 258, 259, 260].indexOf(itemBlockId) >= 0) return 'sword';         // wooden/gold/stone/iron/diamond/netherite sword
             if ([250, 251, 252, 253, 254, 255].indexOf(itemBlockId) >= 0) return 'pickaxe'; // tool IDs
             if ([267, 268, 269, 270, 271, 272].indexOf(itemBlockId) >= 0) return 'bow';   // bow IDs
             if ([261, 262, 263, 264, 265, 266].indexOf(itemBlockId) >= 0) return 'fishing_rod';
@@ -315,6 +322,100 @@
             return Object.keys(_enchantments).length;
         }
 
+        /**
+         * isCursed — checks if an enchantment is a curse type.
+         * @param {number} enchantId - Enchantment ID.
+         * @returns {boolean} True if the enchantment is cursed.
+         */
+        function isCursed(enchantId) {
+            var enchant = _enchantments[enchantId];
+            if (!enchant) return false;
+            // Curse enchantment IDs: 30 (CurseOfBinding), 31 (CurseOfVanishing)
+            return enchantId === 30 || enchantId === 31;
+        }
+
+        /**
+         * getEnchantmentEffects — returns the mechanical effect definitions for an enchantment.
+         * @param {number} enchantId - Enchantment ID.
+         * @returns {Object|null} Object with effect properties, or null if not found.
+         */
+        function getEnchantmentEffects(enchantId) {
+            var enchant = _enchantments[enchantId];
+            if (!enchant) return null;
+
+            // Effect definitions keyed by enchantment ID
+            var effectDefs = {
+                1:  { type: 'attackDamage', value: enchantId === 1 ? 1.5 : 0 },       // Sharpness: +1.5 damage per level
+                2:  { type: 'undeadDamage', value: enchantId === 2 ? 2.5 : 0 },        // Smite: +2.5 damage per level vs undead
+                3:  { type: 'arthropodDamage', value: enchantId === 3 ? 1.5 : 0 },     // BaneOfArthropods: +1.5 damage + slowness
+                4:  { type: 'damageReduction', value: 1 },                             // Protection: -1 damage per level
+                5:  { type: 'fireDamageReduction', value: 0.25 },                      // FireProtection: -25% fire damage per level
+                6:  { type: 'explosionDamageReduction', value: 0.15 },                 // BlastProtection: -15% explosion damage per level
+                7:  { type: 'projectileDamageReduction', value: 0.2 },                 // ProjectileProtection: -20% projectile damage per level
+                8:  { type: 'blockDrops', value: 'extra' },                            // Fortune: chance for extra drops
+                9:  { type: 'blockDrops', value: 'silk' },                             // SilkTouch: drop block itself
+                10: { type: 'breakSpeed', value: 1.3 },                               // Efficiency: +30% break speed per level
+                12: { type: 'attackFire', value: true },                               // FireAspect: set attacker on fire
+                13: { type: 'arrowDamage', value: 1 },                                 // Power: +1 arrow damage per level
+                14: { type: 'arrowKnockback', value: 4 },                              // Punch: +4 knockback ticks per level
+                17: { type: 'thorns', value: true },                                   // Thorns: chance to damage attacker
+                18: { type: 'fallDamageReduction', value: 0.12 },                      // FeatherFalling: -12% fall damage per level
+                19: { type: 'mobDrops', value: 'extra' },                              // Looting: extra mob drops
+                20: { type: 'fishLoot', value: 'bonus' },                              // Lure: faster fishing + better loot
+                21: { type: 'fishLoot', value: 'bonus' },                              // LuckOfTheSea: better fish treasure
+                23: { type: 'tridentReturn', value: true },                            // Loyalty: trident returns
+                24: { type: 'tridentRiptide', value: true },                           // Riptide: launch with throw
+                25: { type: 'tridentChannel', value: true },                           // Channeling: summon lightning on storm
+                26: { type: 'waterDamage', value: 2.5 }                                // Impaling: +2.5 damage per level vs aquatic mobs
+            };
+
+            return effectDefs[enchantId] || null;
+        }
+
+        /**
+         * applyEnchantment — validates and applies an enchantment to an ItemStack.
+         * Checks compatibility with existing enchantments and item slot restrictions.
+         * @param {Donkeycraft.ItemStack} itemStack - The item to enchant.
+         * @param {number} enchantId - Enchantment ID to apply.
+         * @param {number} level - Enchantment level (1-based).
+         * @returns {{success: boolean, reason?: string}} Result object with success status.
+         */
+        function applyEnchantment(itemStack, enchantId, level) {
+            if (!itemStack || !enchantId || level === undefined) {
+                return { success: false, reason: 'Invalid arguments' };
+            }
+
+            var enchant = _enchantments[enchantId];
+            if (!enchant) {
+                return { success: false, reason: 'Unknown enchantment ID: ' + enchantId };
+            }
+
+            // Validate level range
+            if (level < 1 || level > enchant.maxLevel) {
+                return { success: false, reason: 'Invalid level: ' + level + ' (max: ' + enchant.maxLevel + ')' };
+            }
+
+            // Get the item's block ID for slot validation
+            var itemBlockId = itemStack.getItemId ? itemStack.getItemId() : 0;
+            if (!canApplyToItem(itemBlockId, enchantId)) {
+                return { success: false, reason: 'Enchantment cannot be applied to this item' };
+            }
+
+            // Check compatibility with existing enchantments on the item
+            var existingEnchants = itemStack.getEnchantments ? itemStack.getEnchantments() : {};
+            for (var existingId in existingEnchants) {
+                if (existingEnchants.hasOwnProperty(existingId)) {
+                    if (!areCompatible(parseInt(existingId, 10), enchantId)) {
+                        var existingName = _enchantments[existingId] ? _enchantments[existingId].name : 'Unknown';
+                        return { success: false, reason: 'Incompatible with ' + existingName };
+                    }
+                }
+            }
+
+            // All checks passed — the caller should apply the enchantment via itemStack.addEnchantment()
+            return { success: true };
+        }
+
         // Auto-register all enchantments on initialization
         registerEnchantments();
 
@@ -327,7 +428,10 @@
             calculateLevelCost: calculateLevelCost,
             getMaxLevel: getMaxLevel,
             getAllEnchantments: getAllEnchantments,
-            getEnchantmentCount: getEnchantmentCount
+            getEnchantmentCount: getEnchantmentCount,
+            isCursed: isCursed,
+            getEnchantmentEffects: getEnchantmentEffects,
+            applyEnchantment: applyEnchantment
         };
     })();
 

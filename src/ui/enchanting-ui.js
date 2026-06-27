@@ -332,6 +332,7 @@
 
     /**
      * _generateEnchantmentOptions — generates 3 random enchantment options for the input item.
+     * Uses EnchantmentRegistry to dynamically select valid enchantments based on the item type.
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._generateEnchantmentOptions = function() {
@@ -342,26 +343,70 @@
             return;
         }
 
-        // Simple enchantment pool based on item type
-        var allEnchantments = [
-            { id: 1, name: 'Sharpness', level: 1, cost: 1 },
-            { id: 2, name: 'Protection', level: 1, cost: 1 },
-            { id: 3, name: 'Fortune', level: 1, cost: 2 },
-            { id: 4, name: 'Efficiency', level: 1, cost: 1 },
-            { id: 5, name: 'Unbreaking', level: 1, cost: 2 }
-        ];
+        // Determine which slot the item belongs to
+        var itemBlockId = this._inputSlot.getItemId ? this._inputSlot.getItemId() : 0;
+        var isArmor = false;
+        var isWeapon = false;
 
-        // Pick 3 random enchantments
+        if ([300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315].indexOf(itemBlockId) >= 0) {
+            isArmor = true;
+        } else {
+            // Assume weapon for anything that isn't armor (swords, tools, bows, etc.)
+            isWeapon = true;
+        }
+
+        // Get valid enchantments from the registry
+        var registry = Donkeycraft.EnchantmentRegistry;
+        var pool = [];
+
+        if (isWeapon && registry) {
+            var weaponEnchants = registry.getEnchantmentsForSlot('weapon');
+            for (var w = 0; w < weaponEnchants.length; w++) {
+                pool.push(weaponEnchants[w]);
+            }
+        } else if (isArmor && registry) {
+            var armorEnchants = registry.getEnchantmentsForSlot('armor');
+            for (var a = 0; a < armorEnchants.length; a++) {
+                pool.push(armorEnchants[a]);
+            }
+        }
+
+        // If no registry or empty pool, fall back to a minimal static set
+        if (!registry || pool.length === 0) {
+            pool = [
+                { id: 1, name: 'Sharpness', maxLevel: 5, weight: 10 },   // weapon
+                { id: 4, name: 'Protection', maxLevel: 4, weight: 10 }    // armor
+            ];
+        }
+
+        // Pick 3 random unique enchantments (or fewer if pool is small)
         this._enchantOptions = [];
-        for (var i = 0; i < 3; i++) {
-            var idx = Math.floor(Math.random() * allEnchantments.length);
-            var base = allEnchantments[idx];
+        var usedIds = {};
+        var maxAttempts = pool.length * 3;
+        var attempts = 0;
+
+        while (this._enchantOptions.length < 3 && attempts < maxAttempts) {
+            attempts++;
+            var idx = Math.floor(Math.random() * pool.length);
+            var enchant = pool[idx];
+
+            // Skip if already selected
+            if (usedIds[enchant.id]) continue;
+            usedIds[enchant.id] = true;
+
+            // Pick a random valid level for this enchantment
+            var maxLvl = enchant.maxLevel || 1;
+            var randomLevel = Math.floor(Math.random() * maxLvl) + 1;
+
+            // Calculate cost using registry formula
+            var cost = registry.calculateLevelCost ? registry.calculateLevelCost(enchant.id, randomLevel) : randomLevel;
+
             this._enchantOptions.push({
-                id: base.id,
-                name: base.name,
-                level: base.level,
-                cost: base.cost + (i * 2), // Increase cost for later options
-                lapisCost: 1 + i
+                id: enchant.id,
+                name: enchant.name,
+                level: randomLevel,
+                cost: cost + (this._enchantOptions.length * 2), // Increase cost for later options
+                lapisCost: 1 + this._enchantOptions.length
             });
         }
 
