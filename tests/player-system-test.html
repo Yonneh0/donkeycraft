@@ -403,7 +403,7 @@
     // heal — basic
     hurtBox.setAbsorption(0);
     var healed = hurtBox.heal(5);
-    F.assertEq(healed, 5, 'Healed 5 HP');
+    F.assertEq(healed, 3, 'Healed 5 HP (capped at max health)');
     F.assertEq(hurtBox.getHealth(), 20, 'Health: 17 + 5 = 22, capped at 20 => 20');
 
     // heal — over max (health already at 20)
@@ -466,6 +466,7 @@
     // Death callback
     var deathSource = null;
     hurtBox.setOnDeath(function(source) { deathSource = source; });
+    hurtBox.setAbsorption(0); // clear leftover absorption from previous tests
     hurtBox._health = 1;
     hurtBox.takeDamage(1, 'lava');
     F.assert(!hurtPlayer.isAlive(), 'Player dead after taking fatal damage');
