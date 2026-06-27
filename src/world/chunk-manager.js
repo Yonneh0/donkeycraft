@@ -5,6 +5,7 @@
 
     var Donkeycraft = window.Donkeycraft;
     var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
     var RENDER_DISTANCE = Donkeycraft.Config.RENDER_DISTANCE;
 
     // ============================================================
@@ -358,12 +359,24 @@
             return;
         }
 
-        // Get biome for this chunk
+        // Get biome for this chunk using world coordinates for biome lookup
         var biome = null;
         if (Donkeycraft.BiomeRegistry) {
-            biome = Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
+            var worldX = chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            var worldZ = chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            // Use noise-based biome lookup from TerrainGenerator's approach
+            var tempNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005, 0);
+            var rainNoise = Donkeycraft.PerlinNoise.noise2D(0, worldZ * 0.005);
+            // Map noise to biome ID based on temperature and rainfall
+            var temp = (tempNoise + 1) * 0.5; // [0, 1]
+            var rain = (rainNoise + 1) * 0.5; // [0, 1]
+            biome = Donkeycraft.BiomeRegistry.getBiomeByClimate(temp, rain);
         }
-        chunk.biomeId = biome ? biome.id : 1;
+        // Ensure biome is never null — default to plains if lookup failed
+        if (!biome) {
+            biome = Donkeycraft.BiomeRegistry.getBiomeById(Donkeycraft.BiomeID.PLAINS);
+        }
+        chunk.biomeId = biome.id;
 
         Donkeycraft.Logger.info('ChunkManager', 'Generating overworld terrain for chunk [' + chunkX + ',' + chunkZ + ']');
 
@@ -393,8 +406,7 @@
             return;
         }
 
-        var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-        var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+        // biome is guaranteed non-null at this point
         var isDesert = !!biome.isDesert;
         var hasSnow = !!biome.hasSnow;
         var isOcean = !!biome.isOcean;
