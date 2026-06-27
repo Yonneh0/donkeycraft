@@ -191,11 +191,11 @@
     /**
      * Check if vector is approximately equal to another.
      * @param {Donkeycraft.Vector3} v
-     * @param {number} [epsilon=0.001]
+     * @param {number} [epsilon=0.001] — Tolerance for approximate comparison. Pass 0 for exact comparison.
      * @returns {boolean}
      */
     Donkeycraft.Vector3.prototype.equals = function(v, epsilon) {
-        epsilon = epsilon || 0.001;
+        epsilon = (epsilon !== undefined) ? epsilon : 0.001;
         return Math.abs(this.x - v.x) < epsilon &&
                Math.abs(this.y - v.y) < epsilon &&
                Math.abs(this.z - v.z) < epsilon;
@@ -207,6 +207,37 @@
      */
     Donkeycraft.Vector3.prototype.isZero = function() {
         return this.x === 0 && this.y === 0 && this.z === 0;
+    };
+
+    /**
+     * Linear interpolation between two vectors.
+     * @param {Donkeycraft.Vector3} a - Start vector.
+     * @param {Donkeycraft.Vector3} b - End vector.
+     * @param {number} t - Interpolation factor [0, 1].
+     * @returns {Donkeycraft.Vector3}
+     */
+    Donkeycraft.Vector3.lerp = function(a, b, t) {
+        return new Donkeycraft.Vector3(
+            Donkeycraft.lerp(a.x, b.x, t),
+            Donkeycraft.lerp(a.y, b.y, t),
+            Donkeycraft.lerp(a.z, b.z, t)
+        );
+    };
+
+    /**
+     * Create a vector from spherical coordinates (inverted: phi=angle from Z-axis, theta=azimuth).
+     * @param {number} length - Magnitude.
+     * @param {number} phi - Polar angle in radians (0 = +Z axis).
+     * @param {number} theta - Azimuthal angle in radians (0 = +X axis).
+     * @returns {Donkeycraft.Vector3}
+     */
+    Donkeycraft.Vector3.fromSpherical = function(length, phi, theta) {
+        var sinPhi = Math.sin(phi);
+        return new Donkeycraft.Vector3(
+            length * sinPhi * Math.cos(theta),
+            length * Math.cos(phi),
+            length * sinPhi * Math.sin(theta)
+        );
     };
 
     // ============================================================
@@ -454,6 +485,103 @@
         return this;
     };
 
+    /**
+     * Compute the inverse of this matrix using Gauss-Jordan elimination.
+     * @returns {Donkeycraft.Matrix4} A new inverted matrix.
+     */
+    Donkeycraft.Matrix4.prototype.invert = function() {
+        var d = this._data;
+        var inv = new Float32Array(16);
+        var det;
+
+        // Unroll for performance
+        inv[0]  = d[5]  * (d[10] * d[15] - d[14] * d[11])
+                - d[9]  * (d[6]  * d[15] - d[14] * d[10])
+                + d[13] * (d[6]  * d[11] - d[10] * d[7]);
+
+        inv[4]  = -d[4]  * (d[10] * d[15] - d[14] * d[11])
+                  + d[8]  * (d[6]  * d[15] - d[14] * d[10])
+                  - d[12] * (d[6]  * d[11] - d[10] * d[7]);
+
+        inv[8]  = d[4]  * (d[9]  * d[15] - d[13] * d[10])
+                  - d[8]  * (d[5]  * d[15] - d[13] * d[6])
+                  + d[12] * (d[5]  * d[10] - d[9]  * d[6]);
+
+        inv[12] = -d[4]  * (d[9]  * d[14] - d[13] * d[11])
+                  + d[8]  * (d[5]  * d[14] - d[13] * d[7])
+                  - d[12] * (d[5]  * d[11] - d[9]  * d[7]);
+
+        inv[1]  = -d[1]  * (d[10] * d[15] - d[14] * d[11])
+                  + d[9]  * (d[2]  * d[15] - d[14] * d[10])
+                  - d[13] * (d[2]  * d[11] - d[10] * d[3]);
+
+        inv[5]  = d[0]  * (d[10] * d[15] - d[14] * d[11])
+                  - d[8]  * (d[2]  * d[15] - d[14] * d[10])
+                  + d[12] * (d[2]  * d[11] - d[10] * d[3]);
+
+        inv[9]  = -d[0]  * (d[9]  * d[15] - d[13] * d[10])
+                  + d[8]  * (d[1]  * d[15] - d[13] * d[6])
+                  - d[12] * (d[1]  * d[10] - d[9]  * d[6]);
+
+        inv[13] = d[0]  * (d[9]  * d[14] - d[13] * d[11])
+                  - d[8]  * (d[1]  * d[14] - d[13] * d[7])
+                  + d[12] * (d[1]  * d[11] - d[9]  * d[7]);
+
+        inv[2]  = d[1]  * (d[6]  * d[15] - d[14] * d[10])
+                  - d[5]  * (d[2]  * d[15] - d[14] * d[10])
+                  + d[13] * (d[2]  * d[10] - d[6]  * d[3]);
+
+        inv[6]  = -d[0]  * (d[6]  * d[15] - d[14] * d[10])
+                  + d[4]  * (d[2]  * d[15] - d[14] * d[10])
+                  - d[12] * (d[2]  * d[10] - d[6]  * d[3]);
+
+        inv[10] = d[0]  * (d[5]  * d[15] - d[13] * d[6])
+                  - d[4]  * (d[1]  * d[15] - d[13] * d[2])
+                  + d[12] * (d[1]  * d[10] - d[5]  * d[2]);
+
+        inv[14] = -d[0]  * (d[5]  * d[14] - d[13] * d[7])
+                  + d[4]  * (d[1]  * d[14] - d[13] * d[3])
+                  - d[12] * (d[1]  * d[11] - d[5]  * d[3]);
+
+        inv[3]  = -d[1]  * (d[6]  * d[11] - d[10] * d[7])
+                  + d[5]  * (d[2]  * d[11] - d[10] * d[3])
+                  - d[9]  * (d[2]  * d[10] - d[6]  * d[3]);
+
+        inv[7]  = d[0]  * (d[6]  * d[11] - d[10] * d[7])
+                  - d[4]  * (d[2]  * d[11] - d[10] * d[3])
+                  + d[8]  * (d[2]  * d[10] - d[6]  * d[3]);
+
+        inv[11] = -d[0]  * (d[5]  * d[11] - d[9]  * d[7])
+                  + d[4]  * (d[1]  * d[11] - d[9]  * d[3])
+                  - d[8]  * (d[1]  * d[10] - d[5]  * d[2]);
+
+        inv[15] = d[0]  * (d[5]  * d[14] - d[9]  * d[7])
+                  - d[4]  * (d[1]  * d[14] - d[9]  * d[3])
+                  + d[8]  * (d[1]  * d[10] - d[5]  * d[2]);
+
+        det = d[0] * inv[0] + d[1] * inv[4] + d[2] * inv[8] + d[3] * inv[12];
+
+        // Singular matrix check
+        if (Math.abs(det) < 0.00001) {
+            return Donkeycraft.Matrix4.createIdentity();
+        }
+
+        det = 1.0 / det;
+        for (var i = 0; i < 16; i++) {
+            inv[i] *= det;
+        }
+
+        return new Donkeycraft.Matrix4(inv);
+    };
+
+    /**
+     * Get the inverse of this matrix.
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.prototype.getInverse = function() {
+        return this.invert();
+    };
+
     // ============================================================
     // Quaternion
     // ============================================================
@@ -482,13 +610,17 @@
 
     /**
      * Create quaternion from axis and angle.
-     * @param {Donkeycraft.Vector3} axis
-     * @param {number} angleRadians
+     * @param {Donkeycraft.Vector3} axis - Axis of rotation (defaults to Y-axis if null/undefined).
+     * @param {number} angleRadians - Rotation angle in radians.
      * @returns {Donkeycraft.Quaternion}
      */
     Donkeycraft.Quaternion.fromAxisAngle = function(axis, angle) {
         var half = angle / 2;
         var sin = Math.sin(half);
+        // Default to Y-axis if axis is null, undefined, or zero
+        if (!axis || axis.x === 0 && axis.y === 0 && axis.z === 0) {
+            return new Donkeycraft.Quaternion(0, sin, 0, Math.cos(half));
+        }
         var n = axis.normalized();
         return new Donkeycraft.Quaternion(
             n.x * sin,
@@ -496,6 +628,74 @@
             n.z * sin,
             Math.cos(half)
         );
+    };
+
+    /**
+     * Spherical linear interpolation between two quaternions.
+     * @param {Donkeycraft.Quaternion} a - Start quaternion.
+     * @param {Donkeycraft.Quaternion} b - End quaternion.
+     * @param {number} t - Interpolation factor [0, 1].
+     * @returns {Donkeycraft.Quaternion}
+     */
+    Donkeycraft.Quaternion.slerp = function(a, b, t) {
+        var ax = a.x, ay = a.y, az = a.z, aw = a.w;
+        var bx = b.x, by = b.y, bz = b.z, bw = b.w;
+
+        var cosTheta = ax * bx + ay * by + az * bz + aw * bw;
+
+        // If cosTheta < 0, the quaternions are opposite — flip one
+        var flip = 1;
+        if (cosTheta < 0) {
+            flip = -1;
+            cosTheta = -cosTheta;
+        }
+
+        // Clamp for numerical stability
+        var cosClamped = Math.min(1, Math.max(-1, cosTheta));
+
+        var cosAngle, sin, scale0, scale1;
+        if (cosClamped > 0.9999) {
+            // Near-linear interpolation
+            scale0 = 1 - t + flip * t;
+            scale1 = flip * t;
+        } else {
+            angle = Math.acos(cosClamped);
+            sin = Math.sin(angle);
+            scale0 = Math.sin((1 - t) * angle) / sin;
+            scale1 = Math.sin(t * angle) / sin;
+        }
+
+        return new Donkeycraft.Quaternion(
+            scale0 * ax + scale1 * bx,
+            scale0 * ay + scale1 * by,
+            scale0 * az + scale1 * bz,
+            scale0 * aw + scale1 * bw
+        );
+    };
+
+    /**
+     * Compute the conjugate of this quaternion (for unit quaternions, same as inverse).
+     * @returns {Donkeycraft.Quaternion}
+     */
+    Donkeycraft.Quaternion.prototype.conjugate = function() {
+        return new Donkeycraft.Quaternion(-this.x, -this.y, -this.z, this.w);
+    };
+
+    /**
+     * Compute the inverse of this quaternion (assumes unit quaternion).
+     * @returns {Donkeycraft.Quaternion}
+     */
+    Donkeycraft.Quaternion.prototype.inverse = function() {
+        var lenSq = this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
+        if (lenSq > 0.00001) {
+            return new Donkeycraft.Quaternion(
+                -this.x / lenSq,
+                -this.y / lenSq,
+                -this.z / lenSq,
+                this.w / lenSq
+            );
+        }
+        return Donkeycraft.Quaternion.identity();
     };
 
     /**
@@ -573,17 +773,31 @@
     };
 
     /**
-     * Normalize the quaternion.
-     * @returns {Donkeycraft.Quaternion}
+     * Normalize the quaternion in place and return this.
+     * @returns {Donkeycraft.Quaternion} this
      */
     Donkeycraft.Quaternion.prototype.normalize = function() {
         var len = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
         if (len > 0.00001) {
-            return new Donkeycraft.Quaternion(
-                this.x / len, this.y / len, this.z / len, this.w / len
-            );
+            this.x /= len;
+            this.y /= len;
+            this.z /= len;
+            this.w /= len;
+        } else {
+            this.x = 0;
+            this.y = 0;
+            this.z = 0;
+            this.w = 1;
         }
-        return Donkeycraft.Quaternion.identity();
+        return this;
+    };
+
+    /**
+     * Return a new normalized copy of this quaternion.
+     * @returns {Donkeycraft.Quaternion}
+     */
+    Donkeycraft.Quaternion.prototype.normalized = function() {
+        return new Donkeycraft.Quaternion(this.x, this.y, this.z, this.w).normalize();
     };
 
     // ============================================================
@@ -743,6 +957,8 @@
                 frequency *= lacunarity;
             }
 
+            // Avoid division by zero when octaves is 0
+            if (maxValue === 0) return 0;
             return total / maxValue;
         }
 
