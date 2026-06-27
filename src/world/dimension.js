@@ -218,6 +218,15 @@
         }
 
         /**
+         * Get the chunk manager for a specific dimension (without auto-creating).
+         * @param {number} type - Dimension type constant.
+         * @returns {Donkeycraft.ChunkManager|null}
+         */
+        function getChunkManagerForDimensionIfExists(type) {
+            return _chunkManagers[type] || null;
+        }
+
+        /**
          * Set the current active dimension.
          * @param {number} type - Dimension type constant.
          */
@@ -293,6 +302,7 @@
         /**
          * Get or create a ChunkManager for a specific dimension.
          * Each dimension has its own isolated chunk data.
+         * Wires up terrain generation callbacks and lighting engine when available.
          * @param {number} type - Dimension type constant.
          * @param {object} [options] - ChunkManager options (renderDistance, etc.).
          * @returns {Donkeycraft.ChunkManager} The chunk manager for this dimension.
@@ -304,9 +314,73 @@
 
             if (!_chunkManagers[type]) {
                 _chunkManagers[type] = new Donkeycraft.ChunkManager(options || {});
+                _wireGenerationToChunkManager(_chunkManagers[type], type);
             }
 
             return _chunkManagers[type];
+        }
+
+        /**
+         * Wire terrain generation and lighting callbacks to a ChunkManager.
+         * @param {Donkeycraft.ChunkManager} chunkManager - The ChunkManager.
+         * @param {number} dimensionType - Dimension type constant.
+         * @private
+         */
+        function _wireGenerationToChunkManager(chunkManager, dimensionType) {
+            // Wire chunk load callback (generates terrain for new chunks)
+            chunkManager.onChunkLoad = function(chunk) {
+                // Generate terrain based on dimension
+                switch (dimensionType) {
+                    case Donkeycraft.DimensionType.NETHER:
+                        if (Donkeycraft.NetherGenerator && Donkeycraft.NetherGenerator.generateNetherTerrain) {
+                            try { Donkeycraft.NetherGenerator.generateNetherTerrain(chunk, chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                        }
+                        break;
+                    case Donkeycraft.DimensionType.END:
+                        if (Donkeycraft.EndGenerator && Donkeycraft.EndGenerator.generateEndTerrain) {
+                            try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                        }
+                        break;
+                    default: // Overworld — delegate to ChunkManager's built-in generation
+                        if (!chunk.generated && chunkManager._generateTerrain) {
+                            chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ);
+                            chunk.generated = true;
+                        }
+                        break;
+                }
+
+                // Apply lighting after terrain generation
+                if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.updateChunkLighting) {
+                    try {
+                        var dim = getDimension(dimensionType);
+                        if (dim && !dim.hasSkyLight) {
+                            // Nether/End: skip sky light, only calculate block light
+                            chunk.skyLight.fill(0);
+                            Donkeycraft.LightingEngine.calculateBlockLight(chunk);
+                        } else {
+                            Donkeycraft.LightingEngine.updateChunkLighting(chunk);
+                        }
+                    } catch (e) { /* skip */ }
+                }
+            };
+
+            // Wire dirty chunk callback to update lighting on changes
+            chunkManager.onChunksChanged = function() {
+                var dirtyChunks = chunkManager.getDirtyChunks();
+                for (var i = 0; i < dirtyChunks.length; i++) {
+                    if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.updateChunkLighting) {
+                        try {
+                            var dim = getDimension(dimensionType);
+                            if (dim && !dim.hasSkyLight) {
+                                dirtyChunks[i].chunk.skyLight.fill(0);
+                                Donkeycraft.LightingEngine.calculateBlockLight(dirtyChunks[i].chunk);
+                            } else {
+                                Donkeycraft.LightingEngine.updateChunkLighting(dirtyChunks[i].chunk);
+                            }
+                        } catch (e) { /* skip */ }
+                    }
+                }
+            };
         }
 
         /**
@@ -415,6 +489,7 @@
             setSpawnPosition: setSpawnPosition,
             transformCoordinates: transformCoordinates,
             getChunkManagerForDimension: getChunkManagerForDimension,
+            getChunkManagerForDimensionIfExists: getChunkManagerForDimensionIfExists,
             getCurrentChunkManager: getCurrentChunkManager,
             clearChunkManager: clearChunkManager,
             getDimensionHeight: getDimensionHeight,

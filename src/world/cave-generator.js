@@ -21,34 +21,48 @@
         var _surfaceDepth = 5;          // Surface depth for hanging caves
 
         /**
+         * Default dimension configuration for overworld-style generation.
+         * @type {{minY: number, maxY: number, lavaYLevel: number}}
+         * @private
+         */
+        var _defaultConfig = { minY: 0, maxY: WORLD_HEIGHT, lavaYLevel: _lavaYLevel };
+
+        /**
          * Generate caves in a chunk using 3D noise.
          * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
          * @param {number} biomeId - Biome ID for this chunk.
+         * @param {Object} [dimConfig] - Optional dimension config {minY, maxY, lavaYLevel}.
          */
-        function generateCaves(chunk, biomeId) {
+        function generateCaves(chunk, biomeId, dimConfig) {
+            if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
+
+            // Resolve dimension configuration
+            var config = dimConfig || _defaultConfig;
+            var minY = config.minY !== undefined ? config.minY : 0;
+            var maxY = config.maxY !== undefined ? config.maxY : WORLD_HEIGHT;
+            var lavaYLevel = config.lavaYLevel !== undefined ? config.lavaYLevel : _lavaYLevel;
+
             // Ocean biomes: fewer caves (water fills them)
             var density = _caveDensity;
             var radius = _caveRadius;
 
-            if (biomeId === 6) { // Ocean
+            if (biomeId === Donkeycraft.BiomeID.OCEAN) {
                 density = _caveDensity * 0.3;
                 radius = _caveRadius * 0.5;
-            } else if (biomeId === 2 || biomeId === 12) { // Desert
+            } else if (biomeId === Donkeycraft.BiomeID.DESERT || biomeId === Donkeycraft.BiomeID.DESERT_M) {
                 density = _caveDensity * 0.7;
             }
 
-            // Generate main cave layer
-            _generateCaveLayer(chunk, density, radius, 0, WORLD_HEIGHT, 'main');
+            // Generate main cave layer with continuous Y iteration
+            _generateCaveLayer(chunk, density, radius, minY, maxY, 'main');
 
-            // Generate lava caves near bedrock
-            _generateCaveLayer(chunk, density * 0.5, radius * 0.7, 0, _lavaYLevel + 5, 'lava');
+            // Generate lava caves near bedrock floor
+            _generateCaveLayer(chunk, density * 0.5, radius * 0.7, minY, lavaYLevel + 5, 'lava');
         }
 
         /**
-         * Generate a single cave layer within Y bounds.
-         * Samples at reduced Y stride for performance, then carves tunnels
-         * at each sampled level. This avoids iterating every block column
-         * through the full world height.
+         * Generate a single cave layer within Y bounds using continuous Y iteration
+         * for connected cave systems. Uses 3D fbm noise to carve smooth tunnel shapes.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} density - Cave density threshold.
          * @param {number} radius - Base tunnel radius.
@@ -58,20 +72,22 @@
          * @private
          */
         function _generateCaveLayer(chunk, density, radius, minY, maxY, layerType) {
-            // Sample every 4 Y levels for performance — still produces connected caves
-            var yStride = 4;
+            // Clamp to valid range
+            if (minY < 0) minY = 0;
+            if (maxY > WORLD_HEIGHT) maxY = WORLD_HEIGHT;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var worldX = chunk.chunkX * CHUNK_SIZE + x;
                     var worldZ = chunk.chunkZ * CHUNK_SIZE + z;
 
-                    // Adjust threshold based on local X/Z noise for tunnel shapes
+                    // Adjust threshold based on local X/Z noise for tunnel shape variation
                     var threshold = density + Donkeycraft.PerlinNoise.noise2D(
                         x * 0.3, z * 0.3
                     ) * 0.003;
 
-                    for (var y = minY; y < maxY; y += yStride) {
+                    // Continuous Y iteration for connected cave networks
+                    for (var y = minY; y < maxY; y++) {
                         // Primary cave noise — fbm with global seed baked into PerlinNoise
                         var noiseVal = Donkeycraft.PerlinNoise.fbm(
                             worldX * 0.02,
@@ -87,11 +103,6 @@
                             ) * radius * 0.5;
 
                             _carveTunnel(chunk, x, y, z, tunnelRadius);
-
-                            // Also carve one block above for vertical connectivity
-                            if (y + 1 < maxY) {
-                                _carveTunnel(chunk, x, y + 1, z, tunnelRadius * 0.6);
-                            }
                         }
                     }
                 }
@@ -100,6 +111,7 @@
 
         /**
          * Carve a tunnel at the given position with the given radius.
+         * Uses spherical shape with smooth falloff for natural-looking caves.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -119,18 +131,18 @@
                             var by = cy + dy;
                             var bz = cz + dz;
 
-                        // Check bounds
-                        if (bx >= 0 && bx < CHUNK_SIZE &&
-                            by >= 0 && by < WORLD_HEIGHT &&
-                            bz >= 0 && bz < CHUNK_SIZE) {
-                            var currentBlock = chunk.getBlock(bx, by, bz);
-                            // Only carve air and liquids (not solid blocks).
-                            // Block IDs resolved via BlockRegistry for correctness.
-                            if (currentBlock === 0 ||
-                                Donkeycraft.BlockRegistry.isLiquid(currentBlock)) {
-                                chunk.setBlock(bx, by, bz, 0); // Air
+                            // Check bounds
+                            if (bx >= 0 && bx < CHUNK_SIZE &&
+                                by >= 0 && by < WORLD_HEIGHT &&
+                                bz >= 0 && bz < CHUNK_SIZE) {
+                                var currentBlock = chunk.getBlock(bx, by, bz);
+                                // Only carve air and liquids (not solid blocks).
+                                if (currentBlock === 0 ||
+                                    (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isLiquid &&
+                                     Donkeycraft.BlockRegistry.isLiquid(currentBlock))) {
+                                    chunk.setBlock(bx, by, bz, 0); // Air
+                                }
                             }
-                        }
                         }
                     }
                 }

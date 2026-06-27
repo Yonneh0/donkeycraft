@@ -13,7 +13,7 @@
 
     /**
      * Ore definitions with Y-level ranges, vein size, rarity, and biome restrictions.
-     * Block IDs resolved at runtime via BlockRegistry.
+     * Block IDs resolved at runtime via BlockRegistry using block names.
      * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
      */
     var ORE_DEFS = [
@@ -23,7 +23,7 @@
         { blockName: 'diamond_ore',   name: 'diamond_ore',    minY: 0,   maxY: 32,  veinSize: 3,  rarity: 28, biomes: null },
         { blockName: 'redstone_ore',  name: 'redstone_ore',   minY: 0,   maxY: 32,  veinSize: 5,  rarity: 16, biomes: null },
         { blockName: 'lapis_ore',     name: 'lapis_ore',      minY: 0,   maxY: 64,  veinSize: 4,  rarity: 18, biomes: null },
-        { blockName: 'emerald_ore',   name: 'emerald_ore',    minY: 0,   maxY: 32,  veinSize: 2,  rarity: 30, biomes: [7] }
+        { blockName: 'emerald_ore',   name: 'emerald_ore',    minY: 0,   maxY: 32,  veinSize: 2,  rarity: 30, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
     ];
 
     // Cache for resolved block IDs to avoid repeated lookups.
@@ -31,6 +31,7 @@
 
     /**
      * Resolve all ore block IDs from BlockRegistry and cache them.
+     * Handles both standard blocks and special cases (e.g., deepslate variants).
      * @private
      */
     function _resolveBlockIds() {
@@ -39,7 +40,18 @@
 
         for (var i = 0; i < ORE_DEFS.length; i++) {
             var def = ORE_DEFS[i];
+            // Try exact block name first, then common aliases
             var block = Donkeycraft.BlockRegistry.getBlockByName(def.blockName);
+            if (!block) {
+                // Try without underscore prefix (e.g., "coal_ore" → "coal")
+                var shortName = def.blockName.split('_')[0];
+                block = Donkeycraft.BlockRegistry.getBlockByName(shortName);
+            }
+            if (!block) {
+                // Try appending "_ore" to material name
+                var matName = def.blockName.replace('_ore', '');
+                block = Donkeycraft.BlockRegistry.getBlockByName(matName + '_ore');
+            }
             if (block) {
                 _blockCache[def.name] = block.id;
             }
@@ -75,11 +87,13 @@
         }
 
         /**
-         * Place ore veins in a chunk.
+         * Place ores in a chunk.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
          * @param {number} biomeId - Biome ID for this chunk.
          */
         function placeOres(chunk, biomeId) {
+            if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
+
             // Ensure block IDs are resolved
             if (!_blockCache && Donkeycraft.BlockRegistry) {
                 _resolveBlockIds();
@@ -90,7 +104,7 @@
                 var blockId = _getBlockId(oreDef.name);
 
                 // Skip if block not found in registry
-                if (blockId === null) continue;
+                if (blockId === null || blockId === 0) continue;
 
                 // Check biome restriction
                 if (oreDef.biomes && oreDef.biomes.length > 0) {

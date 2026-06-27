@@ -22,22 +22,29 @@
 
         /**
          * Initialize gravity and liquid block sets from Block registry.
+         * Resolves gravity-affected blocks by name from BlockRegistry for correctness.
          */
         function init() {
             if (_initialized) return;
 
-            // Hardcoded gravity-affected blocks (Minecraft behavior: sand, gravel, concrete powder)
-            var gravityBlockIds = [12, 9, 2804, 2805, 2806, 2807]; // sand, gravel, colored concrete powders
+            // Resolve gravity-affected blocks by name from BlockRegistry
+            var gravityBlockNames = ['sand', 'gravel', 'redstone_block'];
 
-            for (var i = 0; i < gravityBlockIds.length; i++) {
-                _gravityBlocks[gravityBlockIds[i]] = true;
-            }
-
-            // Check liquid via BlockRegistry
             if (Donkeycraft.BlockRegistry) {
-                for (var id = 0; id < 256; id++) {
-                    if (Donkeycraft.BlockRegistry.isLiquid(id)) {
-                        _liquidBlocks[id] = true;
+                for (var i = 0; i < gravityBlockNames.length; i++) {
+                    var block = Donkeycraft.BlockRegistry.getBlockByName(gravityBlockNames[i]);
+                    if (block) {
+                        _gravityBlocks[block.id] = true;
+                    }
+                }
+
+                // Also check blocks beyond ID 255
+                for (var id = 0; id < 1000; id++) {
+                    var b = Donkeycraft.BlockRegistry.getBlockById(id);
+                    if (b && Donkeycraft.BlockRegistry.isLiquid) {
+                        if (Donkeycraft.BlockRegistry.isLiquid(id)) {
+                            _liquidBlocks[id] = true;
+                        }
                     }
                 }
             }

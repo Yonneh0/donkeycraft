@@ -328,10 +328,10 @@
         var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
 
         switch (currentDim) {
-            case 1: // Nether
+            case Donkeycraft.DimensionType.NETHER: // Nether
                 _generateNetherChunk(this, chunk, chunkX, chunkZ);
                 break;
-            case 2: // End
+            case Donkeycraft.DimensionType.END: // End
                 _generateEndChunk(this, chunk, chunkX, chunkZ);
                 break;
             default: // Overworld
@@ -359,17 +359,17 @@
             return;
         }
 
-        // Get biome for this chunk using world coordinates for biome lookup
+        // Get biome for this chunk using world coordinates for 2D biome lookup
         var biome = null;
-        if (Donkeycraft.BiomeRegistry) {
+        if (Donkeycraft.BiomeRegistry && Donkeycraft.PerlinNoise) {
             var worldX = chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             var worldZ = chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-            // Use noise-based biome lookup from TerrainGenerator's approach
-            var tempNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005, 0);
-            var rainNoise = Donkeycraft.PerlinNoise.noise2D(0, worldZ * 0.005);
-            // Map noise to biome ID based on temperature and rainfall
-            var temp = (tempNoise + 1) * 0.5; // [0, 1]
-            var rain = (rainNoise + 1) * 0.5; // [0, 1]
+            // Use proper 2D noise with both X and Z coordinates for accurate biome mapping
+            var tempNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005, worldZ * 0.005);
+            var rainNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005 + 1000, worldZ * 0.005 + 1000);
+            // Map noise to biome ID based on temperature and rainfall [0, 1]
+            var temp = (tempNoise + 1) * 0.5;
+            var rain = (rainNoise + 1) * 0.5;
             biome = Donkeycraft.BiomeRegistry.getBiomeByClimate(temp, rain);
         }
         // Ensure biome is never null — default to plains if lookup failed
@@ -455,6 +455,8 @@
         // Apply cave generation if available
         if (Donkeycraft.CaveGenerator && Donkeycraft.CaveGenerator.generateCaves) {
             try { Donkeycraft.CaveGenerator.generateCaves(chunk, chunk.biomeId); } catch (e) { /* skip */ }
+        } else if (Donkeycraft.CaveGenerator && !Donkeycraft.CaveGenerator.generateCaves) {
+            // CaveGenerator exists but generateCaves not available — skip gracefully
         }
 
         // Apply ore generation if available
@@ -477,11 +479,13 @@
     }
 
     // ============================================================
-    // Nether Terrain Generation
+    // Nether Terrain Generation (kept for backward compatibility)
+    // Primary wiring is now in dimension.js via onChunkLoad callbacks.
     // ============================================================
 
     /**
      * Generate nether terrain for a chunk.
+     * Kept for backward compatibility — primary wiring is in dimension.js.
      * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -498,18 +502,15 @@
         Donkeycraft.Logger.info('ChunkManager', 'Generating nether terrain for chunk [' + chunkX + ',' + chunkZ + ']');
 
         try {
-            Donkeycraft.NetherGenerator.generateNetherTerrain(chunkX, chunkZ);
+            Donkeycraft.NetherGenerator.generateNetherTerrain(chunk, chunkX, chunkZ);
         } catch (e) {
             Donkeycraft.Logger.error('ChunkManager', 'Nether terrain generation failed: ' + e.message);
         }
     }
 
-    // ============================================================
-    // End Terrain Generation
-    // ============================================================
-
     /**
      * Generate End terrain for a chunk.
+     * Kept for backward compatibility — primary wiring is in dimension.js.
      * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -526,7 +527,7 @@
         Donkeycraft.Logger.info('ChunkManager', 'Generating End terrain for chunk [' + chunkX + ',' + chunkZ + ']');
 
         try {
-            Donkeycraft.EndGenerator.generateEndTerrain(chunkX, chunkZ);
+            Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunkX, chunkZ);
         } catch (e) {
             Donkeycraft.Logger.error('ChunkManager', 'End terrain generation failed: ' + e.message);
         }

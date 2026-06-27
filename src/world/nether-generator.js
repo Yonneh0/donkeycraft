@@ -27,12 +27,29 @@
 
         /**
          * Generate full nether terrain for a chunk.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * Accepts either (chunk, chunkX, chunkZ) when called from ChunkManager
+         * or (chunkX, chunkZ) when called directly with _chunkManager set.
+         * @param {Donkeycraft.Chunk|number} chunkOrX - Chunk object or chunk X coordinate.
+         * @param {number|number} [chunkZ] - Chunk Z coordinate or chunk X (when using legacy signature).
+         * @param {number} [chunkZ] - Chunk Z coordinate (when chunk is provided).
          */
-        function generateNetherTerrain(chunkX, chunkZ) {
-            var chunk = _chunkManager.getChunk(chunkX, chunkZ);
-            if (!chunk) return;
+        function generateNetherTerrain(chunkOrX, chunkZ, optChunkZ) {
+            var chunk;
+            var cx, cz;
+
+            // Detect calling convention: if first arg is a Chunk object, use new signature
+            if (chunkOrX && typeof chunkOrX.getBlock === 'function') {
+                chunk = chunkOrX;
+                cx = chunk.chunkX;
+                cz = chunkZ;
+            } else {
+                // Legacy signature: (chunkX, chunkZ) with _chunkManager
+                cx = chunkOrX;
+                cz = chunkZ;
+                if (!_chunkManager) return;
+                chunk = _chunkManager.getChunk(cx, cz);
+                if (!chunk) return;
+            }
 
             // Clear existing data
             chunk.blocks.fill(0);
@@ -43,8 +60,8 @@
             _generateBedrockCeiling(chunk);
             _fillNetherrack(chunk);
             _generateLavaSeas(chunk);
-            _generateNetherFeatures(chunk, chunkX, chunkZ);
-            _generateOreVeins(chunk, chunkX, chunkZ);
+            _generateNetherFeatures(chunk, cx, cz);
+            _generateOreVeins(chunk, cx, cz);
 
             // Mark as generated and dirty
             chunk.generated = true;
@@ -58,6 +75,7 @@
          * @private
          */
         function _generateBedrockFloor(chunk) {
+            if (!chunk || !chunk.setBlock) return;
             var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
             if (!bedrock) return;
 
@@ -80,6 +98,7 @@
          * @private
          */
         function _generateBedrockCeiling(chunk) {
+            if (!chunk || !chunk.setBlock) return;
             var bedrock = Donkeycraft.BlockRegistry.getBlockById(37);
             if (!bedrock) return;
 
@@ -102,6 +121,7 @@
          * @private
          */
         function _fillNetherrack(chunk) {
+            if (!chunk || !chunk.setBlock) return;
             var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
             if (!netherrack) return;
 
@@ -122,6 +142,7 @@
          * @private
          */
         function _generateLavaSeas(chunk) {
+            if (!chunk || !chunk.setBlock) return;
             var lava = Donkeycraft.BlockRegistry.getBlockById(213);
             if (!lava) return;
 
@@ -150,6 +171,7 @@
          * @private
          */
         function _generateNetherFeatures(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
             var soulSand = Donkeycraft.BlockRegistry.getBlockById(258);
             var basalt = Donkeycraft.BlockRegistry.getBlockById(110);
@@ -221,6 +243,7 @@
          * @private
          */
         function _generateOreVeins(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var netherrack = Donkeycraft.BlockRegistry.getBlockById(257);
             var quartzOre = Donkeycraft.BlockRegistry.getBlockById(238);
             var goldOre = Donkeycraft.BlockRegistry.getBlockById(272);
@@ -330,14 +353,6 @@
         }
 
         /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The NetherGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.NetherGenerator;
-        }
-
-        /**
          * Destroy and free resources.
          */
         function destroy() {
@@ -345,7 +360,6 @@
         }
 
         return {
-            getInstance: getInstance,
             setChunkManager: setChunkManager,
             generateNetherTerrain: generateNetherTerrain,
             generateNetherHeightmap: generateNetherHeightmap,

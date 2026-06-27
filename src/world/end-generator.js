@@ -27,31 +27,47 @@
 
         /**
          * Generate full End terrain for a chunk.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * Accepts either (chunk, chunkX, chunkZ) when called from ChunkManager
+         * or (chunkX, chunkZ) when called directly with _chunkManager set.
+         * @param {Donkeycraft.Chunk|number} chunkOrX - Chunk object or chunk X coordinate.
+         * @param {number} [chunkX] - Chunk X coordinate (when using legacy signature).
+         * @param {number} [chunkZ] - Chunk Z coordinate (when using legacy signature).
          */
-        function generateEndTerrain(chunkX, chunkZ) {
-            if (!_chunkManager) return;
-            var chunk = _chunkManager.getChunk(chunkX, chunkZ);
-            if (!chunk) return;
+        function generateEndTerrain(chunkOrX, optChunkX, optChunkZ) {
+            var chunk;
+            var cx, cz;
+
+            // Detect calling convention: if first arg is a Chunk object, use new signature
+            if (chunkOrX && typeof chunkOrX.getBlock === 'function') {
+                chunk = chunkOrX;
+                cx = chunk.chunkX;
+                cz = optChunkX;
+            } else {
+                // Legacy signature: (chunkX, chunkZ) with _chunkManager
+                cx = chunkOrX;
+                cz = optChunkX;
+                if (!_chunkManager) return;
+                chunk = _chunkManager.getChunk(cx, cz);
+                if (!chunk) return;
+            }
 
             // Clear existing data
             chunk.blocks.fill(0);
             chunk.clearLight();
 
             // Determine island type for this chunk position
-            var islandType = _getIslandType(chunkX, chunkZ);
+            var islandType = _getIslandType(cx, cz);
 
             // Generate terrain based on island type
             switch (islandType) {
                 case 'midlands':
-                    _generateMidlands(chunk, chunkX, chunkZ);
+                    _generateMidlands(chunk, cx, cz);
                     break;
                 case 'highlands':
-                    _generateHighlands(chunk, chunkX, chunkZ);
+                    _generateHighlands(chunk, cx, cz);
                     break;
                 case 'outer':
-                    _generateOuterEnd(chunk, chunkX, chunkZ);
+                    _generateOuterEnd(chunk, cx, cz);
                     break;
                 default:
                     // Inner islands — nothing to generate (center area)
@@ -60,7 +76,7 @@
 
             // Always attempt to place end cities on highlands
             if (islandType === 'highlands') {
-                _generateEndCity(chunk, chunkX, chunkZ);
+                _generateEndCity(chunk, cx, cz);
             }
 
             // Mark as generated and dirty
@@ -115,6 +131,7 @@
          * @private
          */
         function _generateMidlands(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
             var chorusPlant = Donkeycraft.BlockRegistry.getBlockById(278);
             var chorusFlower = Donkeycraft.BlockRegistry.getBlockById(279);
@@ -165,6 +182,7 @@
          * @private
          */
         function _generateHighlands(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
             var chorusPlant = Donkeycraft.BlockRegistry.getBlockById(278);
 
@@ -207,6 +225,7 @@
          * @private
          */
         function _generateOuterEnd(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var endStone = Donkeycraft.BlockRegistry.getBlockById(12);
 
             if (!endStone) return;
@@ -241,6 +260,7 @@
          * @private
          */
         function _generateEndCity(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock) return;
             var purpurBlock = Donkeycraft.BlockRegistry.getBlockById(280);
             var purpurPillar = Donkeycraft.BlockRegistry.getBlockById(281);
             var shroomlight = Donkeycraft.BlockRegistry.getBlockById(284);
