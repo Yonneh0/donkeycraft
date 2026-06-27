@@ -171,11 +171,9 @@
     Donkeycraft.CreativeInventory.prototype._getFilteredItems = function() {
         var items = this._tabItems[this._currentTab] || [];
 
-        // Filter by search query if present
+        // Filter by search query if present — delegate to searchItems for cross-tab matching
         if (this._searchQuery && this._searchQuery.length > 0) {
-            // In the full game, this would match against item names
-            // For now, return all items (Phase 19+ will add name matching)
-            return items;
+            return this.searchItems(this._searchQuery);
         }
 
         return items;

@@ -473,21 +473,48 @@ void main() {
             }
         });
 
-        // --- Input: Keyboard (block break/place) ---
+        // --- Input: Keyboard ---
         document.addEventListener('keydown', function(e) {
-            // F — toggle creative flying
-            if (e.code === 'KeyF') {
-                var player = game.getPlayer();
-                if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
-                    var flyingSystem = game._flyingSystem;
-                    if (flyingSystem) {
-                        flyingSystem.toggleFlyMode(player);
-                    }
+            // F3 — toggle debug overlay
+            if (e.code === 'F3') {
+                e.preventDefault();
+                game.toggleDebugOverlay();
+            }
+            // Escape — close GUI first, then exit pointer lock
+            if (e.code === 'Escape') {
+                e.preventDefault();
+                var guiMgr = game._guiManager;
+                if (guiMgr && guiMgr.hasOpenScreens) {
+                    guiMgr.closeTopScreen();
+                } else {
+                    game.exitPointerLock();
                 }
             }
-            // Escape — exit pointer lock
-            if (e.code === 'Escape') {
-                game.exitPointerLock();
+            // Number keys 1-9 — select hotbar slot
+            var digitCode = e.code;
+            if (digitCode >= 'Digit1' && digitCode <= 'Digit9') {
+                var slotIndex = parseInt(digitCode.charAt(6), 10) - 1;
+                if (slotIndex >= 0 && slotIndex < 9 && game._hotbar) {
+                    game._hotbar.setSelectedSlot(slotIndex);
+                }
+            }
+            // E — toggle creative inventory
+            if (e.code === 'KeyE') {
+                e.preventDefault();
+                var guiMgr2 = game._guiManager;
+                if (guiMgr2 && guiMgr2.hasOpenScreens) {
+                    guiMgr2.closeTopScreen();
+                }
+            }
+            // F — toggle creative flying
+            if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey) {
+                var player = game.getPlayer();
+                if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
+                    var flyingSys = game._flyingSystem;
+                    if (flyingSys) {
+                        flyingSys.toggleFlyMode(player);
+                    }
+                }
             }
         });
 
@@ -589,8 +616,62 @@ void main() {
         // Start the game with all systems wired up
         startGame(gameSystems);
 
-        // Dispose loading screen after game starts
-        setTimeout(function() { loadingScreen.dispose(); }, 500);
+        // Wire up additional UI systems after game starts
+        setTimeout(function() {
+            var game = window._dkGame;
+            if (!game) return;
+
+            // --- Wire up Hotbar UI ---
+            var hotbarContainer = document.getElementById('dk-hotbar-container');
+            if (hotbarContainer && Donkeycraft.Hotbar && game._guiRenderer && game._canvas) {
+                var hotbar = new Donkeycraft.Hotbar(hotbarContainer, game._guiRenderer, game._canvas);
+                game.setHotbar(hotbar);
+
+                // Sync player inventory to hotbar display
+                if (game._player && game._player.getInventory) {
+                    try {
+                        var inv = game._player.getInventory();
+                        if (inv && typeof inv.getHotbarStacks === 'function') {
+                            hotbar.setSlots(inv.getHotbarStacks());
+                        }
+                    } catch (e) {}
+                }
+
+                // Listen for hotbar selection changes
+                if (hotbar.onSelectedChange) {
+                    hotbar.onSelectedChange(function(newSlot, oldSlot) {
+                        // Sync player selected slot
+                        if (game._player && game._player.setSelectedHotbarSlot) {
+                            game._player.setSelectedHotbarSlot(newSlot);
+                        }
+                    });
+                }
+            }
+
+            // --- Wire up GuiManager (if available) ---
+            if (Donkeycraft.GuiManager) {
+                var guiContainer = document.getElementById('dk-gui-container');
+                var guiBackdrop = document.getElementById('dk-gui-backdrop');
+                try {
+                    var guiManager = new Donkeycraft.GuiManager(guiContainer, guiBackdrop);
+                    game.setGuiManager(guiManager);
+
+                    // Close GUI on backdrop click
+                    if (guiBackdrop) {
+                        guiBackdrop.addEventListener('click', function() {
+                            if (guiManager.hasOpenScreens()) {
+                                guiManager.closeTopScreen();
+                            }
+                        });
+                    }
+                } catch (e) {
+                    Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
+                }
+            }
+
+            // Dispose loading screen after game starts
+            loadingScreen.dispose();
+        }, 500);
     }).catch(function(err) {
         loadingScreen.showError(err.message || 'Initialization failed');
     });

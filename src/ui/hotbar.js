@@ -49,10 +49,10 @@
             slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,100,100,0.6); border: 2px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; position: relative;';
             slotEl.dataset.slotIndex = i;
 
-            // Number indicator
+            // Number indicator — positioned top-left per CSS .dk-slot-number convention
             var numEl = document.createElement('span');
             numEl.className = 'dk-slot-number';
-            numEl.style.cssText = 'position: absolute; bottom: 1px; right: 2px; font-size: 10px; color: #ccc; text-shadow: 1px 1px 1px #000;';
+            numEl.style.cssText = 'position: absolute; top: 1px; left: 3px; font-size: 10px; color: #aaa; text-shadow: 1px 1px 1px #000;';
             numEl.textContent = (i + 1);
             slotEl.appendChild(numEl);
 

@@ -99,7 +99,8 @@
 
             this._dragState.dragElement = document.createElement('div');
             this._dragState.dragElement.className = 'dk-drag-ghost dk-interactive';
-            this._dragState.dragElement.style.cssText = 'position:fixed; pointer-events:none; z-index:9999; font-size:24px; opacity:0.8; transform:translate(-50%,-50%);';
+            // Hidden initially — shown on mousemove to avoid interfering with hit tests
+            this._dragState.dragElement.style.cssText = 'position:fixed; pointer-events:none; z-index:9999; font-size:24px; opacity:0.85; transform:translate(-50%,-50%); display:none;';
             this._dragState.dragElement.textContent = itemEl ? itemEl.textContent : '';
 
             if (countEl && countEl.style.display !== 'none') {
@@ -110,6 +111,7 @@
             }
 
             document.body.appendChild(this._dragState.dragElement);
+            // Position immediately but keep hidden until first mousemove
             this._dragState.dragElement.style.left = e.clientX + 'px';
             this._dragState.dragElement.style.top = e.clientY + 'px';
         }
@@ -124,12 +126,14 @@
     };
 
     /**
-     * _updateDragVisual — updates the drag ghost position.
+     * _updateDragVisual — updates the drag ghost position and reveals it.
      * @param {MouseEvent} e - Mouse move event.
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._updateDragVisual = function(e) {
         if (this._dragState.dragElement) {
+            // Reveal on first movement so the ghost doesn't interfere with initial hit tests
+            this._dragState.dragElement.style.display = '';
             this._dragState.dragElement.style.left = e.clientX + 'px';
             this._dragState.dragElement.style.top = e.clientY + 'px';
         }

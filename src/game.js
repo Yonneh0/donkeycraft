@@ -70,6 +70,15 @@
         // Overlay elements
         this._overlay = null;
 
+        // Hotbar reference for key-based slot selection
+        this._hotbar = null;
+
+        // Debug overlay toggle state (F3)
+        this._debugVisible = false;
+
+        // GuiManager reference for GUI screen management
+        this._guiManager = null;
+
         // Auto-save system (uses Config.AUTO_SAVE_INTERVAL, CHUNKS_PER_SAVE, SAVE_BATCH_DELAY)
         this._autoSaveTimer = 0;
         this._worldStore = null;
@@ -199,6 +208,43 @@
     };
 
     /**
+     * setHotbar — set the hotbar UI reference for key-based slot selection.
+     * @param {Donkeycraft.Hotbar} hotbar - Hotbar instance.
+     */
+    Donkeycraft.Game.prototype.setHotbar = function(hotbar) {
+        this._hotbar = hotbar || null;
+    };
+
+    /**
+     * setGuiManager — set the GUI manager for screen management.
+     * @param {Donkeycraft.GuiManager} guiManager - GuiManager instance.
+     */
+    Donkeycraft.Game.prototype.setGuiManager = function(guiManager) {
+        this._guiManager = guiManager || null;
+    };
+
+    /**
+     * toggleDebugOverlay — toggles the F3 debug overlay visibility.
+     * @returns {boolean} True if debug is now visible.
+     */
+    Donkeycraft.Game.prototype.toggleDebugOverlay = function() {
+        this._debugVisible = !this._debugVisible;
+        var overlay = document.getElementById('dk-debug-overlay');
+        if (overlay) {
+            overlay.style.display = this._debugVisible ? 'block' : 'none';
+        }
+        return this._debugVisible;
+    };
+
+    /**
+     * isDebugVisible — checks if debug overlay is currently visible.
+     * @returns {boolean}
+     */
+    Donkeycraft.Game.prototype.isDebugVisible = function() {
+        return this._debugVisible;
+    };
+
+    /**
      * setSystems — set external system references (called after Game.init()).
      * If constructor functions are passed instead of instances, they will be instantiated
      * using the systems created during Game.init() (input, player, collision, chunkManager).
@@ -211,6 +257,7 @@
      * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
      * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
      * @param {Object} [redstoneEngine] - Redstone engine instance (optional).
+     * @returns {boolean} True if all systems were set successfully.
      */
     Donkeycraft.Game.prototype.setSystems = function(
         movementSystem, collisionSystem, jumpSystem, flyingSystem,
@@ -218,44 +265,90 @@
     ) {
         var self = this;
 
+        // Validate required systems exist before instantiation
+        if (!this._chunkManager) {
+            Donkeycraft.Logger.error('Game', 'setSystems failed: chunkManager not initialized');
+            return false;
+        }
+        if (!this._player) {
+            Donkeycraft.Logger.error('Game', 'setSystems failed: player not initialized');
+            return false;
+        }
+        if (!this._input) {
+            Donkeycraft.Logger.error('Game', 'setSystems failed: input not initialized');
+            return false;
+        }
+
         // Instantiate Collision first (so Movement can reference it without creating a temp instance)
         if (collisionSystem && typeof collisionSystem === 'function') {
-            this._collisionSystem = new collisionSystem(this._chunkManager);
-        } else {
+            try {
+                this._collisionSystem = new collisionSystem(this._chunkManager);
+                Donkeycraft.Logger.info('Game', 'Collision system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Collision instantiation failed: ' + e.message);
+                return false;
+            }
+        } else if (collisionSystem) {
             this._collisionSystem = collisionSystem;
+        } else {
+            Donkeycraft.Logger.warn('Game', 'No collision system provided');
         }
 
         // Instantiate Movement if passed as a constructor (needs input, player, collision, chunkManager)
         if (movementSystem && typeof movementSystem === 'function') {
-            this._movementSystem = new movementSystem(
-                this._input,
-                this._player,
-                this._collisionSystem,
-                this._chunkManager
-            );
-        } else {
+            try {
+                this._movementSystem = new movementSystem(
+                    this._input,
+                    this._player,
+                    this._collisionSystem,
+                    this._chunkManager
+                );
+                Donkeycraft.Logger.info('Game', 'Movement system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Movement instantiation failed: ' + e.message);
+                return false;
+            }
+        } else if (movementSystem) {
             this._movementSystem = movementSystem;
+        } else {
+            Donkeycraft.Logger.warn('Game', 'No movement system provided');
         }
 
         // Instantiate Jumping if passed as a constructor (needs player, input, collision)
         if (jumpSystem && typeof jumpSystem === 'function') {
-            this._jumpSystem = new jumpSystem(
-                this._player,
-                this._input,
-                this._collisionSystem
-            );
-        } else {
+            try {
+                this._jumpSystem = new jumpSystem(
+                    this._player,
+                    this._input,
+                    this._collisionSystem
+                );
+                Donkeycraft.Logger.info('Game', 'Jump system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Jump instantiation failed: ' + e.message);
+                return false;
+            }
+        } else if (jumpSystem) {
             this._jumpSystem = jumpSystem;
+        } else {
+            Donkeycraft.Logger.warn('Game', 'No jump system provided');
         }
 
         // Instantiate Flying if passed as a constructor (needs player, input)
         if (flyingSystem && typeof flyingSystem === 'function') {
-            this._flyingSystem = new flyingSystem(
-                this._player,
-                this._input
-            );
-        } else {
+            try {
+                this._flyingSystem = new flyingSystem(
+                    this._player,
+                    this._input
+                );
+                Donkeycraft.Logger.info('Game', 'Flying system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Flying instantiation failed: ' + e.message);
+                return false;
+            }
+        } else if (flyingSystem) {
             this._flyingSystem = flyingSystem;
+        } else {
+            Donkeycraft.Logger.warn('Game', 'No flying system provided');
         }
 
         // Raycast, BlockAction, BlockPlacement, InteractableBlocks are static modules — assign directly
@@ -273,6 +366,9 @@
         if (this._redstoneEngine && this._timer) {
             this._redstoneEngine.setTimer(this._timer);
         }
+
+        Donkeycraft.Logger.info('Game', 'Systems wired successfully');
+        return true;
     };
 
     /**
