@@ -2,19 +2,19 @@
 
 This document defines the mandatory workflow and coding standards for all AI agents working on this project. Violating these rules will result in incorrect implementations or broken codebases.
 
-For detailed file structure, phase breakdowns, configuration constants, dependency order, and milestone definitions, see **`PLAN.md`**.
+For detailed file structure, module organization, configuration constants, and dependency order, see **`PLAN.md`**.
 
 ---
 
 ## 1. Mandatory Workflow Rules
 
-### 1.1 Follow PLAN.md Strictly
+### 1.1 Follow PLAN.md
 
-- **Always read `PLAN.md` before starting any implementation.** It defines the exact file structure, class responsibilities, line estimates, phase order, and dependency chain.
-- **Implement phases in the order specified by `PLAN.md`.** Do not skip ahead or implement out of order.
+- **Always read `PLAN.md` before starting any implementation.** It defines the exact file structure, class responsibilities, line estimates, module organization, and dependency chain.
+- **Implement modules in the order specified by `PLAN.md`.** Do not skip ahead or implement out of order.
 - **Do NOT modify `PLAN.md` under any circumstances without explicit user approval.** The only allowed changes are:
-  - Changing `[ ]` to `[FULLY OPERATIONAL]` for a phase after thorough functional audit confirms correctness.
-  - Adding notes under a phase's status marker if important findings were discovered during audit.
+  - Updating file descriptions or line counts when files are modified.
+  - Adding notes under a module's description if important findings were discovered during audit.
 - **No changelogs, bugfix reports, or development notes belong in `PLAN.md`.** It is a living plan document, not a change log.
 
 ### 1.2 Audit Before Committing
@@ -36,7 +36,7 @@ After every change (file creation, modification, or deletion), you **must**:
 - **Commit after every discrete change.** One file created or modified = one commit. Do not batch unrelated changes.
 - **Use descriptive commit messages** following this format:
   ```
-  <phase>: <short description of change>
+  <module>: <short description of change>
 
   - Added/modified <file>
   - Implemented <feature/method>
@@ -58,7 +58,7 @@ Skipping the audit step is a critical error. An unaudited file may:
 
 The required workflow is:
 
-1. **Run all functional tests** for the phase as defined in `PLAN.md` Section 4 (Testing & Validation).
+1. **Run all functional tests** for the module as defined in `PLAN.md` file inventory section.
 2. **Present a summary to the user** that includes:
    - Which files were created or modified
    - Which functional tests were executed
@@ -67,10 +67,10 @@ The required workflow is:
    - Confirmation that coding standards were met (IIFE, strict mode, docblocks, naming)
 3. **Wait for the user's approval** before proceeding with:
    - Git commits (`git add` / `git commit`)
-   - Updating `PLAN.md` (changing `[ ]` or `[PARTIAL]` to `[FULLY OPERATIONAL]`, adding verification notes)
+   - Updating `PLAN.md` (updating file descriptions, line counts, or adding verification notes)
 4. **Do not proceed** until the user explicitly confirms or provides feedback.
 
-**Exception:** Routine per-file commits during implementation (Section 1.3) that are not tied to phase completion do not require user review. However, the final commit that marks a phase as complete and the corresponding `PLAN.md` update **always** requires user review first.
+**Exception:** Routine per-file commits during implementation (Section 1.3) that are not tied to module completion do not require user review. However, the final commit that marks a module as complete and the corresponding `PLAN.md` update **always** requires user review first.
 
 ---
 
@@ -183,11 +183,11 @@ Every public method, constructor, and class-level object **must** have a JSDoc-s
 
 ### 2.7 File Independence Principle
 
-Each file is designed to be self-contained within its phase. Files only depend on:
-- Core infrastructure (Phase 1) — universally needed
-- Lower-numbered phases in order
+Each file is designed to be self-contained within its module group. Files only depend on:
+- Core infrastructure — universally needed
+- Lower-numbered modules in order
 
-A file in `src/render/` should never import from `src/player/` or `src/world/`. Communication between phases happens through the `Donkeycraft` namespace and/or the event bus. See `PLAN.md` for the full dependency order.
+A file in `src/render/` should never import from `src/player/` or `src/world/`. Communication between modules happens through the `Donkeycraft` namespace and/or the event bus. See `PLAN.md` for the full dependency order.
 
 ---
 
@@ -233,15 +233,9 @@ A file in `src/render/` should never import from `src/player/` or `src/world/`. 
 
 ## 4. Quick Reference
 
-### 4.1 Status Markers
+### 4.1 Testing
 
-- `[ ]` — Not started
-- `[PARTIAL]` — Files created but not yet functionally verified
-- `[FULLY OPERATIONAL]` — Implemented and verified with functional tests
-
-### 4.2 Testing
-
-Each phase must be validated with a **standalone functional test** before marking it as `[FULLY OPERATIONAL]` in `PLAN.md`. See `PLAN.md` Section 4 for per-phase validation criteria and milestone definitions.
+Each module should be validated with **standalone functional tests** before marking it as complete in `PLAN.md`. See `PLAN.md` for per-module validation criteria.
 
 ---
 
