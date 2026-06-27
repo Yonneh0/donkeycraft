@@ -148,7 +148,7 @@ body { max-width: 1600px; }
 <div id="overall-result" class="pending"><strong>RUNNING TESTS</strong></div>
 <div id="audio-init-section">
     <button id="audio-init-btn" onclick="initAudioContext()">Initialize AudioContext (required for sound tests)</button>
-    <span id="audio-status" style="margin-left: 10px; color: #888;">Not initialized</span>
+    <span id="audio-status" style="margin-left: 10px; color: #888;">Click anywhere or press button to initialize</span>
 </div>
 <div id="results"></div>
 
@@ -179,20 +179,47 @@ body { max-width: 1600px; }
     F.init('results');
 
     // ============================================================
-    // AudioContext initialization
+    // AudioContext initialization — auto-init on page load, fallback to click
     // ============================================================
-    window.initAudioContext = function() {
+    function ensureAudioContext() {
+        if (audioCtx) return true;
         try {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             document.getElementById('audio-status').textContent = 'Initialized (' + audioCtx.sampleRate + 'Hz)';
             document.getElementById('audio-status').style.color = '#2ecc71';
             document.getElementById('audio-init-btn').style.display = 'none';
-
-            // Re-run sound tests now that AudioContext is ready
-            runSoundTests();
+            return true;
         } catch(e) {
-            document.getElementById('audio-status').textContent = 'Failed: ' + e.message;
-            document.getElementById('audio-status').style.color = '#e74c3c';
+            document.getElementById('audio-status').textContent = 'Click anywhere to initialize';
+            document.getElementById('audio-status').style.color = '#f1c40f';
+            return false;
+        }
+    }
+
+    // Attempt auto-init on page load (may work if browser allows)
+    // If it succeeds, schedule sound tests to run after DOM is ready
+    if (ensureAudioContext()) {
+        // AudioContext was created successfully — defer sound tests until after all functions are defined
+        setTimeout(function() {
+            runSoundTests();
+        }, 50);
+    }
+
+    // Fallback: try on first user gesture (click/touch/keydown)
+    function tryInitOnGesture() {
+        if (!audioCtx) {
+            ensureAudioContext();
+            runSoundTests();
+        }
+    }
+    document.addEventListener('click', tryInitOnGesture, { once: false });
+    document.addEventListener('touchstart', tryInitOnGesture, { once: false });
+    document.addEventListener('keydown', tryInitOnGesture, { once: false });
+
+    // Keep button as explicit fallback
+    window.initAudioContext = function() {
+        if (ensureAudioContext()) {
+            runSoundTests();
         }
     };
 
@@ -526,7 +553,7 @@ body { max-width: 1600px; }
     // ============================================================
     function runSoundTests() {
         totalSections++;
-        F.section('18. SoundGenerator — Categories & Caching');
+        F.section('3. SoundGenerator — Categories & Caching');
 
         var categories = sndGen.getCategories();
         F.assertType(categories, 'object', 'getCategories returns array/object');
@@ -584,7 +611,7 @@ body { max-width: 1600px; }
 
         // Sound display table
         totalSections++;
-        F.section('19. SoundGenerator — Audio Generation & Playback');
+        F.section('4. SoundGenerator — Audio Generation & Playback');
 
         var soundTable = '<table class="sound-table"><tr><th>Sound</th><th>Type</th><th>Duration</th><th>Play</th><th>Status</th></tr>';
 
@@ -676,10 +703,10 @@ body { max-width: 1600px; }
                 document.getElementById('results').insertAdjacentHTML('beforeend', soundTable);
 
                 // ============================================================
-                // SECTION 20: AssetManager Tests
+                // SECTION 5: AssetManager Tests
                 // ============================================================
                 totalSections++;
-                F.section('20. AssetManager — Initialization & Textures');
+                F.section('5. AssetManager — Initialization & Textures');
 
                 var info = assetMgr.getAssetInfo();
                 F.assertType(info, 'object', 'getAssetInfo returns object');
@@ -699,7 +726,7 @@ body { max-width: 1600px; }
 
                 // Atlas canvas
                 totalSections++;
-                F.section('21. AssetManager — Atlas Canvas Generation');
+                F.section('6. AssetManager — Atlas Canvas Generation');
 
                 var atlasCanvas = assetMgr.generateAtlasCanvas();
                 F.assertType(atlasCanvas, 'object', 'generateAtlasCanvas returns canvas element');
@@ -719,7 +746,7 @@ body { max-width: 1600px; }
 
                 // Reset
                 totalSections++;
-                F.section('22. AssetManager — Reset');
+                F.section('7. AssetManager — Reset');
 
                 assetMgr.reset();
                 var afterReset = assetMgr.getAllTextures();
