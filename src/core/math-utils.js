@@ -332,13 +332,22 @@
 
     /**
      * Create a rotation matrix around axis.
-     * @param {number} angleRadians
-     * @param {Donkeycraft.Vector3} axis
+     * @param {number} angleRadians - Rotation angle in radians.
+     * @param {Donkeycraft.Vector3} axis - Axis of rotation (will be normalized internally).
      * @returns {Donkeycraft.Matrix4}
      */
     Donkeycraft.Matrix4.createRotation = function(angle, axis) {
         var c = Math.cos(angle), s = Math.sin(angle);
+
+        // Normalize the axis vector for correctness
         var x = axis.x, y = axis.y, z = axis.z;
+        var len = Math.sqrt(x * x + y * y + z * z);
+        if (len > 0.00001) {
+            x /= len; y /= len; z /= len;
+        } else {
+            x = 0; y = 1; z = 0; // Default to Y-axis if axis is zero
+        }
+
         var t = 1 - c;
 
         var m = new Donkeycraft.Matrix4();
@@ -491,22 +500,26 @@
 
     /**
      * Create quaternion from Euler angles (radians), YXZ order.
-     * @param {number} yaw - Y rotation
-     * @param {number} pitch - X rotation
-     * @param {number} [roll=0] - Z rotation
+     * @param {number} yaw - Y rotation (heading).
+     * @param {number} pitch - X rotation (elevation).
+     * @param {number} [roll=0] - Z rotation (bank).
      * @returns {Donkeycraft.Quaternion}
      */
     Donkeycraft.Quaternion.fromEuler = function(yaw, pitch, roll) {
-        roll = roll || 0;
+        yaw = (yaw !== undefined && !isNaN(yaw)) ? yaw : 0;
+        pitch = (pitch !== undefined && !isNaN(pitch)) ? pitch : 0;
+        roll = (roll !== undefined && !isNaN(roll)) ? roll : 0;
+
         var cy = Math.cos(yaw * 0.5), sy = Math.sin(yaw * 0.5);
         var cp = Math.cos(pitch * 0.5), sp = Math.sin(pitch * 0.5);
         var cr = Math.cos(roll * 0.5), sr = Math.sin(roll * 0.5);
 
+        // YXZ Euler-to-quaternion multiplication: q = qyaw × qpitch × qroll
         return new Donkeycraft.Quaternion(
-            sr * cp * cy - cr * sp * sy, // x
-            cr * sp * cy + sr * cp * sy, // y
-            cr * cp * sy - sr * sp * cy, // z
-            cr * cp * cy + sr * sp * sy  // w
+            cy * sp * cr + sy * cp * sr,  // x
+            sy * cp * cr - cy * sp * sr,  // y
+            cy * cp * sr - sy * sp * cr,  // z
+            cy * cp * cr + sy * sp * sr   // w
         );
     };
 
@@ -585,16 +598,15 @@
 
         /**
          * Initialize with a seed.
-         * @param {number} [seed] - Seed value (default: 42). Values <= 0 are mapped to 2147483647.
-         *     Use any positive integer for a custom seed.
+         * @param {number} [seed] - Seed value (default: 42). Use any integer for a custom seed.
          */
         function init(seed) {
             var p = new Uint8Array(256);
             for (var i = 0; i < 256; i++) p[i] = i;
 
-            // Shuffle using seed — use 42 as default, but allow seed=0 explicitly
-            var s = (seed !== undefined && seed !== null) ? seed : 42;
-            if (s <= 0) s += 2147483647;  // Ensure positive starting value for LCG
+            // Shuffle using seed — use 42 as default, but allow any integer including 0
+            var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed)) ? Math.floor(Math.abs(seed)) : 42;
+            if (s <= 0 || s >= 2147483647) s = 42;
             for (var i = 255; i > 0; i--) {
                 s = (s * 16807) % 2147483647;
                 var j = s % (i + 1);
@@ -782,6 +794,7 @@
      * @returns {number}
      */
     Donkeycraft.map = function(value, inMin, inMax, outMin, outMax) {
+        if (inMin === inMax) return outMin;
         return outMin + (outMax - outMin) * ((value - inMin) / (inMax - inMin));
     };
 
