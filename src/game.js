@@ -39,6 +39,7 @@
         this._player = null;
         this._chunkManager = null;
         this._eventBus = null;
+        this._redstoneEngine = null;
 
         // Movement systems (set by external code or initialized here)
         this._movementSystem = null;
@@ -197,22 +198,23 @@
         this._worldStore = worldStore;
     };
 
-    /**
-     * Set external system references (called after Game.init()).
-     * If constructor functions are passed instead of instances, they will be instantiated
-     * using the systems created during Game.init() (input, player, collision, chunkManager).
-     * @param {Function|Object} movementSystem - Movement physics system (constructor or instance).
-     * @param {Function|Object} collisionSystem - Collision detection system (constructor or instance).
-     * @param {Function|Object} jumpSystem - Jump mechanics system (constructor or instance).
-     * @param {Function|Object} flyingSystem - Flying mechanics system (constructor or instance).
-     * @param {Object} raycastSystem - Raycasting system (static module, not a constructor).
-     * @param {Object} blockActionSystem - Block breaking system (static module, not a constructor).
-     * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
-     * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
-     */
+        /**
+         * Set external system references (called after Game.init()).
+         * If constructor functions are passed instead of instances, they will be instantiated
+         * using the systems created during Game.init() (input, player, collision, chunkManager).
+         * @param {Function|Object} movementSystem - Movement physics system (constructor or instance).
+         * @param {Function|Object} collisionSystem - Collision detection system (constructor or instance).
+         * @param {Function|Object} jumpSystem - Jump mechanics system (constructor or instance).
+         * @param {Function|Object} flyingSystem - Flying mechanics system (constructor or instance).
+         * @param {Object} raycastSystem - Raycasting system (static module, not a constructor).
+         * @param {Object} blockActionSystem - Block breaking system (static module, not a constructor).
+         * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
+         * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
+         * @param {Object} [redstoneEngine] - Redstone engine instance (optional).
+         */
     Donkeycraft.Game.prototype.setSystems = function(
         movementSystem, collisionSystem, jumpSystem, flyingSystem,
-        raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem
+        raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem, redstoneEngine
     ) {
         var self = this;
 
@@ -261,6 +263,16 @@
         this._blockActionSystem = blockActionSystem;
         this._blockPlacementSystem = blockPlacementSystem;
         this._interactableBlocksSystem = interactableBlocksSystem;
+
+        // Assign redstone engine if provided
+        if (redstoneEngine) {
+            this._redstoneEngine = redstoneEngine;
+        }
+
+        // Wire up timer reference for redstone engine (required for tick scheduling)
+        if (this._redstoneEngine && this._timer) {
+            this._redstoneEngine.setTimer(this._timer);
+        }
     };
 
     /**

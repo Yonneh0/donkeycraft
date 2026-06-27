@@ -33,6 +33,9 @@
         // Optional ChunkManager reference for chunk access
         var _chunkManager = null;
 
+        // Timer reference (required for tick scheduling)
+        var _timer = null;
+
         // Subsystem references (set via setters)
         var _wiring = null;
         var _repeaterComparator = null;
@@ -97,15 +100,23 @@
         }
 
         /**
+         * Set the timer reference for tick scheduling.
+         * @param {Donkeycraft.Timer} timer - Timer instance.
+         */
+        function setTimer(timer) {
+            _timer = timer;
+        }
+
+        /**
          * Start the redstone engine tick loop.
          * @returns {Function} Unsubscribe function.
          */
         function start() {
-            if (_running) return function() {};
+            if (_running || !_timer) return function() {};
 
             _running = true;
 
-            var unsubscribe = Donkeycraft.Timer.prototype.onTick.call(Donkeycraft._timerInstance, function(dt, tickCount) {
+            var unsubscribe = _timer.onTick(function(dt, tickCount) {
                 _currentTick = tickCount;
                 _processTick();
             });
@@ -284,6 +295,7 @@
          */
         function destroy() {
             _running = false;
+            _timer = null;
             _dirtyQueue = [];
             _eventBus = null;
             _chunkManager = null;
@@ -302,6 +314,7 @@
             setObservers: setObservers,
             setPistons: setPistons,
             setTNT: setTNT,
+            setTimer: setTimer,
             start: start,
             stop: stop,
             markDirty: markDirty,
