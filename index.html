@@ -489,16 +489,8 @@ void main() {
         });
 
         // --- Input: Mouse buttons (break/place) ---
-        document.addEventListener('mousedown', function(e) {
-            if (!game._pointerLocked) return;
-            // Left click = break, Right click = place
-            if (e.button === 0) {
-                // Mouse0 handled in _processInteractions via isKeyDown
-            }
-            if (e.button === 2) {
-                // Mouse2 handled in _processInteractions via isKeyDown
-            }
-        });
+        // Handled by input.js event listeners — game.js _processInteractions()
+        // uses isMouseButtonPressed('left') and isMouseButtonPressed('right').
 
         // Prevent context menu on right-click
         overlay.addEventListener('contextmenu', function(e) {

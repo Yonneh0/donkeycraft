@@ -916,9 +916,10 @@
     Donkeycraft.Game.prototype._tick = function(dt, tickCount) {
         if (!this._running || this._paused) return;
 
-        // Update input key states (for just-pressed detection)
+        // Update input key states and mouse button states (for just-pressed detection)
         if (this._input) {
             this._input.updateKeyStates();
+            this._input.updateMouseButtonStates();
         }
 
         // Tick block break progress (decrement timers, spawn drops)
@@ -1162,7 +1163,7 @@
         );
 
         // Process left click (block breaking)
-        if (this._input.isKeyDown('Mouse0') && result && result.blockX !== undefined) {
+        if (this._input.isMouseButtonPressed('left') && result && result.blockX !== undefined) {
             if (this._blockActionSystem) {
                 this._blockActionSystem.startBreaking(
                     this._chunkManager,
@@ -1174,7 +1175,7 @@
         }
 
         // Process right click (block placement / interaction)
-        if (this._input.isKeyDown('Mouse2') && result && result.blockX !== undefined) {
+        if (this._input.isMouseButtonPressed('right') && result && result.blockX !== undefined) {
             var placePos = this._blockPlacementSystem.getPlacementPosition(
                 result.blockX, result.blockY, result.blockZ,
                 result.faceNormalX, result.faceNormalY, result.faceNormalZ
