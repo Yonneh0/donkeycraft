@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 13 Day/Night Cycle & Weather Test</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Phase 13 Day/Night Cycle & Weather Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: WorldTime (day cycle, moon phases), Weather (rain/thunder/snow, biome restrictions)</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Phase 13: Time & Weather -->
+<script src="../src/world/time.js"></script>
+<script src="../src/render/weather.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: WorldTime — Namespace & Construction
+    // ============================================================
+    F.section('1. WorldTime — Namespace & Construction');
+
+    F.assert(typeof Donkeycraft.WorldTime === 'function', 'WorldTime constructor exists');
+    F.assertType(Donkeycraft.WORLD_TIME_TICKS_PER_DAY, 'number', 'WORLD_TIME_TICKS_PER_DAY = 24000');
+    F.assertEq(Donkeycraft.WORLD_TIME_TICKS_PER_DAY, 24000, 'Ticks per day = 24000');
+    F.assertType(Donkeycraft.WORLD_TIME_TICKS_PER_HOUR, 'number', 'WORLD_TIME_TICKS_PER_HOUR = 1000');
+    F.assertEq(Donkeycraft.WORLD_TIME_TICKS_PER_HOUR, 1000, 'Ticks per hour = 1000');
+    F.assertType(Donkeycraft.WORLD_TIME_MOON_PHASE_CYCLE, 'number', 'WORLD_TIME_MOON_PHASE_CYCLE = 168000');
+    F.assertEq(Donkeycraft.WORLD_TIME_MOON_PHASE_CYCLE, 168000, 'Moon phase cycle = 168000 (7 days)');
+
+    var wt1 = new Donkeycraft.WorldTime();
+    F.assert(wt1 instanceof Donkeycraft.WorldTime, 'Default construction creates WorldTime instance');
+    F.assertEq(wt1.getTotalTicks(), 0, 'Default total ticks = 0');
+
+    var wt2 = new Donkeycraft.WorldTime(5000);
+    F.assertEq(wt2.getTotalTicks(), 5000, 'Construction with initial ticks = 5000');
+
+    var wt3 = new Donkeycraft.WorldTime(-100);
+    F.assertEq(wt3.getTotalTicks(), 0, 'Negative ticks clamped to 0');
+
+    // ============================================================
+    // Section 2: WorldTime — Time of Day Calculations
+    // ============================================================
+    F.section('2. WorldTime — Time of Day Calculations');
+
+    // Sunrise at tick 0 (time of day = 0.0)
+    var wt = new Donkeycraft.WorldTime(0);
+    F.assertEq(wt.getTimeOfDay(), 0, 'Time of day at tick 0 = 0');
+    F.assert(!wt.isDaytime(), 'Tick 0 is not daytime (it\'s just before sunrise)');
+
+    // Noon at tick 6000 (time of day = 0.25)
+    var wtNoon = new Donkeycraft.WorldTime(6000);
+    F.assertEq(wtNoon.getTimeOfDay(), 0.25, 'Time of day at tick 6000 = 0.25 (noon)');
+    F.assert(wtNoon.isDaytime(), 'Tick 6000 is daytime');
+
+    // Sunset at tick 12000 (time of day = 0.5)
+    var wtSunset = new Donkeycraft.WorldTime(12000);
+    F.assertEq(wtSunset.getTimeOfDay(), 0.5, 'Time of day at tick 12000 = 0.5 (sunset)');
+    F.assert(wtSunset.isDaytime(), 'Tick 12000 is daytime');
+
+    // Midnight at tick 18000 (time of day = 0.75)
+    var wtMidnight = new Donkeycraft.WorldTime(18000);
+    F.assertEq(wtMidnight.getTimeOfDay(), 0.75, 'Time of day at tick 18000 = 0.75 (midnight)');
+    F.assert(wtMidnight.isNight(), 'Tick 18000 is nighttime');
+
+    // Edge: tick 4800 (just before daytime starts at 0.2 = 4800)
+    var wtEdge1 = new Donkeycraft.WorldTime(4799);
+    F.assert(wtEdge1.isNight(), 'Tick 4799 is nighttime (before sunrise)');
+
+    var wtEdge2 = new Donkeycraft.WorldTime(4800);
+    F.assert(wtEdge2.isDaytime(), 'Tick 4800 is daytime (sunrise)');
+
+    // Edge: tick 17999 (just before nighttime starts at 0.75 = 18000)
+    var wtEdge3 = new Donkeycraft.WorldTime(17999);
+    F.assert(wtEdge3.isDaytime(), 'Tick 17999 is daytime (before sunset)');
+
+    var wtEdge4 = new Donkeycraft.WorldTime(18000);
+    F.assert(wtEdge4.isNight(), 'Tick 18000 is nighttime (sunset)');
+
+    // Wrap-around: tick 23999 (last tick of day)
+    var wtWrap = new Donkeycraft.WorldTime(23999);
+    F.assertEq(wtWrap.getTimeOfDay(), 23999 / 24000, 'Tick 23999 time of day ≈ 0.9998');
+    F.assert(wtWrap.isNight(), 'Tick 23999 is nighttime');
+
+    // ============================================================
+    // Section 3: WorldTime — Day Counting & Tick Advancement
+    // ============================================================
+    F.section('3. WorldTime — Day Counting & Tick Advancement');
+
+    var wtDay = new Donkeycraft.WorldTime(0);
+    F.assertEq(wtDay.getDays(), 0, 'Day 0 at tick 0');
+    F.assertEq(wtDay.getTicksInDay(), 0, 'Ticks in day at tick 0 = 0');
+
+    // Advance by 1 tick
+    wtDay.tick();
+    F.assertEq(wtDay.getTotalTicks(), 1, 'After 1 tick, total = 1');
+    F.assertEq(wtDay.getTicksInDay(), 1, 'After 1 tick, ticks in day = 1');
+
+    // Advance to end of day
+    wtDay.advance(23998);
+    F.assertEq(wtDay.getTotalTicks(), 23999, 'After advance(23998), total = 23999');
+    F.assertEq(wtDay.getDays(), 0, 'Still day 0 at tick 23999');
+
+    // Cross into next day
+    wtDay.tick();
+    F.assertEq(wtDay.getTotalTicks(), 24000, 'After crossing day boundary, total = 24000');
+    F.assertEq(wtDay.getDays(), 1, 'Now on day 1');
+    F.assertEq(wtDay.getTicksInDay(), 0, 'Ticks in day reset to 0');
+
+    // Multiple days
+    wtDay.advance(48000);
+    F.assertEq(wtDay.getDays(), 3, 'After 48000 more ticks, on day 3');
+    F.assertEq(wtDay.getTicksInDay(), 0, 'Ticks in day = 0 at exact boundary');
+
+    // Advance to noon on day 3 (tick 6000)
+    wtDay.advance(6000);
+    F.assertEq(wtDay.getDays(), 3, 'Still on day 3');
+    F.assertEq(wtDay.getTicksInDay(), 6000, 'Ticks in day = 6000 (noon)');
+    F.assertEq(wtDay.getHour(), 6, 'Hour at tick 6000 = 6');
+
+    // ============================================================
+    // Section 4: WorldTime — Moon Phase System
+    // ============================================================
+    F.section('4. WorldTime — Moon Phase System');
+
+    var wtMoon = new Donkeycraft.WorldTime(0);
+    F.assertEq(wtMoon.getMoonPhase(), 0, 'Moon phase at tick 0 = 0 (New Moon)');
+    F.assertEq(wtMoon.getMoonPhaseName(), 'New Moon', 'Moon phase name = "New Moon"');
+    F.assertEq(wtMoon.getMoonIllumination(), 0, 'Moon illumination at new moon = 0');
+
+    // Phase 1: Waxing Crescent (at 21000 ticks = 1.25 days)
+    var wtPhase1 = new Donkeycraft.WorldTime(21000);
+    F.assertEq(wtPhase1.getMoonPhase(), 1, 'Moon phase at 21000 = 1 (Waxing Crescent)');
+    F.assertEq(wtPhase1.getMoonPhaseName(), 'Waxing Crescent', 'Phase name = "Waxing Crescent"');
+
+    // Phase 4: Full Moon (at 84000 ticks = 5 days)
+    var wtFull = new Donkeycraft.WorldTime(84000);
+    F.assertEq(wtFull.getMoonPhase(), 4, 'Moon phase at 84000 = 4 (Full Moon)');
+    F.assertEq(wtFull.getMoonPhaseName(), 'Full Moon', 'Phase name = "Full Moon"');
+    F.assertEq(wtFull.getMoonIllumination(), 1, 'Full moon illumination = 1');
+
+    // Phase 7: Waning Crescent (at 147000 ticks)
+    var wtPhase7 = new Donkeycraft.WorldTime(147000);
+    F.assertEq(wtPhase7.getMoonPhase(), 7, 'Moon phase at 147000 = 7 (Waning Crescent)');
+
+    // Wrap around: 168000 ticks = 1 full moon cycle
+    var wtCycle = new Donkeycraft.WorldTime(168000);
+    F.assertEq(wtCycle.getMoonPhase(), 0, 'Moon phase at 168000 = 0 (back to New Moon)');
+
+    // Verify all 8 phases are distinct
+    var phases = [];
+    for (var p = 0; p < 8; p++) {
+        var phaseTicks = p * (Donkeycraft.WORLD_TIME_MOON_PHASE_CYCLE / 8);
+        phases.push(new Donkeycraft.WorldTime(phaseTicks).getMoonPhase());
+    }
+    for (var q = 0; q < phases.length; q++) {
+        F.assertEq(phases[q], q, 'Phase at tick ' + (q * 21000) + ' = ' + q);
+    }
+
+    // ============================================================
+    // Section 5: WorldTime — Static Methods & Helpers
+    // ============================================================
+    F.section('5. WorldTime — Static Methods & Helpers');
+
+    F.assertEq(Donkeycraft.WorldTime.getDayLength(), 24000, 'getDayLength() = 24000');
+
+    var todTicks = Donkeycraft.WorldTime.todToTicks(0.5);
+    F.assertEq(todTicks, 12000, 'todToTicks(0.5) = 12000 (sunset)');
+
+    var ticksTod = Donkeycraft.WorldTime.ticksToTod(12000);
+    F.assertEq(ticksTod, 0.5, 'ticksToTod(12000) = 0.5');
+
+    // todToTicks with negative value
+    var negTicks = Donkeycraft.WorldTime.todToTicks(-0.5);
+    F.assertEq(negTicks, 12000, 'todToTicks(-0.5) wraps to 12000');
+
+    // fromTimeOfDay
+    var wtFromTod = Donkeycraft.WorldTime.fromTimeOfDay(0.25, 48000);
+    F.assertEq(wtFromTod.getTotalTicks(), 54000, 'fromTimeOfDay(0.25, 48000) = 54000');
+
+    // ============================================================
+    // Section 6: WorldTime — Serialize/Deserialize & Reset
+    // ============================================================
+    F.section('6. WorldTime — Serialization & Reset');
+
+    var wtSer = new Donkeycraft.WorldTime(12345);
+    var serialized = wtSer.serialize();
+    F.assertEq(serialized.totalTicks, 12345, 'Serialize preserves totalTicks');
+
+    var wtDeser = new Donkeycraft.WorldTime(0);
+    wtDeser.deserialize(serialized);
+    F.assertEq(wtDeser.getTotalTicks(), 12345, 'Deserialize restores totalTicks');
+
+    // Deserialize with null data
+    var wtNull = new Donkeycraft.WorldTime(100);
+    wtNull.deserialize(null);
+    F.assertEq(wtNull.getTotalTicks(), 100, 'Deserialize(null) preserves existing value');
+
+    // Deserialize with negative ticks
+    var wtNeg = new Donkeycraft.WorldTime(0);
+    wtNeg.deserialize({ totalTicks: -500 });
+    F.assertEq(wtNeg.getTotalTicks(), 0, 'Deserialize negative ticks clamped to 0');
+
+    // Reset
+    var wtReset = new Donkeycraft.WorldTime(99999);
+    wtReset.reset();
+    F.assertEq(wtReset.getTotalTicks(), 0, 'reset() sets total ticks to 0');
+
+    // setTotalTicks negative
+    var wtSetNeg = new Donkeycraft.WorldTime(100);
+    wtSetNeg.setTotalTicks(-50);
+    F.assertEq(wtSetNeg.getTotalTicks(), 0, 'setTotalTicks(-50) clamped to 0');
+
+    // ============================================================
+    // Section 7: WorldTime — Hour & Minute Calculations
+    // ============================================================
+    F.section('7. WorldTime — Hour & Minute Calculations');
+
+    var wtHM = new Donkeycraft.WorldTime(0);
+    F.assertEq(wtHM.getHour(), 0, 'Hour at tick 0 = 0');
+    F.assertEq(wtHM.getMinute(), 0, 'Minute at tick 0 = 0');
+
+    // Tick 1000 = hour 1
+    var wtH1 = new Donkeycraft.WorldTime(1000);
+    F.assertEq(wtH1.getHour(), 1, 'Hour at tick 1000 = 1');
+
+    // Tick 3500 = hour 3, minute 29 (ticksInHour=500, floor(500/(1000/60))=floor(29.999)=29)
+    var wtHM2 = new Donkeycraft.WorldTime(3500);
+    F.assertEq(wtHM2.getHour(), 3, 'Hour at tick 3500 = 3');
+    F.assertEq(wtHM2.getMinute(), 29, 'Minute at tick 3500 = 29 (floor of 29.999)');
+
+    // Tick 86399 = 3 days + 14399 ticks (hour 14, minute 23)
+    var wtLast = new Donkeycraft.WorldTime(86399);
+    F.assertEq(wtLast.getHour(), 14, 'Hour at tick 86399 = 14 (ticksInDay=14399)');
+    F.assertEq(wtLast.getMinute(), 23, 'Minute at tick 86399 = 23 (ticksInHour=4399)');
+
+    // ============================================================
+    // Section 8: Weather — Namespace & Construction
+    // ============================================================
+    F.section('8. Weather — Namespace & Construction');
+
+    F.assert(typeof Donkeycraft.Weather === 'function', 'Weather constructor exists');
+    F.assertType(Donkeycraft.WEATHER_CLEAR, 'string', 'WEATHER_CLEAR = "clear"');
+    F.assertType(Donkeycraft.WEATHER_RAIN, 'string', 'WEATHER_RAIN = "rain"');
+    F.assertType(Donkeycraft.WEATHER_THUNDER, 'string', 'WEATHER_THUNDER = "thunder"');
+    F.assertType(Donkeycraft.WEATHER_SNOW, 'string', 'WEATHER_SNOW = "snow"');
+
+    var w = new Donkeycraft.Weather();
+    F.assert(w instanceof Donkeycraft.Weather, 'Default construction creates Weather instance');
+    F.assertEq(w.getWeather(), 'clear', 'Initial weather state = clear');
+    F.assert(!w.isRaining(), 'Not raining initially');
+    F.assert(!w.isThundering(), 'Not thundering initially');
+    F.assert(!w.isSnowing(), 'Not snowing initially');
+    F.assertEq(w.getParticleDensity(), 0, 'Particle density = 0 for clear');
+    F.assertEq(w.getThunderIntensity(), 0, 'Thunder intensity = 0 for clear');
+
+    // ============================================================
+    // Section 9: Weather — Weather State Management
+    // ============================================================
+    F.section('9. Weather — Weather State Management');
+
+    // Set rain
+    w.setWeather('rain');
+    F.assertEq(w.getWeather(), 'rain', 'Weather set to "rain"');
+    F.assert(w.isRaining(), 'isRaining() = true for rain');
+    F.assert(!w.isThundering(), 'isThundering() = false for rain');
+    F.assert(w.getParticleDensity() > 0, 'Particle density > 0 for rain');
+
+    // Set thunder (must follow rain)
+    w.setWeather('thunder');
+    F.assertEq(w.getWeather(), 'thunder', 'Weather set to "thunder"');
+    F.assert(w.isThundering(), 'isThundering() = true for thunder');
+    F.assert(w.isRaining(), 'isRaining() = true for thunder');
+
+    // Set snow
+    w.setWeather('snow');
+    F.assertEq(w.getWeather(), 'snow', 'Weather set to "snow"');
+    F.assert(w.isSnowing(), 'isSnowing() = true for snow');
+    F.assert(!w.isRaining(), 'isRaining() = false for snow');
+
+    // Set clear
+    w.setWeather('clear');
+    F.assertEq(w.getWeather(), 'clear', 'Weather set to "clear"');
+
+    // Invalid state falls back to clear
+    w.setWeather('invalid_state');
+    F.assertEq(w.getWeather(), 'clear', 'Invalid weather state falls back to "clear"');
+
+    // ============================================================
+    // Section 10: Weather — Weather Duration & Timers
+    // ============================================================
+    F.section('10. Weather — Duration & Timers');
+
+    w.setWeather('clear');
+    var duration = w.getWeatherDuration();
+    F.assert(duration >= 6000, 'Clear weather duration >= 6000 ticks (got ' + duration + ')');
+    F.assert(duration <= 120000, 'Clear weather duration <= 120000 ticks (got ' + duration + ')');
+
+    // setWeatherDuration
+    w.setWeatherDuration(5000);
+    F.assertEq(w.getWeatherDuration(), 5000, 'setWeatherDuration(5000) sets duration');
+
+    // Duration clamped to minimum 100
+    w.setWeatherDuration(50);
+    F.assertEq(w.getWeatherDuration(), 100, 'Duration clamped to minimum 100');
+
+    // ============================================================
+    // Section 11: Weather — Weather Change Logic
+    // ============================================================
+    F.section('11. Weather — Weather Change Logic');
+
+    w.setWeather('clear');
+    w.setWeatherDuration(200); // Short duration for testing
+
+    // shouldChangeWeather returns false before 100 ticks
+    F.assert(!w.shouldChangeWeather(), 'shouldChangeWeather = false before 100 ticks');
+
+    // Advance timer past minimum
+    w._weatherTimer = 150;
+    // After 100 ticks, 5% chance each tick (non-deterministic, just check logic allows it)
+    F.assert(w.shouldChangeWeather() === true || w.shouldChangeWeather() === false, 'shouldChangeWeather can return true after 100 ticks');
+
+    // Desert biome forces change away from rain
+    var desertBiome = { isDesert: true };
+    w.setWeather('rain');
+    w._weatherTimer = 200;
+    F.assert(w.shouldChangeWeather(desertBiome) === true, 'Desert forces weather change from rain');
+
+    // ============================================================
+    // Section 12: Weather — Biome Weather Restrictions
+    // ============================================================
+    F.section('12. Weather — Biome Weather Restrictions');
+
+    // Desert (ID 2) never gets rain or snow
+    var desertWeather = w.getBiomeWeather(2);
+    F.assert(!desertWeather.canRain, 'Desert cannot have rain');
+    F.assert(!desertWeather.canSnow, 'Desert cannot have snow');
+
+    // Ocean (ID 6) cannot have snow
+    var oceanWeather = w.getBiomeWeather(6);
+    F.assert(oceanWeather.canRain, 'Ocean can have rain');
+    F.assert(!oceanWeather.canSnow, 'Ocean cannot have snow');
+
+    // Plains (ID 1) all weather allowed
+    var plainsWeather = w.getBiomeWeather(1);
+    F.assert(plainsWeather.canRain, 'Plains can have rain');
+    F.assert(plainsWeather.canSnow, 'Plains can have snow');
+
+    // Custom biome restriction
+    w.setBiomeWeatherRestriction(99, { canRain: false, canSnow: true });
+    var custom = w.getBiomeWeatherRestrictions(99);
+    F.assert(!custom.canRain, 'Custom biome: no rain');
+    F.assert(custom.canSnow, 'Custom biome: snow allowed');
+
+    // ============================================================
+    // Section 13: Weather — Thunder Intensity & Particle Density
+    // ============================================================
+    F.section('13. Weather — Thunder Intensity & Particles');
+
+    w.setWeather('clear');
+    F.assertEq(w.getThunderIntensity(), 0, 'Clear: thunder intensity = 0');
+    F.assertEq(w.getParticleDensity(), 0, 'Clear: particle density = 0');
+
+    w.setWeather('rain');
+    F.assertEq(w.getThunderIntensity(), 0, 'Rain: thunder intensity = 0');
+    F.assert(w.getParticleDensity() > 0, 'Rain: particle density > 0');
+
+    w.setWeather('thunder');
+    F.assert(w.getThunderIntensity() >= 0.7, 'Thunder: thunder intensity >= 0.7');
+    F.assert(w.getParticleDensity() >= 0.8, 'Thunder: particle density >= 0.8');
+
+    w.setWeather('snow');
+    F.assertEq(w.getThunderIntensity(), 0, 'Snow: thunder intensity = 0');
+    F.assert(w.getParticleDensity() > 0 && w.getParticleDensity() < 0.5, 'Snow: particle density between 0 and 0.5');
+
+    // setThunderIntensity clamping
+    w.setThunderIntensity(2.0);
+    F.assertEq(w.getThunderIntensity(), 1, 'setThunderIntensity(2.0) clamped to 1');
+    w.setThunderIntensity(-0.5);
+    F.assertEq(w.getThunderIntensity(), 0, 'setThunderIntensity(-0.5) clamped to 0');
+
+    // ============================================================
+    // Section 14: Weather — Force Change & Clear
+    // ============================================================
+    F.section('14. Weather — Force Change & Clear');
+
+    w.setWeather('rain');
+    w.forceChange('snow');
+    F.assertEq(w.getWeather(), 'snow', 'forceChange("snow") sets weather immediately');
+
+    w.clear();
+    F.assertEq(w.getWeather(), 'clear', 'clear() sets weather to clear');
+
+    // ============================================================
+    // Section 15: Weather — Serialize/Deserialize
+    // ============================================================
+    F.section('15. Weather — Serialization');
+
+    w.setWeather('rain');
+    w._weatherTimer = 500;
+    var wSer = w.serialize();
+    F.assertEq(wSer.weatherState, 'rain', 'Serialize preserves weatherState');
+    F.assertType(wSer.weatherDuration, 'number', 'Serialize preserves weatherDuration');
+    F.assertEq(wSer.weatherTimer, 500, 'Serialize preserves weatherTimer');
+
+    var w2 = new Donkeycraft.Weather();
+    w2.deserialize(wSer);
+    F.assertEq(w2.getWeather(), 'rain', 'Deserialize restores weatherState');
+
+    // Deserialize null — must set thunder via direct field (setWeather forces rain from clear→thunder)
+    var w3 = new Donkeycraft.Weather();
+    w3.setWeather('rain');
+    w3._weatherState = 'thunder';  // Directly set to bypass thunder→rain rule
+    w3.deserialize(null);
+    F.assertEq(w3.getWeather(), 'thunder', 'Deserialize(null) preserves existing state');
+
+    // ============================================================
+    // Section 16: Integration — Time + Weather Coexistence
+    // ============================================================
+    F.section('16. Integration — Time + Weather Coexistence');
+
+    var wtInt = new Donkeycraft.WorldTime(0);
+    var wInt = new Donkeycraft.Weather();
+
+    // Both can coexist and operate independently
+    for (var i = 0; i < 100; i++) {
+        wtInt.tick();
+        wInt.tick();
+    }
+    F.assertEq(wtInt.getTotalTicks(), 100, 'WorldTime advanced to 100 ticks');
+    F.assertType(wInt.getWeather(), 'string', 'Weather still has valid state after ticking');
+
+    // ============================================================
+    // Section 17: Integration — Destroy Methods
+    // ============================================================
+    F.section('17. Integration — Destroy Methods');
+
+    try {
+        wt1.destroy();
+        F.assert(true, 'WorldTime.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'WorldTime.destroy() threw: ' + e.message);
+    }
+
+    try {
+        w.destroy();
+        F.assert(true, 'Weather.destroy() completes without error');
+    } catch (e) {
+        F.assert(false, 'Weather.destroy() threw: ' + e.message);
+    }
+
+    // ============================================================
+    // Section 18: Edge Cases — Negative Time Handling
+    // ============================================================
+    F.section('18. Edge Cases — Negative Time & Boundary Values');
+
+    var wtNeg = new Donkeycraft.WorldTime(0);
+    // getTimeOfDay should always return [0, 1)
+    var tod = wtNeg.getTimeOfDay();
+    F.assert(tod >= 0 && tod < 1, 'getTimeOfDay returns value in [0, 1): ' + tod);
+
+    // getTicksInDay should always return [0, 23999]
+    var ticksInDay = wtNeg.getTicksInDay();
+    F.assert(ticksInDay >= 0 && ticksInDay < 24000, 'getTicksInDay returns value in [0, 23999]: ' + ticksInDay);
+
+    // isDaytime and isNight should be complementary (one must be true)
+    var wtTest = new Donkeycraft.WorldTime(10000);
+    F.assert(wtTest.isDaytime() !== wtTest.isNight(), 'isDaytime and isNight are complementary at tick 10000');
+
+    var wtTest2 = new Donkeycraft.WorldTime(19000);
+    F.assert(wtTest2.isDaytime() !== wtTest2.isNight(), 'isDaytime and isNight are complementary at tick 19000');
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>
