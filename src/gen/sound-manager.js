@@ -35,9 +35,10 @@
 
         /**
          * Generate a block step sound.
-         * @param {AudioContext} ctx
-         * @param {string} material - Material type ("stone", "wood", "sand", etc.).
-         * @returns {AudioBuffer}
+         * @param {AudioContext} ctx - Web Audio API context.
+         * @param {string} [material='stone'] - Material type ("stone", "wood", "sand", etc.).
+         * @returns {AudioBuffer} Procedural noise buffer for footsteps.
+         * @private
          */
         function generateStepSound(ctx, material) {
             var key = 'step:' + (material || 'stone');
@@ -49,9 +50,10 @@
 
         /**
          * Generate a block break sound (crunchy noise).
-         * @param {AudioContext} ctx
-         * @param {string} material
-         * @returns {AudioBuffer}
+         * @param {AudioContext} ctx - Web Audio API context.
+         * @param {string} [material='stone'] - Material type.
+         * @returns {AudioBuffer} Procedural noise buffer for breaking blocks.
+         * @private
          */
         function generateBreakSound(ctx, material) {
             var key = 'break:' + (material || 'stone');
@@ -63,9 +65,10 @@
 
         /**
          * Generate a block place sound (thud).
-         * @param {AudioContext} ctx
-         * @param {string} material
-         * @returns {AudioBuffer}
+         * @param {AudioContext} ctx - Web Audio API context.
+         * @param {string} [material='stone'] - Material type.
+         * @returns {Promise<AudioBuffer>} Procedural thud sound via OfflineAudioContext.
+         * @private
          */
         function generatePlaceSound(ctx, material) {
             var key = 'place:' + (material || 'stone');
@@ -97,9 +100,10 @@
 
         /**
          * Generate a block hit sound (clink).
-         * @param {AudioContext} ctx
-         * @param {string} material
-         * @returns {AudioBuffer}
+         * @param {AudioContext} ctx - Web Audio API context.
+         * @param {string} [material='stone'] - Material type.
+         * @returns {Promise<AudioBuffer>} Procedural clink sound via OfflineAudioContext.
+         * @private
          */
         function generateHitSound(ctx, material) {
             var key = 'hit:' + (material || 'stone');
@@ -129,8 +133,9 @@
 
         /**
          * Generate a footstep sound for walking.
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
+         * @param {AudioContext} ctx - Web Audio API context.
+         * @returns {AudioBuffer} Procedural noise buffer for footsteps.
+         * @private
          */
         function generateFootstepSound(ctx) {
             var key = 'footstep';
@@ -141,20 +146,31 @@
         }
 
         /**
-         * Get or generate a sound by category.
-         * @param {AudioContext} ctx
+         * Get or generate a sound by category. Returns a Promise<AudioBuffer>
+         * regardless of category — synchronous generators are auto-wrapped.
+         * @param {AudioContext} ctx - Web Audio API context.
          * @param {string} category - Sound category ("step", "break", "place", "hit", "footstep").
          * @param {string} [material] - Optional material specifier.
-         * @returns {Promise<AudioBuffer>} Always returns a Promise for consistent API.
+         * @returns {Promise<AudioBuffer>} Always resolves to an AudioBuffer.
          */
         function getSound(ctx, category, material) {
             var result;
             switch (category) {
-                case 'step': result = generateStepSound(ctx, material); break;
-                case 'break': result = generateBreakSound(ctx, material); break;
-                case 'place': result = generatePlaceSound(ctx, material); break;
-                case 'hit': result = generateHitSound(ctx, material); break;
-                case 'footstep': result = generateFootstepSound(ctx); break;
+                case 'step':
+                    result = generateStepSound(ctx, material);
+                    break;
+                case 'break':
+                    result = generateBreakSound(ctx, material);
+                    break;
+                case 'place':
+                    // Returns Promise directly
+                    return generatePlaceSound(ctx, material);
+                case 'hit':
+                    // Returns Promise directly
+                    return generateHitSound(ctx, material);
+                case 'footstep':
+                    result = generateFootstepSound(ctx);
+                    break;
                 default:
                     if (Donkeycraft.Logger) {
                         Donkeycraft.Logger.warn('SoundGenerator', 'Unknown sound category: ' + category);
@@ -166,14 +182,14 @@
 
         /**
          * Get all available sound categories.
-         * @returns {string[]}
+         * @returns {string[]} Array of category name strings.
          */
         function getCategories() {
             return ['step', 'break', 'place', 'hit', 'footstep'];
         }
 
         /**
-         * Clear the sound cache.
+         * Clear the internal sound cache. Call during game reset/shutdown.
          */
         function clearCache() {
             _soundCache = {};

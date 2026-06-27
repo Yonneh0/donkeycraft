@@ -9,8 +9,13 @@
     // Simplex-like noise function (fast 2D/3D)
     // ============================================================
 
+    // ============================================================
+    // Permutation table and noise utilities — shared across all
+    // texture generator modules in src/gen/.
+    // ============================================================
+
     /**
-     * Permutation table for noise functions.
+     * _perm — permutation table for 2D Perlin noise. Initialized with identity mapping, shuffled deterministically by seed.
      * @type {number[]}
      * @private
      */
@@ -20,8 +25,10 @@
     }
 
     /**
-     * Shuffle permutation table deterministically.
-     * @param {number} seed - Seed value.
+     * _shufflePerm — shuffle the permutation table deterministically from a seed.
+     * Uses a Mulberry32-derived mixer to permute indices 0-255, then duplicates
+     * the table to 512 entries for overflow-safe indexing.
+     * @param {number} seed - Numeric seed value.
      * @private
      */
     function _shufflePerm(seed) {
@@ -43,9 +50,9 @@
     }
 
     /**
-     * Fade function for smooth interpolation.
-     * @param {number} t
-     * @returns {number}
+     * _fade — Perlin's quintic fade curve: 6t⁵ − 15t⁴ + 10t³.
+     * @param {number} t - Value in [0, 1].
+     * @returns {number} Smoothed value.
      * @private
      */
     function _fade(t) {
@@ -53,11 +60,11 @@
     }
 
     /**
-     * Linear interpolation.
-     * @param {number} a
-     * @param {number} b
-     * @param {number} t
-     * @returns {number}
+     * _lerp — linear interpolation between a and b by t.
+     * @param {number} a - Start value.
+     * @param {number} b - End value.
+     * @param {number} t - Interpolation factor.
+     * @returns {number} Interpolated result.
      * @private
      */
     function _lerp(a, b, t) {
@@ -65,11 +72,12 @@
     }
 
     /**
-     * Gradient function for noise.
-     * @param {number} hash
-     * @param {number} x
-     * @param {number} y
-     * @returns {number}
+     * _grad — compute the gradient dot product for a given hash and coordinates.
+     * Uses the simplified 2D gradient set from Perlin's improved noise.
+     * @param {number} hash - Hash value from permutation table.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Gradient value.
      * @private
      */
     function _grad(hash, x, y) {
@@ -80,10 +88,11 @@
     }
 
     /**
-     * 2D Perlin noise.
-     * @param {number} x
-     * @param {number} y
-     * @returns {number} Value in [-1, 1].
+     * _noise2D — 2D Perlin noise function. Returns a value in [-1, 1]
+     * based on interpolated gradients at grid corners surrounding (x, y).
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Noise value in [-1, 1].
      * @private
      */
     function _noise2D(x, y) {
@@ -103,19 +112,19 @@
     }
 
     // ============================================================
-    // Mulberry32 PRNG — deterministic pseudo-random number generator
+    // Mulberry32 PRNG — fast, deterministic pseudo-random number generator
     // ============================================================
 
     /**
-     * Internal state for the Mulberry32 PRNG.
+     * _rngState — internal state for the Mulberry32 PRNG. Reset to 42 on first use.
      * @type {number}
      * @private
      */
     var _rngState = 42;
 
     /**
-     * Seed the PRNG with a given value.
-     * @param {number} seed - Seed value.
+     * _seedRng — seed the Mulberry32 PRNG with a given 32-bit integer.
+     * @param {number} seed - Numeric seed value (clamped to 32-bit).
      */
     function _seedRng(seed) {
         _rngState = seed | 0;
@@ -123,8 +132,9 @@
     }
 
     /**
-     * Generate a deterministic pseudo-random number in [0, 1).
-     * @returns {number}
+     * _rng — generate the next deterministic pseudo-random number in [0, 1)
+     * using the Mulberry32 algorithm.
+     * @returns {number} Random value in [0, 1).
      */
     function _rng() {
         var x = _rngState;
@@ -135,13 +145,15 @@
     }
 
     /**
-     * Fractal Brownian Motion for natural-looking texture variation.
-     * @param {number} x
-     * @param {number} y
-     * @param {number} octaves
-     * @param {number} frequency
-     * @param {number} amplitude
-     * @returns {number}
+     * _fbm — Fractal Brownian Motion: sums multiple octaves of 2D Perlin noise
+     * at increasing frequency and decreasing amplitude to produce natural-looking
+     * texture variation (clouds, marble, stone grain, etc.).
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} octaves - Number of noise octaves to sum.
+     * @param {number} frequency - Base frequency multiplier.
+     * @param {number} amplitude - Base amplitude multiplier.
+     * @returns {number} Normalized result in [-1, 1].
      */
     function _fbm(x, y, octaves, frequency, amplitude) {
         var total = 0;
@@ -156,13 +168,14 @@
     }
 
     // ============================================================
-    // Expose noise utilities on a private internal namespace
-    // so all texture generator files can access them without
-    // duplicating state (perm table, rng state).
+    // Expose noise utilities on a private internal namespace so all
+    // texture generator files can access shared state (perm table,
+    // rng state) without duplicating or conflicting with each other.
     // ============================================================
 
     /**
-     * _gen — internal namespace for cross-module noise and PRNG state.
+     * Donkeycraft._gen — internal cross-module namespace for noise and PRNG state.
+     * Not part of the public API. All properties are prefixed with underscore.
      * @namespace
      * @private
      */

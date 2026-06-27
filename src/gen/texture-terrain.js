@@ -52,10 +52,13 @@
 
     /**
      * Generate a dirt texture with noise variation.
+     * @param {number} [seed=12345] - Optional seed for deterministic generation.
      * @returns {HTMLImageElement}
      */
-    function generateDirt() {
-        _shufflePerm(12345);
+    function generateDirt(seed) {
+        var s = seed || 12345;
+        if (_cacheTexture['dirt:' + String(s)]) return _cacheTexture['dirt:' + String(s)];
+        _shufflePerm(s);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
@@ -73,14 +76,17 @@
             }
         }
         ctx.putImageData(imgData, 0, 0);
-        return _canvasToImage(canvas);
+        var result = _canvasToImage(canvas);
+        return _cacheTexture('dirt', String(s), result);
     }
 
     /**
      * Generate grass block top texture (green with noise).
+     * Cached with a fixed key to avoid regeneration on repeated calls.
      * @returns {HTMLImageElement}
      */
     function generateGrassTop() {
+        if (_cacheTexture['grass_top:default']) return _cacheTexture['grass_top:default'];
         _shufflePerm(54321);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
         var ctx = canvas.getContext('2d');
@@ -99,7 +105,8 @@
             }
         }
         ctx.putImageData(imgData, 0, 0);
-        return _canvasToImage(canvas);
+        var result = _canvasToImage(canvas);
+        return _cacheTexture('grass_top', 'default', result);
     }
 
     /**
@@ -107,6 +114,7 @@
      * @returns {HTMLImageElement}
      */
     function generateGrassSide() {
+        if (_cacheTexture['grass_side']) return _cacheTexture['grass_side'];
         _shufflePerm(54321);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
         var ctx = canvas.getContext('2d');
@@ -143,7 +151,8 @@
             }
         }
         ctx.putImageData(imgData, 0, 0);
-        return _canvasToImage(canvas);
+        var result = _canvasToImage(canvas);
+        return _cacheTexture('grass_side', 'default', result);
     }
 
     // ---- Wood family ----
@@ -177,11 +186,13 @@
 
     /**
      * Generate a log top (growth rings) texture.
-     * @param {number} seed
+     * @param {number} [seed=888] - Optional seed for deterministic generation.
      * @returns {HTMLImageElement}
      */
     function generateLogTop(seed) {
-        _shufflePerm(seed || 888);
+        var s = seed || 888;
+        if (_cacheTexture['log_top:' + String(s)]) return _cacheTexture['log_top:' + String(s)];
+        _shufflePerm(s);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#8B7355';
@@ -203,7 +214,8 @@
             imgData.data[i + 2] = Math.max(0, Math.min(255, imgData.data[i + 2] + noise));
         }
         ctx.putImageData(imgData, 0, 0);
-        return _canvasToImage(canvas);
+        var result = _canvasToImage(canvas);
+        return _cacheTexture('log_top', String(s), result);
     }
 
     /**
@@ -671,7 +683,9 @@
     Donkeycraft.TextureGenerator.generatePolishedDiorite = generatePolishedDiorite;
     Donkeycraft.TextureGenerator.generatePolishedAndesite = generatePolishedAndesite;
 
-    // Export generateStone for cross-module use (called from texture-decorative.js getGeneratorForBlock).
-    Donkeycraft.TextureGenerator.generateStone = generateStone;
+    // Aliases for cross-module use.
+    Donkeycraft.TextureGenerator.generateRedSand = function() { return generateSand(183, 105, 63); };
+    Donkeycraft.TextureGenerator.generateSnowBlock = function() { return generateSnow(); };
+    Donkeycraft.TextureGenerator.generateGrass = function() { return generateGrassTop(); };
 
 })();

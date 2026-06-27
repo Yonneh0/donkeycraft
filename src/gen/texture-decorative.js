@@ -20,6 +20,196 @@
     var _canvasToImage = Donkeycraft.TextureGenerator._canvasToImage;
     var TEX_SIZE = 16;
 
+    // Cross-module aliases: import functions from other texture-* modules.
+    // From texture-special.js (loaded before this file)
+    var generatePolished = Donkeycraft.TextureGenerator.generatePolished || null;
+    var generateBedrock = Donkeycraft.TextureGenerator.generateBedrock || null;
+    var generateGlow = Donkeycraft.TextureGenerator.generateGlow || null;
+    var generateBasalt = Donkeycraft.TextureGenerator.generateBasalt || null;
+    var generatePolishedBasalt = Donkeycraft.TextureGenerator.generatePolishedBasalt || null;
+    var generateNetherrack = Donkeycraft.TextureGenerator.generateNetherrack || null;
+    var generateEndStone = Donkeycraft.TextureGenerator.generateEndStone || null;
+    var generatePrismarine = Donkeycraft.TextureGenerator.generatePrismarine || null;
+    var generatePolishedBlackstone = Donkeycraft.TextureGenerator.generatePolishedBlackstone || null;
+    var generateGlowstone = Donkeycraft.TextureGenerator.generateGlowstone || null;
+    var generateShroomlight = Donkeycraft.TextureGenerator.generateShroomlight || null;
+    var generateMagma = Donkeycraft.TextureGenerator.generateMagma || null;
+    var generateSoulSand = Donkeycraft.TextureGenerator.generateSoulSand || null;
+    var generateSoulSoil = Donkeycraft.TextureGenerator.generateSoulSoil || null;
+    var generateAncientDebris = Donkeycraft.TextureGenerator.generateAncientDebris || null;
+    var generateGildedBlackstone = Donkeycraft.TextureGenerator.generateGildedBlackstone || null;
+    var generateWarpedStem = Donkeycraft.TextureGenerator.generateWarpedStem || null;
+    var generateCrimsonStem = Donkeycraft.TextureGenerator.generateCrimsonStem || null;
+    var generateNylium = Donkeycraft.TextureGenerator.generateNylium || null;
+    var generatePurpurBlock = Donkeycraft.TextureGenerator.generatePurpurBlock || null;
+    var generatePurpurPillar = Donkeycraft.TextureGenerator.generatePurpurPillar || null;
+    var generateHayBale = Donkeycraft.TextureGenerator.generateHayBale || null;
+    var generateNetherBrick = Donkeycraft.TextureGenerator.generateNetherBrick || null;
+    var generateRedNetherBrick = Donkeycraft.TextureGenerator.generateRedNetherBrick || null;
+    var generateMossyStoneBrick = Donkeycraft.TextureGenerator.generateMossyStoneBrick || null;
+    // From texture-terrain.js (loaded before this file)
+    var generatePolishedGranite = Donkeycraft.TextureGenerator.generatePolishedGranite || null;
+    var generatePolishedDiorite = Donkeycraft.TextureGenerator.generatePolishedDiorite || null;
+    var generatePolishedAndesite = Donkeycraft.TextureGenerator.generatePolishedAndesite || null;
+    var generateSmoothStone = Donkeycraft.TextureGenerator.generateSmoothStone || null;
+    var generateDeepslate = Donkeycraft.TextureGenerator.generateDeepslate || null;
+    var generateCobbledDeepslate = Donkeycraft.TextureGenerator.generateCobbledDeepslate || null;
+    var generatePolishedDeepslate = Donkeycraft.TextureGenerator.generatePolishedDeepslate || null;
+    var generateStone = Donkeycraft.TextureGenerator.generateStone || null;
+    var generateDirt = Donkeycraft.TextureGenerator.generateDirt || null;
+    var generateGrassTop = Donkeycraft.TextureGenerator.generateGrassTop || null;
+    var generateGrassSide = Donkeycraft.TextureGenerator.generateGrassSide || null;
+    var generateLogSide = Donkeycraft.TextureGenerator.generateLogSide || null;
+    var generateWood = Donkeycraft.TextureGenerator.generateWood || null;
+    var generatePlanks = Donkeycraft.TextureGenerator.generatePlanks || null;
+    var generateBricks = Donkeycraft.TextureGenerator.generateBricks || null;
+    var generateSand = Donkeycraft.TextureGenerator.generateSand || null;
+    var generateSandstone = Donkeycraft.TextureGenerator.generateSandstone || null;
+    var generateChiseledSandstone = Donkeycraft.TextureGenerator.generateChiseledSandstone || null;
+    var generateCutSandstone = Donkeycraft.TextureGenerator.generateCutSandstone || null;
+    var generateOre = Donkeycraft.TextureGenerator.generateOre || null;
+    var generateCoalOre = Donkeycraft.TextureGenerator.generateCoalOre || null;
+    var generateIronOre = Donkeycraft.TextureGenerator.generateIronOre || null;
+    var generateGoldOre = Donkeycraft.TextureGenerator.generateGoldOre || null;
+    var generateDiamondOre = Donkeycraft.TextureGenerator.generateDiamondOre || null;
+    var generateEmeraldOre = Donkeycraft.TextureGenerator.generateEmeraldOre || null;
+    var generateRedstoneOre = Donkeycraft.TextureGenerator.generateRedstoneOre || null;
+    var generateLitRedstoneOre = Donkeycraft.TextureGenerator.generateLitRedstoneOre || null;
+    var generateLapisOre = Donkeycraft.TextureGenerator.generateLapisOre || null;
+    var generateNetherQuartzOre = Donkeycraft.TextureGenerator.generateNetherQuartzOre || null;
+    var generateNetherGoldOre = Donkeycraft.TextureGenerator.generateNetherGoldOre || null;
+    var generateGlass = Donkeycraft.TextureGenerator.generateGlass || null;
+    var generateIce = Donkeycraft.TextureGenerator.generateIce || null;
+    var generateBlueIce = Donkeycraft.TextureGenerator.generateBlueIce || null;
+    var generateSnow = Donkeycraft.TextureGenerator.generateSnow || null;
+    var generateWool = Donkeycraft.TextureGenerator.generateWool || null;
+    var generateConcrete = Donkeycraft.TextureGenerator.generateConcrete || null;
+    var generateConcretePowder = Donkeycraft.TextureGenerator.generateConcretePowder || null;
+    var generateTerracotta = Donkeycraft.TextureGenerator.generateTerracotta || null;
+    var generateSponge = Donkeycraft.TextureGenerator.generateSponge || null;
+    var generateWetSponge = Donkeycraft.TextureGenerator.generateWetSponge || null;
+    var generateSlime = Donkeycraft.TextureGenerator.generateSlime || null;
+    var generateHoney = Donkeycraft.TextureGenerator.generateHoney || null;
+    var generateQuartzPillar = Donkeycraft.TextureGenerator.generateQuartzPillar || null;
+    var generateQuartzBlock = Donkeycraft.TextureGenerator.generateQuartzBlock || null;
+    var generateChiseledQuartz = Donkeycraft.TextureGenerator.generateChiseledQuartz || null;
+    var generateQuartzBricks = Donkeycraft.TextureGenerator.generateQuartzBricks || null;
+    var generateGoldBlock = Donkeycraft.TextureGenerator.generateGoldBlock || null;
+    var generateIronBlock = Donkeycraft.TextureGenerator.generateIronBlock || null;
+    var generateDiamondBlock = Donkeycraft.TextureGenerator.generateDiamondBlock || null;
+    var generateEmeraldBlock = Donkeycraft.TextureGenerator.generateEmeraldBlock || null;
+    var generateCoalBlock = Donkeycraft.TextureGenerator.generateCoalBlock || null;
+    var generateRedstoneBlock = Donkeycraft.TextureGenerator.generateRedstoneBlock || null;
+    var generateLapisBlock = Donkeycraft.TextureGenerator.generateLapisBlock || null;
+
+    // ============================================================
+    // Helper functions needed by getGeneratorForBlock
+    // ============================================================
+
+    /**
+     * Generate red sand texture.
+     * @returns {HTMLImageElement}
+     */
+    function generateRedSand() {
+        return generateSand(183, 105, 63);
+    }
+
+    /**
+     * Generate a snow block texture (solid white with slight noise).
+     * @returns {HTMLImageElement}
+     */
+    function generateSnowBlock() {
+        return generateSnow();
+    }
+
+    // Functions defined locally in this file
+
+    /**
+     * Generate a warped planks texture (teal/green with subtle vertical lines).
+     * @returns {HTMLImageElement}
+     */
+    function generateWarpedPlanks() {
+        _seedRng(2222);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        for (var py = 0; py < TEX_SIZE; py++) {
+            for (var px = 0; px < TEX_SIZE; px++) {
+                var plankX = px % 4;
+                var n = _fbm(px * 0.1, py * 0.1, 2, 1.0, 1.0);
+                var variation = plankX === 0 ? -8 : 0;
+                var cr = Math.max(0, Math.min(255, 60 + variation + n * 10));
+                var cg = Math.max(0, Math.min(255, 160 + variation + n * 15));
+                var cb = Math.max(0, Math.min(255, 155 + variation + n * 12));
+                ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+                ctx.fillRect(px, py, 1, 1);
+            }
+        }
+        return _canvasToImage(canvas);
+    }
+
+    /**
+     * Generate a crimson planks texture (deep red with subtle vertical lines).
+     * @returns {HTMLImageElement}
+     */
+    function generateCrimsonPlanks() {
+        _seedRng(3333);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        for (var py = 0; py < TEX_SIZE; py++) {
+            for (var px = 0; px < TEX_SIZE; px++) {
+                var plankX = px % 4;
+                var n = _fbm(px * 0.1, py * 0.1, 2, 1.0, 1.0);
+                var variation = plankX === 0 ? -8 : 0;
+                var cr = Math.max(0, Math.min(255, 160 + variation + n * 15));
+                var cg = Math.max(0, Math.min(255, 45 + variation + n * 10));
+                var cb = Math.max(0, Math.min(255, 45 + variation + n * 8));
+                ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+                ctx.fillRect(px, py, 1, 1);
+            }
+        }
+        return _canvasToImage(canvas);
+    }
+
+    /**
+     * Generate a cherry wood texture with seeded noise variation.
+     * @returns {HTMLImageElement}
+     */
+    function generateCherryWood() {
+        _seedRng(42);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+        for (var y = 0; y < TEX_SIZE; y++) {
+            for (var x = 0; x < TEX_SIZE; x++) {
+                var n = (_rng() - 0.5) * 15;
+                var idx = (y * TEX_SIZE + x) * 4;
+                imgData.data[idx]     = 180 + n;
+                imgData.data[idx + 1] = 120 + n;
+                imgData.data[idx + 2] = 120 + n;
+                imgData.data[idx + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return _canvasToImage(canvas);
+    }
+
+    /**
+     * Generate a chain texture.
+     * @returns {HTMLImageElement}
+     */
+    function generateChain() {
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#888888';
+        ctx.fillRect(6, 0, 4, 5);
+        ctx.fillRect(6, 7, 4, 5);
+        ctx.fillRect(6, 14, 4, 2);
+        ctx.fillStyle = '#AAAAAA';
+        ctx.fillRect(7, 1, 2, 3);
+        ctx.fillRect(7, 8, 2, 3);
+        return _canvasToImage(canvas);
+    }
+
     // ============================================================
     // Decorative / Plant Textures
     // ============================================================
@@ -138,29 +328,6 @@
                 ctx.fillRect(book * 3 + 1, row * 7 + 2, 2, 5);
             }
         }
-        return _canvasToImage(canvas);
-    }
-
-    /**
-     * Generate a netherrack texture.
-     * @returns {HTMLImageElement}
-     */
-    function generateNetherrack() {
-        _shufflePerm(6666);
-        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-        var ctx = canvas.getContext('2d');
-        var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-        for (var y = 0; y < TEX_SIZE; y++) {
-            for (var x = 0; x < TEX_SIZE; x++) {
-                var n = _fbm(x * 0.15, y * 0.15, 4, 1.0, 1.0);
-                var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 140 + n * 40;
-                imgData.data[idx + 1] = 60 + n * 25;
-                imgData.data[idx + 2] = 60 + n * 20;
-                imgData.data[idx + 3] = 255;
-            }
-        }
-        ctx.putImageData(imgData, 0, 0);
         return _canvasToImage(canvas);
     }
 
@@ -1213,7 +1380,7 @@
     function getGeneratorForBlock(blockName) {
         var generators = {
             // Stone family
-            'stone': function() { return generateStone(42); },
+            'stone': function() { return Donkeycraft.TextureGenerator.generateStone(42); },
             'granite': function() { return generatePolished(170, 130, 120); },
             'diorite': function() { return generatePolished(200, 195, 190); },
             'andesite': function() { return generatePolished(130, 135, 140); },
@@ -1226,7 +1393,7 @@
             'polished_deepslate': function() { return generatePolishedDeepslate(); },
             'dirt': function() { return generateDirt(); },
             'grass_block': function() { return generateGrassSide(); },
-            'gravel': function() { return generateStone(777); },
+            'gravel': function() { return Donkeycraft.TextureGenerator.generateStone(777); },
             // Ores
             'coal_ore': function() { return generateCoalOre(); },
             'iron_ore': function() { return generateIronOre(); },
@@ -1239,7 +1406,7 @@
             'nether_quartz_ore': function() { return generateNetherQuartzOre(); },
             'nether_gold_ore': function() { return generateNetherGoldOre(); },
             // Special blocks
-            'obsidian': function() { return generateStone(999); },
+            'obsidian': function() { return Donkeycraft.TextureGenerator.generateStone(999); },
             'crying_obsidian': function() { return generateGlow(80, 20, 140); },
             'bedrock': function() { return generateBedrock(); },
             // Sand variants
@@ -1585,8 +1752,8 @@
             'melons': function() { return generateMelon(); },
             'pumpkin': function() { return generatePumpkin(); },
             'hay_block': function() { return generateHayBale(); },
-            'cobblestone': function() { return generateStone(42); },
-            'default': function() { return generateStone(0); }
+            'cobblestone': function() { return Donkeycraft.TextureGenerator.generateStone(42); },
+            'default': function() { return Donkeycraft.TextureGenerator.generateStone(0); }
         };
 
         return generators[blockName] || null;
@@ -1681,5 +1848,71 @@
     Donkeycraft.TextureGenerator.generateLava = generateLava;
     Donkeycraft.TextureGenerator.generateLeaves = generateLeaves;
     Donkeycraft.TextureGenerator.generateMissing = generateMissing;
+    Donkeycraft.TextureGenerator.generateWarpedPlanks = generateWarpedPlanks;
+    Donkeycraft.TextureGenerator.generateCrimsonPlanks = generateCrimsonPlanks;
+
+    // Export all locally-defined decorative generators for external access.
+    Donkeycraft.TextureGenerator.generateChain = generateChain;
+    Donkeycraft.TextureGenerator.generateCherryWood = generateCherryWood;
+    Donkeycraft.TextureGenerator.generateCactus = generateCactus;
+    Donkeycraft.TextureGenerator.generateSugarCane = generateSugarCane;
+    Donkeycraft.TextureGenerator.generateReeds = generateReeds;
+    Donkeycraft.TextureGenerator.generateTallGrass = generateTallGrass;
+    Donkeycraft.TextureGenerator.generateFern = generateFern;
+    Donkeycraft.TextureGenerator.generateFlower = generateFlower;
+    Donkeycraft.TextureGenerator.generateRoseBush = generateRoseBush;
+    Donkeycraft.TextureGenerator.generateSunflower = generateSunflower;
+    Donkeycraft.TextureGenerator.generateLilyPad = generateLilyPad;
+    Donkeycraft.TextureGenerator.generateDeadBush = generateDeadBush;
+    Donkeycraft.TextureGenerator.generateVine = generateVine;
+    Donkeycraft.TextureGenerator.generateCaveVines = generateCaveVines;
+    Donkeycraft.TextureGenerator.generateCocoa = generateCocoa;
+    Donkeycraft.TextureGenerator.generateMelon = generateMelon;
+    Donkeycraft.TextureGenerator.generatePumpkin = generatePumpkin;
+    Donkeycraft.TextureGenerator.generateMushroom = generateMushroom;
+    Donkeycraft.TextureGenerator.generateChorusPlant = generateChorusPlant;
+    Donkeycraft.TextureGenerator.generateTNTSide = generateTNTSide;
+    Donkeycraft.TextureGenerator.generateChestSide = generateChestSide;
+    Donkeycraft.TextureGenerator.generateFurnaceFront = generateFurnaceFront;
+    Donkeycraft.TextureGenerator.generateCraftingTable = generateCraftingTable;
+    Donkeycraft.TextureGenerator.generateBookshelf = generateBookshelf;
+    Donkeycraft.TextureGenerator.generatePistonSide = generatePistonSide;
+    Donkeycraft.TextureGenerator.generateDispenser = generateDispenser;
+    Donkeycraft.TextureGenerator.generateObserver = generateObserver;
+    Donkeycraft.TextureGenerator.generateRepeater = generateRepeater;
+    Donkeycraft.TextureGenerator.generateLever = generateLever;
+    Donkeycraft.TextureGenerator.generateButton = generateButton;
+    Donkeycraft.TextureGenerator.generatePressurePlate = generatePressurePlate;
+    Donkeycraft.TextureGenerator.generateDoor = generateDoor;
+    Donkeycraft.TextureGenerator.generateFence = generateFence;
+    Donkeycraft.TextureGenerator.generateWall = generateWall;
+    Donkeycraft.TextureGenerator.generateEndRod = generateEndRod;
+    Donkeycraft.TextureGenerator.generateRedstoneTorch = generateRedstoneTorch;
+    Donkeycraft.TextureGenerator.generateBed = generateBed;
+    Donkeycraft.TextureGenerator.generateSign = generateSign;
+    Donkeycraft.TextureGenerator.generateMirror = generateMirror;
+    Donkeycraft.TextureGenerator.generateBrewingStand = generateBrewingStand;
+    Donkeycraft.TextureGenerator.generateCauldron = generateCauldron;
+    Donkeycraft.TextureGenerator.generatePainting = generatePainting;
+    Donkeycraft.TextureGenerator.generateMobSpawner = generateMobSpawner;
+    Donkeycraft.TextureGenerator.generateRespawnAnchor = generateRespawnAnchor;
+    Donkeycraft.TextureGenerator.generateEndPortal = generateEndPortal;
+    Donkeycraft.TextureGenerator.generateNetherPortal = generateNetherPortal;
+    Donkeycraft.TextureGenerator.generateChiseledBookshelf = generateChiseledBookshelf;
+    Donkeycraft.TextureGenerator.generateLectern = generateLectern;
+    Donkeycraft.TextureGenerator.generateSmoker = generateSmoker;
+    Donkeycraft.TextureGenerator.generateBlastFurnace = generateBlastFurnace;
+    Donkeycraft.TextureGenerator.generateJigsaw = generateJigsaw;
+    Donkeycraft.TextureGenerator.generateComposter = generateComposter;
+    Donkeycraft.TextureGenerator.generateLantern = generateLantern;
+    Donkeycraft.TextureGenerator.generateSoulLantern = generateSoulLantern;
+    Donkeycraft.TextureGenerator.generateSculkSensor = generateSculkSensor;
+    Donkeycraft.TextureGenerator.generateEndPortalFrame = generateEndPortalFrame;
+    Donkeycraft.TextureGenerator.generateNoteBlock = generateNoteBlock;
+    Donkeycraft.TextureGenerator.generateRedstoneLamp = generateRedstoneLamp;
+
+    // Cross-module aliases for terrain functions.
+    // These are defined in texture-terrain.js but re-exported here for convenience.
+    Donkeycraft.TextureGenerator.generateGrass = generateGrass;
 
 })();

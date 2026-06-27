@@ -100,7 +100,8 @@
     }
 
     /**
-     * Clear the internal texture cache.
+     * clearTextureCache — clear the internal texture cache.
+     * Call during game reset/shutdown to free memory.
      */
     function clearTextureCache() {
         _textureCache = {};
@@ -126,5 +127,8 @@
     Donkeycraft.TextureGenerator.clearTextureCache = clearTextureCache;
     Donkeycraft.TextureGenerator._canvasToImage = _canvasToImage;
     Donkeycraft.TextureGenerator.COLOR_MAP = COLOR_MAP;
+
+    // Export TEX_SIZE constant for use by other modules.
+    Donkeycraft.TextureGenerator.TEX_SIZE = TEX_SIZE;
 
 })();

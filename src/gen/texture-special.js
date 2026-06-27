@@ -332,6 +332,56 @@
         return _canvasToImage(canvas);
     }
 
+    // ---- Blackstone family ----
+
+    /**
+     * Generate a polished blackstone texture (smooth dark stone with subtle noise).
+     * @returns {HTMLImageElement}
+     */
+    function generatePolishedBlackstone() {
+        _seedRng(7777);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+        for (var y = 0; y < TEX_SIZE; y++) {
+            for (var x = 0; x < TEX_SIZE; x++) {
+                var n = (_rng() - 0.5) * 8;
+                var idx = (y * TEX_SIZE + x) * 4;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 35 + n));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 32 + n));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 36 + n));
+                imgData.data[idx + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return _canvasToImage(canvas);
+    }
+
+    // ---- Netherrack ----
+
+    /**
+     * Generate a netherrack texture.
+     * @returns {HTMLImageElement}
+     */
+    function generateNetherrack() {
+        _shufflePerm(6666);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+        for (var y = 0; y < TEX_SIZE; y++) {
+            for (var x = 0; x < TEX_SIZE; x++) {
+                var n = _fbm(x * 0.15, y * 0.15, 4, 1.0, 1.0);
+                var idx = (y * TEX_SIZE + x) * 4;
+                imgData.data[idx]     = 140 + n * 40;
+                imgData.data[idx + 1] = 60 + n * 25;
+                imgData.data[idx + 2] = 60 + n * 20;
+                imgData.data[idx + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return _canvasToImage(canvas);
+    }
+
     // ---- Nether special blocks ----
 
     /**
@@ -642,6 +692,7 @@
     Donkeycraft.TextureGenerator.generatePolishedBasalt = generatePolishedBasalt;
     Donkeycraft.TextureGenerator.generateSlime = generateSlime;
     Donkeycraft.TextureGenerator.generateHoney = generateHoney;
+    Donkeycraft.TextureGenerator.generatePolishedBlackstone = generatePolishedBlackstone;
     Donkeycraft.TextureGenerator.generatePrismarine = generatePrismarine;
     Donkeycraft.TextureGenerator.generateWarpedStem = generateWarpedStem;
     Donkeycraft.TextureGenerator.generateCrimsonStem = generateCrimsonStem;
@@ -654,6 +705,7 @@
     Donkeycraft.TextureGenerator.generateAncientDebris = generateAncientDebris;
     Donkeycraft.TextureGenerator.generateGildedBlackstone = generateGildedBlackstone;
     Donkeycraft.TextureGenerator.generateEndStone = generateEndStone;
+    Donkeycraft.TextureGenerator.generateNetherrack = generateNetherrack;
     Donkeycraft.TextureGenerator.generatePurpurBlock = generatePurpurBlock;
     Donkeycraft.TextureGenerator.generatePurpurPillar = generatePurpurPillar;
     Donkeycraft.TextureGenerator.generateHayBale = generateHayBale;
