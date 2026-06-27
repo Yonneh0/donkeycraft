@@ -15,48 +15,74 @@
 </head>
 <body>
 <h1>Donkeycraft — Test Suite</h1>
-<div class="subtitle">Functional tests for each module. Click a test to open it in your browser.</div>
+<div class="subtitle">Functional tests for each module group. Click a test to open it in your browser. Entries follow PLAN.md's dependency order.</div>
 <div class="category">
+
     <a href="core-infrastructure-test.html" class="test-link">
-        <div class="title">Core Infrastructure</div>
-        <div class="desc">Comprehensive functional tests for all 9 core infrastructure modules: namespace, eventbus, config, logger, timer, input, math-utils, audio, init-sequence</div>
+        <div class="title">1. Core Infrastructure</div>
+        <div class="desc">Tests for all 9 core modules (~2,308 lines): namespace, EventBus, config, logger, timer, input, math-utils, audio, init-sequence — including event routing, delta-time accumulation, Perlin noise, strict-mode compliance, and IIFE namespace isolation</div>
     </a>
-    <a href="world-generation-test.html" class="test-link">
-        <div class="title">World Generation & Management</div>
-        <div class="desc">Comprehensive functional tests for all 16 world generation modules: biomes, chunks, terrain, ores, caves, water, surface, lighting, physics, dimensions, portals, nether/end generators, time, and utilities</div>
+
+    <a href="asset-generator-test.html" class="test-link">
+        <div class="title">2. Asset Generation</div>
+        <div class="desc">Tests for the asset generator module (~4,732 lines): procedural texture generation using Simplex noise for 285+ block types, procedural sound generation via Web Audio API across 13 categories, and texture atlas canvas assembly</div>
     </a>
+
+    <a href="rendering-test.html" class="test-link">
+        <div class="title">3. WebGL Rendering Engine</div>
+        <div class="desc">Tests for all 15 rendering modules (~3,404 lines): GL context creation, shader compilation, geometry builder, mesh optimizer, chunk mesh, terrain renderer, camera, fog, sky, lighting, hand renderer, break particles, GUI renderer, weather system — covering WebGL 1.0 constraints and batched draw calls</div>
+    </a>
+
     <a href="block-system-test.html" class="test-link">
-        <div class="title">Block System</div>
-        <div class="desc">Comprehensive functional tests for all 5 block system modules: Block, BlockTypes, BlockState, BlockModels, RecipeRegistry — including cross-module integration and edge cases</div>
+        <div class="title">4. Block System</div>
+        <div class="desc">Tests for all 6 block modules (~2,436 lines): Block definitions (257 vanilla blocks with hardness/blast resistance/drop), BlockState variants, BlockTypes classification, TextureAtlas UV mapping, BlockModels with AO data, RecipeRegistry with crafting/furnace/shapeless matching — including cross-module integration</div>
     </a>
+
+    <a href="world-generation-test.html" class="test-link">
+        <div class="title">5. World Generation & Management</div>
+        <div class="desc">Tests for all 17 world modules (~4,323 lines): Chunk data structures (16×256×16), ChunkManager radius tracking, biome definitions, terrain generation via Perlin noise, ore distribution, 3D cave generation, water placement, surface layer per biome, lighting engine BFS flood-fill, physics (gravity blocks, liquid flow), dimension system (Overworld/Nether/End), portal detection, nether/end generators, world time (24000-tick day cycle), and utilities</div>
+    </a>
+
     <a href="player-system-test.html" class="test-link">
-        <div class="title">Player System</div>
-        <div class="desc">Comprehensive functional tests for all 10 player system modules: Player, Movement, Collision, Jumping, Flying, HurtBox, GameMode, Stats, Hunger, Experience</div>
+        <div class="title">6. Player System</div>
+        <div class="desc">Tests for all 10 player modules (~2,664 lines): Player entity (position, velocity, dimensions 1.8×0.6), Movement physics (walking/sprinting/swimming/flying), AABB collision detection & response, Jump mechanics with cooldown, Creative/Spectator flying, HurtBox damage/knockback/fall-damage, GameMode (Survival/Creative/Spectator), Stats tracking, Hunger system (food/saturation/starvation), Experience/XP levels</div>
     </a>
-    <a href="storage-test.html" class="test-link">
-        <div class="title">Storage System</div>
-        <div class="desc">Comprehensive functional tests for WorldStore, LevelData (with auto-save), and AssetCache modules — including config constants, chunk normalization, serialization, and quota handling</div>
-    </a>
+
     <a href="interaction-system-test.html" class="test-link">
-        <div class="title">Interaction System</div>
-        <div class="desc">Comprehensive functional tests for all 4 interaction modules: Raycast (DDA voxel traversal), BlockAction (breaking mechanics, tool multipliers), BlockPlacement (collision validation, face normal placement), InteractableBlocks (doors, levers, buttons, chests, furnaces)</div>
+        <div class="title">7. Interaction System</div>
+        <div class="desc">Tests for all 4 interaction modules (~1,283 lines): DDA voxel raycasting with hit detection and face normal, BlockAction breaking mechanics with tool speed multipliers and drop spawning, BlockPlacement with face normal handling and player AABB collision, InteractableBlocks right-click interactions (doors, chests, furnaces, levers, buttons, dispensers)</div>
     </a>
-    <a href="game-systems-test.html" class="test-link">
-        <div class="title">Game Systems</div>
-        <div class="desc">Comprehensive functional tests for all 3 game system modules: EnchantmentRegistry (26+ enchantments, compatibility rules), PotionRegistry (40 potions, 18 effects, brewing recipes), ActivePotionManager (entity effect lifecycle), ToolRegistry (7 material tiers, break time, correct-for-drop)</div>
-    </a>
-    <a href="redstone-test.html" class="test-link">
-        <div class="title">Redstone System</div>
-        <div class="desc">Comprehensive functional tests for all 6 redstone modules: RedstoneEngine (tick scheduling, dirty queue), Wiring (signal propagation), Repeater/Comparator (delays, modes), Observers (facing, emit), Pistons (push chains, crush detection), TNT (fuse, explosions)</div>
-    </a>
+
     <a href="inventory-gui-test.html" class="test-link">
-        <div class="title">Inventory & GUI System</div>
-        <div class="desc">Comprehensive functional tests for all 13 Inventory & GUI modules: ItemStack, Inventory, GuiManager, Hotbar, CraftingGrid, CreativeInventory, FurnaceUI, ChestUI, AnvilUI, EnchantingUI, DebugOverlay, GuiElements (DragDrop, Button, TabNavigator, TextInput), LoadingScreen</div>
+        <div class="title">8. Inventory & GUI System</div>
+        <div class="desc">Tests for all 13 UI modules (~4,175 lines): ItemStack (count, NBT tags, stacking), Inventory (slots, drag state, shift-click), GuiManager (modal stacking, keyboard/mouse routing), Hotbar (slot rendering, number keys 1-9, scroll wheel), CraftingGrid (3×3 + output matching), CreativeInventory (6 tabs, search by name/ID), FurnaceUI (input/fuel/output/progress), ChestUI (27/54 slots), AnvilUI (rename/repair/enchant), EnchantingUI (random options, level cost), DebugOverlay (F3 screen), GuiElements (drag-drop, tabs, buttons, text input), LoadingScreen (progress bar, rotating tips)</div>
     </a>
+
+    <a href="entity-mob-test.html" class="test-link">
+        <div class="title">9. Entity & Mob System</div>
+        <div class="desc">Tests for all 9 entity modules (~2,779 lines): Entity base class (position, velocity, health, bounding box, serialization), EntityManager (spawn/despawn/tick/by-type queries), PassiveMobs (cow/pig/sheep/chicken — wander/flee/item drops), HostileMobs (zombie/skeleton/spider/creeper/enderman — chase/attack/explode), BossMobs (Ender Dragon/Wither — phases/attacks/death animation), MobAI (A* pathfinding, line-of-sight, chase/flee/wander), Projectiles (arrows/snowballs/ender pearls/dragon breath — gravity/impact), Animals (breeding/babies/leads/food), MobSpawning (chunk/light/biome checks, mob caps)</div>
+    </a>
+
+    <a href="redstone-test.html" class="test-link">
+        <div class="title">10. Redstone System</div>
+        <div class="desc">Tests for all 6 redstone modules (~2,177 lines): RedstoneEngine tick scheduling and dirty queue, Wiring signal propagation with branching and torch states (strength 0–15), Repeater/Comparator (delays 1–4 ticks, compare/difference modes), Observers (facing detection, 1-tick pulse, cooldown), Pistons & sticky pistons (push chains up to 12 blocks, pull, crush detection), TNT (40-tick fuse, radius-8 explosions, blast resistance)</div>
+    </a>
+
+    <a href="game-systems-test.html" class="test-link">
+        <div class="title">11. Game Systems</div>
+        <div class="desc">Tests for all 3 game system modules (~1,267 lines): EnchantmentRegistry (26+ vanilla enchantments, compatibility rules, application logic), PotionRegistry (40 potions, 18 effects, brewing recipes), ActivePotionManager (entity effect lifecycle), ToolRegistry (7 material tiers, speed multipliers, correct-for-drop detection, durability)</div>
+    </a>
+
+    <a href="storage-test.html" class="test-link">
+        <div class="title">12. Storage System</div>
+        <div class="desc">Tests for all 3 storage modules (~1,530 lines): WorldStore (IndexedDB save/load, dirty chunk batching, quota handling, chunk format normalization), LevelData (spawn position, game mode, time, seed, player data, validation, auto-save with WorldStore integration), AssetCache (IndexedDB persistent caching for texture atlases and sounds, quota management)</div>
+    </a>
+
     <a href="game-system-test.html" class="test-link">
-        <div class="title">Game System (Main Entry Point)</div>
-        <div class="desc">Comprehensive functional tests for Donkeycraft.Game: constructor, state transitions, movement, flying, interaction cooldowns, block overlap detection, hotbar selection, time of day, canvas resize, destroy cleanup, block retrieval, event bus, pointer lock, camera sync</div>
+        <div class="title">13. Game System (Main Entry Point)</div>
+        <div class="desc">Tests for Donkeycraft.Game (~1,195 lines): constructor, state transitions (init → running → paused), movement controls, flying mechanics, interaction cooldowns, block overlap detection, hotbar selection, time of day sync, canvas resize handling, destroy cleanup, block retrieval, EventBus integration, pointer lock, camera-player synchronization</div>
     </a>
+
 </div>
 
 <script>
