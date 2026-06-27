@@ -512,7 +512,7 @@
      * Start periodic auto-save to WorldStore.
      * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance for persistence.
      * @param {string} worldName — World name identifier.
-     * @param {number} [intervalMs=60000] — Auto-save interval in milliseconds.
+     * @param {number} [intervalMs] — Auto-save interval in milliseconds. Defaults to Config.LEVEL_DATA_AUTO_SAVE_INTERVAL or Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL.
      */
     Donkeycraft.LevelData.prototype.startAutoSave = function(worldStore, worldName, intervalMs) {
         if (!worldStore || !worldName) {
@@ -521,7 +521,12 @@
 
         this._worldStore = worldStore;
         this._worldNameRef = worldName;
-        this._autoSaveInterval = intervalMs || Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
+        // Priority: passed intervalMs > Config.LEVEL_DATA_AUTO_SAVE_INTERVAL > DEFAULT_AUTO_SAVE_INTERVAL
+        var defaultInterval = Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
+        if (Donkeycraft.Config && Donkeycraft.Config.LEVEL_DATA_AUTO_SAVE_INTERVAL) {
+            defaultInterval = Donkeycraft.Config.LEVEL_DATA_AUTO_SAVE_INTERVAL;
+        }
+        this._autoSaveInterval = intervalMs || defaultInterval;
         this._autoSaveEnabled = true;
         this._autoSaveTimer = 0;
     };
@@ -566,32 +571,43 @@
 
     /**
      * Persist current level data to WorldStore immediately.
-     * Saves both level data and triggers dirty chunk save.
+     * Loads existing world data first to preserve chunks, then merges updated level data.
+     * Also triggers dirty chunk save via WorldStore.saveDirtyChunks().
      * @returns {Promise<boolean>} True if persistence succeeded.
      */
     Donkeycraft.LevelData.prototype.persistToStore = function() {
+        var self = this;
         if (!this._worldStore || !this._worldNameRef) {
             return Promise.resolve(false);
         }
 
         this.markSaved();
 
-        var levelData = this.serialize();
-        var self = this;
+        // Load existing world data to preserve chunks before overwriting
+        return this._worldStore.loadWorld(this._worldNameRef).then(function(worldData) {
+            var levelData = self.serialize();
+            var existingChunks = [];
 
-        return this._worldStore.saveWorld(this._worldNameRef, levelData, []).then(function(success) {
-            if (!success) {
-                return false;
+            // Preserve existing chunks if world exists
+            if (worldData && worldData.chunks) {
+                existingChunks = worldData.chunks;
             }
-            // Also save dirty chunks if available
-            if (self._worldStore.saveDirtyChunks) {
-                return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function(count) {
-                    return true;
-                }).catch(function() {
-                    return true; // Level data saved even if chunks failed
-                });
-            }
-            return true;
+
+            // Save merged data: updated level + preserved chunks
+            return self._worldStore.saveWorld(self._worldNameRef, levelData, existingChunks).then(function(saveSuccess) {
+                if (!saveSuccess) {
+                    return false;
+                }
+                // Also save dirty chunks if available
+                if (self._worldStore.saveDirtyChunks) {
+                    return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function() {
+                        return true;
+                    }).catch(function() {
+                        return true; // Level data saved even if chunks failed
+                    });
+                }
+                return true;
+            });
         });
     };
 

@@ -105,6 +105,7 @@
     /**
      * _normalizeChunks — normalize chunk data to internal format.
      * Handles both old format ({ cx, cz, blockData, skyLight, blockLight }) and new format ({ cx, cz, data: { blockData, skyLight, blockLight } }).
+     * Logs warnings for skipped invalid entries to aid debugging data corruption.
      * @private
      * @param {Array} chunks — Raw chunk array from storage.
      * @returns {Array} Normalized chunk array.
@@ -131,8 +132,10 @@
                         blockLight: c.blockLight || 0
                     }
                 });
+            } else {
+                // Skip invalid entries with warning
+                Donkeycraft.Logger.warn('WorldStore', 'Skipping invalid chunk entry at index ' + i + ': ' + JSON.stringify(c).substring(0, 120));
             }
-            // Skip invalid entries
         }
         return normalized;
     };
@@ -407,7 +410,7 @@
     /**
      * Save all dirty chunks from the chunk manager in batches.
      * Uses Config.CHUNKS_PER_SAVE for batch size to avoid blocking the main thread.
-     * Properly serializes full blockData arrays and light data.
+     * Properly serializes full blockData, skyLight, and blockLight Uint8Array/Uint16Array data.
      * @param {string} worldName — World name.
      * @returns {Promise<number>} Number of chunks saved.
      */
@@ -424,34 +427,77 @@
             return Promise.resolve(0);
         }
 
+        // Filter to only truly dirty chunks
+        var dirtyList = [];
+        for (var i = 0; i < dirtyChunks.length; i++) {
+            if (dirtyChunks[i] && dirtyChunks[i].isDirty()) {
+                dirtyList.push(dirtyChunks[i]);
+            }
+        }
+
+        if (dirtyList.length === 0) {
+            return Promise.resolve(0);
+        }
+
         // Save in batches to avoid blocking the main thread
         var totalSaved = 0;
         var batchIndex = 0;
 
+        /**
+         * serializeChunkData — extract serializable data from a chunk.
+         * Copies TypedArray data into plain arrays for safe JSON serialization.
+         * @private
+         * @param {Donkeycraft.Chunk} chunk — Chunk instance.
+         * @returns {{blockData: number[], skyLight: number[], blockLight: number[]}} Serialized chunk data.
+         */
+        var serializeChunkData = function(chunk) {
+            var blockDataArr = null;
+            var skyLightArr = null;
+            var blockLightArr = null;
+
+            if (chunk.blocks && chunk.blocks instanceof Uint16Array) {
+                blockDataArr = Array.prototype.slice.call(chunk.blocks);
+            } else if (chunk.getBlockData) {
+                var bd = chunk.getBlockData();
+                if (bd) {
+                    blockDataArr = Array.prototype.slice.call(bd);
+                }
+            }
+
+            if (chunk.skyLight && chunk.skyLight instanceof Uint8Array) {
+                skyLightArr = Array.prototype.slice.call(chunk.skyLight);
+            }
+
+            if (chunk.blockLight && chunk.blockLight instanceof Uint8Array) {
+                blockLightArr = Array.prototype.slice.call(chunk.blockLight);
+            }
+
+            return {
+                blockData: blockDataArr,
+                skyLight: skyLightArr,
+                blockLight: blockLightArr
+            };
+        };
+
         var saveNextBatch = function() {
-            var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length - batchIndex);
-            if (batchSize <= 0) {
+            if (batchIndex >= dirtyList.length) {
                 self._emit('chunks:saved', { worldName: worldName, count: totalSaved });
                 return Promise.resolve(totalSaved);
             }
 
-            var batchPromises = [];
+            var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyList.length - batchIndex);
+            var batchSavePromises = [];
+
             for (var i = 0; i < batchSize; i++) {
                 var idx = batchIndex + i;
-                var chunk = dirtyChunks[idx];
-                if (!chunk || !chunk.isDirty()) {
-                    continue;
-                }
+                var chunk = dirtyList[idx];
+                if (!chunk) continue;
 
                 var cx = chunk.chunkX;
                 var cz = chunk.chunkZ;
-                var chunkData = {
-                    blockData: chunk.getBlockData ? chunk.getBlockData() : null,
-                    skyLight: chunk.getSkyLight ? chunk.getSkyLight(0, 0, 0) : 0,
-                    blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
-                };
+                var chunkData = serializeChunkData(chunk);
 
-                batchPromises.push(
+                batchSavePromises.push(
                     self.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
                         if (success) {
                             totalSaved++;
@@ -459,15 +505,17 @@
                                 chunk.markClean();
                             }
                         }
+                    }).catch(function(err) {
+                        Donkeycraft.Logger.warn('WorldStore', 'Failed to save chunk [' + cx + ',' + cz + ']: ' + (err && err.message ? err.message : String(err)));
                     })
                 );
             }
 
             batchIndex += batchSize;
 
-            return Promise.all(batchPromises).then(function() {
-                // Small delay between batches to avoid blocking
-                if (batchIndex < dirtyChunks.length) {
+            return Promise.all(batchSavePromises).then(function() {
+                // Small delay between batches to avoid blocking the main thread
+                if (batchIndex < dirtyList.length) {
                     return new Promise(function(resolve) {
                         setTimeout(resolve, 10);
                     }).then(saveNextBatch);

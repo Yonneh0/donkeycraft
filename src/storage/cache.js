@@ -91,6 +91,7 @@
 
     /**
      * Get a cached texture atlas from IndexedDB.
+     * Validates stored dimensions match ImageData before reconstruction.
      * @param {string} [worldName=default] — World name for cache key.
      * @returns {Promise<HTMLCanvasElement|null>} Resolves with canvas or null if not cached.
      */
@@ -108,24 +109,41 @@
                 var request = store.get('texture-atlas:' + worldName);
 
                 request.onsuccess = function() {
-                    if (!request.result || !request.result.data) {
+                    if (!request.result || !request.result.imageData) {
+                        resolve(null);
+                        return;
+                    }
+
+                    var storedW = request.result.width;
+                    var storedH = request.result.height;
+                    var imageData = request.result.imageData;
+
+                    // Validate dimensions match ImageData byte length (4 bytes per pixel)
+                    if (!storedW || !storedH || storedW <= 0 || storedH <= 0) {
+                        Donkeycraft.Logger.warn('AssetCache', 'Invalid texture atlas dimensions: ' + storedW + 'x' + storedH);
+                        resolve(null);
+                        return;
+                    }
+
+                    var expectedBytes = storedW * storedH * 4;
+                    if (imageData.data && imageData.data.length !== expectedBytes) {
+                        Donkeycraft.Logger.warn('AssetCache', 'Texture atlas ImageData size mismatch: expected ' + expectedBytes + ' bytes, got ' + imageData.data.length + '. Cache may be corrupted.');
                         resolve(null);
                         return;
                     }
 
                     // Reconstruct canvas from stored image data
                     var canvas = document.createElement('canvas');
-                    var w = request.result.width;
-                    var h = request.result.height;
-                    canvas.width = w;
-                    canvas.height = h;
+                    canvas.width = storedW;
+                    canvas.height = storedH;
                     var ctx = canvas.getContext('2d');
-                    if (ctx && request.result.imageData) {
+                    if (ctx) {
                         try {
-                            ctx.putImageData(request.result.imageData, 0, 0);
+                            ctx.putImageData(imageData, 0, 0);
                             resolve(canvas);
                         } catch (e) {
-                            resolve(null); // ImageData too large for putImageData
+                            Donkeycraft.Logger.warn('AssetCache', 'Failed to put texture atlas ImageData: ' + e.message);
+                            resolve(null);
                         }
                     } else {
                         resolve(null);

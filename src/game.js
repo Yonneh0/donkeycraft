@@ -219,18 +219,36 @@
 
     /**
      * setWorldStore — set the world store for auto-save persistence.
+     * Also wires the chunk manager reference so saveDirtyChunks() can access dirty chunks.
      * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance.
      */
     Donkeycraft.Game.prototype.setWorldStore = function(worldStore) {
         this._worldStore = worldStore;
+        // Wire chunk manager reference for saveDirtyChunks()
+        if (worldStore && worldStore.setChunkManager && this._chunkManager) {
+            worldStore.setChunkManager(this._chunkManager);
+        }
     };
 
     /**
      * setLevelData — set the LevelData instance for player state persistence.
+     * Also activates periodic auto-save using WorldStore if available.
      * @param {Donkeycraft.LevelData} levelData — LevelData instance.
+     * @param {string} [worldName=default] — World name for auto-save targeting.
      */
-    Donkeycraft.Game.prototype.setLevelData = function(levelData) {
+    Donkeycraft.Game.prototype.setLevelData = function(levelData, worldName) {
         this._levelData = levelData || null;
+        // Activate periodic auto-save if LevelData and WorldStore are both available
+        if (levelData && this._worldStore && worldName) {
+            try {
+                var intervalMs = Donkeycraft.Config && Donkeycraft.Config.LEVEL_DATA_AUTO_SAVE_INTERVAL
+                    ? Donkeycraft.Config.LEVEL_DATA_AUTO_SAVE_INTERVAL
+                    : Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
+                levelData.startAutoSave(this._worldStore, worldName, intervalMs);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to start LevelData auto-save: ' + e.message);
+            }
+        }
     };
 
     /**
@@ -398,43 +416,24 @@
     };
 
     /**
-     * Save dirty chunks to IndexedDB using Config.CHUNKS_PER_SAVE batching.
+     * Save dirty chunks to IndexedDB via WorldStore.saveDirtyChunks().
+     * Delegates full serialization (blockData, skyLight, blockLight) to WorldStore.
      * @private
      * @param {string} worldName - World name identifier.
+     * @returns {Promise<number>|number} Promise resolving to chunk count saved, or 0 if not available.
      */
     Donkeycraft.Game.prototype._saveDirtyChunks = function(worldName) {
-        if (!this._worldStore || !this._worldStore.isReady()) return;
-
-        var self = this;
-        var CHUNKS_PER_SAVE = Config.CHUNKS_PER_SAVE;
-        var dirtyChunks = this._chunkManager ? this._chunkManager.getDirtyChunks() : [];
-
-        if (dirtyChunks.length === 0) return;
-
-        // Save chunks in batches for performance
-        var batchSize = Math.min(CHUNKS_PER_SAVE, dirtyChunks.length);
-        var savedCount = 0;
-
-        for (var i = 0; i < batchSize && i < dirtyChunks.length; i++) {
-            var chunk = dirtyChunks[i];
-            if (!chunk || !chunk.isDirty()) continue;
-
-            var cx = chunk.chunkX;
-            var cz = chunk.chunkZ;
-            var chunkData = {
-                blockData: chunk.getBlockData ? chunk.getBlockData() : null,
-                skyLight: chunk.getSkyLight ? chunk.getSkyLight(0, 0, 0) : 0,
-                blockLight: chunk.getBlockLight ? chunk.getBlockLight(0, 0, 0) : 0
-            };
-
-            this._worldStore.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
-                if (success) savedCount++;
-            }).catch(function() {
-                // Silently ignore individual save failures
-            });
+        if (!this._worldStore || !this._worldStore.isReady()) {
+            return 0;
         }
 
-        Donkeycraft.Logger.info('Game', 'Auto-saved ' + batchSize + ' chunks to world: ' + worldName);
+        // Delegate to WorldStore.saveDirtyChunks which handles full serialization and batching
+        try {
+            return this._worldStore.saveDirtyChunks(worldName);
+        } catch (e) {
+            Donkeycraft.Logger.error('Game', '_saveDirtyChunks failed: ' + e.message);
+            return 0;
+        }
     };
 
     /**
@@ -1108,19 +1107,29 @@
         this._processInteractions();
 
         // Auto-save chunks: accumulate time and save at Config.AUTO_SAVE_INTERVAL
+        // Only handle chunk saving here; LevelData handles its own level data auto-save separately
         if (this._worldStore && this._chunkManager) {
             this._autoSaveTimer += dt * 1000; // Convert to ms
             if (this._autoSaveTimer >= Config.AUTO_SAVE_INTERVAL) {
                 this._autoSaveTimer = 0;
-                try {
-                    this._saveDirtyChunks('default');
-                } catch (e) {
-                    Donkeycraft.Logger.warn('Game', 'Auto-save failed: ' + e.message);
+                var worldName = (this._levelData && this._levelData.getWorldName)
+                    ? this._levelData.getWorldName()
+                    : 'default';
+
+                var savePromise = this._saveDirtyChunks(worldName);
+                if (savePromise && typeof savePromise.then === 'function') {
+                    savePromise.then(function(count) {
+                        Donkeycraft.Logger.info('Game', 'Auto-saved ' + count + ' chunks to world: ' + worldName);
+                    }).catch(function(e) {
+                        Donkeycraft.Logger.warn('Game', 'Auto-save failed: ' + (e && e.message ? e.message : String(e)));
+                    });
+                } else if (typeof savePromise === 'number') {
+                    Donkeycraft.Logger.info('Game', 'Auto-saved ' + savePromise + ' chunks to world: ' + worldName);
                 }
             }
         }
 
-        // Tick LevelData auto-save (if separate LevelData instance is active)
+        // Tick LevelData auto-save for level data persistence (separate from chunk saves)
         if (this._levelData && this._levelData.tickAutoSave) {
             try {
                 this._levelData.tickAutoSave(dt);
