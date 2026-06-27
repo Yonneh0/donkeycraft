@@ -85,29 +85,82 @@
     };
 
     /**
-     * _initTextureAtlas — initialize the texture atlas system.
-     * Texture atlas generation is deferred to the AssetGenerator pipeline which
-     * produces procedural textures and uploads them via TextureAtlas.generate().
-     * This phase simply signals completion since the atlas is initialized separately.
+     * _initTextureAtlas — generate all procedural block textures via AssetGenerator.
      * @private
-     * @returns {Promise<Object>} Resolves with atlas info when ready.
+     * @returns {Promise<Object>} Resolves with { textures } when ready.
      */
     Donkeycraft.InitSequence.prototype._initTextureAtlas = function() {
-        return new Promise(function(resolve) {
-            resolve({ name: 'texture-atlas-ready' });
+        var self = this;
+        return new Promise(function(resolve, reject) {
+            try {
+                if (Donkeycraft.AssetGenerator && typeof Donkeycraft.AssetGenerator.generateAllTextures === 'function') {
+                    Donkeycraft.AssetGenerator.generateAllTextures().then(function(textures) {
+                        Donkeycraft.Logger.info('InitSequence', 'Procedural textures generated: ' + Object.keys(textures || {}).length + ' textures');
+
+                        // Wire generated textures into AssetManager so game.js can read them via getAllTextures()
+                        if (Donkeycraft.AssetManager && typeof Donkeycraft.AssetManager.generateAllBlockTextures === 'function') {
+                            try {
+                                var managed = Donkeycraft.AssetManager.generateAllBlockTextures();
+                                Donkeycraft.Logger.info('InitSequence', 'Textures wired to AssetManager: ' + Object.keys(managed || {}).length + ' textures');
+                            } catch (e) {
+                                Donkeycraft.Logger.warn('InitSequence', 'Failed to wire textures to AssetManager: ' + e.message);
+                            }
+                        }
+
+                        resolve({ textures: textures || {} });
+                    }).catch(function(err) {
+                        Donkeycraft.Logger.error('InitSequence', 'Texture generation failed: ' + err.message);
+                        resolve({ textures: {} });
+                    });
+                } else {
+                    Donkeycraft.Logger.warn('InitSequence', 'AssetGenerator not available — skipping texture generation');
+                    resolve({ textures: {} });
+                }
+            } catch (e) {
+                Donkeycraft.Logger.error('InitSequence', 'Texture atlas init error: ' + e.message);
+                resolve({ textures: {} });
+            }
         });
     };
 
     /**
      * _initAudio — initialize the audio system with decoded buffers.
-     * Audio initialization is deferred to the Audio system which handles its own
-     * async buffer decoding. This phase simply signals completion.
+     * Attempts to create AudioContext and pre-load procedural sounds.
      * @private
-     * @returns {Promise<Object>} Resolves with audio system info when ready.
+     * @returns {Promise<Object>} Resolves with { audioSystem } when ready.
      */
     Donkeycraft.InitSequence.prototype._initAudio = function() {
-        return new Promise(function(resolve) {
-            resolve({ name: 'audio-ready' });
+        var self = this;
+        return new Promise(function(resolve, reject) {
+            try {
+                // Initialize PerlinNoise for terrain generation before audio
+                if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init && !Donkeycraft.PerlinNoise._initialized) {
+                    var seed = self._config ? self._config.SEED : 42;
+                    Donkeycraft.PerlinNoise.init(seed);
+                    Donkeycraft.PerlinNoise._initialized = true;
+                    Donkeycraft.Logger.info('InitSequence', 'PerlinNoise initialized with seed: ' + seed);
+                }
+
+                if (typeof window.AudioContext === 'undefined' && typeof window.webkitAudioContext === 'undefined') {
+                    Donkeycraft.Logger.warn('InitSequence', 'Web Audio API not available — audio disabled');
+                    resolve({ perlinNoiseReady: true });
+                    return;
+                }
+
+                // Create audio system
+                var audioSys = new Donkeycraft.AudioSystem();
+                audioSys.init().then(function() {
+                    Donkeycraft.Logger.info('InitSequence', 'AudioSystem initialized successfully');
+                    resolve({ audioSystem: audioSys, perlinNoiseReady: true });
+                }).catch(function(err) {
+                    Donkeycraft.Logger.warn('InitSequence', 'Audio init failed: ' + err.message);
+                    // Still resolve with noise ready so terrain can generate
+                    resolve({ perlinNoiseReady: true });
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('InitSequence', 'Audio exception: ' + e.message);
+                resolve({}); // Graceful fallback
+            }
         });
     };
 
@@ -268,6 +321,21 @@
                 config: self._config,
                 eventBus: self._eventBus
             };
+            // Merge texture-atlas phase results (generated textures)
+            var texResult = self['_phaseResult1'];
+            if (texResult && texResult.textures) {
+                self._systems.generatedTextures = texResult.textures;
+            }
+            // Merge audio phase results (audioSystem, perlinNoiseReady)
+            var audioResult = self['_phaseResult2'];
+            if (audioResult) {
+                if (audioResult.audioSystem) {
+                    self._systems.audioSystem = audioResult.audioSystem;
+                }
+                if (audioResult.perlinNoiseReady) {
+                    self._systems.perlinNoiseReady = true;
+                }
+            }
             // Merge indexedDB phase results (worldStore, assetCache) if available
             var idbResult = self['_phaseResult3'];
             if (idbResult) {
