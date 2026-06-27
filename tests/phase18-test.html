@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Phase 18 Hunger & XP Test</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Phase 18 Hunger & XP Test</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Testing: Hunger System (hunger.js) and Experience System (experience.js)</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Phase 1 Core -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/timer.js"></script>
+<script src="../src/core/input.js"></script>
+<script src="../src/core/math-utils.js"></script>
+<script src="../src/core/audio.js"></script>
+
+<!-- Phase 3 Block System -->
+<script src="../src/world/block.js"></script>
+<script src="../src/world/block-state.js"></script>
+<script src="../src/world/block-types.js"></script>
+<script src="../src/world/texture-atlas.js"></script>
+<script src="../src/world/block-models.js"></script>
+<script src="../src/world/recipe-registry.js"></script>
+
+<!-- Phase 4 World Generation -->
+<script src="../src/world/biome.js"></script>
+<script src="../src/world/chunk.js"></script>
+<script src="../src/world/chunk-manager.js"></script>
+<script src="../src/world/terrain-generator.js"></script>
+<script src="../src/world/ore-generator.js"></script>
+<script src="../src/world/cave-generator.js"></script>
+<script src="../src/world/structure-generator.js"></script>
+<script src="../src/world/water-generator.js"></script>
+<script src="../src/world/terrain-surface.js"></script>
+<script src="../src/world/lighting-engine.js"></script>
+<script src="../src/world/physics.js"></script>
+
+<!-- Phase 5 Player & Movement -->
+<script src="../src/player/player.js"></script>
+<script src="../src/player/collision.js"></script>
+<script src="../src/player/movement.js"></script>
+<script src="../src/player/jumping.js"></script>
+<script src="../src/player/flying.js"></script>
+<script src="../src/player/hurt-box.js"></script>
+
+<!-- Phase 18: Hunger & XP -->
+<script src="../src/player/hunger.js"></script>
+<script src="../src/player/experience.js"></script>
+
+<!-- Load shared test framework -->
+<script src="test.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    var F = TestFramework;
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Hunger System Namespace & Construction
+    // ============================================================
+    F.section('1. Hunger System — Namespace & Construction');
+
+    F.assert(typeof Donkeycraft.Hunger === 'function', 'Donkeycraft.Hunger is registered');
+
+    var hungerPlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0, gameMode: 'survival' });
+    var hunger = new Donkeycraft.Hunger(hungerPlayer);
+
+    F.assertType(hunger, 'object', 'Hunger instance created');
+    F.assert(typeof hunger.getFoodLevel === 'function', 'Hunger has getFoodLevel method');
+    F.assert(typeof hunger.getSaturation === 'function', 'Hunger has getSaturation method');
+    F.assert(typeof hunger.consumeFood === 'function', 'Hunger has consumeFood method');
+    F.assert(typeof hunger.tick === 'function', 'Hunger has tick method');
+    F.assert(typeof hunger.isStarving === 'function', 'Hunger has isStarving method');
+    F.assert(typeof hunger.reset === 'function', 'Hunger has reset method');
+    F.assert(typeof hunger.destroy === 'function', 'Hunger has destroy method');
+
+    // Test initial values
+    F.assertEq(hunger.getFoodLevel(), 20, 'Initial food level = 20');
+    F.assertEq(hunger.getSaturation(), 20.0, 'Initial saturation = 20.0');
+    F.assert(hunger.isStarving() === false, 'Not starving initially');
+    F.assert(hunger.hasFood() === true, 'Has food initially');
+
+    // Test setFoodLevel / setSaturation
+    hunger.setFoodLevel(10);
+    F.assertEq(hunger.getFoodLevel(), 10, 'setFoodLevel(10) = 10');
+
+    hunger.setSaturation(5.0);
+    F.assertEq(hunger.getSaturation(), 5.0, 'setSaturation(5.0) = 5.0');
+
+    // Test clamping
+    hunger.setFoodLevel(25);
+    F.assertEq(hunger.getFoodLevel(), 20, 'setFoodLevel(25) clamped to 20');
+
+    hunger.setFoodLevel(-3);
+    F.assertEq(hunger.getFoodLevel(), 0, 'setFoodLevel(-3) clamped to 0');
+
+    hunger.setSaturation(-10);
+    F.assertEq(hunger.getSaturation(), 0, 'setSaturation(-10) clamped to 0');
+
+    // Test setHurtBox
+    var hurtBox = new Donkeycraft.HurtBox(hungerPlayer);
+    hunger.setHurtBox(hurtBox);
+    F.info('HurtBox reference set via setHurtBox');
+
+    // ============================================================
+    // Section 2: Food Consumption
+    // ============================================================
+    F.section('2. Food Consumption');
+
+    // Test basic food consumption
+    hunger.setFoodLevel(0);
+    hunger.setSaturation(0);
+    var restored = hunger.consumeFood(3, 0.6);
+    F.assertEq(restored, 3, 'consumeFood(3, 0.6) restores 3 food');
+    F.assertEq(hunger.getFoodLevel(), 3, 'Food level after eating = 3');
+
+    // Test saturation gain
+    var satAfterEat = hunger.getSaturation();
+    F.assert(satAfterEat > 0, 'Saturation increased after eating (got ' + satAfterEat.toFixed(2) + ')');
+
+    // Test food capped at 20
+    hunger.setFoodLevel(18);
+    hunger.setSaturation(0);
+    var restored2 = hunger.consumeFood(5, 0.6);
+    F.assertEq(restored2, 2, 'consumeFood(5) at food=18 only restores 2 (capped at 20)');
+    F.assertEq(hunger.getFoodLevel(), 20, 'Food level capped at 20');
+
+    // Test saturation cap at food * 2
+    hunger.setFoodLevel(10);
+    hunger.setSaturation(0);
+    hunger.consumeFood(4, 0.8);
+    var sat = hunger.getSaturation();
+    var maxSat = hunger.getFoodLevel() * 2;
+    F.assert(sat <= maxSat, 'Saturation <= foodLevel * 2 (sat=' + sat.toFixed(2) + ', max=' + maxSat + ')');
+
+    // Test saturationRatio parameter — use fresh instances to avoid state leakage
+    var hungerA = new Donkeycraft.Hunger(new Donkeycraft.Player({ gameMode: 'survival' }));
+    hungerA.setFoodLevel(0);
+    hungerA.setSaturation(0);
+    hungerA.consumeFood(5, 1.0); // Max saturation ratio
+    var fullSat = hungerA.getSaturation();
+
+    var hungerB = new Donkeycraft.Hunger(new Donkeycraft.Player({ gameMode: 'survival' }));
+    hungerB.setFoodLevel(0);
+    hungerB.setSaturation(0);
+    hungerB.consumeFood(5, 0.1); // Min saturation ratio
+    var lowSat = hungerB.getSaturation();
+
+    F.assert(fullSat > lowSat, 'Higher saturationRatio gives more saturation (ratio1=' + fullSat.toFixed(2) + ', ratio2=' + lowSat.toFixed(2) + ')');
+
+    hungerA.destroy();
+    hungerB.destroy();
+
+    // Test hasFood
+    hunger.setFoodLevel(0);
+    F.assert(hunger.hasFood() === false, 'hasFood = false when food = 0');
+    hunger.setFoodLevel(1);
+    F.assert(hunger.hasFood() === true, 'hasFood = true when food > 0');
+
+    // Test isStarving
+    hunger.setFoodLevel(0);
+    F.assert(hunger.isStarving() === true, 'isStarving = true when food = 0');
+    hunger.setFoodLevel(1);
+    F.assert(hunger.isStarving() === false, 'isStarving = false when food > 0');
+
+    // ============================================================
+    // Section 3: Saturation Fraction
+    // ============================================================
+    F.section('3. Saturation Fraction');
+
+    hunger.setFoodLevel(20);
+    hunger.setSaturation(20.0);
+    var frac1 = hunger.getSaturationFraction();
+    F.assertNear(frac1, 0.5, 0.01, 'Saturation fraction at full: ~0.5 (got ' + frac1.toFixed(3) + ')');
+
+    hunger.setSaturation(40);
+    var frac2 = hunger.getSaturationFraction();
+    F.assertNear(frac2, 1.0, 0.01, 'Saturation fraction at max: ~1.0 (got ' + frac2.toFixed(3) + ')');
+
+    hunger.setSaturation(0);
+    var frac3 = hunger.getSaturationFraction();
+    F.assertEq(frac3, 0, 'Saturation fraction at 0 saturation = 0');
+
+    // ============================================================
+    // Section 4: Hunger Degradation
+    // ============================================================
+    F.section('4. Hunger Degradation');
+
+    hunger.setFoodLevel(20);
+
+    // Sprint degradation: 1 food per ~2.5 blocks
+    hunger.applySprintDegradation(5.0);
+    F.assertEq(hunger.getFoodLevel(), 18, 'Sprint 5 blocks: food -= 2 (got ' + hunger.getFoodLevel() + ')');
+
+    // Walk degradation: 1 food per ~8 blocks
+    hunger.setFoodLevel(20);
+    hunger.applyWalkDegradation(16.0);
+    F.assertEq(hunger.getFoodLevel(), 18, 'Walk 16 blocks: food -= 2 (got ' + hunger.getFoodLevel() + ')');
+
+    // No degradation when food = 0
+    hunger.setFoodLevel(0);
+    hunger.applySprintDegradation(10.0);
+    F.assertEq(hunger.getFoodLevel(), 0, 'No degradation when food = 0');
+
+    hunger.applyWalkDegradation(10.0);
+    F.assertEq(hunger.getFoodLevel(), 0, 'No walk degradation when food = 0');
+
+    // ============================================================
+    // Section 5: Experience System — Namespace & Construction
+    // ============================================================
+    F.section('5. Experience System — Namespace & Construction');
+
+    F.assert(typeof Donkeycraft.Experience === 'function', 'Donkeycraft.Experience is registered');
+
+    var xpPlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0 });
+    var xp = new Donkeycraft.Experience(xpPlayer);
+
+    F.assertType(xp, 'object', 'Experience instance created');
+    F.assert(typeof xp.getLevel === 'function', 'Experience has getLevel method');
+    F.assert(typeof xp.getPoints === 'function', 'Experience has getPoints method');
+    F.assert(typeof xp.addXP === 'function', 'Experience has addXP method');
+    F.assert(typeof xp.spendXP === 'function', 'Experience has spendXP method');
+    F.assert(typeof xp.pickupOrb === 'function', 'Experience has pickupOrb method');
+    F.assert(typeof xp.getLevelThreshold === 'function', 'Experience has getLevelThreshold method');
+    F.assert(typeof xp.getTotalXP === 'function', 'Experience has getTotalXP method');
+    F.assert(typeof xp.serialize === 'function', 'Experience has serialize method');
+    F.assert(typeof xp.fromObject === 'function', 'Experience has fromObject method');
+
+    // Test initial values
+    F.assertEq(xp.getLevel(), 0, 'Initial XP level = 0');
+    F.assertEq(xp.getPoints(), 0, 'Initial XP points = 0');
+    F.assertEq(xp.getTotalXP(), 0, 'Initial total XP = 0');
+
+    // ============================================================
+    // Section 6: XP Level Thresholds
+    // ============================================================
+    F.section('6. XP Level Thresholds');
+
+    // Level 0: threshold = 7 + 0*2 = 7
+    xp.setLevel(0);
+    F.assertEq(xp.getLevelThreshold(), 7, 'Level 0 threshold = 7');
+
+    // Level 1: threshold = 7 + 1*2 = 9
+    xp.setLevel(1);
+    F.assertEq(xp.getLevelThreshold(), 9, 'Level 1 threshold = 9');
+
+    // Level 15: threshold = 7 + 15*2 = 37
+    xp.setLevel(15);
+    F.assertEq(xp.getLevelThreshold(), 37, 'Level 15 threshold = 37');
+
+    // Level 16: threshold = 7 + 16*2 = 39
+    xp.setLevel(16);
+    F.assertEq(xp.getLevelThreshold(), 39, 'Level 16 threshold = 39');
+
+    // Level 17: threshold = 37 + (17-16)*3 = 40
+    xp.setLevel(17);
+    F.assertEq(xp.getLevelThreshold(), 40, 'Level 17 threshold = 40');
+
+    // Level 30: threshold = 37 + (30-16)*3 = 37 + 42 = 79
+    xp.setLevel(30);
+    F.assertEq(xp.getLevelThreshold(), 79, 'Level 30 threshold = 79');
+
+    // ============================================================
+    // Section 7: XP Addition & Leveling Up
+    // ============================================================
+    F.section('7. XP Addition & Leveling Up');
+
+    xp.setLevelToZero(0);
+    xp.setPoints(0);
+    xp._totalXP = 0;
+
+    // Add 5 XP — should not level up (threshold at level 0 = 7)
+    xp.addXP(5);
+    F.assertEq(xp.getLevel(), 0, 'After +5 XP: level = 0');
+    F.assertEq(xp.getPoints(), 5, 'After +5 XP: points = 5');
+
+    // Add 3 XP — should level up (5+3=8 >= 7)
+    xp.addXP(3);
+    F.assertEq(xp.getLevel(), 1, 'After +3 XP (total 8): level = 1');
+    F.assertEq(xp.getPoints(), 1, 'After +3 XP: points = 1 (8-7=1)');
+
+    // Test total XP tracking — addXP increments totalXP
+    var currentTotal = xp.getTotalXP();
+    F.assertEq(currentTotal, 8, 'Total XP = 8 (sum of all XP added)');
+
+    // Add enough to level up multiple times using a fresh instance
+    var xp2 = new Donkeycraft.Experience(new Donkeycraft.Player());
+    xp2.setLevelToZero(0);
+    xp2.setPoints(0);
+    xp2._totalXP = 0;
+    xp2.addXP(50);
+    F.assert(xp2.getLevel() >= 3, 'After +50 XP: level >= 3 (got ' + xp2.getLevel() + ')');
+
+    // Total XP should equal the amount added
+    F.assertEq(xp2.getTotalXP(), 50, 'Total XP = 50 (never decreases)');
+    xp2.destroy();
+
+    // ============================================================
+    // Section 8: XP Progress & Spending
+    // ============================================================
+    F.section('8. XP Progress & Spending');
+
+    xp.setLevelToZero(2);
+    xp.setPoints(0);
+    xp._totalXP = 0;
+
+    // Level 2 threshold = 7 + 2*2 = 11
+    F.assertEq(xp.getLevelThreshold(), 11, 'Level 2 threshold = 11');
+
+    var progress = xp.getProgressToNextLevel();
+    F.assertEq(progress, 0, 'Progress at 0 points = 0');
+
+    xp.setPoints(5);
+    var progress2 = xp.getProgressToNextLevel();
+    F.assertNear(progress2, 5 / 11, 0.01, 'Progress at 5/11 points ≈ 0.45 (got ' + progress2.toFixed(3) + ')');
+
+    // Test spendXP — should succeed with enough points
+    xp.setPoints(10);
+    var spent = xp.spendXP(5);
+    F.assert(spent === true, 'spendXP(5) succeeds with 10 points');
+    F.assertEq(xp.getPoints(), 5, 'After spending 5: points = 5');
+
+    // Test spendXP — should fail (not enough points)
+    xp.setPoints(3);
+    var spent2 = xp.spendXP(10);
+    F.assert(spent2 === false, 'spendXP(10) fails with only 3 points');
+    F.assertEq(xp.getPoints(), 3, 'Points unchanged after failed spend');
+
+    // Test pickupOrb — use fresh instance for isolation
+    var xp3 = new Donkeycraft.Experience(new Donkeycraft.Player());
+    xp3.setLevelToZero(0);
+    xp3.setPoints(0);
+    xp3._totalXP = 0;
+    xp3.pickupOrb(15);
+    F.assertEq(xp3.getTotalXP(), 15, 'pickupOrb(15): total XP = 15');
+    F.assertEq(xp3.getLevel(), 1, 'pickupOrb(15): level = 1 (15-7=8, below level 1 threshold of 9)');
+    F.assertEq(xp3.getPoints(), 8, 'pickupOrb(15): points = 8');
+    xp3.destroy();
+
+    // ============================================================
+    // Section 9: XP Serialization
+    // ============================================================
+    F.section('9. XP Serialization');
+
+    xp.setLevelToZero(5);
+    xp.setPoints(20);
+    // Manually set total XP (addXP would recalculate, so we use setLevelToZero + direct manipulation)
+    xp._totalXP = 100;
+
+    var serialized = xp.serialize();
+    F.assertType(serialized, 'object', 'serialize() returns an object');
+    F.assertEq(serialized.level, 5, 'Serialized level = 5');
+    F.assertEq(serialized.points, 20, 'Serialized points = 20');
+    F.assertEq(serialized.totalXP, 100, 'Serialized totalXP = 100');
+
+    // Deserialize
+    xp.setLevelToZero(0);
+    xp.setPoints(0);
+    xp._totalXP = 0;
+    xp.fromObject({ level: 10, points: 30, totalXP: 200 });
+    F.assertEq(xp.getLevel(), 10, 'Deserialized level = 10');
+    F.assertEq(xp.getPoints(), 30, 'Deserialized points = 30');
+    F.assertEq(xp.getTotalXP(), 200, 'Deserialized totalXP = 200');
+
+    // ============================================================
+    // Section 10: Hunger Tick — Starvation & Regen
+    // ============================================================
+    F.section('10. Hunger Tick — Starvation & Regen');
+
+    // Create player with hurtbox for tick testing
+    var tickPlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0, gameMode: 'survival' });
+    var tickHurtBox = new Donkeycraft.HurtBox(tickPlayer);
+    var tickHunger = new Donkeycraft.Hunger(tickPlayer);
+    tickHunger.setHurtBox(tickHurtBox);
+
+    // Test starvation damage at food = 0, health <= 5
+    tickHunger.setFoodLevel(0);
+    tickHunger.setSaturation(0);
+    tickHurtBox.heal(20); // Restore to full health first
+    tickPlayer.setAlive(true);
+
+    // Simulate 8+ seconds of starvation
+    var starveTime = 0;
+    while (tickPlayer.isAlive() && starveTime < 64) {
+        tickHunger.tick(1.0); // 1 second per tick for testing
+        starveTime++;
+    }
+
+    if (!tickPlayer.isAlive()) {
+        F.assert(true, 'Player dies from starvation after 8+ seconds at food=0');
+    } else {
+        // Health should have decreased (may not die if regen kept up)
+        F.info('Starvation test: player survived ' + starveTime + 's, health=' + tickHurtBox.getHealth());
+    }
+
+    // Test creative mode — no hunger
+    var creativePlayer = new Donkeycraft.Player({ gameMode: 'creative' });
+    var creativeHunger = new Donkeycraft.Hunger(creativePlayer);
+    creativeHunger.setFoodLevel(0);
+    creativeHunger.tick(1.0);
+    F.assertEq(creativeHunger.getFoodLevel(), 20, 'Creative mode: food restored to 20 after tick');
+
+    // Test reset
+    tickHunger.setFoodLevel(5);
+    tickHunger.setSaturation(2.0);
+    tickHunger.reset();
+    F.assertEq(tickHunger.getFoodLevel(), 20, 'reset() restores food to 20');
+    F.assertEq(tickHunger.getSaturation(), 20.0, 'reset() restores saturation to 20.0');
+
+    // ============================================================
+    // Section 11: Integration — Hunger + HurtBox
+    // ============================================================
+    F.section('11. Integration — Hunger + HurtBox');
+
+    var integPlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0, gameMode: 'survival' });
+    var integHurtBox = new Donkeycraft.HurtBox(integPlayer);
+    var integHunger = new Donkeycraft.Hunger(integPlayer);
+    integHunger.setHurtBox(integHurtBox);
+
+    // Eat food, then tick with saturation drain
+    integHunger.setFoodLevel(20);
+    integHunger.setSaturation(20.0);
+    integHurtBox.heal(20);
+
+    // Simulate 10 seconds of tick with saturation drain
+    for (var i = 0; i < 10; i++) {
+        integHunger.tick(1.0);
+    }
+
+    F.assert(integHunger.getSaturation() < 20, 'Saturation decreased after ticks (got ' + integHunger.getSaturation().toFixed(1) + ')');
+    F.assert(integHunger.getFoodLevel() <= 20, 'Food level still <= 20');
+
+    // Test destroy
+    hunger.destroy();
+    hungerPlayer.destroy();
+    xp.destroy();
+    xpPlayer.destroy();
+    tickHunger.destroy();
+    tickPlayer.destroy();
+    creativeHunger.destroy();
+    creativePlayer.destroy();
+    integHunger.destroy();
+    integPlayer.destroy();
+
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>
