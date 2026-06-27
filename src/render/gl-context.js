@@ -267,8 +267,11 @@
 
         if (this._context && !this._contextLost) {
             try {
-                // Attempt graceful context loss (preserves drawing buffer if preserveDrawingBuffer was true)
-                this._context.loseContext(true);
+                // Attempt graceful context loss (preserves drawing buffer if preserveDrawingBuffer was true).
+                // loseContext is a non-standard extension method — check availability first.
+                if (typeof this._context.loseContext === 'function') {
+                    this._context.loseContext(true);
+                }
             } catch (e) {
                 // loseContext may not be supported on all browsers/platforms
                 Donkeycraft.Logger.warn('GLContext', 'loseContext not available: ' + e.message);
