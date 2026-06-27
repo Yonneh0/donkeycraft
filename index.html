@@ -53,7 +53,7 @@
      Load project scripts in dependency order
      ============================================================ -->
 
-<!-- Phase 1: Core Infrastructure -->
+<!-- Core Infrastructure -->
 <script src="src/core/namespace.js"></script>
 <script src="src/core/eventbus.js"></script>
 <script src="src/core/config.js"></script>
@@ -63,7 +63,7 @@
 <script src="src/core/math-utils.js"></script>
 <script src="src/core/audio.js"></script>
 
-<!-- Phase 2: WebGL Rendering -->
+<!-- WebGL Rendering -->
 <script src="src/render/gl-context.js"></script>
 <script src="src/render/shader-manager.js"></script>
 <script src="src/render/geometry-builder.js"></script>
@@ -78,7 +78,7 @@
 <script src="src/render/break-particles.js"></script>
 <script src="src/render/gui-renderer.js"></script>
 
-<!-- Phase 3: Block System -->
+<!-- Block System -->
 <script src="src/world/block.js"></script>
 <script src="src/world/block-state.js"></script>
 <script src="src/world/block-types.js"></script>
@@ -86,7 +86,7 @@
 <script src="src/world/block-models.js"></script>
 <script src="src/world/recipe-registry.js"></script>
 
-<!-- Phase 4: World Generation -->
+<!-- World Generation -->
 <script src="src/world/chunk.js"></script>
 <script src="src/world/chunk-manager.js"></script>
 <script src="src/world/biome.js"></script>
@@ -100,7 +100,7 @@
 <script src="src/world/physics.js"></script>
 <script src="src/world/world-utils.js"></script>
 
-<!-- Phase 5: Player & Movement -->
+<!-- Player & Movement -->
 <script src="src/player/player.js"></script>
 <script src="src/player/movement.js"></script>
 <script src="src/player/collision.js"></script>
@@ -108,17 +108,17 @@
 <script src="src/player/flying.js"></script>
 <script src="src/player/hurt-box.js"></script>
 
-<!-- Phase 6: Interaction -->
+<!-- Interaction -->
 <script src="src/interaction/raycast.js"></script>
 <script src="src/interaction/block-action.js"></script>
 <script src="src/interaction/block-placement.js"></script>
 <script src="src/interaction/interactable-blocks.js"></script>
 
-<!-- Phase 6.5: Loading Screen & Init -->
+<!-- Loading Screen & Init -->
 <script src="src/core/init-sequence.js"></script>
 <script src="src/ui/loading-screen.js"></script>
 
-<!-- Phase 7: Inventory & UI -->
+<!-- Inventory & UI -->
 <script src="src/ui/item-stack.js"></script>
 <script src="src/ui/inventory.js"></script>
 <script src="src/ui/gui-manager.js"></script>
@@ -131,7 +131,7 @@
 <script src="src/ui/enchanting-ui.js"></script>
 <script src="src/ui/debug-overlay.js"></script>
 
-<!-- Phase 9: Entities & Mobs -->
+<!-- Entities & Mobs -->
 <script src="src/entity/entity.js"></script>
 <script src="src/entity/entity-manager.js"></script>
 <script src="src/entity/passive-mobs.js"></script>
@@ -142,7 +142,7 @@
 <script src="src/entity/animals.js"></script>
 <script src="src/entity/mob-spawning.js"></script>
 
-<!-- Phase 10: Redstone -->
+<!-- Redstone -->
 <script src="src/redstone/redstone-engine.js"></script>
 <script src="src/redstone/wiring.js"></script>
 <script src="src/redstone/repeater-comparator.js"></script>
@@ -150,40 +150,40 @@
 <script src="src/redstone/pistons.js"></script>
 <script src="src/redstone/tnt.js"></script>
 
-<!-- Phase 12: Dimensions -->
+<!-- Dimensions -->
 <script src="src/world/dimension.js"></script>
 <script src="src/world/portal.js"></script>
 <script src="src/world/nether-generator.js"></script>
 <script src="src/world/end-generator.js"></script>
 
-<!-- Phase 13: Time & Weather -->
+<!-- Time & Weather -->
 <script src="src/world/time.js"></script>
 <script src="src/render/weather.js"></script>
 
-<!-- Phase 14: Save/Load -->
+<!-- Save/Load -->
 <script src="src/storage/world-store.js"></script>
 <script src="src/storage/level-data.js"></script>
 <script src="src/storage/cache.js"></script>
 
-<!-- Phase 15: Game Modes -->
+<!-- Game Modes -->
 <script src="src/player/game-mode.js"></script>
 <script src="src/player/stats.js"></script>
 
-<!-- Phase 16: Enchanting & Potions -->
+<!-- Enchanting & Potions -->
 <script src="src/game/enchantment.js"></script>
 <script src="src/game/potion.js"></script>
 
-<!-- Phase 17: Tools -->
+<!-- Tools -->
 <script src="src/game/tool.js"></script>
 
-<!-- Phase 18: Hunger & XP -->
+<!-- Hunger & XP -->
 <script src="src/player/hunger.js"></script>
 <script src="src/player/experience.js"></script>
 
-<!-- Phase 19: Assets -->
+<!-- Assets -->
 <script src="src/core/asset-generator.js"></script>
 
-<!-- Phase 20: UI Elements -->
+<!-- UI Elements -->
 <script src="src/ui/gui-elements.js"></script>
 
 <!-- Shader Sources (embedded for file:/// compatibility) -->
@@ -412,10 +412,10 @@ void main() {
 `;
 </script>
 
-<!-- Phase 21: Main Entry Point & Game Loop -->
+<!-- Main Entry Point & Game Loop -->
 <script src="src/game.js"></script>
 
-<!-- Game initialization (Phase 21: Main Entry Point & Game Loop) -->
+<!-- Game initialization (Main Entry Point & Game Loop) -->
 <script>
 (function() {
     'use strict';
