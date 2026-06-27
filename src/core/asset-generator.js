@@ -11,6 +11,7 @@
 
     /**
      * Permutation table for noise functions.
+     * @type {number[]}
      * @private
      */
     var _perm = [];
@@ -104,7 +105,6 @@
     /**
      * Seeded pseudo-random number generator (Mulberry32).
      * Returns a float in [0, 1) for deterministic texture variation.
-     * @type {number}
      * @private
      */
     var _rngState = 42;
@@ -166,6 +166,8 @@
 
         /**
          * Internal cache for generated textures to avoid regeneration.
+         * Keys are prefixed by generator name to prevent collisions between
+         * different generators that may share the same seed value.
          * @type {Object.<string, HTMLImageElement>}
          * @private
          */
@@ -173,6 +175,7 @@
 
         /**
          * Maximum number of textures to cache (prevents unbounded memory growth).
+         * @type {number}
          * @private
          */
         var MAX_CACHE_SIZE = 512;
@@ -180,6 +183,7 @@
         /**
          * Color definitions for block families.
          * Maps color names to RGB values used in texture generation.
+         * @type {Object.<string, {r: number, g: number, b: number}>}
          */
         var COLOR_MAP = {
             white:      { r: 240, g: 240, b: 240 },
@@ -215,22 +219,24 @@
         }
 
         /**
-         * Cache a generated texture by key.
-         * @param {string} key - Unique cache key.
+         * Cache a generated texture by key with generator prefix to prevent collisions.
+         * @param {string} prefix - Generator prefix (e.g., "stone", "dirt").
+         * @param {string} key - Unique cache key within the prefix.
          * @param {HTMLImageElement} img - Generated image.
+         * @returns {HTMLImageElement}
          * @private
          */
-        function _cacheTexture(key, img) {
-            if (!_textureCache[key]) {
-                _textureCache[key] = img;
+        function _cacheTexture(prefix, key, img) {
+            var fullKey = prefix + ':' + key;
+            if (!_textureCache[fullKey]) {
+                _textureCache[fullKey] = img;
                 // Evict oldest entries if cache exceeds max size
                 var keys = Object.keys(_textureCache);
                 if (keys.length > MAX_CACHE_SIZE) {
-                    // Remove first entry (FIFO)
                     delete _textureCache[keys[0]];
                 }
             }
-            return img;
+            return _textureCache[fullKey];
         }
 
         /**
@@ -241,14 +247,28 @@
         }
 
         /**
+         * Convert a canvas element to an Image element via data URL.
+         * @param {HTMLCanvasElement} canvas - Source canvas.
+         * @returns {HTMLImageElement}
+         * @private
+         */
+        function _canvasToImage(canvas) {
+            var img = new Image();
+            img.src = canvas.toDataURL('image/png');
+            return img;
+        }
+
+        // ---- Stone family ----
+
+        /**
          * Generate a stone texture with noise variation.
          * @param {number} seed
          * @returns {HTMLImageElement}
          */
         function generateStone(seed) {
-            var cacheKey = 'stone:' + (seed || 42);
-            if (_textureCache[cacheKey]) return _textureCache[cacheKey];
-            _shufflePerm(seed || 42);
+            var s = seed || 42;
+            if (_textureCache['stone:' + String(s)]) return _textureCache['stone:' + String(s)];
+            _shufflePerm(s);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
@@ -265,11 +285,11 @@
             }
             ctx.putImageData(imgData, 0, 0);
             var result = _canvasToImage(canvas);
-            return _cacheTexture(cacheKey, result);
+            return _cacheTexture('stone', String(s), result);
         }
 
         /**
-         * Generate a dirt texture with grass top layer.
+         * Generate a dirt texture with noise variation.
          * @returns {HTMLImageElement}
          */
         function generateDirt() {
@@ -321,7 +341,7 @@
         }
 
         /**
-         * Generate grass block side texture (grass top + dirt bottom).
+         * Generate grass block side texture (grass top + dirt bottom with drips).
          * @returns {HTMLImageElement}
          */
         function generateGrassSide() {
@@ -333,24 +353,21 @@
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var r, g, b;
                     if (y < 3) {
-                        // Top grass layer
                         var n = _fbm(x * 0.2, y * 0.2, 3, 1.0, 1.0);
                         r = 76 + n * 20;
                         g = 160 + n * 30;
                         b = 40 + n * 15;
                     } else if (y < 5) {
-                        // Transition with grass drips — use deterministic noise instead of Math.random()
                         var drip = _noise2D(x * 0.3, y * 0.5);
                         if (drip > 0.2) {
                             var dripNoise = _noise2D(x * 0.7 + 100, y * 0.7 + 100);
-                            r = 76 + (dripNoise + 1) * 5;   // range ~71-81
-                            g = 140 + (dripNoise + 1) * 10;  // range ~130-160
+                            r = 76 + (dripNoise + 1) * 5;
+                            g = 140 + (dripNoise + 1) * 10;
                             b = 40;
                         } else {
                             r = 134; g = 96; b = 60;
                         }
                     } else {
-                        // Dirt bottom
                         var n = _fbm(x * 0.12, y * 0.12, 3, 1.0, 1.0);
                         r = 134 + n * 25;
                         g = 96 + n * 20;
@@ -366,6 +383,8 @@
             ctx.putImageData(imgData, 0, 0);
             return _canvasToImage(canvas);
         }
+
+        // ---- Wood family ----
 
         /**
          * Generate a log side (bark) texture.
@@ -405,7 +424,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#8B7355';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Draw concentric rings
             for (var ring = 2; ring <= 8; ring += 2) {
                 ctx.strokeStyle = ring % 4 === 0 ? '#6B5335' : '#A0896B';
                 ctx.lineWidth = 1;
@@ -413,7 +431,6 @@
                 ctx.arc(8, 8, ring, 0, Math.PI * 2);
                 ctx.stroke();
             }
-            // Add seeded noise for natural variation
             var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < imgData.data.length; i += 4) {
                 var px = (i / 4) % TEX_SIZE;
@@ -455,7 +472,7 @@
         }
 
         /**
-         * Generate a plank texture.
+         * Generate a plank texture with vertical plank lines.
          * @param {number} r - Base red value.
          * @param {number} g - Base green value.
          * @param {number} b - Base blue value.
@@ -466,16 +483,14 @@
             _shufflePerm(seed || 111);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Draw 4 vertical planks
             for (var py = 0; py < TEX_SIZE; py++) {
                 for (var px = 0; px < TEX_SIZE; px++) {
                     var plankX = px % 4;
                     var n = _fbm(px * 0.1, py * 0.1, 2, 1.0, 1.0);
-                    var variation = plankX === 0 ? -10 : 0; // Darker lines between planks
+                    var variation = plankX === 0 ? -10 : 0;
                     var cr = Math.max(0, Math.min(255, r + variation + n * 10));
                     var cg = Math.max(0, Math.min(255, g + variation + n * 8));
                     var cb = Math.max(0, Math.min(255, b + variation + n * 6));
-                    var idx = (py * TEX_SIZE + px) * 4;
                     ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
                     ctx.fillRect(px, py, 1, 1);
                 }
@@ -483,8 +498,10 @@
             return _canvasToImage(canvas);
         }
 
+        // ---- Fabric / Wool ----
+
         /**
-         * Generate a colored wool/fabric texture with seeded noise variation and woven pattern.
+         * Generate a colored wool/fabric texture with seeded noise and woven pattern.
          * @param {number} r - Base red.
          * @param {number} g - Base green.
          * @param {number} b - Base blue.
@@ -498,7 +515,6 @@
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = (_rng() - 0.5) * 20;
-                    // Woven pattern: slight horizontal variation
                     var weave = (y % 2 === 0) ? 3 : -3;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n + weave));
@@ -510,6 +526,8 @@
             ctx.putImageData(imgData, 0, 0);
             return _canvasToImage(canvas);
         }
+
+        // ---- Concrete / Powder ----
 
         /**
          * Generate a concrete texture (smooth colored surface) with seeded noise.
@@ -525,7 +543,7 @@
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (_rng() - 0.5) * 8; // Less noise than wool
+                    var n = (_rng() - 0.5) * 8;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
@@ -536,6 +554,34 @@
             ctx.putImageData(imgData, 0, 0);
             return _canvasToImage(canvas);
         }
+
+        /**
+         * Generate a concrete powder texture (same as concrete but rougher) with seeded noise.
+         * @param {number} r
+         * @param {number} g
+         * @param {number} b
+         * @returns {HTMLImageElement}
+         */
+        function generateConcretePowder(r, g, b) {
+            _seedRng(r + g + b);
+            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+            var ctx = canvas.getContext('2d');
+            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+            for (var y = 0; y < TEX_SIZE; y++) {
+                for (var x = 0; x < TEX_SIZE; x++) {
+                    var n = (_rng() - 0.5) * 18;
+                    var idx = (y * TEX_SIZE + x) * 4;
+                    imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
+                    imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
+                    imgData.data[idx + 2] = Math.max(0, Math.min(255, b + n));
+                    imgData.data[idx + 3] = 255;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return _canvasToImage(canvas);
+        }
+
+        // ---- Glass / Ice ----
 
         /**
          * Generate a glass texture (transparent with border).
@@ -566,12 +612,53 @@
         }
 
         /**
-         * Generate a brick texture.
-         * @param {number} r - Brick red.
-         * @param {number} g - Brick green.
-         * @param {number} b - Brick blue.
+         * Generate an ice texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
+        function generateIce() {
+            _seedRng(42);
+            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+            var ctx = canvas.getContext('2d');
+            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+            for (var y = 0; y < TEX_SIZE; y++) {
+                for (var x = 0; x < TEX_SIZE; x++) {
+                    var n = (_rng() - 0.5) * 15;
+                    var idx = (y * TEX_SIZE + x) * 4;
+                    imgData.data[idx]     = 180 + n;
+                    imgData.data[idx + 1] = 210 + n;
+                    imgData.data[idx + 2] = 240 + n;
+                    imgData.data[idx + 3] = 160;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return _canvasToImage(canvas);
+        }
+
+        /**
+         * Generate a blue ice texture (more opaque, deeper blue) with seeded noise.
+         * @returns {HTMLImageElement}
+         */
+        function generateBlueIce() {
+            _seedRng(42);
+            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+            var ctx = canvas.getContext('2d');
+            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+            for (var y = 0; y < TEX_SIZE; y++) {
+                for (var x = 0; x < TEX_SIZE; x++) {
+                    var n = (_rng() - 0.5) * 8;
+                    var idx = (y * TEX_SIZE + x) * 4;
+                    imgData.data[idx]     = 100 + n;
+                    imgData.data[idx + 1] = 160 + n;
+                    imgData.data[idx + 2] = 230 + n;
+                    imgData.data[idx + 3] = 230;
+                }
+            }
+            ctx.putImageData(imgData, 0, 0);
+            return _canvasToImage(canvas);
+        }
+
+        // ---- Bricks ----
+
         /**
          * Generate a brick texture with seeded color variation.
          * @param {number} r - Brick red.
@@ -583,10 +670,8 @@
             _seedRng(r + g + b);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Mortar background
             ctx.fillStyle = '#999999';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Draw brick rows
             var brickH = 3;
             var mortarW = 1;
             for (var row = 0; row < TEX_SIZE; row += brickH) {
@@ -594,7 +679,6 @@
                 for (var col = -4 + offset; col < TEX_SIZE; col += 8) {
                     var bx = col;
                     var by = row;
-                    // Brick with seeded color variation
                     var brickR = r + (_rng() - 0.5) * 15;
                     var brickG = g + (_rng() - 0.5) * 10;
                     var brickB = b + (_rng() - 0.5) * 8;
@@ -604,6 +688,8 @@
             }
             return _canvasToImage(canvas);
         }
+
+        // ---- Ore ----
 
         /**
          * Generate an ore texture (ore veins embedded in stone).
@@ -617,7 +703,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Stone background (inline to avoid re-shuffling via generateStone)
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _fbm(x * 0.15, y * 0.15, 4, 1.0, 1.0);
@@ -630,7 +715,6 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Place ore clusters
             var orePositions = [
                 { x: 4, y: 3 }, { x: 10, y: 5 }, { x: 6, y: 10 },
                 { x: 12, y: 12 }, { x: 3, y: 13 }
@@ -639,7 +723,6 @@
             for (var i = 0; i < orePositions.length; i++) {
                 var pos = orePositions[i];
                 ctx.fillStyle = 'rgb(' + oreR + ',' + oreG + ',' + oreB + ')';
-                // Draw small ore cluster (3-4 pixels) with seeded randomness
                 for (var dx = -1; dx <= 1; dx++) {
                     for (var dy = -1; dy <= 1; dy++) {
                         if (_rng() > 0.4) {
@@ -653,13 +736,8 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a sand texture.
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
+        // ---- Sand / Snow ----
+
         /**
          * Generate a sand texture with seeded noise variation.
          * @param {number} r
@@ -687,10 +765,6 @@
         }
 
         /**
-         * Generate a snow texture (white with slight blue tint).
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a snow texture (white with slight blue tint) using seeded noise.
          * @returns {HTMLImageElement}
          */
@@ -713,6 +787,8 @@
             return _canvasToImage(canvas);
         }
 
+        // ---- Liquids ----
+
         /**
          * Generate a water texture.
          * @returns {HTMLImageElement}
@@ -729,7 +805,7 @@
                     imgData.data[idx]     = 30 + n * 20;
                     imgData.data[idx + 1] = 80 + n * 40;
                     imgData.data[idx + 2] = 180 + n * 40;
-                    imgData.data[idx + 3] = 180; // Semi-transparent
+                    imgData.data[idx + 3] = 180;
                 }
             }
             ctx.putImageData(imgData, 0, 0);
@@ -760,10 +836,8 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a bedrock texture (dark gray with noise).
-         * @returns {HTMLImageElement}
-         */
+        // ---- Special blocks ----
+
         /**
          * Generate a bedrock texture (dark gray with seeded noise variation).
          * @returns {HTMLImageElement}
@@ -787,13 +861,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a glowing block texture.
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a glowing block texture with seeded noise.
          * @param {number} r
@@ -826,10 +893,6 @@
         }
 
         /**
-         * Generate a quartz pillar texture (horizontal stripes).
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a quartz pillar texture (horizontal stripes) with seeded noise.
          * @returns {HTMLImageElement}
          */
@@ -842,7 +905,6 @@
                 ctx.fillStyle = isStripe ? '#E8E0D0' : '#D8D0C0';
                 ctx.fillRect(0, y, TEX_SIZE, 1);
             }
-            // Add seeded subtle noise
             var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < imgData.data.length; i += 4) {
                 var n = (_rng() - 0.5) * 8;
@@ -879,13 +941,6 @@
         }
 
         /**
-         * Generate a polished block texture (smooth with subtle pattern).
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a polished block texture (smooth with subtle pattern) using seeded noise.
          * @param {number} r
          * @param {number} g
@@ -899,7 +954,7 @@
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (_rng() - 0.5) * 6; // Very smooth
+                    var n = (_rng() - 0.5) * 6;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
@@ -912,13 +967,6 @@
         }
 
         /**
-         * Generate a leaf texture.
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a leaf texture with seeded clump variation.
          * @param {number} r
          * @param {number} g
@@ -929,10 +977,8 @@
             _seedRng(r + g + b);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Fill with base color
             ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Add seeded leaf clumps
             for (var i = 0; i < 20; i++) {
                 var lx = Math.floor(_rng() * 14);
                 var ly = Math.floor(_rng() * 14);
@@ -945,10 +991,8 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a TNT side texture.
-         * @returns {HTMLImageElement}
-         */
+        // ---- Block-specific textures ----
+
         /**
          * Generate a TNT side texture with seeded noise variation.
          * @returns {HTMLImageElement}
@@ -957,13 +1001,10 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Red base
             ctx.fillStyle = '#CC3333';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // White stripe in middle
             ctx.fillStyle = '#EEEEEE';
             ctx.fillRect(0, 6, TEX_SIZE, 4);
-            // Add seeded noise
             var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < imgData.data.length; i += 4) {
                 var n = (_rng() - 0.5) * 15;
@@ -982,13 +1023,10 @@
         function generateChestSide() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B6914';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Chest line
             ctx.fillStyle = '#6B4F12';
             ctx.fillRect(0, 7, TEX_SIZE, 2);
-            // Lock hint
             ctx.fillStyle = '#CCCC44';
             ctx.fillRect(7, 8, 2, 2);
             return _canvasToImage(canvas);
@@ -1001,13 +1039,10 @@
         function generateFurnaceFront() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Smooth stone base
             ctx.fillStyle = '#B0B0B0';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Furnace opening
             ctx.fillStyle = '#333333';
             ctx.fillRect(4, 5, 8, 7);
-            // Fire glow inside
             ctx.fillStyle = '#FF6600';
             ctx.fillRect(5, 8, 6, 3);
             return _canvasToImage(canvas);
@@ -1020,10 +1055,8 @@
         function generateCraftingTable() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Plank base
             ctx.fillStyle = '#BC9862';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Grid lines
             ctx.strokeStyle = '#6B5335';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1040,17 +1073,13 @@
         function generateBookshelf() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B5A2B';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Books in rows
             var colors = ['#CC3333', '#336699', '#339933', '#996633', '#663399'];
             for (var row = 0; row < 2; row++) {
                 for (var book = 0; book < 5; book++) {
                     ctx.fillStyle = colors[(row * 5 + book) % colors.length];
-                    var bx = book * 3 + 1;
-                    var by = row * 7 + 2;
-                    ctx.fillRect(bx, by, 2, 5);
+                    ctx.fillRect(book * 3 + 1, row * 7 + 2, 2, 5);
                 }
             }
             return _canvasToImage(canvas);
@@ -1080,10 +1109,6 @@
         }
 
         /**
-         * Generate an end stone texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate an end stone texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
@@ -1106,10 +1131,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a gold block texture (shiny yellow).
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a gold block texture (shiny yellow) with seeded noise.
          * @returns {HTMLImageElement}
@@ -1141,17 +1162,14 @@
         function generateIronBlock() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Grid pattern for iron ingots
             ctx.fillStyle = '#D4C4A8';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.strokeStyle = '#B0A080';
             ctx.lineWidth = 1;
-            // 2×2 grid
             ctx.strokeRect(0.5, 0.5, 7, 7);
             ctx.strokeRect(8.5, 0.5, 7, 7);
             ctx.strokeRect(0.5, 8.5, 7, 7);
             ctx.strokeRect(8.5, 8.5, 7, 7);
-            // Add seeded noise
             _seedRng(42);
             var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < imgData.data.length; i += 4) {
@@ -1165,10 +1183,6 @@
         }
 
         /**
-         * Generate a diamond block texture (cyan with sparkle).
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a diamond block texture (cyan with sparkle) using seeded noise.
          * @returns {HTMLImageElement}
          */
@@ -1178,20 +1192,13 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#55DDDD';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Diamond sparkle highlights with seeded positions
             for (var i = 0; i < 8; i++) {
-                var hx = Math.floor(_rng() * 14);
-                var hy = Math.floor(_rng() * 14);
                 ctx.fillStyle = 'rgba(200, 255, 255, 0.6)';
-                ctx.fillRect(hx, hy, 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a redstone block texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a redstone block texture with seeded specks.
          * @returns {HTMLImageElement}
@@ -1202,7 +1209,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#AA2222';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Darker seeded specks
             for (var i = 0; i < 15; i++) {
                 ctx.fillStyle = 'rgba(80, 10, 10, 0.5)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1210,10 +1216,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a lapis block texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a lapis block texture with seeded blue specks.
          * @returns {HTMLImageElement}
@@ -1224,7 +1226,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#3355AA';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Blue seeded specks
             for (var i = 0; i < 12; i++) {
                 ctx.fillStyle = 'rgba(40, 60, 160, 0.6)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1233,11 +1234,7 @@
         }
 
         /**
-         * Generate a emerald block texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
-         * Generate a emerald block texture with seeded green specks.
+         * Generate an emerald block texture with seeded green specks.
          * @returns {HTMLImageElement}
          */
         function generateEmeraldBlock() {
@@ -1246,7 +1243,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#33BB55';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Lighter green seeded specks
             for (var i = 0; i < 10; i++) {
                 ctx.fillStyle = 'rgba(80, 220, 100, 0.5)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1254,10 +1250,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a coal block texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a coal block texture with seeded sparkle.
          * @returns {HTMLImageElement}
@@ -1268,7 +1260,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#333333';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Coal seeded sparkle
             for (var i = 0; i < 8; i++) {
                 ctx.fillStyle = 'rgba(60, 60, 60, 0.7)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1276,13 +1267,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a slime block texture.
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a slime block texture with seeded noise variation.
          * @param {number} r
@@ -1297,7 +1281,6 @@
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    // Slime grid pattern
                     var isGrid = x % 4 === 0 || y % 4 === 0;
                     var brightness = isGrid ? 0.7 : 1.0;
                     var n = (_rng() - 0.5) * 10;
@@ -1305,17 +1288,13 @@
                     imgData.data[idx]     = Math.max(0, Math.min(255, r * brightness + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g * brightness + n));
                     imgData.data[idx + 2] = Math.max(0, Math.min(255, b * brightness + n));
-                    imgData.data[idx + 3] = 200; // Semi-transparent
+                    imgData.data[idx + 3] = 200;
                 }
             }
             ctx.putImageData(imgData, 0, 0);
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a honey block texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a honey block texture with seeded noise variation.
          * @returns {HTMLImageElement}
@@ -1332,17 +1311,13 @@
                     imgData.data[idx]     = 230 + n;
                     imgData.data[idx + 1] = 180 + n;
                     imgData.data[idx + 2] = 50 + n;
-                    imgData.data[idx + 3] = 220; // Semi-transparent
+                    imgData.data[idx + 3] = 220;
                 }
             }
             ctx.putImageData(imgData, 0, 0);
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a hay bale texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a hay bale texture with seeded line wobble.
          * @returns {HTMLImageElement}
@@ -1353,7 +1328,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#C8B050';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Horizontal seeded lines with slight wobble
             ctx.strokeStyle = '#A89040';
             ctx.lineWidth = 1;
             for (var y = 2; y < TEX_SIZE; y += 3) {
@@ -1372,15 +1346,12 @@
         function generateMelon() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Green outer
             ctx.fillStyle = '#44AA44';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Inner green circle
             ctx.fillStyle = '#66CC66';
             ctx.beginPath();
             ctx.arc(8, 8, 6, 0, Math.PI * 2);
             ctx.fill();
-            // Grid lines
             ctx.strokeStyle = '#338833';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1399,7 +1370,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#CC7722';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Grid lines for segments
             ctx.strokeStyle = '#AA5511';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1420,7 +1390,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = isRed ? '#CC2222' : '#8B6914';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Spots for red mushroom
             if (isRed) {
                 ctx.fillStyle = '#FFFFFF';
                 var spots = [{ x: 3, y: 3 }, { x: 10, y: 4 }, { x: 7, y: 9 }, { x: 4, y: 12 }];
@@ -1434,10 +1403,6 @@
         }
 
         /**
-         * Generate a chorus plant texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a chorus plant texture with seeded node positions.
          * @returns {HTMLImageElement}
          */
@@ -1447,7 +1412,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#AA77CC';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded purple nodes
             for (var i = 0; i < 10; i++) {
                 ctx.fillStyle = 'rgba(160, 100, 200, 0.7)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1464,7 +1428,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#44AA44';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Cactus lines
             ctx.strokeStyle = '#338833';
             ctx.lineWidth = 1;
             for (var y = 2; y < TEX_SIZE; y += 4) {
@@ -1472,7 +1435,6 @@
                 ctx.moveTo(0, y); ctx.lineTo(TEX_SIZE, y);
                 ctx.stroke();
             }
-            // Edge highlights
             ctx.fillStyle = '#55CC55';
             ctx.fillRect(0, 0, 1, TEX_SIZE);
             ctx.fillRect(14, 0, 1, TEX_SIZE);
@@ -1486,10 +1448,8 @@
         function generateSugarCane() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Light green base
             ctx.fillStyle = '#88CC44';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Segment lines
             ctx.strokeStyle = '#66AA33';
             ctx.lineWidth = 1;
             for (var y = 3; y < TEX_SIZE; y += 5) {
@@ -1505,7 +1465,7 @@
          * @returns {HTMLImageElement}
          */
         function generateReeds() {
-            return generateSugarCane(); // Same as sugar cane
+            return generateSugarCane();
         }
 
         /**
@@ -1517,17 +1477,13 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             if (lit) {
-                // Glowing orange
                 ctx.fillStyle = '#FFAA00';
                 ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                // Redstone dot
                 ctx.fillStyle = '#FF4400';
                 ctx.fillRect(6, 6, 4, 4);
             } else {
-                // Stone base
                 ctx.fillStyle = '#999999';
                 ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                // Redstone line
                 ctx.fillStyle = '#AA2222';
                 ctx.fillRect(6, 6, 4, 4);
             }
@@ -1543,7 +1499,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#AA6644';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Black circle for note
             ctx.fillStyle = '#222222';
             ctx.beginPath();
             ctx.arc(8, 8, 3, 0, Math.PI * 2);
@@ -1552,7 +1507,7 @@
         }
 
         /**
-         * Generate a end portal frame texture.
+         * Generate an end portal frame texture.
          * @returns {HTMLImageElement}
          */
         function generateEndPortalFrame() {
@@ -1560,10 +1515,8 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#556655';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Inner eye
             ctx.fillStyle = '#220033';
             ctx.fillRect(4, 4, 8, 8);
-            // Star
             ctx.fillStyle = '#AA44FF';
             ctx.fillRect(7, 7, 2, 2);
             return _canvasToImage(canvas);
@@ -1576,16 +1529,13 @@
         function generateMossyStoneBrick() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             ctx.fillStyle = '#889988';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Moss patches
             ctx.fillStyle = '#557744';
             var mosses = [{ x: 0, y: 0 }, { x: 8, y: 0 }, { x: 0, y: 8 }, { x: 10, y: 10 }];
             for (var i = 0; i < mosses.length; i++) {
                 ctx.fillRect(mosses[i].x, mosses[i].y, 4, 4);
             }
-            // Brick lines
             ctx.strokeStyle = '#667766';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -1604,7 +1554,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#442222';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Brick pattern
             for (var row = 0; row < 4; row++) {
                 var offset = (row % 2) * 4;
                 for (var col = -4 + offset; col < TEX_SIZE; col += 8) {
@@ -1615,10 +1564,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a polished blackstone texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a polished blackstone texture with seeded noise.
          * @returns {HTMLImageElement}
@@ -1643,10 +1588,6 @@
         }
 
         /**
-         * Generate a polished basalt texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a polished basalt texture with seeded noise.
          * @returns {HTMLImageElement}
          */
@@ -1654,7 +1595,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Smoother than regular basalt
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = (_rng() - 0.5) * 8;
@@ -1667,10 +1607,6 @@
         }
 
         /**
-         * Generate a glowstone texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a glowstone texture with seeded bright spots.
          * @returns {HTMLImageElement}
          */
@@ -1680,7 +1616,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#DDCC66';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded bright spots
             for (var i = 0; i < 12; i++) {
                 ctx.fillStyle = 'rgba(255, 240, 150, 0.6)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1688,10 +1623,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a shroomlight texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a shroomlight texture with seeded glow spots.
          * @returns {HTMLImageElement}
@@ -1702,7 +1633,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#CC3300';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded glow spots
             for (var i = 0; i < 10; i++) {
                 ctx.fillStyle = 'rgba(255, 100, 50, 0.5)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -1761,18 +1691,6 @@
         }
 
         /**
-         * Convert a canvas element to an Image element via data URL.
-         * @param {HTMLCanvasElement} canvas - Source canvas.
-         * @returns {HTMLImageElement}
-         * @private
-         */
-        function _canvasToImage(canvas) {
-            var img = new Image();
-            img.src = canvas.toDataURL('image/png');
-            return img;
-        }
-
-        /**
          * Generate a snow block texture (solid white with slight noise).
          * @returns {HTMLImageElement}
          */
@@ -1781,63 +1699,13 @@
         }
 
         /**
-         * Generate an ice texture.
+         * Generate a red sand texture.
          * @returns {HTMLImageElement}
          */
-        /**
-         * Generate an ice texture with seeded noise variation.
-         * @returns {HTMLImageElement}
-         */
-        function generateIce() {
-            _seedRng(42);
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            for (var y = 0; y < TEX_SIZE; y++) {
-                for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (_rng() - 0.5) * 15;
-                    var idx = (y * TEX_SIZE + x) * 4;
-                    imgData.data[idx]     = 180 + n;
-                    imgData.data[idx + 1] = 210 + n;
-                    imgData.data[idx + 2] = 240 + n;
-                    imgData.data[idx + 3] = 160; // Semi-transparent
-                }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return _canvasToImage(canvas);
+        function generateRedSand() {
+            return generateSand(183, 105, 63);
         }
 
-        /**
-         * Generate a blue ice texture (more opaque, deeper blue).
-         * @returns {HTMLImageElement}
-         */
-        /**
-         * Generate a blue ice texture (more opaque, deeper blue) with seeded noise.
-         * @returns {HTMLImageElement}
-         */
-        function generateBlueIce() {
-            _seedRng(42);
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            for (var y = 0; y < TEX_SIZE; y++) {
-                for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (_rng() - 0.5) * 8;
-                    var idx = (y * TEX_SIZE + x) * 4;
-                    imgData.data[idx]     = 100 + n;
-                    imgData.data[idx + 1] = 160 + n;
-                    imgData.data[idx + 2] = 230 + n;
-                    imgData.data[idx + 3] = 230; // Mostly opaque
-                }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a sponge texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a sponge texture with seeded holes.
          * @returns {HTMLImageElement}
@@ -1848,12 +1716,9 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#DDAA33';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded sponge holes
             for (var i = 0; i < 15; i++) {
                 ctx.fillStyle = 'rgba(180, 140, 20, 0.6)';
-                var hx = Math.floor(_rng() * 14);
-                var hy = Math.floor(_rng() * 14);
-                ctx.fillRect(hx, hy, 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -1868,12 +1733,9 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#668844';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded sponge holes (darker)
             for (var i = 0; i < 15; i++) {
                 ctx.fillStyle = 'rgba(50, 70, 30, 0.6)';
-                var hx = Math.floor(_rng() * 14);
-                var hy = Math.floor(_rng() * 14);
-                ctx.fillRect(hx, hy, 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -1904,18 +1766,6 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a red sand texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateRedSand() {
-            return generateSand(183, 105, 63);
-        }
-
-        /**
-         * Generate a sandstone texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a sandstone texture with seeded noise and layer effect.
          * @returns {HTMLImageElement}
@@ -1949,7 +1799,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#D4C496';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Chiseled pattern (indentation)
             ctx.strokeStyle = '#B4A476';
             ctx.lineWidth = 1;
             ctx.strokeRect(2, 2, 12, 12);
@@ -1964,7 +1813,6 @@
         function generateCutSandstone() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Smooth sandstone with horizontal line
             ctx.fillStyle = '#D4C496';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.strokeStyle = '#B4A476';
@@ -1975,53 +1823,14 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a coal ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateCoalOre() {
-            return generateOre(30, 30, 30);
-        }
+        // ---- Ore aliases ----
 
-        /**
-         * Generate an iron ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateIronOre() {
-            return generateOre(210, 180, 150);
-        }
-
-        /**
-         * Generate a gold ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateGoldOre() {
-            return generateOre(237, 201, 36);
-        }
-
-        /**
-         * Generate a diamond ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateDiamondOre() {
-            return generateOre(80, 220, 230);
-        }
-
-        /**
-         * Generate an emerald ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateEmeraldOre() {
-            return generateOre(40, 220, 80);
-        }
-
-        /**
-         * Generate a redstone ore texture (unlit = dark stone with red specks).
-         * @returns {HTMLImageElement}
-         */
-        function generateRedstoneOre() {
-            return generateOre(180, 20, 20);
-        }
+        function generateCoalOre()       { return generateOre(30, 30, 30); }
+        function generateIronOre()       { return generateOre(210, 180, 150); }
+        function generateGoldOre()       { return generateOre(237, 201, 36); }
+        function generateDiamondOre()    { return generateOre(80, 220, 230); }
+        function generateEmeraldOre()    { return generateOre(40, 220, 80); }
+        function generateRedstoneOre()   { return generateOre(180, 20, 20); }
 
         /**
          * Generate a lit redstone ore texture (glowing red).
@@ -2030,10 +1839,8 @@
         function generateLitRedstoneOre() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             var stoneImg = generateStone(1234);
             ctx.drawImage(stoneImg, 0, 0);
-            // Glowing red center
             ctx.fillStyle = '#FF2200';
             ctx.fillRect(5, 5, 6, 6);
             ctx.fillStyle = '#FF6644';
@@ -2041,13 +1848,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a lapis ore texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateLapisOre() {
-            return generateOre(30, 60, 180);
-        }
+        function generateLapisOre()      { return generateOre(30, 60, 180); }
 
         /**
          * Generate a nether quartz ore texture.
@@ -2058,7 +1859,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Netherrack background
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
@@ -2070,12 +1870,10 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Quartz specks (white)
             var quartzPositions = [{ x: 5, y: 4 }, { x: 11, y: 8 }, { x: 7, y: 12 }];
             for (var i = 0; i < quartzPositions.length; i++) {
                 ctx.fillStyle = '#E8D8C0';
-                var pos = quartzPositions[i];
-                ctx.fillRect(pos.x, pos.y, 2, 2);
+                ctx.fillRect(quartzPositions[i].x, quartzPositions[i].y, 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -2089,7 +1887,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Netherrack background
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
@@ -2101,12 +1898,10 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Gold specks
             var goldPositions = [{ x: 4, y: 5 }, { x: 10, y: 10 }, { x: 8, y: 3 }];
             for (var i = 0; i < goldPositions.length; i++) {
                 ctx.fillStyle = '#DDAA33';
-                var pos = goldPositions[i];
-                ctx.fillRect(pos.x, pos.y, 2, 2);
+                ctx.fillRect(goldPositions[i].x, goldPositions[i].y, 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -2120,7 +1915,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Netherrack background
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
@@ -2132,20 +1926,14 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Ancient debris (bronze/copper color)
             var debrisPositions = [{ x: 6, y: 5 }, { x: 9, y: 8 }, { x: 7, y: 11 }];
             for (var i = 0; i < debrisPositions.length; i++) {
                 ctx.fillStyle = '#BB8844';
-                var pos = debrisPositions[i];
-                ctx.fillRect(pos.x, pos.y, 2, 2);
+                ctx.fillRect(debrisPositions[i].x, debrisPositions[i].y, 2, 2);
             }
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a gilded blackstone texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a gilded blackstone texture with seeded noise and gold specks.
          * @returns {HTMLImageElement}
@@ -2155,7 +1943,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Seeded blackstone background
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = (_rng() - 0.5) * 10;
@@ -2167,7 +1954,6 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Gold seeded specks
             for (var i = 0; i < 6; i++) {
                 ctx.fillStyle = 'rgba(200, 170, 50, 0.7)';
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
@@ -2182,16 +1968,13 @@
         function generateMagma() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Dark stone base
             ctx.fillStyle = '#8B6040';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Magma cracks
             ctx.fillStyle = '#CC4400';
             var cracks = [{ x: 2, y: 3 }, { x: 8, y: 2 }, { x: 5, y: 8 }, { x: 11, y: 10 }, { x: 3, y: 13 }];
             for (var i = 0; i < cracks.length; i++) {
                 ctx.fillRect(cracks[i].x, cracks[i].y, 3, 2);
             }
-            // Glow
             ctx.fillStyle = '#FF6622';
             ctx.fillRect(3, 4, 2, 1);
             ctx.fillRect(9, 3, 2, 1);
@@ -2244,10 +2027,8 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a warped stem texture.
-         * @returns {HTMLImageElement}
-         */
+        // ---- Nether wood ----
+
         function generateWarpedStem() {
             _shufflePerm(2222);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
@@ -2267,18 +2048,8 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a warped planks texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateWarpedPlanks() {
-            return generatePlanks(60, 180, 170, 2222);
-        }
+        function generateWarpedPlanks() { return generatePlanks(60, 180, 170, 2222); }
 
-        /**
-         * Generate a crimson stem texture.
-         * @returns {HTMLImageElement}
-         */
         function generateCrimsonStem() {
             _shufflePerm(3333);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
@@ -2298,13 +2069,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a crimson planks texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateCrimsonPlanks() {
-            return generatePlanks(170, 50, 50, 3333);
-        }
+        function generateCrimsonPlanks() { return generatePlanks(170, 50, 50, 3333); }
 
         /**
          * Generate a nylium texture (netherrack with nylium growth) using seeded noise.
@@ -2316,7 +2081,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            // Netherrack base
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
@@ -2328,7 +2092,6 @@
                 }
             }
             ctx.putImageData(imgData, 0, 0);
-            // Nylium growth color with seeded positions
             _seedRng(isWarped ? 2222 : 3333);
             var gr = isWarped ? 60 : 180;
             var gg = isWarped ? 170 : 50;
@@ -2340,6 +2103,8 @@
             return _canvasToImage(canvas);
         }
 
+        // ---- Chain / decorative ----
+
         /**
          * Generate a chain texture.
          * @returns {HTMLImageElement}
@@ -2348,11 +2113,9 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#888888';
-            // Chain links (vertical)
             ctx.fillRect(6, 0, 4, 5);
             ctx.fillRect(6, 7, 4, 5);
             ctx.fillRect(6, 14, 4, 2);
-            // Highlight
             ctx.fillStyle = '#AAAAAA';
             ctx.fillRect(7, 1, 2, 3);
             ctx.fillRect(7, 8, 2, 3);
@@ -2368,7 +2131,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#883333';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Brick pattern
             for (var row = 0; row < 4; row++) {
                 var offset = (row % 2) * 4;
                 for (var col = -4 + offset; col < TEX_SIZE; col += 8) {
@@ -2388,7 +2150,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#E8DCC8';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Subtle lines
             ctx.strokeStyle = '#D8CCB8';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -2406,7 +2167,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#E8DCC8';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Vertical lines
             ctx.strokeStyle = '#D8CCB8';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -2424,7 +2184,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#E8DCC8';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Small brick pattern
             for (var row = 0; row < 8; row++) {
                 var offset = (row % 2) * 2;
                 for (var col = -2 + offset; col < TEX_SIZE; col += 4) {
@@ -2445,7 +2204,6 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#AA77C0';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Vertical lines
             ctx.strokeStyle = '#9966B0';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -2469,31 +2227,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a concrete powder texture (same as concrete but rougher) with seeded noise.
-         * @param {number} r
-         * @param {number} g
-         * @param {number} b
-         * @returns {HTMLImageElement}
-         */
-        function generateConcretePowder(r, g, b) {
-            _seedRng(r + g + b);
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
-            for (var y = 0; y < TEX_SIZE; y++) {
-                for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (_rng() - 0.5) * 18; // More noise than concrete
-                    var idx = (y * TEX_SIZE + x) * 4;
-                    imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
-                    imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
-                    imgData.data[idx + 2] = Math.max(0, Math.min(255, b + n));
-                    imgData.data[idx + 3] = 255;
-                }
-            }
-            ctx.putImageData(imgData, 0, 0);
-            return _canvasToImage(canvas);
-        }
+        // ---- Plants / decor ----
 
         /**
          * Generate a lily pad texture.
@@ -2502,13 +2236,11 @@
         function generateLilyPad() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Green circle with gap
             ctx.fillStyle = '#44AA22';
             ctx.beginPath();
             ctx.arc(8, 8, 7, 0.3, Math.PI * 2 - 0.3);
             ctx.lineTo(8, 8);
             ctx.fill();
-            // Veins
             ctx.strokeStyle = '#338811';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -2525,10 +2257,8 @@
         function generateVine() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(0,0,0,0)';
-            ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+            ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.fillStyle = '#44AA22';
-            // Random vine segments
             var vines = [
                 { x: 0, y: 0 }, { x: 3, y: 1 }, { x: 5, y: 2 },
                 { x: 2, y: 4 }, { x: 8, y: 3 }, { x: 10, y: 5 },
@@ -2545,14 +2275,8 @@
          * Generate a grass block top texture alias.
          * @returns {HTMLImageElement}
          */
-        function generateGrass() {
-            return generateGrassTop();
-        }
+        function generateGrass() { return generateGrassTop(); }
 
-        /**
-         * Generate a tall grass texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a tall grass texture with seeded blade positions.
          * @returns {HTMLImageElement}
@@ -2563,11 +2287,8 @@
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.fillStyle = '#55AA33';
-            // Seeded blades of grass
             for (var i = 0; i < 8; i++) {
-                var bx = 1 + Math.floor(_rng() * 14);
-                var by = 4 + Math.floor(_rng() * 4);
-                ctx.fillRect(bx, by, 1, 8 + Math.floor(_rng() * 4));
+                ctx.fillRect(1 + Math.floor(_rng() * 14), 4 + Math.floor(_rng() * 4), 1, 8 + Math.floor(_rng() * 4));
             }
             return _canvasToImage(canvas);
         }
@@ -2581,7 +2302,6 @@
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.fillStyle = '#44AA33';
-            // Fern shape
             ctx.fillRect(7, 4, 2, 10);
             ctx.fillRect(5, 6, 2, 6);
             ctx.fillRect(9, 6, 2, 6);
@@ -2599,10 +2319,8 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Stem
             ctx.fillStyle = '#44AA33';
             ctx.fillRect(7, 8, 2, 6);
-            // Petals
             var petalColor = color === 'red' ? '#CC2222' :
                              color === 'blue' ? '#3366CC' :
                              color === 'yellow' ? '#DDDD33' : '#CC8844';
@@ -2621,10 +2339,8 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Stem
             ctx.fillStyle = '#44AA33';
             ctx.fillRect(7, 4, 2, 10);
-            // Two roses
             ctx.fillStyle = '#CC2222';
             ctx.fillRect(5, 2, 6, 4);
             ctx.fillRect(6, 1, 4, 2);
@@ -2641,10 +2357,8 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Stem
             ctx.fillStyle = '#88AA33';
             ctx.fillRect(7, 8, 2, 6);
-            // Top flower
             ctx.fillStyle = '#DDCC33';
             ctx.fillRect(5, 2, 6, 5);
             ctx.fillRect(6, 1, 4, 2);
@@ -2662,7 +2376,6 @@
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
             ctx.fillStyle = '#8B7355';
-            // Dead branches
             ctx.fillRect(7, 6, 2, 8);
             ctx.fillRect(4, 8, 4, 2);
             ctx.fillRect(10, 5, 3, 2);
@@ -2678,10 +2391,8 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Vine
             ctx.fillStyle = '#44AA33';
             ctx.fillRect(7, 0, 2, 10);
-            // Glow berries
             ctx.fillStyle = '#88DD44';
             ctx.fillRect(5, 4, 2, 2);
             ctx.fillRect(9, 6, 2, 2);
@@ -2696,16 +2407,16 @@
         function generateCocoa() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood background
             ctx.fillStyle = '#8B5A2B';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Cocoa pods
             ctx.fillStyle = '#664422';
             ctx.fillRect(5, 6, 6, 5);
             ctx.fillStyle = '#886633';
             ctx.fillRect(6, 7, 4, 3);
             return _canvasToImage(canvas);
         }
+
+        // ---- Redstone components ----
 
         /**
          * Generate a piston side texture.
@@ -2714,13 +2425,10 @@
         function generatePistonSide() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B6914';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Iron plate
             ctx.fillStyle = '#AAAAAA';
             ctx.fillRect(0, 6, TEX_SIZE, 4);
-            // Piston head
             ctx.fillStyle = '#88CC44';
             ctx.fillRect(2, 0, 12, 6);
             return _canvasToImage(canvas);
@@ -2734,14 +2442,11 @@
         function generateDispenser(isDispenser) {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             ctx.fillStyle = '#888888';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Dark opening
             ctx.fillStyle = '#444444';
             ctx.fillRect(5, 5, 6, 6);
             if (isDispenser) {
-                // Eye indicator
                 ctx.fillStyle = '#CC4444';
                 ctx.fillRect(7, 7, 2, 2);
             }
@@ -2755,12 +2460,10 @@
         function generateObserver() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base with stripes
             for (var y = 0; y < TEX_SIZE; y++) {
                 ctx.fillStyle = y % 4 < 2 ? '#888888' : '#777777';
                 ctx.fillRect(0, y, TEX_SIZE, 1);
             }
-            // Redstone eye
             ctx.fillStyle = '#CC2222';
             ctx.fillRect(6, 6, 4, 4);
             return _canvasToImage(canvas);
@@ -2773,16 +2476,13 @@
         function generateRepeater() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             ctx.fillStyle = '#888888';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Redstone torches and line
             ctx.fillStyle = '#CC2222';
             ctx.fillRect(3, 6, 2, 4);
             ctx.fillRect(11, 6, 2, 4);
             ctx.fillStyle = '#AA1111';
             ctx.fillRect(5, 7, 6, 2);
-            // Torch lights
             ctx.fillStyle = '#FFAA44';
             ctx.fillRect(3, 7, 2, 1);
             ctx.fillRect(11, 7, 2, 1);
@@ -2796,16 +2496,12 @@
         function generateLever() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             ctx.fillStyle = '#888888';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Base plate
             ctx.fillStyle = '#666666';
             ctx.fillRect(6, 10, 4, 3);
-            // Lever stick
             ctx.fillStyle = '#555555';
             ctx.fillRect(7, 4, 2, 7);
-            // Iron ball
             ctx.fillStyle = '#AAAAAA';
             ctx.fillRect(6, 2, 4, 4);
             return _canvasToImage(canvas);
@@ -2819,13 +2515,8 @@
         function generateButton(isStone) {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            if (isStone) {
-                ctx.fillStyle = '#888888';
-                ctx.fillRect(5, 6, 6, 4);
-            } else {
-                ctx.fillStyle = '#8B6914';
-                ctx.fillRect(5, 6, 6, 4);
-            }
+            ctx.fillStyle = isStone ? '#888888' : '#8B6914';
+            ctx.fillRect(5, 6, 6, 4);
             return _canvasToImage(canvas);
         }
 
@@ -2840,7 +2531,6 @@
             if (isStone) {
                 ctx.fillStyle = '#888888';
                 ctx.fillRect(1, 4, 14, 8);
-                // Stone pattern
                 ctx.strokeStyle = '#777777';
                 ctx.lineWidth = 1;
                 ctx.strokeRect(2, 5, 5, 6);
@@ -2848,7 +2538,6 @@
             } else {
                 ctx.fillStyle = '#8B6914';
                 ctx.fillRect(1, 4, 14, 8);
-                // Wood grain
                 ctx.strokeStyle = '#6B4F12';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
@@ -2870,17 +2559,13 @@
                 ctx.fillStyle = '#CCCCBB';
                 ctx.fillRect(2, 0, 5, 16);
                 ctx.fillRect(9, 0, 5, 16);
-                // Rivets
                 ctx.fillStyle = '#999998';
-                ctx.fillRect(3, 2, 1, 1);
-                ctx.fillRect(3, 13, 1, 1);
-                ctx.fillRect(10, 2, 1, 1);
-                ctx.fillRect(10, 13, 1, 1);
+                ctx.fillRect(3, 2, 1, 1); ctx.fillRect(3, 13, 1, 1);
+                ctx.fillRect(10, 2, 1, 1); ctx.fillRect(10, 13, 1, 1);
             } else {
                 ctx.fillStyle = '#BC9862';
                 ctx.fillRect(2, 0, 5, 16);
                 ctx.fillRect(9, 0, 5, 16);
-                // Wood grain
                 ctx.strokeStyle = '#9C7842';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
@@ -2901,19 +2586,13 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#8B6914';
-            // Vertical posts
             ctx.fillRect(2, 0, 3, 16);
             ctx.fillRect(11, 0, 3, 16);
-            // Horizontal bars
             ctx.fillRect(5, 3, 6, 2);
             ctx.fillRect(5, 11, 6, 2);
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a wall texture (cobblestone).
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a wall texture (cobblestone) with seeded stone shades.
          * @returns {HTMLImageElement}
@@ -2922,7 +2601,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Cobblestone pattern
             var stones = [
                 { x: 0, y: 8, w: 7, h: 8 },
                 { x: 8, y: 8, w: 8, h: 5 },
@@ -2945,10 +2623,8 @@
         function generateEndRod() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // White pole
             ctx.fillStyle = '#EEEEEE';
             ctx.fillRect(7, 0, 2, 16);
-            // Glowing tip
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(5, 0, 6, 4);
             ctx.fillStyle = '#DDDDDD';
@@ -2963,13 +2639,10 @@
         function generateRedstoneTorch() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stick
             ctx.fillStyle = '#555555';
             ctx.fillRect(7, 6, 2, 8);
-            // Torch top
             ctx.fillStyle = '#CC2222';
             ctx.fillRect(6, 1, 4, 5);
-            // Glow
             ctx.fillStyle = '#FF6644';
             ctx.fillRect(7, 2, 2, 3);
             return _canvasToImage(canvas);
@@ -2990,10 +2663,8 @@
             };
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wool part (top half)
             ctx.fillStyle = colors[color] || '#EEEEEE';
             ctx.fillRect(1, 0, 14, 6);
-            // Bed base (bottom half)
             ctx.fillStyle = '#333333';
             ctx.fillRect(1, 6, 14, 8);
             return _canvasToImage(canvas);
@@ -3013,20 +2684,14 @@
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = plankColors[woodType] || '#BC9862';
             ctx.fillRect(2, 0, 12, 12);
-            // Border
             ctx.strokeStyle = '#6B5335';
             ctx.lineWidth = 1;
             ctx.strokeRect(2.5, 0.5, 11, 11);
-            // Post at bottom
             ctx.fillStyle = plankColors[woodType] || '#BC9862';
             ctx.fillRect(6, 12, 4, 4);
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a mirror texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate a mirror texture with seeded reflective noise.
          * @returns {HTMLImageElement}
@@ -3035,7 +2700,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Silver reflective surface with seeded noise
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = (_rng() - 0.5) * 10;
@@ -3044,7 +2708,6 @@
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
-            // Frame
             ctx.strokeStyle = '#8B6914';
             ctx.lineWidth = 2;
             ctx.strokeRect(1, 1, 14, 14);
@@ -3058,17 +2721,13 @@
         function generateBrewingStand() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Base
             ctx.fillStyle = '#555555';
             ctx.fillRect(4, 10, 8, 4);
-            // Stem
             ctx.fillRect(7, 6, 2, 5);
-            // Cups
             ctx.fillStyle = '#333333';
             ctx.fillRect(4, 3, 3, 4);
             ctx.fillRect(9, 3, 3, 4);
             ctx.fillRect(6, 0, 4, 4);
-            // Potion glow
             ctx.fillStyle = '#8844AA';
             ctx.fillRect(5, 4, 2, 2);
             ctx.fillRect(10, 4, 2, 2);
@@ -3082,16 +2741,12 @@
         function generateCauldron() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Outer body
             ctx.fillStyle = '#555555';
             ctx.fillRect(1, 4, 14, 10);
-            // Inner (dark)
             ctx.fillStyle = '#333333';
             ctx.fillRect(3, 5, 10, 8);
-            // Rim
             ctx.fillStyle = '#666666';
             ctx.fillRect(0, 3, 16, 2);
-            // Handles
             ctx.fillStyle = '#777777';
             ctx.fillRect(0, 4, 2, 4);
             ctx.fillRect(14, 4, 2, 4);
@@ -3105,10 +2760,8 @@
         function generatePainting() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Brown frame
             ctx.fillStyle = '#6B4F12';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Inner canvas
             ctx.fillStyle = '#DDCCAA';
             ctx.fillRect(2, 2, 12, 12);
             return _canvasToImage(canvas);
@@ -3121,13 +2774,10 @@
         function generateMobSpawner() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stone base
             ctx.fillStyle = '#888888';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Dark opening
             ctx.fillStyle = '#333333';
             ctx.fillRect(4, 4, 8, 8);
-            // Spawner frame
             ctx.strokeStyle = '#556655';
             ctx.lineWidth = 2;
             ctx.strokeRect(3, 3, 10, 10);
@@ -3135,30 +2785,23 @@
         }
 
         /**
-         * Generate a respawning anchor texture.
+         * Generate a respawn anchor texture.
          * @returns {HTMLImageElement}
          */
         function generateRespawnAnchor() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Blackstone base
             ctx.fillStyle = '#333333';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Purple glow
             ctx.fillStyle = '#AA44FF';
             ctx.fillRect(4, 5, 8, 6);
             ctx.fillStyle = '#CC66FF';
             ctx.fillRect(6, 7, 4, 3);
-            // Top detail
             ctx.fillStyle = '#444444';
             ctx.fillRect(2, 2, 12, 3);
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate an end portal texture.
-         * @returns {HTMLImageElement}
-         */
         /**
          * Generate an end portal texture with seeded starfield positions.
          * @returns {HTMLImageElement}
@@ -3167,7 +2810,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Starfield
             ctx.fillStyle = '#110022';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
             for (var i = 0; i < 30; i++) {
@@ -3179,10 +2821,6 @@
         }
 
         /**
-         * Generate a nether portal texture.
-         * @returns {HTMLImageElement}
-         */
-        /**
          * Generate a nether portal texture with seeded purple swirl noise.
          * @returns {HTMLImageElement}
          */
@@ -3190,11 +2828,9 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Purple swirl with seeded noise
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
                     var n = _rng();
-                    var idx = (y * TEX_SIZE + x) * 4;
                     var r = 80 + n * 60;
                     var g = 20 + n * 30;
                     var b = 160 + n * 80;
@@ -3212,10 +2848,8 @@
         function generateChiseledBookshelf() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B5A2B';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Small book slots (3×3 grid)
             var bookColors = ['#CC3333', '#336699', '#339933', '#996633', '#663399', '#AA8844', '#4488AA', '#AA4488', '#88AA44'];
             for (var row = 0; row < 3; row++) {
                 for (var col = 0; col < 3; col++) {
@@ -3233,13 +2867,10 @@
         function generateLectern() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B6914';
             ctx.fillRect(0, 4, TEX_SIZE, 12);
-            // Slanted top
             ctx.fillStyle = '#BC9862';
             ctx.fillRect(3, 2, 10, 4);
-            // Book
             ctx.fillStyle = '#AA4422';
             ctx.fillRect(5, 1, 6, 3);
             return _canvasToImage(canvas);
@@ -3252,13 +2883,10 @@
         function generateSmoker() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#6B4F12';
             ctx.fillRect(2, 0, 12, 16);
-            // Dark opening
             ctx.fillStyle = '#333333';
             ctx.fillRect(5, 4, 6, 8);
-            // Smoke hint
             ctx.fillStyle = '#666666';
             ctx.fillRect(6, 2, 4, 3);
             return _canvasToImage(canvas);
@@ -3271,13 +2899,10 @@
         function generateBlastFurnace() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Iron base
             ctx.fillStyle = '#888888';
             ctx.fillRect(2, 0, 12, 16);
-            // Dark opening
             ctx.fillStyle = '#333333';
             ctx.fillRect(5, 4, 6, 8);
-            // Gear hint
             ctx.fillStyle = '#AAAAAA';
             ctx.fillRect(6, 6, 4, 4);
             return _canvasToImage(canvas);
@@ -3290,17 +2915,13 @@
         function generateJigsaw() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Beige base
             ctx.fillStyle = '#CCB888';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Jigsaw pattern
             ctx.strokeStyle = '#AA9866';
             ctx.lineWidth = 1;
-            // Male piece (top)
             ctx.beginPath();
             ctx.arc(8, 4, 3, Math.PI, 0);
             ctx.stroke();
-            // Female piece (bottom)
             ctx.beginPath();
             ctx.arc(8, 12, 3, 0, Math.PI);
             ctx.stroke();
@@ -3314,10 +2935,8 @@
         function generateComposter() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B6914';
             ctx.fillRect(2, 0, 12, 16);
-            // Level indicator lines
             ctx.strokeStyle = '#6B4F12';
             ctx.lineWidth = 1;
             for (var y = 3; y < 14; y += 3) {
@@ -3325,7 +2944,6 @@
                 ctx.moveTo(4, y); ctx.lineTo(12, y);
                 ctx.stroke();
             }
-            // Lid
             ctx.fillStyle = '#9C7842';
             ctx.fillRect(1, 0, 14, 2);
             return _canvasToImage(canvas);
@@ -3338,18 +2956,14 @@
         function generateLantern() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Hanging chain
             ctx.fillStyle = '#666666';
             ctx.fillRect(7, 0, 2, 3);
-            // Lantern body
             ctx.fillStyle = '#555555';
             ctx.fillRect(4, 3, 8, 10);
-            // Glow
             ctx.fillStyle = '#FFAA44';
             ctx.fillRect(5, 4, 6, 8);
             ctx.fillStyle = '#FFDD88';
             ctx.fillRect(6, 5, 4, 6);
-            // Top cap
             ctx.fillStyle = '#444444';
             ctx.fillRect(5, 2, 6, 2);
             return _canvasToImage(canvas);
@@ -3366,7 +2980,6 @@
             ctx.fillRect(7, 0, 2, 3);
             ctx.fillStyle = '#444444';
             ctx.fillRect(4, 3, 8, 10);
-            // Blue soul fire
             ctx.fillStyle = '#6688CC';
             ctx.fillRect(5, 4, 6, 8);
             ctx.fillStyle = '#88AADD';
@@ -3383,10 +2996,8 @@
         function generateSculkSensor() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Sculk base
             ctx.fillStyle = '#1A2B3C';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Concentric circles
             ctx.strokeStyle = '#22AA88';
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -3395,11 +3006,12 @@
             ctx.beginPath();
             ctx.arc(8, 8, 4, 0, Math.PI * 2);
             ctx.stroke();
-            // Center glow
             ctx.fillStyle = '#33DDAA';
             ctx.fillRect(7, 7, 2, 2);
             return _canvasToImage(canvas);
         }
+
+        // ---- Deepslate family ----
 
         /**
          * Generate a deepslate texture with seeded noise variation.
@@ -3432,7 +3044,6 @@
             _seedRng(777);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Cobblestone pattern with deepslate colors and seeded shades
             var stones = [
                 { x: 0, y: 8, w: 7, h: 8 },
                 { x: 8, y: 8, w: 8, h: 5 },
@@ -3476,8 +3087,10 @@
          * @returns {HTMLImageElement}
          */
         function generateCobbledDeepslateWall() {
-            return generateCobbledDeepslate(); // Same base texture
+            return generateCobbledDeepslate();
         }
+
+        // ---- Polished variants ----
 
         /**
          * Generate a polished granite texture with seeded noise.
@@ -3571,6 +3184,8 @@
             return _canvasToImage(canvas);
         }
 
+        // ---- Additional decorative blocks ----
+
         /**
          * Generate a coral block texture with seeded noise variation.
          * @param {string} color - Coral color name ("dead", "purple", "blue", "orange", "pink").
@@ -3611,19 +3226,13 @@
         function generateStructureBlock(type) {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            if (type === 'save') {
-                ctx.fillStyle = '#DDAA33';
-            } else if (type === 'load') {
-                ctx.fillStyle = '#33DD33';
-            } else {
-                ctx.fillStyle = '#DD3333';
-            }
+            if (type === 'save') ctx.fillStyle = '#DDAA33';
+            else if (type === 'load') ctx.fillStyle = '#33DD33';
+            else ctx.fillStyle = '#DD3333';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Border
             ctx.strokeStyle = '#555555';
             ctx.lineWidth = 2;
             ctx.strokeRect(1, 1, 14, 14);
-            // Center icon
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(6, 6, 4, 4);
             return _canvasToImage(canvas);
@@ -3636,22 +3245,14 @@
         function generateTarget() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Wood base
             ctx.fillStyle = '#8B6914';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Target circles
             ctx.fillStyle = '#DDAA77';
-            ctx.beginPath();
-            ctx.arc(8, 8, 6, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(8, 8, 6, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#CC4422';
-            ctx.beginPath();
-            ctx.arc(8, 8, 4, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(8, 8, 4, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#DDAA77';
-            ctx.beginPath();
-            ctx.arc(8, 8, 2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(8, 8, 2, 0, Math.PI * 2); ctx.fill();
             return _canvasToImage(canvas);
         }
 
@@ -3663,25 +3264,20 @@
         function generateSweetBerryBush(stage) {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Branches
             ctx.fillStyle = '#6B4F12';
             ctx.fillRect(3, 8, 10, 2);
             ctx.fillRect(6, 4, 2, 5);
-            // Berries (more at higher stages)
             if (stage >= 1) {
                 ctx.fillStyle = '#CC2222';
-                ctx.fillRect(5, 5, 2, 2);
-                ctx.fillRect(9, 6, 2, 2);
+                ctx.fillRect(5, 5, 2, 2); ctx.fillRect(9, 6, 2, 2);
             }
             if (stage >= 2) {
                 ctx.fillStyle = '#DD3333';
-                ctx.fillRect(4, 7, 2, 2);
-                ctx.fillRect(10, 5, 2, 2);
+                ctx.fillRect(4, 7, 2, 2); ctx.fillRect(10, 5, 2, 2);
             }
             if (stage >= 3) {
                 ctx.fillStyle = '#EE4444';
-                ctx.fillRect(6, 3, 2, 2);
-                ctx.fillRect(8, 7, 2, 2);
+                ctx.fillRect(6, 3, 2, 2); ctx.fillRect(8, 7, 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -3695,10 +3291,8 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Base
             ctx.fillStyle = '#556655';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Glow spots with seeded spread pattern
             ctx.fillStyle = '#88CC88';
             var isSpread = direction === 'up' || direction === 'multiple' || direction === 'down';
             if (isSpread) {
@@ -3706,7 +3300,6 @@
                     ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
                 }
             } else {
-                // Directional: fill center area for cardinal directions
                 ctx.fillRect(4, 4, 8, 8);
             }
             return _canvasToImage(canvas);
@@ -3719,14 +3312,12 @@
         function generateSporeBlossom() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Purple flower cluster
             ctx.fillStyle = '#6633AA';
             ctx.fillRect(4, 4, 8, 8);
             ctx.fillStyle = '#8855CC';
             ctx.fillRect(5, 5, 6, 6);
             ctx.fillStyle = '#AA77EE';
             ctx.fillRect(6, 6, 4, 4);
-            // Spores falling
             ctx.fillStyle = 'rgba(150, 100, 220, 0.5)';
             ctx.fillRect(3, 13, 2, 2);
             ctx.fillRect(11, 14, 2, 2);
@@ -3743,7 +3334,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             if (type === 'tip') {
-                // Sharp point
                 ctx.fillStyle = '#8B7355';
                 ctx.beginPath();
                 ctx.moveTo(8, 0); ctx.lineTo(12, 8); ctx.lineTo(4, 8);
@@ -3751,11 +3341,9 @@
             } else if (type === 'middle') {
                 ctx.fillStyle = '#8B7355';
                 ctx.fillRect(6, 2, 4, 12);
-                // Highlight
                 ctx.fillStyle = '#A0896B';
                 ctx.fillRect(7, 3, 2, 10);
             } else {
-                // Base (flat)
                 ctx.fillStyle = '#7B6345';
                 ctx.fillRect(2, 10, 12, 4);
                 ctx.fillStyle = '#8B7355';
@@ -3765,7 +3353,7 @@
         }
 
         /**
-         * Generate a azalea texture with seeded leaf positions.
+         * Generate an azalea texture with seeded leaf positions.
          * @param {boolean} hasFlowers - Whether flowering azalea.
          * @returns {HTMLImageElement}
          */
@@ -3773,13 +3361,11 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Seeded leaf clumps
             ctx.fillStyle = '#44AA33';
             for (var i = 0; i < 15; i++) {
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             if (hasFlowers) {
-                // Pink flowers at deterministic positions
                 ctx.fillStyle = '#FF88AA';
                 var flowers = [{ x: 3, y: 3 }, { x: 9, y: 5 }, { x: 6, y: 10 }, { x: 12, y: 12 }];
                 for (var i = 0; i < flowers.length; i++) {
@@ -3798,7 +3384,6 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded patchy green moss
             ctx.fillStyle = '#66AA44';
             for (var i = 0; i < 25; i++) {
                 ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 1);
@@ -3806,13 +3391,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a cave vines with glow berries texture (alias).
-         * @returns {HTMLImageElement}
-         */
-        function generateCaveVinesWithGlowBerries() {
-            return generateCaveVines();
-        }
+        function generateCaveVinesWithGlowBerries() { return generateCaveVines(); }
 
         /**
          * Generate a pitcher plant texture.
@@ -3821,14 +3400,11 @@
         function generatePitcherPlant() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Stem
             ctx.fillStyle = '#66AA55';
             ctx.fillRect(7, 4, 2, 10);
-            // Pitcher leaves
             ctx.fillStyle = '#77CC66';
             ctx.fillRect(4, 2, 8, 4);
             ctx.fillRect(5, 0, 6, 3);
-            // Pitcher pot
             ctx.fillStyle = '#55AA44';
             ctx.fillRect(5, 12, 6, 4);
             return _canvasToImage(canvas);
@@ -3842,7 +3418,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Seeded greenish cluster of eggs
             for (var i = 0; i < 20; i++) {
                 var alpha = 0.5 + _rng() * 0.5;
                 ctx.fillStyle = 'rgba(140, 200, 80, ' + alpha + ')';
@@ -3853,124 +3428,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a cream cow texture (decorative item) with seeded noise.
-         * @returns {HTMLImageElement}
-         */
-        function generateCream() {
-            _seedRng(42);
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#F5F0E0';
-            ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Seeded subtle texture spots
-            for (var i = 0; i < 10; i++) {
-                ctx.fillStyle = 'rgba(200, 190, 170, 0.3)';
-                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
-            }
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a scoot boots texture (placeholder).
-         * @returns {HTMLImageElement}
-         */
-        function generateScootBoots() {
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8B6914';
-            ctx.fillRect(3, 2, 4, 12);
-            ctx.fillRect(9, 2, 4, 12);
-            // Boots detail
-            ctx.fillStyle = '#6B4F12';
-            ctx.fillRect(3, 14, 4, 2);
-            ctx.fillRect(9, 14, 4, 2);
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a batroglet texture (placeholder).
-         * @returns {HTMLImageElement}
-         */
-        function generateBatroglet() {
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#553366';
-            // Bat-like shape
-            ctx.fillRect(6, 6, 4, 4);
-            ctx.fillRect(2, 4, 4, 3);
-            ctx.fillRect(10, 4, 4, 3);
-            // Eyes
-            ctx.fillStyle = '#FF4444';
-            ctx.fillRect(7, 7, 1, 1);
-            ctx.fillRect(9, 7, 1, 1);
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a axolotl bucket texture.
-         * @param {string} variant - Axolotl variant color.
-         * @returns {HTMLImageElement}
-         */
-        function generateAxolotlBucket(variant) {
-            var colors = {
-                blue: '#4488DD', pink: '#EE88AA', gold: '#DDAA33',
-                cyan: '#36A2B4', wild: '#88AA55'
-            };
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            // Bucket outline
-            ctx.fillStyle = '#AAAAAA';
-            ctx.fillRect(4, 2, 8, 12);
-            ctx.fillRect(3, 4, 10, 2);
-            // Water
-            ctx.fillStyle = 'rgba(100, 150, 200, 0.5)';
-            ctx.fillRect(5, 5, 6, 8);
-            // Axolotl
-            ctx.fillStyle = colors[variant] || '#EE88AA';
-            ctx.fillRect(6, 6, 4, 4);
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a powder snow bucket texture.
-         * @returns {HTMLImageElement}
-         */
-        function generatePowderSnowBucket() {
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            // Bucket outline
-            ctx.fillStyle = '#888888';
-            ctx.fillRect(4, 2, 8, 12);
-            ctx.fillRect(3, 4, 10, 2);
-            // Powder snow
-            ctx.fillStyle = '#CCDDEE';
-            ctx.fillRect(5, 5, 6, 8);
-            ctx.fillStyle = '#EEF0FF';
-            ctx.fillRect(6, 6, 4, 3);
-            return _canvasToImage(canvas);
-        }
-
-        /**
-         * Generate a sniffer egg texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateSnifferEgg() {
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            // Egg shape
-            ctx.fillStyle = '#DD8844';
-            ctx.beginPath();
-            ctx.ellipse(8, 9, 5, 6, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Cracks
-            ctx.strokeStyle = '#BB6622';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(6, 5); ctx.lineTo(8, 8); ctx.lineTo(10, 6);
-            ctx.stroke();
-            return _canvasToImage(canvas);
-        }
+        // ---- Cherry / Mangrove ----
 
         /**
          * Generate a cherry blossom leaves texture with seeded positions.
@@ -3980,7 +3438,6 @@
             _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Seeded pink leaves with varying alpha
             for (var i = 0; i < 30; i++) {
                 var alpha = 0.5 + _rng() * 0.5;
                 ctx.fillStyle = 'rgba(240, 160, 180, ' + alpha + ')';
@@ -4012,29 +3469,9 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a cherry planks texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateCherryPlanks() {
-            return generatePlanks(200, 140, 140, 4444);
-        }
-
-        /**
-         * Generate a mangrove planks texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateMangrovePlanks() {
-            return generatePlanks(120, 70, 50, 5555);
-        }
-
-        /**
-         * Generate a mangrove log texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateMangroveLog() {
-            return generateLogSide(5555);
-        }
+        function generateCherryPlanks()    { return generatePlanks(200, 140, 140, 4444); }
+        function generateMangrovePlanks()  { return generatePlanks(120, 70, 50, 5555); }
+        function generateMangroveLog()     { return generateLogSide(5555); }
 
         /**
          * Generate a root texture with seeded strand positions.
@@ -4045,24 +3482,17 @@
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#8B6914';
-            // Seeded root strands
             for (var i = 0; i < 8; i++) {
                 ctx.fillRect(Math.floor(_rng() * 12), Math.floor(_rng() * 12), 3, 2);
             }
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate an attached melon stem texture.
-         * @returns {HTMLImageElement}
-         */
         function generateAttachedMelonStem() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Vine
             ctx.fillStyle = '#66AA33';
             ctx.fillRect(7, 0, 2, 10);
-            // Melon
             ctx.fillStyle = '#44AA44';
             ctx.fillRect(4, 10, 8, 4);
             ctx.fillStyle = '#338833';
@@ -4070,17 +3500,11 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate an attached pumpkin stem texture.
-         * @returns {HTMLImageElement}
-         */
         function generateAttachedPumpkinStem() {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Vine
             ctx.fillStyle = '#88AA33';
             ctx.fillRect(7, 0, 2, 10);
-            // Pumpkin
             ctx.fillStyle = '#CC7722';
             ctx.fillRect(4, 10, 8, 4);
             ctx.fillStyle = '#AA5511';
@@ -4088,20 +3512,7 @@
             return _canvasToImage(canvas);
         }
 
-        /**
-         * Generate a mojang logo placeholder texture.
-         * @returns {HTMLImageElement}
-         */
-        function generateMojangLogo() {
-            var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
-            var ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#555555';
-            ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            ctx.fillStyle = '#AAAAAA';
-            ctx.font = '8px monospace';
-            ctx.fillText('D', 5, 12);
-            return _canvasToImage(canvas);
-        }
+        // ---- Missing / fallback ----
 
         /**
          * Generate a missing texture (red/black checkerboard).
@@ -4117,7 +3528,6 @@
                     ctx.fillRect(x, y, 1, 1);
                 }
             }
-            // X overlay
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -4126,6 +3536,10 @@
             ctx.stroke();
             return _canvasToImage(canvas);
         }
+
+        // ============================================================
+        // getGeneratorForBlock — map block names to generator functions
+        // ============================================================
 
         /**
          * Get a texture generator function for a block name.
@@ -4139,8 +3553,14 @@
                 'granite': function() { return generatePolished(170, 130, 120); },
                 'diorite': function() { return generatePolished(200, 195, 190); },
                 'andesite': function() { return generatePolished(130, 135, 140); },
+                'polished_granite': function() { return generatePolishedGranite(); },
+                'polished_diorite': function() { return generatePolishedDiorite(); },
+                'polished_andesite': function() { return generatePolishedAndesite(); },
+                'smooth_stone': function() { return generateSmoothStone(); },
                 'deepslate': function() { return generateDeepslate(); },
                 'cobbled_deepslate': function() { return generateCobbledDeepslate(); },
+                'polished_deepslate': function() { return generatePolishedDeepslate(); },
+                'cobbled_deepslate_wall': function() { return generateCobbledDeepslateWall(); },
                 'dirt': function() { return generateDirt(); },
                 'grass_block': function() { return generateGrassSide(); },
                 'gravel': function() { return generateStone(777); },
@@ -4182,32 +3602,42 @@
                 'spruce_wood': function() { return generateWood(111); },
                 'birch_wood': function() { return generateWood(112); },
                 'jungle_wood': function() { return generateWood(113); },
+                'dark_oak_wood': function() { return generateWood(114); },
+                'mangrove_wood': function() { return generateWood(5555); },
+                'cherry_log': function() { return generateLogSide(4444); },
+                'cherry_wood': function() { return generateCherryWood(); },
                 // Stone bricks
                 'stone_bricks': function() { return generateBricks(120, 120, 120); },
+                'cracked_stone_bricks': function() { return generateBricks(120, 120, 120); },
                 'mossy_stone_bricks': function() { return generateMossyStoneBrick(); },
+                'chiseled_stone_bricks': function() { return generateBricks(120, 120, 120); },
                 'end_stone_bricks': function() { return generateEndStone(); },
                 // Prismarine variants
                 'prismarine': function() { return generatePrismarine('normal'); },
                 'prismarine_bricks': function() { return generatePrismarine('bricks'); },
                 'prismarine_dark': function() { return generatePrismarine('dark'); },
-                // Wood logs (top)
-                'oak_log_top': function() { return generateLogTop(100); },
-                'spruce_log_top': function() { return generateLogTop(101); },
-                'birch_log_top': function() { return generateLogTop(102); },
-                'jungle_log_top': function() { return generateLogTop(103); },
-                'acacia_log_top': function() { return generateLogTop(104); },
-                'dark_oak_log_top': function() { return generateLogTop(105); },
-                // Dark oak wood
-                'dark_oak_wood': function() { return generateWood(114); },
-                // Mangrove
-                'mangrove_wood': function() { return generateWood(5555); },
-                // Cherry
-                'cherry_log': function() { return generateLogSide(4444); },
-                'cherry_wood': function() { return generateCherryWood(); },
                 // Glass
                 'glass': function() { return generateGlass(200, 220, 255); },
                 'tinted_glass': function() { return generateGlass(60, 50, 80); },
                 'glass_pane': function() { return generateGlass(200, 220, 255); },
+                // Stained glass (16 colors)
+                'white_stained_glass': function() { return generateGlass(240, 240, 240); },
+                'orange_stained_glass': function() { return generateGlass(234, 131, 36); },
+                'magenta_stained_glass': function() { return generateGlass(183, 71, 185); },
+                'light_blue_stained_glass': function() { return generateGlass(100, 198, 232); },
+                'yellow_stained_glass': function() { return generateGlass(240, 222, 64); },
+                'lime_stained_glass': function() { return generateGlass(125, 227, 56); },
+                'pink_stained_glass': function() { return generateGlass(239, 141, 177); },
+                'gray_stained_glass': function() { return generateGlass(101, 101, 101); },
+                'light_gray_stained_glass': function() { return generateGlass(177, 183, 191); },
+                'cyan_stained_glass': function() { return generateGlass(54, 162, 180); },
+                'purple_stained_glass': function() { return generateGlass(151, 81, 175); },
+                'blue_stained_glass': function() { return generateGlass(53, 96, 186); },
+                'brown_stained_glass': function() { return generateGlass(113, 84, 64); },
+                'green_stained_glass': function() { return generateGlass(87, 134, 63); },
+                'red_stained_glass': function() { return generateGlass(183, 52, 55); },
+                'black_stained_glass': function() { return generateGlass(33, 33, 33); },
+                // Ice / snow
                 'ice': function() { return generateIce(); },
                 'blue_ice': function() { return generateBlueIce(); },
                 'snow_block': function() { return generateSnowBlock(); },
@@ -4229,7 +3659,7 @@
                 'green_wool': function() { return generateWool(87, 134, 63); },
                 'red_wool': function() { return generateWool(183, 52, 55); },
                 'black_wool': function() { return generateWool(33, 33, 33); },
-                // Concrete
+                // Concrete (all 16 colors)
                 'white_concrete': function() { return generateConcrete(240, 240, 240); },
                 'orange_concrete': function() { return generateConcrete(234, 131, 36); },
                 'magenta_concrete': function() { return generateConcrete(183, 71, 185); },
@@ -4246,7 +3676,7 @@
                 'green_concrete': function() { return generateConcrete(87, 134, 63); },
                 'red_concrete': function() { return generateConcrete(183, 52, 55); },
                 'black_concrete': function() { return generateConcrete(33, 33, 33); },
-                // Concrete powder (same colors, rougher)
+                // Concrete powder (all 16 colors)
                 'white_concrete_powder': function() { return generateConcretePowder(240, 240, 240); },
                 'orange_concrete_powder': function() { return generateConcretePowder(234, 131, 36); },
                 'magenta_concrete_powder': function() { return generateConcretePowder(183, 71, 185); },
@@ -4276,10 +3706,8 @@
                 'basalt': function() { return generateBasalt(); },
                 'polished_basalt': function() { return generatePolishedBasalt(); },
                 'blackstone': function() { return generatePolishedBlackstone(); },
-                'smooth_stone': function() { return generateSmoothStone(); },
-                'polished_diorite': function() { return generatePolishedDiorite(); },
-                'polished_andesite': function() { return generatePolishedAndesite(); },
-                'polished_granite': function() { return generatePolishedGranite(); },
+                'polished_blackstone': function() { return generatePolishedBlackstone(); },
+                'polished_blackstone_bricks': function() { return generateBricks(45, 42, 46); },
                 // Leaves
                 'oak_leaves': function() { return generateLeaves(50, 130, 40); },
                 'spruce_leaves': function() { return generateLeaves(30, 80, 30); },
@@ -4292,9 +3720,6 @@
                 'wet_sponge': function() { return generateWetSponge(); },
                 // Honey and slime
                 'honey_block': function() { return generateHoney(); },
-                // Sand variants for special blocks
-                'polished_blackstone': function() { return generatePolishedBlackstone(); },
-                'polished_blackstone_bricks': function() { return generateBricks(45, 42, 46); },
                 // Nether blocks
                 'netherrack': function() { return generateNetherrack(); },
                 'soul_sand': function() { return generateSoulSand(); },
@@ -4315,7 +3740,7 @@
                 'nether_wart_block': function() { return generateBricks(100, 30, 30); },
                 'shroomlight': function() { return generateShroomlight(); },
                 'glowstone': function() { return generateGlowstone(); },
-                // End blocks (purpur)
+                // End blocks
                 'purpur_block': function() { return generatePurpurBlock(); },
                 'purpur_pillar': function() { return generatePurpurPillar(); },
                 // Metals
@@ -4360,12 +3785,9 @@
                 'redstone_wire': function() {
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Transparent background
                     ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-                    // Red dust line
                     ctx.fillStyle = '#AA0000';
                     ctx.fillRect(0, 7, TEX_SIZE, 2);
-                    // Glow
                     ctx.fillStyle = '#FF2222';
                     ctx.fillRect(0, 7, TEX_SIZE, 1);
                     return _canvasToImage(canvas);
@@ -4382,19 +3804,14 @@
                 'sticky_piston': function() {
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Wood base (same as piston)
                     ctx.fillStyle = '#8B6914';
                     ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                    // Iron plate
                     ctx.fillStyle = '#AAAAAA';
                     ctx.fillRect(0, 6, TEX_SIZE, 4);
-                    // Sticky piston head (green slime layer)
                     ctx.fillStyle = '#55AA33';
                     ctx.fillRect(2, 0, 12, 6);
-                    // Slime drip detail
                     for (var _i = 0; _i < 4; _i++) {
-                        var _dx = 3 + _i * 3;
-                        ctx.fillRect(_dx, 5, 2, 2);
+                        ctx.fillRect(3 + _i * 3, 5, 2, 2);
                     }
                     return _canvasToImage(canvas);
                 },
@@ -4405,13 +3822,10 @@
                 'trapped_chest': function() {
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Wood base (same as chest)
                     ctx.fillStyle = '#8B6914';
                     ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                    // Chest line
                     ctx.fillStyle = '#6B4F12';
                     ctx.fillRect(0, 7, TEX_SIZE, 2);
-                    // Trap mechanism (gear-like indicator)
                     ctx.fillStyle = '#888888';
                     ctx.fillRect(6, 7, 4, 2);
                     ctx.fillStyle = '#AAAAAA';
@@ -4422,43 +3836,25 @@
                     _seedRng(42);
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Darker wood base
                     ctx.fillStyle = '#6B4F12';
                     ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                    // Metal bands
                     ctx.fillStyle = '#555555';
                     ctx.fillRect(0, 4, TEX_SIZE, 2);
                     ctx.fillRect(0, 10, TEX_SIZE, 2);
-                    // Seeded wood grain lines
-                    ctx.strokeStyle = '#7B5F22';
-                    ctx.lineWidth = 0.5;
-                    for (var _i = 0; _i < 4; _i++) {
-                        var _y = 1 + _i * 4;
-                        ctx.beginPath();
-                        ctx.moveTo(0, _y); ctx.lineTo(TEX_SIZE, _y + (_rng() - 0.5));
-                        ctx.stroke();
-                    }
                     return _canvasToImage(canvas);
                 },
                 'furnace': function() { return generateFurnaceFront(); },
                 'lit_furnace': function() {
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Smooth stone base
                     ctx.fillStyle = '#B0B0B0';
                     ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-                    // Furnace opening
                     ctx.fillStyle = '#333333';
                     ctx.fillRect(4, 5, 8, 7);
-                    // Bright fire glow inside (more intense than unlit)
                     ctx.fillStyle = '#FF8800';
                     ctx.fillRect(5, 7, 6, 4);
                     ctx.fillStyle = '#FFCC44';
                     ctx.fillRect(6, 8, 4, 2);
-                    // Glow spill on surrounding stone
-                    ctx.fillStyle = 'rgba(255, 136, 0, 0.15)';
-                    ctx.fillRect(3, 4, 1, 9);
-                    ctx.fillRect(12, 4, 1, 9);
                     return _canvasToImage(canvas);
                 },
                 'smoker': function() { return generateSmoker(); },
@@ -4467,17 +3863,15 @@
                 'bookshelf': function() { return generateBookshelf(); },
                 'chiseled_bookshelf': function() { return generateChiseledBookshelf(); },
                 'lectern': function() { return generateLectern(); },
-                // Doors and fences
+                // Doors (wood variants)
                 'oak_door': function() { return generateDoor(false); },
                 'iron_door': function() { return generateDoor(true); },
                 'spruce_door': function() {
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
-                    // Dark spruce wood
                     ctx.fillStyle = '#6B4F12';
                     ctx.fillRect(2, 0, 5, 16);
                     ctx.fillRect(9, 0, 5, 16);
-                    // Wood grain
                     ctx.strokeStyle = '#5B3F02';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
@@ -4488,11 +3882,13 @@
                     ctx.stroke();
                     return _canvasToImage(canvas);
                 },
+                // Fences and walls
                 'oak_fence': function() { return generateFence(); },
                 'cobblestone_wall': function() { return generateWall(); },
                 'brick_wall': function() { return generateBricks(160, 60, 50); },
                 'nether_brick_wall': function() { return generateNetherBrick(); },
                 'end_stone_brick_wall': function() { return generateEndStone(); },
+                'sandstone_wall': function() { return generateSandstone(); },
                 // Buttons and pressure plates
                 'stone_button': function() { return generateButton(true); },
                 'oak_button': function() { return generateButton(false); },
@@ -4513,6 +3909,11 @@
                 // Beds
                 'oak_bed': function() { return generateBed('white'); },
                 'red_bed': function() { return generateBed('red'); },
+                // Signs (wood variants)
+                'oak_sign': function() { return generateSign('oak'); },
+                'spruce_sign': function() { return generateSign('spruce'); },
+                'birch_sign': function() { return generateSign('birch'); },
+                'acacia_sign': function() { return generateSign('acacia'); },
                 // Other
                 'painting': function() { return generatePainting(); },
                 'mirror': function() { return generateMirror(); },
@@ -4522,6 +3923,8 @@
                 'melons': function() { return generateMelon(); },
                 'pumpkin': function() { return generatePumpkin(); },
                 'hay_block': function() { return generateHayBale(); },
+                // Cobblestone alias
+                'cobblestone': function() { return generateStone(42); },
                 // Default fallback
                 'default': function() { return generateStone(0); }
             };
@@ -4539,7 +3942,6 @@
             if (gen) {
                 return gen();
             }
-            // Fallback: generate a colored placeholder based on hash of name
             return generateFallbackTexture(blockName);
         }
 
@@ -4551,7 +3953,6 @@
         function generateFallbackTexture(blockName) {
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Hash the name to get a color
             var hash = 0;
             for (var i = 0; i < blockName.length; i++) {
                 hash = ((hash << 5) - hash) + blockName.charCodeAt(i);
@@ -4560,7 +3961,6 @@
             var hue = Math.abs(hash) % 360;
             ctx.fillStyle = 'hsl(' + hue + ', 40%, 50%)';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Border
             ctx.strokeStyle = 'rgba(0,0,0,0.3)';
             ctx.lineWidth = 1;
             ctx.strokeRect(0, 0, TEX_SIZE - 1, TEX_SIZE - 1);
@@ -4586,7 +3986,7 @@
         /**
          * Get the texture name mapping for a block ID.
          * @param {number} blockId - Block ID.
-         * @returns {string|null} Primary texture name, or null.
+         * @returns {string|null} Primary texture name, or null if not found.
          */
         function getTextureNameForBlock(blockId) {
             var block = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockById(blockId) : null;
@@ -4620,6 +4020,7 @@
             generatePlanks: generatePlanks,
             generateWool: generateWool,
             generateConcrete: generateConcrete,
+            generateConcretePowder: generateConcretePowder,
             generateGlass: generateGlass,
             generateBricks: generateBricks,
             generateOre: generateOre,
@@ -4704,7 +4105,6 @@
             generateQuartzBricks: generateQuartzBricks,
             generatePurpurBlock: generatePurpurBlock,
             generatePurpurPillar: generatePurpurPillar,
-            generateConcretePowder: generateConcretePowder,
             generateLilyPad: generateLilyPad,
             generateVine: generateVine,
             generateGrass: generateGrass,
@@ -4745,6 +4145,8 @@
             generateLectern: generateLectern,
             generateSmoker: generateSmoker,
             generateBlastFurnace: generateBlastFurnace,
+            generateJigsaw: generateJigsaw,
+            generateComposter: generateComposter,
             generateStructureBlock: generateStructureBlock,
             generateTarget: generateTarget,
             generateSweetBerryBush: generateSweetBerryBush,
@@ -4755,9 +4157,6 @@
             generateMossCarpet: generateMossCarpet,
             generatePitcherPlant: generatePitcherPlant,
             generateFrogspawn: generateFrogspawn,
-            generateAxolotlBucket: generateAxolotlBucket,
-            generatePowderSnowBucket: generatePowderSnowBucket,
-            generateSnifferEgg: generateSnifferEgg,
             generateCherryLeaves: generateCherryLeaves,
             generateCherryWood: generateCherryWood,
             generateCherryPlanks: generateCherryPlanks,
@@ -4769,6 +4168,7 @@
             generateDeepslate: generateDeepslate,
             generateCobbledDeepslate: generateCobbledDeepslate,
             generatePolishedDeepslate: generatePolishedDeepslate,
+            generateCobbledDeepslateWall: generateCobbledDeepslateWall,
             generatePolishedGranite: generatePolishedGranite,
             generatePolishedDiorite: generatePolishedDiorite,
             generatePolishedAndesite: generatePolishedAndesite,
@@ -4780,7 +4180,7 @@
             generateAllTextures: generateAllTextures,
             getTextureNameForBlock: getTextureNameForBlock,
             getNameMap: getNameMap,
-            // Color map for reference
+            clearTextureCache: clearTextureCache,
             COLOR_MAP: COLOR_MAP
         };
     })();
@@ -4808,7 +4208,7 @@
             var buffer = ctx.createBuffer(1, length, sampleRate);
             var data = buffer.getChannelData(0);
             for (var i = 0; i < length; i++) {
-                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 3); // Decay
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 3);
             }
             return buffer;
         }
@@ -4822,7 +4222,6 @@
         function generateStepSound(ctx, material) {
             var key = 'step:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
-
             var buffer = _createNoiseBuffer(ctx, 0.1);
             _soundCache[key] = buffer;
             return buffer;
@@ -4837,7 +4236,6 @@
         function generateBreakSound(ctx, material) {
             var key = 'break:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
-
             var buffer = _createNoiseBuffer(ctx, 0.2);
             _soundCache[key] = buffer;
             return buffer;
@@ -4852,21 +4250,19 @@
         function generatePlaceSound(ctx, material) {
             var key = 'place:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
-
             try {
                 var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
-                var o2 = offline.createOscillator();
-                var g2 = offline.createGain();
-                o2.type = 'sine';
-                o2.frequency.setValueAtTime(200, offline.currentTime);
-                o2.frequency.exponentialRampToValueAtTime(100, offline.currentTime + 0.1);
-                g2.gain.setValueAtTime(0.3, offline.currentTime);
-                g2.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.1);
-                o2.connect(g2);
-                g2.connect(offline.destination);
-                o2.start(offline.currentTime);
-                o2.stop(offline.currentTime + 0.15);
-
+                var osc = offline.createOscillator();
+                var gain = offline.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, offline.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, offline.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(offline.destination);
+                osc.start(offline.currentTime);
+                osc.stop(offline.currentTime + 0.15);
                 return offline.startRendering().then(function(renderedBuffer) {
                     _soundCache[key] = renderedBuffer;
                     return renderedBuffer;
@@ -4888,21 +4284,19 @@
         function generateHitSound(ctx, material) {
             var key = 'hit:' + (material || 'stone');
             if (_soundCache[key]) return _soundCache[key];
-
             try {
                 var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.08, ctx.sampleRate);
-            var osc = offline.createOscillator();
-            var gain = offline.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(800, offline.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(400, offline.currentTime + 0.05);
-            gain.gain.setValueAtTime(0.15, offline.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.08);
-            osc.connect(gain);
-            gain.connect(offline.destination);
-            osc.start(offline.currentTime);
-            osc.stop(offline.currentTime + 0.1);
-
+                var osc = offline.createOscillator();
+                var gain = offline.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, offline.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, offline.currentTime + 0.05);
+                gain.gain.setValueAtTime(0.15, offline.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.08);
+                osc.connect(gain);
+                gain.connect(offline.destination);
+                osc.start(offline.currentTime);
+                osc.stop(offline.currentTime + 0.1);
                 return offline.startRendering().then(function(rb) {
                     _soundCache[key] = rb;
                     return rb;
@@ -4914,75 +4308,6 @@
         }
 
         /**
-         * Generate a generic entity ambient sound.
-         * @param {AudioContext} ctx
-         * @param {string} type - Entity type ("passive", "hostile").
-         * @returns {AudioBuffer}
-         */
-        function generateAmbientSound(ctx, type) {
-            var key = 'ambient:' + (type || 'passive');
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-                var osc = offline.createOscillator();
-                var gain = offline.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(type === 'hostile' ? 150 : 300, offline.currentTime);
-                osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 100 : 250, offline.currentTime + 0.15);
-                osc.frequency.linearRampToValueAtTime(type === 'hostile' ? 180 : 280, offline.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.1, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
-                osc.connect(gain);
-                gain.connect(offline.destination);
-                osc.start(offline.currentTime);
-                osc.stop(offline.currentTime + 0.35);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate ambient sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.3);
-            }
-        }
-
-        /**
-         * Generate a hurt/death sound.
-         * @param {AudioContext} ctx
-         * @param {string} type
-         * @returns {AudioBuffer}
-         */
-        function generateHurtSound(ctx, type) {
-            var key = 'hurt:' + (type || 'entity');
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.2, ctx.sampleRate);
-                var osc = offline.createOscillator();
-                var gain = offline.createGain();
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(400, offline.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(200, offline.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.12, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.2);
-                osc.connect(gain);
-                gain.connect(offline.destination);
-                osc.start(offline.currentTime);
-                osc.stop(offline.currentTime + 0.25);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate hurt sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.2);
-            }
-        }
-
-        /**
          * Generate a footstep sound for walking.
          * @param {AudioContext} ctx
          * @returns {AudioBuffer}
@@ -4990,232 +4315,15 @@
         function generateFootstepSound(ctx) {
             var key = 'footstep';
             if (_soundCache[key]) return _soundCache[key];
-
             var buffer = _createNoiseBuffer(ctx, 0.06);
             _soundCache[key] = buffer;
             return buffer;
         }
 
         /**
-         * Generate a water splash sound.
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generateSplashSound(ctx) {
-            var key = 'splash';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-                var buffer = _createNoiseBuffer(ctx, 0.3);
-                var source = offline.createBufferSource();
-                source.buffer = buffer;
-                var filter = offline.createBiquadFilter();
-                filter.type = 'bandpass';
-                filter.frequency.setValueAtTime(1000, offline.currentTime);
-                filter.Q.setValueAtTime(2, offline.currentTime);
-                var gain = offline.createGain();
-                gain.gain.setValueAtTime(0.2, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.3);
-                source.connect(filter);
-                filter.connect(gain);
-                gain.connect(offline.destination);
-                source.start(offline.currentTime);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate splash sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.3);
-            }
-        }
-
-        /**
-         * Generate a glass break sound (high-pitched shatter).
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generateGlassBreakSound(ctx) {
-            var key = 'glass_break';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.25, ctx.sampleRate);
-                var buffer = _createNoiseBuffer(ctx, 0.25);
-                var source = offline.createBufferSource();
-                source.buffer = buffer;
-                var filter = offline.createBiquadFilter();
-                filter.type = 'highpass';
-                filter.frequency.setValueAtTime(3000, offline.currentTime);
-                var gain = offline.createGain();
-                gain.gain.setValueAtTime(0.15, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.25);
-                source.connect(filter);
-                filter.connect(gain);
-                gain.connect(offline.destination);
-                source.start(offline.currentTime);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate glass break sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.25);
-            }
-        }
-
-        /**
-         * Generate a pop sound (e.g., enderman teleport, blaze fireball).
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generatePopSound(ctx) {
-            var key = 'pop';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.15, ctx.sampleRate);
-                var osc = offline.createOscillator();
-                var gain = offline.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, offline.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, offline.currentTime + 0.05);
-                osc.frequency.exponentialRampToValueAtTime(300, offline.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.2, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.15);
-                osc.connect(gain);
-                gain.connect(offline.destination);
-                osc.start(offline.currentTime);
-                osc.stop(offline.currentTime + 0.2);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate pop sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.15);
-            }
-        }
-
-        /**
-         * Generate an explosion sound.
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generateExplosionSound(ctx) {
-            var key = 'explosion';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.8, ctx.sampleRate);
-                var buffer = _createNoiseBuffer(ctx, 0.8);
-                var source = offline.createBufferSource();
-                source.buffer = buffer;
-                var filter = offline.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(500, offline.currentTime);
-                filter.frequency.exponentialRampToValueAtTime(50, offline.currentTime + 0.8);
-                var gain = offline.createGain();
-                gain.gain.setValueAtTime(0.5, offline.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.8);
-                source.connect(filter);
-                filter.connect(gain);
-                gain.connect(offline.destination);
-                source.start(offline.currentTime);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate explosion sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.8);
-            }
-        }
-
-        /**
-         * Generate a level-up / enchant sound.
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generateEnchantSound(ctx) {
-            var key = 'enchant';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.5, ctx.sampleRate);
-                for (var i = 0; i < 3; i++) {
-                    var osc = offline.createOscillator();
-                    var gain = offline.createGain();
-                    var startTime = offline.currentTime + i * 0.12;
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(400 + i * 200, startTime);
-                    osc.frequency.exponentialRampToValueAtTime(800 + i * 300, startTime + 0.2);
-                    gain.gain.setValueAtTime(0, startTime);
-                    gain.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
-                    gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
-                    osc.connect(gain);
-                    gain.connect(offline.destination);
-                    osc.start(startTime);
-                    osc.stop(startTime + 0.35);
-                }
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate enchant sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.5);
-            }
-        }
-
-        /**
-         * Generate a drink/sip sound.
-         * @param {AudioContext} ctx
-         * @returns {AudioBuffer}
-         */
-        function generateDrinkSound(ctx) {
-            var key = 'drink';
-            if (_soundCache[key]) return _soundCache[key];
-
-            try {
-                var offline = new OfflineAudioContext(1, ctx.sampleRate * 0.4, ctx.sampleRate);
-                var buffer = _createNoiseBuffer(ctx, 0.4);
-                var source = offline.createBufferSource();
-                source.buffer = buffer;
-                var filter = offline.createBiquadFilter();
-                filter.type = 'bandpass';
-                filter.frequency.setValueAtTime(500, offline.currentTime);
-                filter.Q.setValueAtTime(5, offline.currentTime);
-                var gain = offline.createGain();
-                gain.gain.setValueAtTime(0.15, offline.currentTime);
-                gain.gain.linearRampToValueAtTime(0.2, offline.currentTime + 0.1);
-                gain.gain.linearRampToValueAtTime(0.15, offline.currentTime + 0.3);
-                gain.gain.exponentialRampToValueAtTime(0.01, offline.currentTime + 0.4);
-                source.connect(filter);
-                filter.connect(gain);
-                gain.connect(offline.destination);
-                source.start(offline.currentTime);
-
-                return offline.startRendering().then(function(rb) {
-                    _soundCache[key] = rb;
-                    return rb;
-                });
-            } catch (e) {
-                if (Donkeycraft.Logger) Donkeycraft.Logger.error('SoundGenerator', 'Failed to generate drink sound: ' + e.message);
-                return _createNoiseBuffer(ctx, 0.4);
-            }
-        }
-
-        /**
          * Get or generate a sound by category.
          * @param {AudioContext} ctx
-         * @param {string} category - Sound category ("step", "break", "place", "hit", "footstep", "splash", "glass_break", "pop", "explosion", "enchant", "drink", "ambient", "hurt").
+         * @param {string} category - Sound category ("step", "break", "place", "hit", "footstep").
          * @param {string} [material] - Optional material specifier.
          * @returns {Promise<AudioBuffer>} Always returns a Promise for consistent API.
          */
@@ -5227,21 +4335,12 @@
                 case 'place': result = generatePlaceSound(ctx, material); break;
                 case 'hit': result = generateHitSound(ctx, material); break;
                 case 'footstep': result = generateFootstepSound(ctx); break;
-                case 'splash': result = generateSplashSound(ctx); break;
-                case 'glass_break': result = generateGlassBreakSound(ctx); break;
-                case 'pop': result = generatePopSound(ctx); break;
-                case 'explosion': result = generateExplosionSound(ctx); break;
-                case 'enchant': result = generateEnchantSound(ctx); break;
-                case 'drink': result = generateDrinkSound(ctx); break;
-                case 'ambient': result = generateAmbientSound(ctx, material); break;
-                case 'hurt': result = generateHurtSound(ctx, material); break;
                 default:
                     if (Donkeycraft.Logger) {
                         Donkeycraft.Logger.warn('SoundGenerator', 'Unknown sound category: ' + category);
                     }
                     result = _createNoiseBuffer(ctx, 0.1);
             }
-            // Always return Promise<AudioBuffer> for consistent API
             return Promise.resolve(result);
         }
 
@@ -5250,7 +4349,7 @@
          * @returns {string[]}
          */
         function getCategories() {
-            return ['step', 'break', 'place', 'hit', 'footstep', 'splash', 'glass_break', 'pop', 'explosion', 'enchant', 'drink', 'ambient', 'hurt'];
+            return ['step', 'break', 'place', 'hit', 'footstep'];
         }
 
         /**
@@ -5260,34 +4359,15 @@
             _soundCache = {};
         }
 
-        /**
-         * Check if a sound is cached.
-         * @param {string} key
-         * @returns {boolean}
-         */
-        function isCached(key) {
-            return !!_soundCache[key];
-        }
-
         return {
             getSound: getSound,
             getCategories: getCategories,
             clearCache: clearCache,
-            isCached: isCached,
-            // Expose individual generators for direct use
             generateStepSound: generateStepSound,
             generateBreakSound: generateBreakSound,
             generatePlaceSound: generatePlaceSound,
             generateHitSound: generateHitSound,
-            generateFootstepSound: generateFootstepSound,
-            generateSplashSound: generateSplashSound,
-            generateGlassBreakSound: generateGlassBreakSound,
-            generatePopSound: generatePopSound,
-            generateExplosionSound: generateExplosionSound,
-            generateEnchantSound: generateEnchantSound,
-            generateDrinkSound: generateDrinkSound,
-            generateAmbientSound: generateAmbientSound,
-            generateHurtSound: generateHurtSound
+            generateFootstepSound: generateFootstepSound
         };
     })();
 
@@ -5301,7 +4381,7 @@
     Donkeycraft.AssetManager = (function() {
         var _generatedTextures = null;
         var _audioContext = null;
-        var _atlasCache = null; // Cached atlas canvas
+        var _atlasCache = null;
 
         /**
          * Initialize the asset manager with an AudioContext.
@@ -5353,18 +4433,6 @@
         }
 
         /**
-         * Preload all sounds.
-         * @returns {Promise}
-         */
-        function preloadAllSounds() {
-            if (!_audioContext) return Promise.resolve();
-            var categories = Donkeycraft.SoundGenerator.getCategories();
-            return Promise.all(Donkeycraft.SoundGenerator.getCategories().map(function(cat) {
-                return Donkeycraft.SoundGenerator.getSound(_audioContext, cat);
-            }));
-        }
-
-        /**
          * Get the texture name map for atlas building.
          * @returns {Object.<number, string>}
          */
@@ -5373,24 +4441,22 @@
         }
 
         /**
-         * Generate a procedural texture atlas image (1280×1280 canvas — ~500% larger than original 256×256).
-         * Each texture cell is 80×80 pixels instead of 16×16.
+         * Generate a procedural texture atlas canvas.
+         * Each texture cell is 80×80 pixels. Dynamically sized to fit all block IDs.
          * Useful for debugging or saving to disk.
          * @returns {HTMLCanvasElement}
          */
         function generateAtlasCanvas() {
-            // Return cached atlas if available
             if (_atlasCache) return _atlasCache;
 
-            var CELL_SIZE = 80; // 5× larger than 16px
-            var GRID_COLS = 32; // Increased to fit more blocks per row
+            var CELL_SIZE = 80;
+            var GRID_COLS = 32;
             var atlasCanvas = document.createElement('canvas');
             var blocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
             var maxId = 0;
             for (var i = 0; i < blocks.length; i++) {
                 if (blocks[i].id > maxId) maxId = blocks[i].id;
             }
-            // Dynamically size grid to fit all block IDs
             var gridRows = Math.ceil((maxId + 1) / GRID_COLS);
             atlasCanvas.width = CELL_SIZE * GRID_COLS;
             atlasCanvas.height = CELL_SIZE * gridRows;
@@ -5401,7 +4467,6 @@
             for (var i = 0; i < blocks.length; i++) {
                 var block = blocks[i];
                 var id = block.id;
-
                 var col = id % GRID_COLS;
                 var row = Math.floor(id / GRID_COLS);
                 var tex = textures[id];
@@ -5409,7 +4474,6 @@
                 if (tex) {
                     ctx.drawImage(tex, col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 } else {
-                    // Missing texture placeholder
                     ctx.fillStyle = '#FF00FF';
                     ctx.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                     ctx.strokeStyle = '#000000';
@@ -5423,7 +4487,7 @@
                 }
             }
 
-            _atlasCache = atlasCanvas; // Cache for future calls
+            _atlasCache = atlasCanvas;
             return atlasCanvas;
         }
 
@@ -5450,7 +4514,7 @@
          */
         function reset() {
             _generatedTextures = null;
-            _atlasCache = null; // Also clear atlas cache
+            _atlasCache = null;
             Donkeycraft.SoundGenerator.clearCache();
         }
 
@@ -5460,7 +4524,6 @@
             getTexture: getTexture,
             getAllTextures: getAllTextures,
             preloadSounds: preloadSounds,
-            preloadAllSounds: preloadAllSounds,
             getNameMap: getNameMap,
             generateAtlasCanvas: generateAtlasCanvas,
             getAssetInfo: getAssetInfo,
@@ -5469,7 +4532,7 @@
     })();
 
     // ============================================================
-    // AssetGenerator — simple Promise-based wrapper for init-sequence
+    // AssetGenerator — Promise-based wrapper for init-sequence
     // ============================================================
 
     /**
@@ -5485,31 +4548,27 @@
         function generateAllTextures() {
             return new Promise(function(resolve) {
                 try {
-                    // Ensure BlockRegistry is available
                     if (!Donkeycraft.BlockRegistry || !Donkeycraft.TextureGenerator) {
                         Donkeycraft.Logger.warn('AssetGenerator', 'BlockRegistry or TextureGenerator not available — skipping texture generation');
                         resolve({});
                         return;
                     }
 
-                    // Generate all textures via TextureGenerator
                     var textures = Donkeycraft.TextureGenerator.generateAllTextures();
 
-                    // Initialize AssetManager if needed
                     if (!Donkeycraft.AssetManager) {
                         Donkeycraft.Logger.warn('AssetGenerator', 'AssetManager not available');
                         resolve(textures || {});
                         return;
                     }
 
-                    // Store generated textures in AssetManager for later retrieval
                     Donkeycraft.AssetManager.generateAllBlockTextures();
 
                     Donkeycraft.Logger.info('AssetGenerator', 'Generated ' + (Object.keys(textures || {}).length) + ' block textures');
                     resolve(textures || {});
                 } catch (e) {
                     Donkeycraft.Logger.error('AssetGenerator', 'Texture generation failed: ' + e.message);
-                    resolve({}); // Graceful fallback — terrain-renderer will use placeholder
+                    resolve({});
                 }
             });
         }
@@ -5525,7 +4584,6 @@
                 canvas.height = 16;
                 var ctx = canvas.getContext('2d');
 
-                // Checkerboard pattern: alternating white and magenta squares
                 var size = 8;
                 for (var row = 0; row < 2; row++) {
                     for (var col = 0; col < 2; col++) {
@@ -5534,7 +4592,6 @@
                     }
                 }
 
-                // Draw "X" to indicate missing
                 ctx.strokeStyle = '#000000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
@@ -5569,19 +4626,5 @@
             generateMissingTexture: generateMissingTexture
         };
     })();
-
-    // ============================================================
-    // TextureGenerator — add generateMissing() fallback method
-    // ============================================================
-
-    // Add generateMissing to TextureGenerator if it doesn't exist yet
-    if (typeof Donkeycraft.TextureGenerator === 'object' && typeof Donkeycraft.TextureGenerator.generateAllTextures === 'function') {
-        // Only add generateMissing if not already defined
-        if (typeof Donkeycraft.TextureGenerator.generateMissing !== 'function') {
-            Donkeycraft.TextureGenerator.generateMissing = function() {
-                return Donkeycraft.AssetGenerator ? Donkeycraft.AssetGenerator.generateMissingTexture() : null;
-            };
-        }
-    }
 
 })();
