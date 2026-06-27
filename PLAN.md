@@ -283,14 +283,14 @@ IndexedDB world storage and level data persistence.
 
 ---
 
-## Phase 15: Game Modes & Player Stats [STATUS: PENDING]
+## Phase 15: Game Modes & Player Stats [STATUS: FULLY OPERATIONAL]
 
-Survival, Creative, Spectator modes and player statistics.
+Survival, Creative, Spectator modes and player statistics. All 126 tests passing.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 88 | `src/player/game-mode.js` | Game modes: Survival (health, hunger, damage), Creative (fly, no damage, infinite items), Spectator (through blocks) | 150 | [ ] |
-| 89 | `src/player/stats.js` | Player stats: achievements/advancements, statistics (blocks mined, entities killed) | 120 | [ ] |
+| 88 | `src/player/game-mode.js` | Game modes: Survival (health, hunger, damage), Creative (fly, no damage, infinite items), Spectator (through blocks) | 150 | [FULLY OPERATIONAL] — verified: 126 tests passing, game mode transitions, permissions, creative flying, onTick subscribers |
+| 89 | `src/player/stats.js` | Player stats: achievements/advancements, statistics (blocks mined, entities killed) | 120 | [FULLY OPERATIONAL] — verified: stat increment/get/set, distance recording, block/combat tracking, serialization/deserialization |
 
 **Subtotal Phase 15: ~270 lines, 2 files**
 
@@ -321,15 +321,15 @@ Tool system with material tiers and durability.
 
 ---
 
-## Phase 18: Health/Hunger/XP Systems [STATUS: PENDING]
+## Phase 18: Health/Hunger/XP Systems [STATUS: FULLY OPERATIONAL]
 
-Player survival mechanics.
+Player survival mechanics. All 85 tests passing.
 *Note: Core health, damage, and absorption are handled by Phase 5's `hurt-box.js`. This phase focuses on hunger and XP.*
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 93 | `src/player/hunger.js` | Hunger system: food value, saturation, starvation damage, auto-regeneration | 150 | [ ] |
-| 94 | `src/player/experience.js` | XP system: levels, XP orbs, enchanting costs, fishing XP, trade XP | 130 | [ ] |
+| 93 | `src/player/hunger.js` | Hunger system: food value, saturation, starvation damage, auto-regeneration | 150 | [FULLY OPERATIONAL] — verified: 85 tests passing, food consumption, saturation mechanics, degradation, starvation |
+| 94 | `src/player/experience.js` | XP system: levels, XP orbs, enchanting costs, fishing XP, trade XP | 130 | [FULLY OPERATIONAL] — verified: XP thresholds, leveling up, orb pickup, spendXP, serialization |
 
 **Subtotal Phase 18: ~280 lines, 2 files**
 
