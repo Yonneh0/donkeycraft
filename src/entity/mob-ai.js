@@ -44,7 +44,7 @@
      * @param {number} x2 - End X.
      * @param {number} y2 - End Y.
      * @param {number} z2 - End Z.
-     * @param {Function} isBlockSolid - Callback(blockId) returning true if block blocks vision.
+     * @param {Function} isBlockSolid - Callback(x, y, z) returning truthy if block blocks vision.
      * @returns {boolean} True if line-of-sight exists.
      */
     Donkeycraft.MobAI.hasLineOfSight = function(x1, y1, z1, x2, y2, z2, isBlockSolid) {
@@ -67,13 +67,8 @@
             var cy = Math.floor(y1 + stepY * i);
             var cz = Math.floor(z1 + stepZ * i);
 
-            // Get block at this position (using the callback)
-            var blockId = isBlockSolid(cx, cy, cz);
-            if (blockId !== null && blockId > 0) {
-                // Check if it's a solid/vision-blocking block
-                if (typeof blockId === 'function' ? blockId() : true) {
-                    return false;
-                }
+            if (isBlockSolid(cx, cy, cz)) {
+                return false;
             }
         }
 

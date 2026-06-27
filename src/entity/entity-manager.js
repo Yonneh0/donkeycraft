@@ -191,16 +191,22 @@
                         // Entity tick error — mark for removal
                         idsToRemove.push(parseInt(id, 10));
                     }
-                } else if (!entity.isAlive() && entity._despawned) {
-                    // Already despawned — schedule removal
-                    idsToRemove.push(parseInt(id, 10));
                 }
             }
         }
 
-        // Remove dead/despawned entities
+        // Remove dead/despawned entities collected during tick
         for (var i = 0; i < idsToRemove.length; i++) {
             this.despawn(idsToRemove[i]);
+        }
+
+        // Also remove any entities that died or were despawned during tick
+        for (var id in this._entities) {
+            if (this._entities.hasOwnProperty(id)) {
+                if (!this._entities[id].isAlive()) {
+                    this.despawn(parseInt(id, 10));
+                }
+            }
         }
     };
 

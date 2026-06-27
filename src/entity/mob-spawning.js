@@ -257,9 +257,10 @@
      * @param {Function} getBlockLight - Callback(x, y, z) returning light level.
      * @param {Function} getHeightAt - Callback(x, z) returning surface Y height.
      * @param {Function} isBlockSolid - Callback(x, y, z) returning true if block is solid.
+     * @param {string} [biome] - Current biome name (optional filter).
      * @returns {object|null} Spawn position {x, y, z} or null if no valid position.
      */
-    Donkeycraft.MobSpawner.prototype.findSpawnPosition = function(definition, chunkX, chunkZ, getBlockLight, getHeightAt, isBlockSolid) {
+    Donkeycraft.MobSpawner.prototype.findSpawnPosition = function(definition, chunkX, chunkZ, getBlockLight, getHeightAt, isBlockSolid, biome) {
         // Random position within chunk
         var localX = Math.floor(Math.random() * 16);
         var localZ = Math.floor(Math.random() * 16);
@@ -287,9 +288,8 @@
             return null;
         }
 
-        // Check biome filter
-        if (definition.biomes.length > 0) {
-            var biome = getBlockLight._currentBiome; // Set by caller
+        // Check biome filter — only apply if biome data is available
+        if (definition.biomes.length > 0 && biome !== null && biome !== undefined) {
             if (definition.biomes.indexOf(biome) === -1) {
                 return null;
             }
@@ -331,7 +331,7 @@
      * @param {Function} worldInfo.isBlockSolid - Callback(x, y, z).
      * @param {Function} worldInfo.createMob - Callback(type, x, y, z).
      * @param {Function} worldInfo.spawnEntity - Callback(entity).
-     * @param {Function} worldInfo.getCurrentBiome - Callback(x, z).
+     * @param {Function} [worldInfo.getCurrentBiome] - Callback(x, z) returning biome name.
      */
     Donkeycraft.MobSpawner.prototype.tick = function(deltaTime, worldInfo) {
         if (!this.enabled) {
@@ -347,6 +347,11 @@
         }
 
         this._ticksSinceCheck = 0;
+
+        // Guard: worldInfo must provide getChunksInRange
+        if (!worldInfo || typeof worldInfo.getChunksInRange !== 'function') {
+            return;
+        }
 
         // Get loaded chunks
         var chunks = worldInfo.getChunksInRange();
@@ -375,12 +380,10 @@
                 var chunkX = chunk.chunkX;
                 var chunkZ = chunk.chunkZ;
 
-                // Set current biome for filter check
+                // Get current biome for filter check
+                var currentBiome = null;
                 if (worldInfo.getCurrentBiome) {
-                    var biome = worldInfo.getCurrentBiome(chunkX * 8, chunkZ * 8);
-                    if (definition.biomes.length > 0 && definition.biomes.indexOf(biome) === -1) {
-                        continue;
-                    }
+                    currentBiome = worldInfo.getCurrentBiome(chunkX * 16 + 7, chunkZ * 16 + 7);
                 }
 
                 // Find spawn position
@@ -390,7 +393,8 @@
                     chunkZ,
                     worldInfo.getBlockLight,
                     worldInfo.getHeightAt,
-                    worldInfo.isBlockSolid
+                    worldInfo.isBlockSolid,
+                    currentBiome
                 );
 
                 if (pos) {

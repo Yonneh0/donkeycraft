@@ -179,23 +179,26 @@
      * Switch to the next phase.
      */
     Donkeycraft.BossMob.prototype._nextPhase = function() {
-        this._phaseIndex++;
-        if (this._phaseIndex >= this.phases.length) {
-            // Loop back to first phase or enter death phase
-            if (!this._isDying && this.health < this.maxHealth * 0.25) {
-                // Enter death phase at 25% health
-                this._isDying = true;
-                this.currentPhase = 'death';
-                this._deathTimer = this.deathDuration;
-            } else {
-                this._phaseIndex = 0;
-            }
+        // Check if should enter death phase (at 25% health or below)
+        if (!this._isDying && this.health < this.maxHealth * 0.25) {
+            this._isDying = true;
+            this.currentPhase = 'death';
+            this._deathTimer = this.deathDuration;
+            return;
         }
 
-        if (!this._isDying) {
-            this.currentPhase = this.phases[this._phaseIndex];
-            this._phaseTimer = this.minPhaseDuration + Math.random() * (this.maxPhaseDuration - this.minPhaseDuration);
+        // If already in death phase, never switch away
+        if (this._isDying) {
+            return;
         }
+
+        this._phaseIndex++;
+        if (this._phaseIndex >= this.phases.length) {
+            this._phaseIndex = 0; // Loop back to first phase
+        }
+
+        this.currentPhase = this.phases[this._phaseIndex];
+        this._phaseTimer = this.minPhaseDuration + Math.random() * (this.maxPhaseDuration - this.minPhaseDuration);
     };
 
     /**
@@ -206,7 +209,6 @@
             return;
         }
 
-        this._attackCooldown -= 1 / Config.GAME_TICKS_PER_SECOND;
         if (this._attackCooldown > 0) {
             return;
         }
@@ -316,7 +318,7 @@
             this._nextPhase();
         }
 
-        // Decrease attack cooldown
+        // Decrease attack cooldown and attempt attack
         this._attackCooldown -= deltaTime;
 
         // Phase-specific behavior

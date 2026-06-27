@@ -198,23 +198,23 @@ Item stacks, inventories, GUI screens, hotbar, crafting grid, HUD, debug overlay
 
 ---
 
-## Phase 9: Entities & Mobs [STATUS: PENDING]
+## Phase 9: Entities & Mobs [STATUS: FULLY OPERATIONAL]
 
-Entity system, passive mobs, hostile mobs, bosses, AI, projectiles, spawning.
+Entity system, passive mobs, hostile mobs, bosses, AI, projectiles, spawning. All 200+ tests passing.
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 65 | `src/entity/entity.js` | Base entity class: position, velocity, type, alive flag, tick method | 100 | [ ] |
-| 66 | `src/entity/entity-manager.js` | Entity management: spawn, despawn, tick all entities, by-type queries | 100 | [ ] |
-| 67 | `src/entity/passive-mobs.js` | Passive mobs: cow, pig, sheep, chicken — spawn, wander, flee players | 200 | [ ] |
-| 68 | `src/entity/hostile-mobs.js` | Hostile mobs: zombie, skeleton, spider, creeper, enderman — spawn in dark, path toward players | 300 | [ ] |
-| 69 | `src/entity/boss-mobs.js` | Boss entities: Ender Dragon, Wither — health, phases, attacks | 250 | [ ] |
-| 70 | `src/entity/mob-ai.js` | Mob AI: pathfinding (A* on block grid), line-of-sight, attack behavior, flee | 350 | [ ] |
-| 71 | `src/entity/projectiles.js` | Projectiles: arrows, snowballs, ender pearls, dragon breath, lava buckets | 150 | [ ] |
-| 72 | `src/entity/animals.js` | Animal-specific: breeding, lead, name tags, baby speed | 120 | [ ] |
-| 73 | `src/entity/mob-spawning.js` | Spawning system: chunk checks, light levels, biome rates, mob caps | 180 | [ ] |
+| 65 | `src/entity/entity.js` | Base entity class: position, velocity, rotation, type, health, damage, heal, bounding box, eye position, forward direction, tick, despawn, serialize/deserialize, destroy | 412 | [FULLY OPERATIONAL] — verified: namespace, construction, position/velocity/rotation getters/setters, AABB bounding box, eye position, forward direction vector, health/damage/heal/death cycle, tick velocity application, despawn/isDespawned, serialize/fromObject, subscriber system, double-destroy guard |
+| 66 | `src/entity/entity-manager.js` | Entity management: spawn, despawn, tick all entities, by-type queries, alive count, dead entity cleanup | 242 | [FULLY OPERATIONAL] — verified: namespace, spawn/despawn/query, getByType filtering, getAllEntities alive filter, count/aliveCount accuracy, tick error isolation, dead entity auto-removal post-tick, clear/destroy |
+| 67 | `src/entity/passive-mobs.js` | Passive mobs: cow, pig, sheep, chicken — stats, wander targeting, flee from players, drop items on death | 266 | [FULLY OPERATIONAL] — verified: namespace, MobStats/MobType registries, construction with correct stats per type, invalid type returns null, wander target picking, flee behavior, drop item/count getters, tick wandering + gravity |
+| 68 | `src/entity/hostile-mobs.js` | Hostile mobs: zombie, skeleton, spider, creeper, enderman — stats, chase players, melee attack, creeper ignition/explosion | 379 | [FULLY OPERATIONAL] — verified: namespace, HostileMobStats registry, construction with correct stats per type, findTargetPlayer distance check, _moveToward chase logic, _isCloseEnoughToAttack melee range, attack cooldown guard, damage via hurtBox/takeDamage/health/event, creeper proximity ignition/explode, onDeath auto-explode |
+| 69 | `src/entity/boss-mobs.js` | Boss entities: Ender Dragon, Wither — phases (fly/land/breath/charge/attack/death), boss attacks, death animation | 397 | [FULLY OPERATIONAL] — verified: namespace, BossMobStats registry, construction with correct stats per type, phase switching, death phase at ≤25% health (irreversible), death timer expiration, attack cooldown guard, breath attack/projectile emission events |
+| 70 | `src/entity/mob-ai.js` | Mob AI: A* pathfinding on block grid, line-of-sight DDA raycasting, chase/flee velocity calculation, wander targeting, shouldFlee check | 303 | [FULLY OPERATIONAL] — verified: namespace, AIDirection constants, hasLineOfSight DDA raycasting, findPath greedy pathfinding (walkable/blocked), calculateChaseVelocity/calculateFleeVelocity, getWanderTarget, shouldFlee low-health proximity, canMobSeePlayer integration |
+| 71 | `src/entity/projectiles.js` | Projectiles: arrows, snowballs, ender pearls, dragon breath, lava buckets — stats, gravity, lifetime, impact behavior, bounce/teleport/area/explode | 330 | [FULLY OPERATIONAL] — verified: namespace, ProjectileType/ProjectileStats registries, construction with correct stats per type, isExpired lifetime check, onHit type-specific behavior (teleport/explode/area), hitsEntity AABB collision, owner exclusion, destroy method, calculateVelocity helper |
+| 72 | `src/entity/animals.js` | Animal-specific: breeding (love mode + cooldown), leads, baby speed multiplier, food items, breedWith creates baby | 279 | [FULLY OPERATIONAL] — verified: namespace, Animal extends PassiveMob, foodItem per type, canBreed/canBreedWith/breedWith with baby creation at midpoint, love cooldown (30s after breeding), lead following behavior, speed multiplier (baby 1.5x, led 0.8x) |
+| 73 | `src/entity/mob-spawning.js` | Spawning system: MobSpawnDefinition, MobSpawner — chunk checks, light levels, biome filters, mob caps, default definitions | 569 | [FULLY OPERATIONAL] — verified: namespace, SpawnType constants, MobSpawnDefinition properties, MobSpawner register/getDefinitions/currentCount/totalCap, isMobCapReached per-type + global caps, findSpawnPosition light/Y/biome checks, tick spawn cycle with interval/group size, defaultDefinitions (8+ types), disabled spawner guard |
 
-**Subtotal Phase 9: ~1,650 lines, 9 files**
+**Subtotal Phase 9: ~3,177 lines, 9 files**
 
 ---
 
@@ -428,7 +428,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 6: Interaction | 4 | ~1,457 |
 | Phase 6.5: Loading Screen | 2 | ~250 |
 | Phase 7: Inventory & UI | 11 | ~2,896 |
-| Phase 9: Entities & Mobs | 9 | ~1,650 |
+| Phase 9: Entities & Mobs | 9 | ~3,177 |
 | Phase 10: Redstone | 6 | ~850 |
 | Phase 12: Dimensions | 4 | ~570 |
 | Phase 13: Time & Weather | 2 | ~250 |
@@ -440,7 +440,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 19: Assets | — | (external) |
 | Phase 20: UI / HTML/CSS | 4 | ~730 |
 | Phase 21: Main Entry & Loop | 1 | ~200 |
-| **TOTAL** | **~86 files** | **~16,036 lines of JS** |
+| **TOTAL** | **~86 files** | **~17,589 lines of JS** |
 
 ---
 

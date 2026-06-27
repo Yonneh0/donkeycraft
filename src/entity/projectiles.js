@@ -24,7 +24,7 @@
         arrow:          { speed: 2.0, damage: 3, gravity: 0.05, lifetime: 60, pierce: false },
         snowball:       { speed: 1.5, damage: 0, gravity: 0.1, lifetime: 20, bounce: true },
         ender_pearl:    { speed: 2.5, damage: 0, gravity: 0.08, lifetime: 30, teleport: true },
-        dragon_breath:  { speed: 0.3, damage: 1, gravity: 0, lifetime: 300, area: true },
+        dragon_breath:  { speed: 0.3, damage: 1, gravity: 0, lifetime: 300, area: true, areaRadius: 3 },
         lava_bucket:    { speed: 1.8, damage: 5, gravity: 0.15, lifetime: 15, explode: true }
     };
 
@@ -59,7 +59,7 @@
         });
 
         /**
-         * Initial velocity.
+         * Current velocity as a Vector3 (overridden from Entity base).
          * @type {Donkeycraft.Vector3}
          */
         this._velocity = new Donkeycraft.Vector3(config.vx || 0, config.vy || 0, config.vz || 0);
@@ -138,6 +138,13 @@
         this.areaRadius = stats.areaRadius || 3;
 
         /**
+         * Whether the projectile has been destroyed.
+         * @type {boolean}
+         * @private
+         */
+        this._destroyed = false;
+
+        /**
          * Whether the projectile has hit something.
          * @type {boolean}
          * @private
@@ -150,11 +157,19 @@
     Donkeycraft.Projectile.prototype.constructor = Donkeycraft.Projectile;
 
     /**
-     * Check if the projectile is expired.
+     * Check if the projectile is expired or destroyed.
      * @returns {boolean}
      */
     Donkeycraft.Projectile.prototype.isExpired = function() {
-        return this._age >= this.lifetime || !this.isAlive();
+        return this._age >= this.lifetime || !this.isAlive() || this._destroyed;
+    };
+
+    /**
+     * Destroy the projectile and free resources.
+     */
+    Donkeycraft.Projectile.prototype.destroy = function() {
+        this._destroyed = true;
+        this.despawn();
     };
 
     /**

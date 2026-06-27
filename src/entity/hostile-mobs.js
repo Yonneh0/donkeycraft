@@ -195,12 +195,16 @@
      * Attack the target player.
      */
     Donkeycraft.HostileMob.prototype.attack = function() {
-        if (!this._targetPlayer || !this._targetPlayer.isAlive()) {
+        if (!this._targetPlayer) {
             return;
         }
 
-        // Decrease attack cooldown
-        this._attackCooldown -= 1 / Config.GAME_TICKS_PER_SECOND;
+        // Check if target is alive (only if it has isAlive method)
+        if (typeof this._targetPlayer.isAlive === 'function' && !this._targetPlayer.isAlive()) {
+            return;
+        }
+
+        // Check if on cooldown
         if (this._attackCooldown > 0) {
             return;
         }
@@ -325,10 +329,15 @@
             }
         }
 
-        // Chase target player
-        if (this._targetPlayer && this._targetPlayer.isAlive()) {
+        // Chase target player (only if it has isAlive method and is alive)
+        if (this._targetPlayer && (typeof this._targetPlayer.isAlive !== 'function' || this._targetPlayer.isAlive())) {
             var pPos = this._targetPlayer.getPosition();
             this._moveToward(pPos.x, pPos.z);
+
+            // Auto-ignite creepers when near target player
+            if (this.explodes) {
+                this.handleCreeperProximity(this._targetPlayer);
+            }
 
             // Attack if close enough
             if (this._isCloseEnoughToAttack()) {

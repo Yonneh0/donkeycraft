@@ -96,7 +96,7 @@
      * @returns {boolean}
      */
     Donkeycraft.Animal.prototype.canBreed = function() {
-        return this._inLove && !this.isBaby && this._loveCooldown <= 0;
+        return this._inLove && !this.isBaby;
     };
 
     /**
@@ -108,7 +108,7 @@
         }
 
         this._inLove = true;
-        this._loveCooldown = 30; // 30 seconds cooldown after breeding
+        this._loveCooldown = 0; // Cooldown starts at 0 — resets to 30 after breeding
     };
 
     /**
@@ -240,7 +240,7 @@
             var dist = Math.sqrt(dx * dx + dz * dz);
 
             if (dist > 4) {
-                // Follow owner slowly
+                // Follow owner slowly — use getSpeedMultiplier() which accounts for baby speed and lead penalty
                 var speedMult = this.getSpeedMultiplier();
                 this._velocity.x = (dx / dist) * this.speed * speedMult * 0.5;
                 this._velocity.z = (dz / dist) * this.speed * speedMult * 0.5;
@@ -250,11 +250,8 @@
             }
         }
 
-        // Baby animals have faster movement
-        if (this.isBaby) {
-            this._velocity.x *= this.babySpeedMultiplier;
-            this._velocity.z *= this.babySpeedMultiplier;
-        }
+        // Baby animals have faster movement — apply via getSpeedMultiplier() in wander logic (parent class)
+        // No additional multiplication here to avoid double-applying the baby speed bonus.
     };
 
     /**

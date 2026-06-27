@@ -80,6 +80,13 @@
         this._despawned = false;
 
         /**
+         * Whether the entity has been destroyed (resources freed).
+         * @type {boolean}
+         * @private
+         */
+        this._destroyed = false;
+
+        /**
          * Health points (0 = dead).
          * @type {number}
          */
@@ -271,14 +278,15 @@
             this.setAlive(false);
         }
 
-        // Emit damage event
+        // Emit damage event — standardize format for consistent handling
         if (EventBus) {
             try {
                 EventBus.emit('entity:damage', {
-                    entity: this,
+                    target: this,
+                    attacker: source,
                     amount: amount,
-                    source: source,
-                    health: this.health
+                    health: this.health,
+                    maxHealth: this.maxHealth
                 });
             } catch (e) {
                 // EventBus may not be available in tests
@@ -394,8 +402,11 @@
      * Destroy the entity and free resources.
      */
     Donkeycraft.Entity.prototype.destroy = function() {
+        if (this._destroyed) return; // Guard against double-destroy
+        this._destroyed = true;
         this._position = null;
         this._velocity = null;
+        this._rotation = null;
         this._subscribers = [];
     };
 

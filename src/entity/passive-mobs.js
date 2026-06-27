@@ -163,7 +163,22 @@
      * @private
      */
     Donkeycraft.PassiveMob.prototype.onDeath = function() {
-        // Subclasses can override to emit drop events
+        // Emit item drop event for external systems to handle
+        if (Donkeycraft.EventBus) {
+            try {
+                var count = this.dropCount[0] + Math.floor(Math.random() * (this.dropCount[1] - this.dropCount[0] + 1));
+                Donkeycraft.EventBus.emit('mob:drop', {
+                    entity: this,
+                    item: this.dropItem,
+                    count: count,
+                    x: this._position.x,
+                    y: this._position.y,
+                    z: this._position.z
+                });
+            } catch (e) {
+                // EventBus may not be available in tests
+            }
+        }
     };
 
     /**

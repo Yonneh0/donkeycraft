@@ -122,4 +122,23 @@
         this._listeners = {};
     };
 
+    /**
+     * Safely emit an event on the global EventBus (if available).
+     * @param {string} event - Event name.
+     * @param {...*} args - Arguments to pass to listeners.
+     */
+    Donkeycraft.EventBus.emitSafe = function(event) {
+        if (!Donkeycraft.EventBus._global) return;
+        var args = Array.prototype.slice.call(arguments, 1);
+        Donkeycraft.EventBus._global.emit.apply(Donkeycraft.EventBus._global, [event].concat(args));
+    };
+
+    /**
+     * Set the global EventBus instance for emitSafe to use.
+     * @param {Donkeycraft.EventBus} instance - Global EventBus instance.
+     */
+    Donkeycraft.EventBus.setGlobal = function(instance) {
+        Donkeycraft.EventBus._global = instance;
+    };
+
 })();
