@@ -888,7 +888,9 @@ body { max-width: 1400px; }
                 var afterReset = assetMgr.getAllTextures();
                 F.assert(afterReset === null, 'getAllTextures returns null after reset');
                 if (afterReset === null) passedSections++; else failedSections++;
-    }
+            });
+        })(); // end asyncSoundTest IIFE
+    } // end runSoundTests function
 
     // ============================================================
     // Global sound playback function
