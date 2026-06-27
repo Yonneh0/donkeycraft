@@ -3402,16 +3402,17 @@
         }
 
         /**
-         * Generate a deepslate texture.
+         * Generate a deepslate texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
         function generateDeepslate() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 15;
+                    var n = (_rng() - 0.5) * 15;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 70 + n;
                     imgData.data[idx + 1] = 80 + n;
@@ -3424,13 +3425,14 @@
         }
 
         /**
-         * Generate a cobbled deepslate texture.
+         * Generate a cobbled deepslate texture with seeded stone shades.
          * @returns {HTMLImageElement}
          */
         function generateCobbledDeepslate() {
+            _seedRng(777);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Cobblestone pattern with deepslate colors
+            // Cobblestone pattern with deepslate colors and seeded shades
             var stones = [
                 { x: 0, y: 8, w: 7, h: 8 },
                 { x: 8, y: 8, w: 8, h: 5 },
@@ -3439,7 +3441,7 @@
             ];
             for (var i = 0; i < stones.length; i++) {
                 var s = stones[i];
-                var shade = 65 + Math.floor(Math.random() * 25);
+                var shade = 65 + Math.floor(_rng() * 25);
                 ctx.fillStyle = 'rgb(' + (shade - 5) + ',' + shade + ',' + (shade + 10) + ')';
                 ctx.fillRect(s.x, s.y, s.w, s.h);
             }
@@ -3447,16 +3449,17 @@
         }
 
         /**
-         * Generate a polished deepslate texture.
+         * Generate a polished deepslate texture with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generatePolishedDeepslate() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 8;
+                    var n = (_rng() - 0.5) * 8;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 60 + n;
                     imgData.data[idx + 1] = 70 + n;
@@ -3469,7 +3472,7 @@
         }
 
         /**
-         * Generate a cobbled deepslate wall texture.
+         * Generate a cobbled deepslate wall texture (same base as cobbled deepslate).
          * @returns {HTMLImageElement}
          */
         function generateCobbledDeepslateWall() {
@@ -3477,16 +3480,17 @@
         }
 
         /**
-         * Generate a polished granite texture.
+         * Generate a polished granite texture with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generatePolishedGranite() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 10;
+                    var n = (_rng() - 0.5) * 10;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 170 + n;
                     imgData.data[idx + 1] = 130 + n;
@@ -3499,16 +3503,17 @@
         }
 
         /**
-         * Generate a polished diorite texture.
+         * Generate a polished diorite texture with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generatePolishedDiorite() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 10;
+                    var n = (_rng() - 0.5) * 10;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 200 + n;
                     imgData.data[idx + 1] = 195 + n;
@@ -3521,16 +3526,17 @@
         }
 
         /**
-         * Generate a polished andesite texture.
+         * Generate a polished andesite texture with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generatePolishedAndesite() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 10;
+                    var n = (_rng() - 0.5) * 10;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 130 + n;
                     imgData.data[idx + 1] = 135 + n;
@@ -3543,16 +3549,17 @@
         }
 
         /**
-         * Generate a smooth stone texture.
+         * Generate a smooth stone texture with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generateSmoothStone() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 6;
+                    var n = (_rng() - 0.5) * 6;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 190 + n;
                     imgData.data[idx + 1] = 185 + n;
@@ -3565,8 +3572,8 @@
         }
 
         /**
-         * Generate a coral block texture.
-         * @param {string} color - Coral color name.
+         * Generate a coral block texture with seeded noise variation.
+         * @param {string} color - Coral color name ("dead", "purple", "blue", "orange", "pink").
          * @returns {HTMLImageElement}
          */
         function generateCoralBlock(color) {
@@ -3578,12 +3585,13 @@
             var r = parseInt(c.slice(1, 3), 16);
             var g = parseInt(c.slice(3, 5), 16);
             var b = parseInt(c.slice(5, 7), 16);
+            _seedRng(r + g + b);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 20;
+                    var n = (_rng() - 0.5) * 20;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = Math.max(0, Math.min(255, r + n));
                     imgData.data[idx + 1] = Math.max(0, Math.min(255, g + n));
@@ -3679,22 +3687,23 @@
         }
 
         /**
-         * Generate a glow lichen texture.
+         * Generate a glow lichen texture with seeded spot positions.
          * @param {string} direction - "north", "south", "east", "west", "up", "down", or "multiple".
          * @returns {HTMLImageElement}
          */
         function generateGlowLichen(direction) {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             // Base
             ctx.fillStyle = '#556655';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Glow spots - all directions render spread pattern for visual consistency
+            // Glow spots with seeded spread pattern
             ctx.fillStyle = '#88CC88';
             var isSpread = direction === 'up' || direction === 'multiple' || direction === 'down';
             if (isSpread) {
                 for (var i = 0; i < 12; i++) {
-                    ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                    ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
                 }
             } else {
                 // Directional: fill center area for cardinal directions
@@ -3756,20 +3765,21 @@
         }
 
         /**
-         * Generate a azalea texture.
+         * Generate a azalea texture with seeded leaf positions.
          * @param {boolean} hasFlowers - Whether flowering azalea.
          * @returns {HTMLImageElement}
          */
         function generateAzalea(hasFlowers) {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Leaves
+            // Seeded leaf clumps
             ctx.fillStyle = '#44AA33';
             for (var i = 0; i < 15; i++) {
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             if (hasFlowers) {
-                // Pink flowers
+                // Pink flowers at deterministic positions
                 ctx.fillStyle = '#FF88AA';
                 var flowers = [{ x: 3, y: 3 }, { x: 9, y: 5 }, { x: 6, y: 10 }, { x: 12, y: 12 }];
                 for (var i = 0; i < flowers.length; i++) {
@@ -3780,17 +3790,18 @@
         }
 
         /**
-         * Generate a moss carpet texture.
+         * Generate a moss carpet texture with seeded patch positions.
          * @returns {HTMLImageElement}
          */
         function generateMossCarpet() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Patchy green moss
+            // Seeded patchy green moss
             ctx.fillStyle = '#66AA44';
             for (var i = 0; i < 25; i++) {
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 1);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 1);
             }
             return _canvasToImage(canvas);
         }
@@ -3824,36 +3835,38 @@
         }
 
         /**
-         * Generate a frogspawn texture.
+         * Generate a frogspawn texture with seeded egg positions and alpha.
          * @returns {HTMLImageElement}
          */
         function generateFrogspawn() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Greenish cluster of eggs
+            // Seeded greenish cluster of eggs
             for (var i = 0; i < 20; i++) {
-                var alpha = 0.5 + Math.random() * 0.5;
+                var alpha = 0.5 + _rng() * 0.5;
                 ctx.fillStyle = 'rgba(140, 200, 80, ' + alpha + ')';
                 ctx.beginPath();
-                ctx.arc(2 + Math.random() * 12, 2 + Math.random() * 12, 1.5, 0, Math.PI * 2);
+                ctx.arc(2 + _rng() * 12, 2 + _rng() * 12, 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
             return _canvasToImage(canvas);
         }
 
         /**
-         * Generate a cream cow texture (decorative item).
+         * Generate a cream cow texture (decorative item) with seeded noise.
          * @returns {HTMLImageElement}
          */
         function generateCream() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#F5F0E0';
             ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
-            // Subtle texture
+            // Seeded subtle texture spots
             for (var i = 0; i < 10; i++) {
                 ctx.fillStyle = 'rgba(200, 190, 170, 0.3)';
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -3960,32 +3973,34 @@
         }
 
         /**
-         * Generate a cherry blossom leaves texture.
+         * Generate a cherry blossom leaves texture with seeded positions.
          * @returns {HTMLImageElement}
          */
         function generateCherryLeaves() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
-            // Pink leaves
+            // Seeded pink leaves with varying alpha
             for (var i = 0; i < 30; i++) {
-                var alpha = 0.5 + Math.random() * 0.5;
+                var alpha = 0.5 + _rng() * 0.5;
                 ctx.fillStyle = 'rgba(240, 160, 180, ' + alpha + ')';
-                ctx.fillRect(Math.floor(Math.random() * 14), Math.floor(Math.random() * 14), 2, 2);
+                ctx.fillRect(Math.floor(_rng() * 14), Math.floor(_rng() * 14), 2, 2);
             }
             return _canvasToImage(canvas);
         }
 
         /**
-         * Generate a cherry wood texture.
+         * Generate a cherry wood texture with seeded noise variation.
          * @returns {HTMLImageElement}
          */
         function generateCherryWood() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
             for (var y = 0; y < TEX_SIZE; y++) {
                 for (var x = 0; x < TEX_SIZE; x++) {
-                    var n = (Math.random() - 0.5) * 15;
+                    var n = (_rng() - 0.5) * 15;
                     var idx = (y * TEX_SIZE + x) * 4;
                     imgData.data[idx]     = 180 + n;
                     imgData.data[idx + 1] = 120 + n;
@@ -4022,16 +4037,17 @@
         }
 
         /**
-         * Generate a root texture.
+         * Generate a root texture with seeded strand positions.
          * @returns {HTMLImageElement}
          */
         function generateRoot() {
+            _seedRng(42);
             var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
             var ctx = canvas.getContext('2d');
             ctx.fillStyle = '#8B6914';
-            // Root strands
+            // Seeded root strands
             for (var i = 0; i < 8; i++) {
-                ctx.fillRect(Math.floor(Math.random() * 12), Math.floor(Math.random() * 12), 3, 2);
+                ctx.fillRect(Math.floor(_rng() * 12), Math.floor(_rng() * 12), 3, 2);
             }
             return _canvasToImage(canvas);
         }
@@ -4172,7 +4188,7 @@
                 'end_stone_bricks': function() { return generateEndStone(); },
                 // Prismarine variants
                 'prismarine': function() { return generatePrismarine('normal'); },
-                'prismine_bricks': function() { return generatePrismarine('bricks'); },
+                'prismarine_bricks': function() { return generatePrismarine('bricks'); },
                 'prismarine_dark': function() { return generatePrismarine('dark'); },
                 // Wood logs (top)
                 'oak_log_top': function() { return generateLogTop(100); },
@@ -4403,6 +4419,7 @@
                     return _canvasToImage(canvas);
                 },
                 'barrel': function() {
+                    _seedRng(42);
                     var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
                     var ctx = canvas.getContext('2d');
                     // Darker wood base
