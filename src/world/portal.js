@@ -70,7 +70,7 @@
         }
 
         /**
-         * Get the global block at world coordinates (via chunk manager).
+         * Get the global block at world coordinates (via WorldUtils).
          * @param {number} x - Global X.
          * @param {number} y - Global Y.
          * @param {number} z - Global Z.
@@ -78,10 +78,7 @@
          * @private
          */
         function getBlockAt(x, y, z) {
-            if (!_chunkManager || x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
-                return 0;
-            }
-            return _chunkManager.getBlock(x, y, z);
+            return Donkeycraft.WorldUtils.getBlockAt(_chunkManager, x, y, z);
         }
 
         /**
@@ -319,7 +316,7 @@
         }
 
         /**
-         * Set a block at global coordinates (via chunk manager).
+         * Set a block at global coordinates (via WorldUtils).
          * @param {number} x - Global X.
          * @param {number} y - Global Y.
          * @param {number} z - Global Z.
@@ -327,9 +324,7 @@
          * @private
          */
         function setBlockAt(x, y, z, blockId) {
-            if (_chunkManager && _chunkManager.setBlock) {
-                _chunkManager.setBlock(x, y, z, blockId);
-            }
+            Donkeycraft.WorldUtils.setBlockAt(_chunkManager, x, y, z, blockId);
         }
 
         /**
