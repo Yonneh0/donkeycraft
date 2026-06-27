@@ -99,6 +99,9 @@
         registerBlock(8, 'grass_block', 0.6, 0.6, 7, 1, false, false, 0, 15);
         registerBlock(9, 'gravel', 0.6, 0.5, 9, 1, false, false, 0, 15);
 
+        // Bedrock (ID 1000) — world boundary block, unbreakable
+        registerBlock(1000, 'bedrock', -1, 3600000.0, -1, 0, false, false, 0, 15);
+
         // Ores (IDs 10-18)
         registerBlock(10, 'coal_ore', 3.0, 6.0, 20, 1, false, false, 0, 15);
         registerBlock(11, 'iron_ore', 3.0, 6.0, 21, 1, false, false, 0, 15);
