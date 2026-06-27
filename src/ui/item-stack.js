@@ -13,7 +13,7 @@
      */
     Donkeycraft.ItemStack = function(itemId, count, tag) {
         this._itemId = itemId || 0;
-        this._count = count || 0;
+        this._count = Math.max(0, count || 0);
         this._tag = tag || null;
     };
 

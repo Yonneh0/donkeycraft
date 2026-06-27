@@ -44,6 +44,8 @@
                 ui = new this._uiComponents[type](data);
             } catch (e) {
                 if (Donkeycraft.Logger) Donkeycraft.Logger.error('GuiManager: Failed to create UI for type "' + type + '": ' + e.message);
+                // Don't push entry if construction failed — silently fail open
+                return;
             }
         }
 

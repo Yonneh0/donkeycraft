@@ -19,7 +19,13 @@
         this._title = title || null;
 
         // Drag state
-        this._dragState = null; // { sourceSlot, stack, remainingCount }
+        this._dragState = null; // { sourceSlot, originalStack, dragStack, remainingCount }
+
+        // Event listeners for UI layer integration
+        this._listeners = {
+            onSlotChange: [],
+            onSelectedChange: []
+        };
     };
 
     /**
@@ -40,11 +46,20 @@
      */
     Donkeycraft.Inventory.prototype.setSlot = function(index, stack) {
         if (index < 0 || index >= this._slotCount) return false;
+        var oldStack = this._slots[index];
         if (stack && stack.isEmpty()) {
             this._slots[index] = null;
-            return true;
+        } else {
+            this._slots[index] = stack;
         }
-        this._slots[index] = stack;
+        // Emit slot change event for UI layer integration
+        if (oldStack !== this._slots[index]) {
+            if (this._listeners.onSlotChange) {
+                for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                    try { this._listeners.onSlotChange[i](index, this._slots[index], oldStack); } catch (e) {}
+                }
+            }
+        }
         return true;
     };
 
@@ -257,17 +272,16 @@
                     this._slots[sourceSlot] = null;
                     return null;
                 } else {
-                    // Return remaining as a new stack
+                    // Return remaining as a new stack but keep drag active
                     var remaining = new Donkeycraft.ItemStack(dragStack.getItemId(), this._dragState.remainingCount, dragStack.getTag());
                     return remaining;
                 }
             }
         }
 
-        // Cannot place — return remaining
+        // Target slot is full or incompatible — keep drag state active
+        // Caller can try another target slot or call endDrag() to cancel
         var remaining = new Donkeycraft.ItemStack(dragStack.getItemId(), this._dragState.remainingCount, dragStack.getTag());
-        this._slots[sourceSlot] = dragStack.clone();
-        this._dragState = null;
         return remaining;
     };
 
@@ -362,6 +376,20 @@
     };
 
     /**
+     * onSlotChange — subscribes to slot change events.
+     * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
+     * @returns {Function} Unsubscribe function.
+     */
+    Donkeycraft.Inventory.prototype.onSlotChange = function(callback) {
+        this._listeners.onSlotChange.push(callback);
+        var self = this;
+        return function() {
+            var idx = self._listeners.onSlotChange.indexOf(callback);
+            if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
+        };
+    };
+
+    /**
      * deserialize — restores the inventory from a serialized object.
      * @param {Object} data - Serialized inventory data.
      */
@@ -392,6 +420,7 @@
     Donkeycraft.Inventory.prototype.destroy = function() {
         this._slots = [];
         this._dragState = null;
+        this._listeners = {};
     };
 
 })();

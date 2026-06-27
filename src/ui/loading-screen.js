@@ -39,6 +39,7 @@
         this._errorEl = null;
         this._tipIndex = 0;
         this._disposed = false;
+        this._lastProgress = -1; // Track last progress to prevent duplicate tip rotation
         this._create();
     };
 
@@ -106,10 +107,18 @@
 
         // Clamp to 0-100
         var p = Math.max(0, Math.min(100, percent));
+
+        // Save old progress before updating
+        var oldProgress = this._lastProgress;
+
+        // Only update DOM if progress actually changed
+        if (p === oldProgress) return;
+        this._lastProgress = p;
+
         this._progressBar.style.width = p + '%';
 
-        // Rotate tips at certain thresholds
-        if (p % 25 === 0 && p > 0) {
+        // Rotate tips at 25% thresholds, but only when progress increases
+        if (p % 25 === 0 && p > 0 && p > oldProgress) {
             this._tipIndex = (this._tipIndex + 1) % Donkeycraft.LoadingScreenTips.length;
             this._tipEl.textContent = '[Tip] ' + Donkeycraft.LoadingScreenTips[this._tipIndex];
         }

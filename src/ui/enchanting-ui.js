@@ -188,7 +188,7 @@
         // Lapis count display
         if (slotName === 'lapis') {
             if (this._lapisCount > 0) {
-                el.textContent = '💎×' + this._lapisCount;
+                el.textContent = '🔵×' + this._lapisCount;
             } else {
                 el.innerHTML = '<span style="color:#aaa;font-size:11px;">Lapis</span>';
             }

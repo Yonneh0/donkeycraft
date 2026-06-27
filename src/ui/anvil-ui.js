@@ -183,10 +183,24 @@
         // If both items are the same type, combine them (repair/merge)
         if (right && right.getItemId() === left.getItemId()) {
             var combined = left.clone();
-            // Sum durability from both items (Minecraft combines durability)
+            // Repair: average remaining durability + bonus, capped at max durability (2*maxDurability - originalDurability)
+            // Minecraft uses: result = floor((A.maxDurability + A.currentDurability + B.currentDurability) / 2), capped at A.maxDurability
+            var leftMaxDurability = 100; // Default max durability for most items
             var leftDurability = left.getDurability() || 0;
             var rightDurability = right.getDurability() || 0;
-            combined.setDurability(leftDurability + rightDurability);
+
+            // Use tag.maxDurability if available, otherwise default to 100
+            var leftTag = left.getTag();
+            if (leftTag && leftTag.maxDurability !== undefined) {
+                leftMaxDurability = leftTag.maxDurability;
+            }
+
+            // Calculate repaired durability: average of both current durabilities + bonus
+            var repairedDurability = Math.floor((leftDurability + rightDurability) / 2 + leftMaxDurability * 0.25);
+            // Cap at max durability (items can't be restored beyond original condition)
+            repairedDurability = Math.min(repairedDurability, leftMaxDurability);
+            combined.setDurability(repairedDurability);
+
             // Merge enchantments from right to left
             var rightEnchants = right.getEnchantments();
             if (rightEnchants && rightEnchants.length > 0) {

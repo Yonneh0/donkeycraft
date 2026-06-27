@@ -235,7 +235,7 @@
      * @param {number} n - Slot index (0-8).
      */
     Donkeycraft.Hotbar.prototype.setSelectedSlot = function(n) {
-        if (n < 0 || n > 8) return;
+        if (n < 0 || n >= 9) return;
         if (n === this._selectedSlot) return;
 
         var oldSlot = this._selectedSlot;

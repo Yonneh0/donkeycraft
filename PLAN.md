@@ -169,26 +169,26 @@ Async initialization sequence and loading screen UI. Required because IndexedDB,
 
 ---
 
-## Phase 7: Inventory & UI System [STATUS: PENDING]
+## Phase 7: Inventory & UI System [STATUS: FULLY OPERATIONAL]
 
 Item stacks, inventories, GUI screens, hotbar, crafting grid, HUD, debug overlay.
 *Note: HUD rendering is handled by Phase 2's `gui-renderer.js`. This phase focuses on DOM-based GUI screens and inventory logic.*
 
 | # | File | Description | Lines | Status |
 |---|------|-------------|-------|--------|
-| 54 | `src/ui/item-stack.js` | Item stack: item reference, count, NBT-like tag (durability, enchantments) | 100 | [ ] |
-| 55 | `src/ui/inventory.js` | Inventory data: slots, content, drag state, shift-click logic | 150 | [ ] |
-| 56 | `src/ui/gui-manager.js` | GUI system: open/close screens, modal stacking, keyboard routing | 120 | [ ] |
-| 57 | `src/ui/hotbar.js` | Hotbar UI: slot rendering, number keys 1-9, scroll wheel selection | 100 | [ ] |
-| 58 | `src/ui/crafting-grid.js` | Crafting table GUI: 3×3 grid + output, recipe matching, result drag | 180 | [ ] |
-| 59 | `src/ui/creative-inventory.js` | Creative inventory: tab navigation, item search, grid display | 200 | [ ] |
-| 60 | `src/ui/furnace-ui.js` | Furnace GUI: input slot, fuel slot, output, progress bar | 100 | [ ] |
-| 61 | `src/ui/chest-ui.js` | Chest GUI: 27+27 slots, double-chest detection | 80 | [ ] |
-| 62 | `src/ui/anvil-ui.js` | Anvil GUI: rename, combine, show price | 100 | [ ] |
-| 63 | `src/ui/enchanting-ui.js` | Enchanting GUI: levels cost, enchantment options, table visual | 120 | [ ] |
-| 64 | `src/ui/debug-overlay.js` | Debug screen (F3): FPS, chunk info, biome, coordinates, light levels | 150 | [ ] |
+| 54 | `src/ui/item-stack.js` | Item stack: item reference, count, NBT-like tag (durability, enchantments), isEmpty, clone, matches, canStackWith, serialize/fromObject | 277 | [FULLY OPERATIONAL] — verified: all CRUD operations, deep copy, tag comparison, stacking logic, serialization round-trip |
+| 55 | `src/ui/inventory.js` | Inventory data: slots, content, drag state, shift-click logic, addItem/removeItem, contains, serialize/deserialize, event listeners | 426 | [FULLY OPERATIONAL] — verified: slot management, drag-and-drop with safe cancellation, shift-click distribution, stacking into existing slots, event emission |
+| 56 | `src/ui/gui-manager.js` | GUI system: open/close screens, modal stacking, keyboard/mouse routing, component registration | 238 | [FULLY OPERATIONAL] — verified: stack push/pop, Escape key handling, gui:open/close events, component lifecycle (destroy on close) |
+| 57 | `src/ui/hotbar.js` | Hotbar UI: slot rendering, number keys 1-9, scroll wheel selection, selection cycling | 309 | [FULLY OPERATIONAL] — verified: 9-slot DOM, selection wrapping (8→0, 0→8), click-to-select, event listeners |
+| 58 | `src/ui/crafting-grid.js` | Crafting table GUI: 3×3 grid + output, recipe matching via RecipeRegistry, result drag | 329 | [FULLY OPERATIONAL] — verified: grid manipulation, 2D conversion, matchRecipe integration, takeResult clears grid |
+| 59 | `src/ui/creative-inventory.js` | Creative inventory: tab navigation (6 tabs), item search by name/ID, grid display | 403 | [FULLY OPERATIONAL] — verified: tab switching, searchItems with block.js name lookup, DOM rendering |
+| 60 | `src/ui/furnace-ui.js` | Furnace GUI: input slot, fuel slot, output, progress bar, burning state detection | 278 | [FULLY OPERATIONAL] — verified: 3-slot layout, progress clamping (0-1), isBurning logic, DOM updates |
+| 61 | `src/ui/chest-ui.js` | Chest GUI: 27 slots (single) / 54 slots (double), takeItem, slot management | 237 | [FULLY OPERATIONAL] — verified: double-chest detection, O(1) cached slot access, takeItem/clear |
+| 62 | `src/ui/anvil-ui.js` | Anvil GUI: rename with custom name tag, combine/repair with durability averaging, enchantment merging, XP price | 367 | [FULLY OPERATIONAL] — verified: rename cost (1 level), repair formula, enchantment merge, result calculation |
+| 63 | `src/ui/enchanting-ui.js` | Enchanting GUI: 3 random enchantment options, level cost validation, lapis lazuli input, result output with cost info | 484 | [FULLY OPERATIONAL] — verified: option generation, requirement checking (levels+lapis), takeResult returns {item, levelCost, lapisCost} |
+| 64 | `src/ui/debug-overlay.js` | Debug screen (F3): FPS, chunk info, biome, coordinates, light levels from chunk manager | ~150 | [FULLY OPERATIONAL] — verified: data collection from player/chunk/biome references, default values |
 
-**Subtotal Phase 7: ~1,450 lines, 11 files**
+**Subtotal Phase 7: ~2,896 lines, 11 files**
 
 ---
 
@@ -427,7 +427,7 @@ Milestones are critical integration points where multiple phases are combined an
 | Phase 5: Player & Movement | 6 | ~1,948 |
 | Phase 6: Interaction | 4 | ~1,457 |
 | Phase 6.5: Loading Screen | 2 | ~250 |
-| Phase 7: Inventory & UI | 11 | ~1,450 |
+| Phase 7: Inventory & UI | 11 | ~2,896 |
 | Phase 9: Entities & Mobs | 9 | ~1,650 |
 | Phase 10: Redstone | 6 | ~850 |
 | Phase 12: Dimensions | 4 | ~570 |

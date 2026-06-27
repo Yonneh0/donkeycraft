@@ -237,38 +237,49 @@
         // Temporarily swap references for helper methods that use this._player/this._chunkManager
         var savedPlayer = this._player;
         var savedChunkManager = this._chunkManager;
-        if (localPlayer !== this._player) {
+        var swapped = false;
+
+        if (localPlayer !== this._player || localChunkManager !== this._chunkManager) {
             this._player = localPlayer;
-        }
-        if (localChunkManager !== this._chunkManager) {
             this._chunkManager = localChunkManager;
+            swapped = true;
         }
 
-        var coords = this.getPlayerCoords();
-        var chunkInfo = this.getChunkInfo();
-        var lightLevels = this.getLightLevels();
-        var biomeName = this.getBiomeName();
-        var gameMode = this.getGameMode();
+        try {
+            var coords = this.getPlayerCoords();
+            var chunkInfo = this.getChunkInfo();
+            var lightLevels = this.getLightLevels();
+            var biomeName = this.getBiomeName();
+            var gameMode = this.getGameMode();
 
-        // Restore original references
-        this._player = savedPlayer;
-        this._chunkManager = savedChunkManager;
+            return {
+                fps: this._fps,
+                coordinates: coords,
+                chunkInfo: chunkInfo,
+                lightLevels: lightLevels,
+                biome: biomeName,
+                gameMode: gameMode,
+                deltaTime: this._getDeltaTime()
+            };
+        } finally {
+            // Always restore original references, even if an exception occurred
+            if (swapped) {
+                this._player = savedPlayer;
+                this._chunkManager = savedChunkManager;
+            }
+        }
+    };
 
-        // Delta time
-        var deltaTime = 0;
+    /**
+     * _getDeltaTime — gets delta time from the timer reference.
+     * @returns {number}
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._getDeltaTime = function() {
         if (this._timer) {
-            try { deltaTime = this._timer.getDeltaTime ? this._timer.getDeltaTime() : 0; } catch (e) {}
+            try { return this._timer.getDeltaTime ? this._timer.getDeltaTime() : 0; } catch (e) {}
         }
-
-        return {
-            fps: this._fps,
-            coordinates: coords,
-            chunkInfo: chunkInfo,
-            lightLevels: lightLevels,
-            biome: biomeName,
-            gameMode: gameMode,
-            deltaTime: deltaTime
-        };
+        return 0;
     };
 
     /**

@@ -144,7 +144,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
      */
     Donkeycraft.CraftingGrid.prototype.setGridSlot = function(index, stack) {
-        if (index < 0 || index > 8) return;
+        if (index < 0 || index >= 9) return;
         var oldStack = this._grid[index];
         this._grid[index] = stack;
         this._updateGridDisplay();

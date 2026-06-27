@@ -99,6 +99,9 @@
                 tabBtn.style.color = '#fff';
             }
 
+            // Store tab name in dataset for reliable identification
+            tabBtn.dataset.tabName = this._tabs[t];
+
             tabBtn.addEventListener('click', (function(tabName) {
                 return function() { self.selectTab(tabName); };
             })(this._tabs[t]));
@@ -241,8 +244,8 @@
             var btns = this._tabBarEl.querySelectorAll('.dk-inv-tab');
             for (var i = 0; i < btns.length; i++) {
                 var btn = btns[i];
-                var btnTab = btn.textContent.toLowerCase();
-                if (btnTab === tabName) {
+                // Use dataset.tabName for reliable identification instead of textContent
+                if (btn.dataset.tabName === tabName) {
                     btn.style.background = 'rgba(80,120,200,0.5)';
                     btn.style.color = '#fff';
                     btn.className = 'dk-inv-tab active';
