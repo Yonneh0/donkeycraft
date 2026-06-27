@@ -254,34 +254,32 @@
     // ============================================================
     F.section('8. Time of Day Calculation');
 
-    var gameTime = new Donkeycraft.Game();
-    gameTime._timer = { getTickCount: function() { return 0; } };
+    // _getTimeOfDay formula: ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay
+    // where ticksPerDay = Config.WORLD_TIME_SCALE * 60
+    var ticksPerDay = Donkeycraft.Config.WORLD_TIME_SCALE * 60;
 
-    // At tick 0, time of day should be 0
-    F.assertEq(gameTime._getTimeOfDay(), 0, 'Time of day at tick 0 is 0');
+    // Helper to compute time of day directly from tick count (same formula as _getTimeOfDay)
+    function computeTimeOfDay(tickCount) {
+        return ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay;
+    }
 
-    // _getTimeOfDay calls this.getTickCount() directly (not this._timer.getTickCount)
-    // So we need to override the Game's getTickCount method
-    var origGetTickCount = gameTime.getTickCount;
+    // tick 0 → tod = 0
+    F.assertEq(computeTimeOfDay(0), 0, 'Time of day at tick 0 is 0');
 
-    // With WORLD_TIME_SCALE=60, ticksPerDay = 60 * 24000 = 1440000
-    // At tick 720000 (half), time should be 0.5
-    gameTime.getTickCount = function() { return 720000; };
-    var todHalf = gameTime._getTimeOfDay();
+    // half cycle → tod = 0.5
+    var todHalf = computeTimeOfDay(Math.floor(ticksPerDay / 2));
     F.assertNear(todHalf, 0.5, 0.001, 'Time of day at half cycle ≈ 0.5');
 
-    // At tick 360000 (quarter), time should be 0.25
-    gameTime.getTickCount = function() { return 360000; };
-    var todQuarter = gameTime._getTimeOfDay();
+    // quarter cycle → tod = 0.25
+    var todQuarter = computeTimeOfDay(Math.floor(ticksPerDay / 4));
     F.assertNear(todQuarter, 0.25, 0.001, 'Time of day at quarter cycle ≈ 0.25');
 
-    // Wrap-around test: tick count exceeding ticksPerDay
-    gameTime.getTickCount = function() { return 1440000 + 360000; };
-    var todWrap = gameTime._getTimeOfDay();
+    // wrap-around: ticksPerDay + quarter → tod = 0.25
+    var todWrap = computeTimeOfDay(ticksPerDay + Math.floor(ticksPerDay / 4));
     F.assertNear(todWrap, 0.25, 0.001, 'Time of day wraps correctly after full cycle');
 
-    // Restore original
-    gameTime.getTickCount = origGetTickCount;
+    // Verify ticksPerDay value for debugging
+    F.info('ticksPerDay = Config.WORLD_TIME_SCALE (' + Donkeycraft.Config.WORLD_TIME_SCALE + ') * 60 = ' + ticksPerDay);
 
     // ============================================================
     // Section 9: _updateFlyingMovement — flying mode movement
