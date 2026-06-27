@@ -225,10 +225,10 @@
     };
 
     /**
-     * Create a vector from spherical coordinates (inverted: phi=angle from Z-axis, theta=azimuth).
+     * Create a vector from spherical coordinates (phi=angle from +Y-axis, theta=azimuth from +X toward +Z).
      * @param {number} length - Magnitude.
-     * @param {number} phi - Polar angle in radians (0 = +Z axis).
-     * @param {number} theta - Azimuthal angle in radians (0 = +X axis).
+     * @param {number} phi - Polar angle in radians (0 = +Y axis, π/2 = XY plane, π = -Y axis).
+     * @param {number} theta - Azimuthal angle in radians (0 = +X axis, π/2 = +Z axis).
      * @returns {Donkeycraft.Vector3}
      */
     Donkeycraft.Vector3.fromSpherical = function(length, phi, theta) {
@@ -238,6 +238,16 @@
             length * Math.cos(phi),
             length * sinPhi * Math.sin(theta)
         );
+    };
+
+    /**
+     * Distance squared to another vector (avoids sqrt for comparison).
+     * @param {Donkeycraft.Vector3} v
+     * @returns {number}
+     */
+    Donkeycraft.Vector3.prototype.distanceToSq = function(v) {
+        var dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z;
+        return dx * dx + dy * dy + dz * dz;
     };
 
     // ============================================================
@@ -470,6 +480,14 @@
     };
 
     /**
+     * Create a deep copy of this matrix.
+     * @returns {Donkeycraft.Matrix4}
+     */
+    Donkeycraft.Matrix4.prototype.clone = function() {
+        return new Donkeycraft.Matrix4(new Float32Array(this._data));
+    };
+
+    /**
      * Transpose the matrix in place.
      * @returns {Donkeycraft.Matrix4} this
      */
@@ -487,10 +505,11 @@
 
     /**
      * Compute the inverse of this matrix using Gauss-Jordan elimination.
+     * Returns a new Matrix4; does not modify the original.
      * @returns {Donkeycraft.Matrix4} A new inverted matrix.
      */
     Donkeycraft.Matrix4.prototype.invert = function() {
-        var d = this._data;
+        var d = this._data; // source data (not mutated)
         var inv = new Float32Array(16);
         var det;
 
@@ -655,8 +674,8 @@
 
         var cosAngle, sin, scale0, scale1;
         if (cosClamped > 0.9999) {
-            // Near-linear interpolation
-            scale0 = 1 - t + flip * t;
+            // Near-linear interpolation: shortest-path SLERP degenerates to LERP
+            scale0 = 1 - t;
             scale1 = flip * t;
         } else {
             var angle = Math.acos(cosClamped);
@@ -798,6 +817,14 @@
      */
     Donkeycraft.Quaternion.prototype.normalized = function() {
         return new Donkeycraft.Quaternion(this.x, this.y, this.z, this.w).normalize();
+    };
+
+    /**
+     * Create a deep copy of this quaternion.
+     * @returns {Donkeycraft.Quaternion}
+     */
+    Donkeycraft.Quaternion.prototype.clone = function() {
+        return new Donkeycraft.Quaternion(this.x, this.y, this.z, this.w);
     };
 
     // ============================================================
