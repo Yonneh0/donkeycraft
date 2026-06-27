@@ -13,12 +13,14 @@ varying float vDepth;
 uniform sampler2D uTexture;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform float uLightFactor;
 
 void main() {
     vec4 texColor = texture2D(uTexture, vUV);
     if (texColor.a < 0.5) discard;
 
-    vec3 finalColor = texColor.rgb * vLight;
+    // Apply dynamic lighting factor (sun intensity * ambient) on top of baked face light
+    vec3 finalColor = texColor.rgb * vLight * uLightFactor;
 
     // Exponential distance fog
     float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
@@ -76,7 +78,7 @@ void main() {
 }
 `;
 
-// Hand/Item Fragment Shader
+// Hand/Item Fragment Shader (reserved for future use — currently uses 'gui' shader program instead)
 var HAND_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -92,7 +94,7 @@ void main() {
 }
 `;
 
-// Particle Fragment Shader
+// Particle Fragment Shader (reserved for future use — currently uses 'gui' shader program instead)
 var PARTICLE_FRAGMENT_SHADER = `
 precision mediump float;
 

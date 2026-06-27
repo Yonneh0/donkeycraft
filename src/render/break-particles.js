@@ -61,18 +61,10 @@
      * @param {number} blockId - The block ID that was broken.
      */
     Donkeycraft.BreakParticles.prototype.spawn = function(x, y, z, blockId) {
-        // First spawn always creates _particleCountPerBlock particles.
-        // Subsequent spawns fill remaining capacity up to _maxParticles.
-        var isInitialSpawn = this._particles.length === 0;
+        // Each spawn creates _particleCountPerBlock particles (or fewer if near capacity).
         var maxToAdd = this._maxParticles - this._particles.length;
 
-        var count;
-        if (isInitialSpawn) {
-            count = Math.min(this._particleCountPerBlock, maxToAdd);
-        } else {
-            // Fill remaining capacity on subsequent spawns
-            count = maxToAdd;
-        }
+        var count = Math.min(this._particleCountPerBlock, maxToAdd);
 
         for (var i = 0; i < count; i++) {
             if (this._particles.length >= this._maxParticles) break;
@@ -171,7 +163,7 @@
 
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
-            var trx = cx + rx + ux, tryY = cy + ry + uy, trz = cz + rz + uz;
+            var trx = cx + rx + ux, trY = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
             var r = p.color.r, g = p.color.g, b = p.color.b;
@@ -184,13 +176,13 @@
             vertices[base + 9]  = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
             vertices[base + 12] = 1; vertices[base + 13] = 0;
             vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
-            vertices[base + 18] = trx; vertices[base + 19] = tryY; vertices[base + 20] = trz;
+            vertices[base + 18] = trx; vertices[base + 19] = trY; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
             vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
             vertices[base + 30] = 0; vertices[base + 31] = 0;
             vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
-            vertices[base + 36] = trx; vertices[base + 37] = tryY; vertices[base + 38] = trz;
+            vertices[base + 36] = trx; vertices[base + 37] = trY; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
             vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;

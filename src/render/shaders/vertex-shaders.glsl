@@ -86,7 +86,7 @@ void main() {
 }
 `;
 
-// Hand/Item Vertex Shader
+// Hand/Item Vertex Shader (reserved for future use — currently uses 'gui' shader program instead)
 var HAND_VERTEX_SHADER = `
 attribute vec3 aPosition;
 attribute vec2 aUV;

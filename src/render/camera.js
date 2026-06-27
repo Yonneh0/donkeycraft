@@ -82,8 +82,9 @@
     };
 
     /**
-     * Get the forward direction vector (reuses cached vector).
-     * @returns {Donkeycraft.Vector3} Normalized forward vector.
+     * Get the horizontal forward direction vector (Y=0, always orthogonal to world-up).
+     * Used for stable strafing and walking movement.
+     * @returns {Donkeycraft.Vector3} Normalized horizontal forward vector.
      */
     Donkeycraft.Camera.prototype.getForward = function() {
         var cosYaw = Math.cos(this._yaw);
@@ -94,6 +95,25 @@
             -sinYaw,
             0,
             -cosYaw
+        ).normalize();
+
+        return this._forward;
+    };
+
+    /**
+     * Get the full 3D forward direction vector including pitch.
+     * Used for creative/spectator flying where looking up = moving up.
+     * @returns {Donkeycraft.Vector3} Normalized 3D forward vector.
+     */
+    Donkeycraft.Camera.prototype.getForward3D = function() {
+        var cosYaw = Math.cos(this._yaw);
+        var sinYaw = Math.sin(this._yaw);
+        var cosPitch = Math.cos(this._pitch);
+
+        this._forward.set(
+            -sinYaw * cosPitch,
+            -Math.sin(this._pitch),
+            -cosYaw * cosPitch
         ).normalize();
 
         return this._forward;
@@ -207,7 +227,7 @@
     };
 
     /**
-     * Move the camera forward/backward.
+     * Move the camera forward/backward (horizontal movement for walking).
      * @param {number} amount - Distance to move (positive = forward).
      */
     Donkeycraft.Camera.prototype.moveForward = function(amount) {
@@ -218,7 +238,19 @@
     };
 
     /**
-     * Move the camera left/right (strafe).
+     * Move the camera forward/backward with pitch (3D movement for flying).
+     * Looking up moves upward, looking down moves downward.
+     * @param {number} amount - Distance to move (positive = forward).
+     */
+    Donkeycraft.Camera.prototype.moveForward3D = function(amount) {
+        var forward = this.getForward3D();
+        this._position.x += forward.x * amount;
+        this._position.y += forward.y * amount;
+        this._position.z += forward.z * amount;
+    };
+
+    /**
+     * Move the camera left/right (horizontal strafing for walking).
      * @param {number} amount - Distance to strafe (positive = right).
      */
     Donkeycraft.Camera.prototype.moveRight = function(amount) {
@@ -226,6 +258,19 @@
         this._position.x += right.x * amount;
         this._position.y += right.y * amount;
         this._position.z += right.z * amount;
+    };
+
+    /**
+     * Move the camera left/right (3D strafing for flying).
+     * Uses a horizontal right vector so strafing stays level regardless of pitch.
+     * @param {number} amount - Distance to strafe (positive = right).
+     */
+    Donkeycraft.Camera.prototype.moveRight3D = function(amount) {
+        var cosYaw = Math.cos(this._yaw);
+        var sinYaw = Math.sin(this._yaw);
+        // Horizontal right vector (Y=0) for stable strafing in any pitch
+        this._position.x += cosYaw * amount;
+        this._position.z += sinYaw * amount;
     };
 
     /**

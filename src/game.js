@@ -120,9 +120,9 @@
             // Create lighting system
             this._lighting = new Donkeycraft.Lighting();
 
-            // Create terrain renderer
+            // Create terrain renderer (pass lighting for dynamic time-of-day)
             this._terrainRenderer = new Donkeycraft.TerrainRenderer(
-                this._gl, this._shaderManager, this._fog
+                this._gl, this._shaderManager, this._fog, this._lighting
             );
             this._terrainRenderer.setRenderDistance(this._renderDistance);
 
@@ -759,10 +759,11 @@
             'uniform sampler2D uTexture;\n' +
             'uniform vec3 uFogColor;\n' +
             'uniform float uFogDensity;\n' +
+            'uniform float uLightFactor;\n' +
             'void main() {\n' +
             '  vec4 texColor = texture2D(uTexture, vUV);\n' +
             '  if (texColor.a < 0.5) discard;\n' +
-            '  vec3 finalColor = texColor.rgb * vLight;\n' +
+            '  vec3 finalColor = texColor.rgb * vLight * uLightFactor;\n' +
             '  float fogFactor = 1.0 - exp(-vDepth * uFogDensity);\n' +
             '  fogFactor = clamp(fogFactor, 0.0, 1.0);\n' +
             '  finalColor = mix(finalColor, uFogColor, fogFactor);\n' +
@@ -896,6 +897,18 @@
                 this._camera.updateProjection();
             }
         }
+    };
+
+    /**
+     * Get the current time of day [0, 1) from world time.
+     * Uses Config.WORLD_TIME_SCALE (ticks per second) to derive a smooth 0-1 value.
+     * @private
+     * @returns {number} Time of day in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
+     */
+    Donkeycraft.Game.prototype._getTimeOfDay = function() {
+        var tickCount = this.getTickCount();
+        var ticksPerDay = Config.WORLD_TIME_SCALE * 60; // 60-second full day cycle
+        return ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay;
     };
 
     /**
@@ -1250,12 +1263,16 @@
             this._terrainRenderer.updateChunks(chunkX, chunkZ);
         }
 
-        // Render sky
+        // Update time of day and apply lighting to sky
+        if (this._lighting) {
+            var timeOfDay = this._getTimeOfDay();
+            this._lighting.setTimeOfDay(timeOfDay);
+        }
         if (this._sky) {
             this._sky.render(this._camera, this._lighting);
         }
 
-        // Render terrain
+        // Render terrain (handles fog color + uLightFactor internally)
         if (this._terrainRenderer && this._camera) {
             this._terrainRenderer.render(this._camera);
         }

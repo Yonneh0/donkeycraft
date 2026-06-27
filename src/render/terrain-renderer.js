@@ -10,11 +10,16 @@
 
     /**
      * TerrainRenderer — Manages rendering of the chunk-based terrain.
+     * @param {WebGLRenderingContext} gl - WebGL context.
+     * @param {ShaderManager} shaderManager - Shader manager instance.
+     * @param {Fog} fog - Fog system for distance fog.
+     * @param {Lighting} [lighting] - Optional lighting system for dynamic time-of-day lighting.
      */
-    Donkeycraft.TerrainRenderer = function(gl, shaderManager, fog) {
+    Donkeycraft.TerrainRenderer = function(gl, shaderManager, fog, lighting) {
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._fog = fog;
+        this._lighting = lighting || null;
 
         // Chunk mesh storage: map "chunkX,chunkZ" → ChunkMesh
         this._chunks = {};
@@ -22,6 +27,10 @@
 
         // Dirty chunks needing rebuild
         this._dirtyChunks = {};
+
+        // Pending meshes: chunks whose geometry couldn't be built yet (e.g., block data not ready)
+        // map "chunkX,chunkZ" → { x: number, z: number }
+        this._pendingMeshes = {};
 
         // Geometry builder and mesh optimizer
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
@@ -51,6 +60,22 @@
      */
     Donkeycraft.TerrainRenderer.prototype.setWorldData = function(getBlockFunc) {
         this._getBlockFunc = getBlockFunc;
+    };
+
+    /**
+     * Set the lighting system for dynamic time-of-day lighting.
+     * @param {Lighting} lighting - Lighting system instance.
+     */
+    Donkeycraft.TerrainRenderer.prototype.setLighting = function(lighting) {
+        this._lighting = lighting || null;
+    };
+
+    /**
+     * Get the current lighting system instance.
+     * @returns {Lighting|null}
+     */
+    Donkeycraft.TerrainRenderer.prototype.getLighting = function() {
+        return this._lighting;
     };
 
     /**
@@ -88,6 +113,9 @@
         var gl = this._gl;
         if (!gl || !this._getBlockFunc) return;
 
+        // First, process any pending meshes (deferred from previous frames)
+        this._processPendingMeshes();
+
         // Determine which chunks should be loaded
         var neededChunks = {};
         for (var dx = -this._renderDistance; dx <= this._renderDistance; dx++) {
@@ -121,6 +149,7 @@
 
     /**
      * Create a new chunk mesh.
+     * If the block data is all air (0 vertices), defers mesh building until data is available.
      * @private
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -141,12 +170,12 @@
         // Build geometry (face culling already done during build)
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
 
-        // Debug logging
+        // If geometry is empty (all air), defer mesh building.
+        // The chunk may not have terrain data yet — it will be built on the next frame.
         if (geometry.vertexCount === 0) {
-            Donkeycraft.Logger.warn('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] has 0 vertices — checking block data');
-            // Sample a few blocks to debug
-            var sampleBlock = localGetBlock(8, 64, 8);
-            Donkeycraft.Logger.info('TerrainRenderer', 'Sample block at (8,64,8) = ' + sampleBlock);
+            var pendingKey = chunkX + ',' + chunkZ;
+            this._pendingMeshes[pendingKey] = { x: chunkX, z: chunkZ };
+            return;
         }
 
         // Create chunk mesh object
@@ -158,6 +187,44 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
+    };
+
+    /**
+     * Process pending meshes: attempt to build geometry for chunks that were deferred.
+     * Called from updateChunks() each frame.
+     * @private
+     */
+    Donkeycraft.TerrainRenderer.prototype._processPendingMeshes = function() {
+        var keysToDelete = [];
+        var self = this;
+
+        for (var key in this._pendingMeshes) {
+            if (!this._pendingMeshes.hasOwnProperty(key)) continue;
+
+            var pending = this._pendingMeshes[key];
+            var existingMesh = this._chunks[key];
+
+            // If a mesh already exists, skip (it was built later via another path)
+            if (existingMesh) {
+                keysToDelete.push(key);
+                continue;
+            }
+
+            // Rebuild geometry with current block data
+            self._createChunkMesh(pending.x, pending.z);
+
+            // If still no mesh, keep it pending (block data may still be unavailable)
+            if (!this._chunks[key]) {
+                // Keep pending — will retry next frame
+            } else {
+                keysToDelete.push(key);
+            }
+        }
+
+        // Remove processed entries
+        for (var i = 0; i < keysToDelete.length; i++) {
+            delete this._pendingMeshes[keysToDelete[i]];
+        }
     };
 
     /**
@@ -337,9 +404,24 @@
         }
         this._shaderManager.setSampler('uTexture', 0);
 
-        // Set fog uniforms
+        // Set fog uniforms and update fog color from lighting system
         if (this._fog) {
+            // Update fog color from lighting if available (time-of-day aware)
+            if (this._lighting) {
+                this._fog.updateFromSky(this._lighting.getSkyColor());
+            }
             this._fog.applyToFogUniforms(this._shaderManager);
+        }
+
+        // Set dynamic lighting factor (sun intensity * ambient)
+        if (this._lighting) {
+            var sunIntensity = this._lighting.getSunIntensity();
+            var ambientLight = this._lighting.getAmbientLight();
+            var lightFactor = Math.max(sunIntensity, ambientLight);
+            this._shaderManager.setFloat('uLightFactor', lightFactor);
+        } else {
+            // Default: full brightness when no lighting system
+            this._shaderManager.setFloat('uLightFactor', 1.0);
         }
 
         // Draw each chunk, skipping those outside the frustum
@@ -411,6 +493,14 @@
         }
         this._chunks = {};
         this._chunkCount = 0;
+
+        // Clear pending meshes
+        for (var key in this._pendingMeshes) {
+            if (this._pendingMeshes.hasOwnProperty(key)) {
+                delete this._pendingMeshes[key];
+            }
+        }
+        this._pendingMeshes = {};
 
         if (this._gl && this._placeholderTexture) {
             this._gl.deleteTexture(this._placeholderTexture);

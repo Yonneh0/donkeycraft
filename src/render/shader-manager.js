@@ -288,10 +288,14 @@
     /**
      * Set a mat4 uniform.
      * @param {string} name - Uniform name.
-     * @param {Donkeycraft.Matrix4} value - Matrix4 value.
+     * @param {Donkeycraft.Matrix4} value - Matrix4 value (must have getData() method).
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setMat4 = function(name, value) {
+        if (!value || typeof value.getData !== 'function') {
+            Donkeycraft.Logger.warn('ShaderManager', 'setMat4: invalid Matrix4 value for uniform "' + name + '"');
+            return false;
+        }
         var self = this;
         return this._setUniform(name, function(gl, loc, val) {
             if (loc) gl.uniformMatrix4fv(loc, false, val.getData());
