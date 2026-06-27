@@ -189,16 +189,17 @@
     F.assert(noHit === null, 'Raycast returns null when no solid blocks exist');
 
     // 1f. Raycast with solid blocks — origin in air above stone layer, inside chunk (0,0)
+    // Use non-integer y=50.5 to avoid DDA grid boundary issue (tMaxY=0 at exact integer boundaries)
     mockCM.createMockChunk(0, 0);
     mockCM.fillArea(mockCM, 0, 0, 0, 15, 49, 15, 1); // stone from y=0 to y=49, air above
-    var origin2 = new Donkeycraft.Vector3(8, 50, 8); // inside chunk (0,0) — z=8 is within local range 0-15
+    var origin2 = new Donkeycraft.Vector3(8, 50.5, 8); // inside chunk (0,0), non-integer y avoids DDA boundary
     var dirDown = new Donkeycraft.Vector3(0, -1, 0);
     var hitResult = Donkeycraft.Raycast.raycast(mockCM, origin2, dirDown, 6.0);
     F.assert(hitResult !== null, 'Raycast hits solid block below player');
     if (hitResult) {
         F.assertEq(hitResult.blockY, 49, 'Hit block Y = 49 (top of stone layer)');
         F.assertEq(hitResult.faceNormalY, 1, 'Face normal Y = 1 (hitting top face)');
-        F.assertNear(hitResult.distance, 1.0, 0.1, 'Distance ≈ 1.0 (one block below)');
+        F.assertNear(hitResult.distance, 0.5, 0.1, 'Distance ≈ 0.5 (half block below from y=50.5)');
     }
 
     // 1g. Raycast with ignoreIds
