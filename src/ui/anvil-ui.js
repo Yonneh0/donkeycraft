@@ -124,6 +124,49 @@
     };
 
     /**
+     * _getMaxDurability — looks up the maximum durability for an item stack.
+     * Checks tag.maxDurability first, then tool system tier lookup, then falls back to defaults.
+     * @param {Donkeycraft.ItemStack} stack - Item stack to look up.
+     * @returns {number} Maximum durability value.
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._getMaxDurability = function(stack) {
+        if (!stack || stack.isEmpty()) return 0;
+
+        // Check tag for explicit maxDurability
+        var tag = stack.getTag();
+        if (tag && tag.maxDurability !== undefined && tag.maxDurability > 0) {
+            return tag.maxDurability;
+        }
+
+        // Look up from tool system if available
+        var itemId = stack.getItemId();
+        if (Donkeycraft.ToolRegistry && typeof Donkeycraft.ToolRegistry.getMaxDurability === 'function') {
+            try {
+                var maxDur = Donkeycraft.ToolRegistry.getMaxDurability(itemId);
+                if (maxDur > 0) return maxDur;
+            } catch (e) {}
+        }
+
+        // Fallback: hardcoded max durabilities by item ID
+        var fallbackMap = {
+            195: 250,   // wooden_pickaxe
+            197: 250,   // wooden_sword
+            196: 2031,  // stone_pickaxe
+            198: 2031,  // stone_sword
+            199: 3031,  // iron_pickaxe
+            201: 3031,  // iron_sword
+            202: 4031,  // gold_pickaxe
+            204: 4031,  // gold_sword
+            205: 1531,  // diamond_pickaxe
+            207: 1531,  // diamond_sword
+            310: 64,    // stick
+            312: 32     // torch (placeholder)
+        };
+        return fallbackMap[itemId] || 100; // Default max durability
+    };
+
+    /**
      * _getItemDisplayChar — gets a display character for an item ID.
      * @param {number} itemId - Block/item ID.
      * @returns {string}
@@ -183,25 +226,24 @@
         // If both items are the same type, combine them (repair/merge)
         if (right && right.getItemId() === left.getItemId()) {
             var combined = left.clone();
-            // Repair: average remaining durability + bonus, capped at max durability (2*maxDurability - originalDurability)
-            // Minecraft uses: result = floor((A.maxDurability + A.currentDurability + B.currentDurability) / 2), capped at A.maxDurability
-            var leftMaxDurability = 100; // Default max durability for most items
+
+            // Get durability values from tags
             var leftDurability = left.getDurability() || 0;
             var rightDurability = right.getDurability() || 0;
 
-            // Use tag.maxDurability if available, otherwise default to 100
-            var leftTag = left.getTag();
-            if (leftTag && leftTag.maxDurability !== undefined) {
-                leftMaxDurability = leftTag.maxDurability;
-            }
+            // Look up max durability: prefer tag, then tool system, then fallback defaults
+            var leftMaxDurability = this._getMaxDurability(left);
+            var rightMaxDurability = this._getMaxDurability(right);
 
-            // Calculate repaired durability: average of both current durabilities + bonus
-            var repairedDurability = Math.floor((leftDurability + rightDurability) / 2 + leftMaxDurability * 0.25);
-            // Cap at max durability (items can't be restored beyond original condition)
-            repairedDurability = Math.min(repairedDurability, leftMaxDurability);
+            // Use the larger maxDurability as reference (Minecraft uses the base item's max)
+            var maxDurability = Math.max(leftMaxDurability, rightMaxDurability);
+
+            // Minecraft repair formula: floor((maxDurability + A.currentDurability + B.currentDurability) / 2), capped at maxDurability
+            var repairedDurability = Math.floor((maxDurability + leftDurability + rightDurability) / 2);
+            repairedDurability = Math.min(repairedDurability, maxDurability);
             combined.setDurability(repairedDurability);
 
-            // Merge enchantments from right to left
+            // Merge enchantments from right to left with compatibility checking
             var rightEnchants = right.getEnchantments();
             if (rightEnchants && rightEnchants.length > 0) {
                 for (var e = 0; e < rightEnchants.length; e++) {
@@ -209,7 +251,8 @@
                 }
             }
             this._resultStack = combined;
-            // Price based on enchantment levels and previous anvil uses
+
+            // Calculate XP price based on enchantment levels and anvil operations
             var totalEnchantLevel = 0;
             if (rightEnchants) {
                 for (var e2 = 0; e2 < rightEnchants.length; e2++) {

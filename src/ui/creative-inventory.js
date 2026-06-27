@@ -277,6 +277,7 @@
     /**
      * searchItems — searches for items across all tabs by name or ID.
      * Uses block.js definitions for name matching when available.
+     * ID matching is exact-only to prevent false positives (e.g., "1" won't match ID 10).
      * @param {string} query - Search query string.
      * @returns {number[]} Array of matching item IDs.
      */
@@ -312,14 +313,14 @@
                     var id = items[i];
                     if (seen[id]) continue;
 
-                    // Try matching by ID first
-                    if (String(id).indexOf(queryLower) !== -1 || String(id) === queryLower) {
+                    // Try exact ID match first (prevents "1" matching IDs 10, 11, etc.)
+                    if (String(id) === queryLower) {
                         matchingIds.push(id);
                         seen[id] = true;
                         continue;
                     }
 
-                    // Try matching against block names from block.js
+                    // Try partial name matching against block names from block.js
                     var name = null;
                     if (nameLookup && nameLookup.hasOwnProperty(id)) {
                         name = nameLookup[id];

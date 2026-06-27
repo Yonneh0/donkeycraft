@@ -243,9 +243,10 @@
 
     /**
      * processDrop — handles dropping an item onto a target slot during drag.
+     * Places items from the drag state into the target slot, updating both source and target as needed.
      * @param {number} sourceSlot - Source slot index (where drag started).
      * @param {number} targetSlot - Target slot index (where drop lands).
-     * @returns {Donkeycraft.ItemStack|null} Remaining stack, or null if fully placed.
+     * @returns {Donkeycraft.ItemStack|null} Remaining stack if partially placed, or null if fully placed/cancelled.
      */
     Donkeycraft.Inventory.prototype.processDrop = function(sourceSlot, targetSlot) {
         if (targetSlot < 0 || targetSlot >= this._slotCount) return null;
@@ -254,9 +255,19 @@
         var dragStack = this._dragState.dragStack;
         var target = this._slots[targetSlot];
 
+        // If source and target are the same, cancel the drag (no-op)
+        if (sourceSlot === targetSlot) {
+            this.endDrag(this._dragState);
+            return null;
+        }
+
         if (target === null) {
-            // Empty slot — place entire stack
-            this._slots[targetSlot] = dragStack.clone();
+            // Empty slot — place entire remaining stack
+            this._slots[targetSlot] = new Donkeycraft.ItemStack(
+                dragStack.getItemId(),
+                this._dragState.remainingCount,
+                dragStack.getTag() ? JSON.parse(JSON.stringify(dragStack.getTag())) : null
+            );
             this._dragState.remainingCount = 0;
             this._slots[sourceSlot] = null;
             return null;
@@ -269,11 +280,16 @@
                 this._dragState.remainingCount -= toPlace;
 
                 if (this._dragState.remainingCount <= 0) {
+                    // Fully placed — clear source slot
                     this._slots[sourceSlot] = null;
                     return null;
                 } else {
-                    // Return remaining as a new stack but keep drag active
-                    var remaining = new Donkeycraft.ItemStack(dragStack.getItemId(), this._dragState.remainingCount, dragStack.getTag());
+                    // Partially placed — return remaining as a new stack, keep drag active
+                    var remaining = new Donkeycraft.ItemStack(
+                        dragStack.getItemId(),
+                        this._dragState.remainingCount,
+                        dragStack.getTag() ? JSON.parse(JSON.stringify(dragStack.getTag())) : null
+                    );
                     return remaining;
                 }
             }
@@ -281,7 +297,11 @@
 
         // Target slot is full or incompatible — keep drag state active
         // Caller can try another target slot or call endDrag() to cancel
-        var remaining = new Donkeycraft.ItemStack(dragStack.getItemId(), this._dragState.remainingCount, dragStack.getTag());
+        var remaining = new Donkeycraft.ItemStack(
+            dragStack.getItemId(),
+            this._dragState.remainingCount,
+            dragStack.getTag() ? JSON.parse(JSON.stringify(dragStack.getTag())) : null
+        );
         return remaining;
     };
 

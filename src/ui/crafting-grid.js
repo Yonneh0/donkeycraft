@@ -174,6 +174,7 @@
 
     /**
      * matchRecipe — attempts to match the current grid against registered recipes.
+     * Checks both shaped and shapeless recipes.
      * @returns {Donkeycraft.Recipe|null} The first matching recipe, or null.
      */
     Donkeycraft.CraftingGrid.prototype.matchRecipe = function() {
@@ -181,11 +182,39 @@
 
         var grid2D = this.getGridAs2D();
         try {
-            return this._recipeRegistry.matchShapedRecipe(grid2D, 3, 3);
+            // First try shaped recipes (3×3 grid)
+            var shapedResult = this._recipeRegistry.matchShapedRecipe(grid2D, 3, 3);
+            if (shapedResult) return shapedResult;
+
+            // Then try shapeless recipes by converting grid to item counts
+            var itemCounts = {};
+            for (var r = 0; r < 3; r++) {
+                for (var c = 0; c < 3; c++) {
+                    var blockId = grid2D[r][c];
+                    if (blockId !== 0) {
+                        itemCounts[blockId] = (itemCounts[blockId] || 0) + 1;
+                    }
+                }
+            }
+
+            // Only attempt shapeless matching if at least one item is present
+            var hasItems = false;
+            for (var key in itemCounts) {
+                if (itemCounts.hasOwnProperty(key) && itemCounts[key] > 0) {
+                    hasItems = true;
+                    break;
+                }
+            }
+
+            if (hasItems) {
+                return this._recipeRegistry.matchShapelessRecipe(itemCounts);
+            }
         } catch (e) {
             if (Donkeycraft.Logger) Donkeycraft.Logger.error('CraftingGrid: Recipe matching failed: ' + e.message);
             return null;
         }
+
+        return null;
     };
 
     /**
