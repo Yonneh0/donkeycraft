@@ -1,5 +1,5 @@
 // Donkeycraft — Mob AI
-// Pathfinding (A* on block grid), line-of-sight, attack behavior, flee.
+// Pathfinding (greedy best-first), line-of-sight, attack behavior, flee.
 (function() {
     'use strict';
 
@@ -7,7 +7,7 @@
     var Config = Donkeycraft.Config;
 
     /**
-     * Direction constants for A* pathfinding.
+     * Direction constants for pathfinding.
      */
     Donkeycraft.AIDirection = {
         NONE: 0,
@@ -20,7 +20,7 @@
     };
 
     /**
-     * Direction deltas for A* pathfinding.
+     * Direction deltas for pathfinding.
      */
     Donkeycraft.AIDirectionDeltas = {
         1: { x: 0, y: 0, z: -1 },
@@ -33,6 +33,9 @@
 
     /**
      * MobAI — shared AI utilities for mob pathfinding and behavior.
+     * Note: findPath uses greedy best-first search (not full A*), sufficient
+     * for basic mob movement in a voxel world. For complex navigation, integrate
+     * with a proper A* library.
      */
     Donkeycraft.MobAI = {};
 
@@ -76,7 +79,8 @@
     };
 
     /**
-     * Simple A* pathfinding on a 3D block grid.
+     * Simple greedy pathfinding on a 3D block grid.
+     * Not full A* — uses direction selection based on distance to target.
      * @param {number} startX - Start X.
      * @param {number} startY - Start Y.
      * @param {number} startZ - Start Z.
@@ -84,14 +88,11 @@
      * @param {number} endY - End Y.
      * @param {number} endZ - End Z.
      * @param {Function} isWalkable - Callback(x, y, z) returning true if block is walkable.
-     * @param {number} maxSteps - Maximum A* steps to prevent infinite loops.
+     * @param {number} maxSteps - Maximum steps to prevent infinite loops.
      * @returns {Object|null} Path with 'steps' array and 'distance', or null if no path.
      */
     Donkeycraft.MobAI.findPath = function(startX, startY, startZ, endX, endY, endZ, isWalkable, maxSteps) {
         maxSteps = maxSteps || 200;
-
-        // Simple greedy pathfinding (not full A* — just direction selection)
-        // This is sufficient for basic mob movement in a voxel world
 
         var currentX = Math.floor(startX);
         var currentY = Math.floor(startY);
@@ -175,6 +176,7 @@
      * @param {number} mobZ - Mob current Z.
      * @param {number} targetX - Target X.
      * @param {number} targetZ - Target Z.
+     * @param {number} speed - Movement speed.
      * @returns {{vx: number, vz: number}} Velocity components.
      */
     Donkeycraft.MobAI.calculateChaseVelocity = function(mobX, mobZ, targetX, targetZ, speed) {
@@ -198,6 +200,7 @@
      * @param {number} mobZ - Mob current Z.
      * @param {number} sourceX - Source X.
      * @param {number} sourceZ - Source Z.
+     * @param {number} speed - Movement speed.
      * @returns {{vx: number, vz: number}} Velocity components.
      */
     Donkeycraft.MobAI.calculateFleeVelocity = function(mobX, mobZ, sourceX, sourceZ, speed) {
@@ -221,15 +224,21 @@
     };
 
     /**
-     * Check if a mob can "see" a player (simplified line-of-sight).
+     * Check if a mob can "see" a player (simplified line-of-sight with DDA).
+     * Air blocks (blockId 0 or falsy) never block vision.
      * @param {Donkeycraft.Entity} mob - Mob entity.
-     * @param {Donkeycraft.Player} player - Player entity.
-     * @param {Function} getBlockId - Callback(x, y, z) returning block ID.
+     * @param {Donkeycraft.Entity} player - Player entity.
+     * @param {Function} getBlockId - Callback(x, y, z) returning block ID (0 = air).
      * @returns {boolean} True if mob can see player.
      */
     Donkeycraft.MobAI.canMobSeePlayer = function(mob, player, getBlockId) {
         var eyePos = mob.getEyePosition();
         var targetPos = player.getEyePosition();
+
+        // Guard against destroyed entities
+        if (!eyePos || !targetPos) {
+            return false;
+        }
 
         var dx = targetPos.x - eyePos.x;
         var dy = targetPos.y - eyePos.y;
@@ -251,15 +260,20 @@
             var bz = Math.floor(eyePos.z + stepZ * i);
 
             var blockId = getBlockId(bx, by, bz);
-            if (blockId && blockId > 0) {
-                // Check transparency using block.js if available
-                if (Donkeycraft.Block && !Donkeycraft.Block.isTransparent(blockId)) {
+
+            // Air blocks (0 or falsy) never block vision
+            if (!blockId || blockId === 0) {
+                continue;
+            }
+
+            // Check transparency using block.js if available
+            if (Donkeycraft.Block && typeof Donkeycraft.Block.isTransparent === 'function') {
+                if (!Donkeycraft.Block.isTransparent(blockId)) {
                     return false;
                 }
-                if (!Donkeycraft.Block) {
-                    // Fallback: assume all blocks block vision
-                    return false;
-                }
+            } else {
+                // Fallback: assume all non-air blocks block vision
+                return false;
             }
         }
 
@@ -269,16 +283,23 @@
     /**
      * Determine if a mob should flee from a player.
      * @param {Donkeycraft.Entity} mob - Mob entity.
-     * @param {Donkeycraft.Player} player - Player entity.
+     * @param {Donkeycraft.Entity} player - Player entity.
      * @param {number} fleeDistance - Distance at which mob flees.
      * @returns {boolean} True if mob should flee.
      */
     Donkeycraft.MobAI.shouldFlee = function(mob, player, fleeDistance) {
         fleeDistance = fleeDistance || 5;
 
-        var dx = mob._position.x - player.getPosition().x;
-        var dy = mob._position.y - player.getPosition().y;
-        var dz = mob._position.z - player.getPosition().z;
+        // Guard against destroyed entities
+        var mobPos = mob.getPosition();
+        var playerPos = player.getPosition();
+        if (!mobPos || !playerPos) {
+            return false;
+        }
+
+        var dx = mobPos.x - playerPos.x;
+        var dy = mobPos.y - playerPos.y;
+        var dz = mobPos.z - playerPos.z;
         var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
         return dist < fleeDistance && mob.health < mob.maxHealth * 0.3; // Flee when low health
@@ -288,7 +309,7 @@
      * Get a random wander target within a given radius.
      * @param {number} centerX - Center X.
      * @param {number} centerZ - Center Z.
-     * @param {number} maxRadius - Maximum wander radius.
+     * @param {number} [maxRadius=10] - Maximum wander radius.
      * @returns {{x: number, z: number}} Wander coordinates.
      */
     Donkeycraft.MobAI.getWanderTarget = function(centerX, centerZ, maxRadius) {

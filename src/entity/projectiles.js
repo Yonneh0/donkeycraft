@@ -29,7 +29,7 @@
     };
 
     /**
-     * Projectile — a thrown/tipped projectile entity.
+     * Projectile — a thrown/projectile entity.
      * @param {object} config - Projectile configuration.
      * @param {string} config.type - Projectile type (arrow, snowball, ender_pearl, dragon_breath, lava_bucket).
      * @param {number} config.x - Initial X position.
@@ -57,12 +57,6 @@
             height: 0.25,
             width: 0.25
         });
-
-        /**
-         * Current velocity as a Vector3 (overridden from Entity base).
-         * @type {Donkeycraft.Vector3}
-         */
-        this._velocity = new Donkeycraft.Vector3(config.vx || 0, config.vy || 0, config.vz || 0);
 
         /**
          * Projectile speed multiplier.
@@ -168,8 +162,9 @@
      * Destroy the projectile and free resources.
      */
     Donkeycraft.Projectile.prototype.destroy = function() {
-        this._destroyed = true;
+        // Call despawn first (before _destroyed check in Entity.despawn)
         this.despawn();
+        this._destroyed = true;
     };
 
     /**
@@ -182,10 +177,13 @@
         this._hasHit = true;
 
         // Type-specific impact behavior
-        if (this.teleport && this.owner && this.owner.getPosition) {
+        if (this.teleport && this.owner && this.owner.isAlive && this.owner.isAlive() && this.owner.getPosition) {
             // Ender pearl — teleport owner to projectile location
-            this.owner.setPosition(hitX, hitY, hitZ);
-            this.owner.setHealth(this.owner.getHealth() - 2); // Fall damage on teleport
+            var ownerPos = this.owner.getPosition();
+            if (ownerPos) {
+                this.owner.setPosition(hitX, hitY, hitZ);
+                this.owner.setHealth(this.owner.getHealth() - 2); // Fall damage on teleport
+            }
         }
 
         if (this.explode) {
@@ -236,7 +234,7 @@
     };
 
     /**
-     * Check collision with an entity.
+     * Check collision with an entity using inclusive AABB comparison.
      * @param {Donkeycraft.Entity} entity - Entity to check against.
      * @returns {boolean} True if projectile hits entity.
      */
@@ -248,9 +246,15 @@
         var projBox = this.getBoundingBox();
         var entBox = entity.getBoundingBox();
 
-        return (projBox.maxX > entBox.minX && projBox.minX < entBox.maxX &&
-                projBox.maxY > entBox.minY && projBox.minY < entBox.maxY &&
-                projBox.maxZ > entBox.minZ && projBox.minZ < entBox.maxZ);
+        // Guard against null bounding boxes (destroyed entities)
+        if (!projBox || !entBox) {
+            return false;
+        }
+
+        // Use inclusive comparison (>= and <=) so touching edges count as hits
+        return (projBox.maxX >= entBox.minX && projBox.minX <= entBox.maxX &&
+                projBox.maxY >= entBox.minY && projBox.minY <= entBox.maxY &&
+                projBox.maxZ >= entBox.minZ && projBox.minZ <= entBox.maxZ);
     };
 
     /**
@@ -258,6 +262,8 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Projectile.prototype.tick = function(deltaTime) {
+        if (this._destroyed) return;
+
         // Call base tick (applies velocity to position)
         Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
 

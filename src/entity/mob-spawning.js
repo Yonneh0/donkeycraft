@@ -150,6 +150,18 @@
          * @type {boolean}
          */
         this.enabled = true;
+
+        /**
+         * Default despawn distance for entities far from players.
+         * @type {number}
+         */
+        this.despawnRadius = 128;
+
+        /**
+         * Ticks an entity can linger before despawning after going out of range.
+         * @type {number}
+         */
+        this.despawnDelay = 600; // 30 seconds at 20 TPS
     };
 
     /**
@@ -250,6 +262,39 @@
     };
 
     /**
+     * Validate a spawn position — check solid block below and light level.
+     * @param {Donkeycraft.MobSpawnDefinition} definition - Spawn definition.
+     * @param {number} x - X position.
+     * @param {number} y - Y position.
+     * @param {number} z - Z position.
+     * @param {Function} getBlockLight - Callback(x, y, z) returning light level.
+     * @param {Function} isBlockSolid - Callback(x, y, z) returning true if block is solid.
+     * @returns {boolean} True if spawn position is valid.
+     */
+    Donkeycraft.MobSpawner.prototype.validateSpawnPosition = function(definition, x, y, z, getBlockLight, isBlockSolid) {
+        // Check light level at spawn position
+        var lightLevel = getBlockLight(x, y, z);
+        if (lightLevel === undefined || lightLevel === null ||
+            lightLevel < definition.minLightLevel || lightLevel > definition.maxLightLevel) {
+            return false;
+        }
+
+        // Check Y range
+        if (y < definition.minY || y > definition.maxY) {
+            return false;
+        }
+
+        // Check solid block below if required
+        if (definition.requireSolidBelow) {
+            if (!isBlockSolid(x, y - 1, z)) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    /**
      * Find a valid spawn position for a mob in a chunk.
      * @param {Donkeycraft.MobSpawnDefinition} definition - Spawn definition.
      * @param {number} chunkX - Chunk X coordinate.
@@ -277,14 +322,8 @@
         // Try to spawn on the surface (one block above ground)
         var spawnY = surfaceY + 1;
 
-        // Check light level at spawn position
-        var lightLevel = getBlockLight(worldX, spawnY, worldZ);
-        if (lightLevel < definition.minLightLevel || lightLevel > definition.maxLightLevel) {
-            return null;
-        }
-
-        // Check Y range
-        if (spawnY < definition.minY || spawnY > definition.maxY) {
+        // Validate spawn position
+        if (!this.validateSpawnPosition(definition, worldX + 0.5, spawnY, worldZ + 0.5, getBlockLight, isBlockSolid)) {
             return null;
         }
 
@@ -306,6 +345,7 @@
      * @param {number} z - Z position.
      * @param {Function} createMob - Callback(type, x, y, z) returning mob entity.
      * @param {Function} spawnEntity - Callback(entity) to add entity to world.
+     * @returns {Donkeycraft.Entity|null} Spawned entity or null.
      */
     Donkeycraft.MobSpawner.prototype.spawnMobAt = function(definition, x, y, z, createMob, spawnEntity) {
         var mob = createMob(definition.type, x, y, z);
@@ -338,6 +378,11 @@
             return;
         }
 
+        // Guard: worldInfo must provide getChunksInRange
+        if (!worldInfo || typeof worldInfo.getChunksInRange !== 'function') {
+            return;
+        }
+
         // Increment tick counter
         this._ticksSinceCheck += deltaTime * Config.GAME_TICKS_PER_SECOND;
 
@@ -347,11 +392,6 @@
         }
 
         this._ticksSinceCheck = 0;
-
-        // Guard: worldInfo must provide getChunksInRange
-        if (!worldInfo || typeof worldInfo.getChunksInRange !== 'function') {
-            return;
-        }
 
         // Get loaded chunks
         var chunks = worldInfo.getChunksInRange();

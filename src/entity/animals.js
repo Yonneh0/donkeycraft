@@ -7,7 +7,10 @@
     var Config = Donkeycraft.Config;
 
     /**
-     * Animal — extends PassiveMob with animal-specific features.
+     * Animal — extends PassiveMob with animal-specific features:
+     * - Breeding: two animals of the same type in love mode produce a baby.
+     * - Leads: players can lead animals with reduced speed.
+     * - Baby speed: baby animals move 1.5x faster.
      * @param {object} config - Animal configuration.
      * @param {string} config.type - Mob type (cow, pig, sheep, chicken).
      * @param {number} [config.x=0] - Initial X position.
@@ -33,7 +36,7 @@
         this.isBaby = !!config.isBaby;
 
         /**
-         * Baby animal speed multiplier.
+         * Baby animal speed multiplier (1.5x base speed).
          * @type {number}
          */
         this.babySpeedMultiplier = 1.5;
@@ -46,7 +49,7 @@
         this._inLove = false;
 
         /**
-         * Love mode cooldown timer.
+         * Love mode cooldown timer (seconds before can enter love mode again).
          * @type {number}
          * @private
          */
@@ -66,10 +69,17 @@
         this.leadOwner = null;
 
         /**
-         * Food item that triggers love mode.
+         * Food item that triggers love mode (e.g., 'wheat' for cows).
          * @type {string}
          */
         this.foodItem = this._getFoodItem();
+
+        /**
+         * Age timer in ticks — babies start at negative age and grow to 0.
+         * Negative values = baby, positive = adult with cooldown.
+         * @type {number}
+         */
+        this.age = config.isBaby ? -24000 : 0;
     };
 
     // Inherit from PassiveMob
@@ -92,11 +102,42 @@
     };
 
     /**
+     * Feed this animal — triggers love mode if the food matches.
+     * @param {string} foodItem - Item name fed to the animal.
+     * @returns {boolean} True if food was accepted.
+     */
+    Donkeycraft.Animal.prototype.feed = function(foodItem) {
+        if (foodItem !== this.foodItem) {
+            return false; // Wrong food
+        }
+
+        // If baby, accelerate growth
+        if (this.isBaby && this.age < 0) {
+            this.age += 6000; // Speed up growth by 6000 ticks per feed
+            if (this.age >= 0) {
+                // Fully grown — transition to adult
+                this.isBaby = false;
+                this.age = 0;
+            }
+            return true;
+        }
+
+        // If adult and on cooldown, check cooldown
+        if (!this.isBaby && this._loveCooldown > 0) {
+            return false; // Still in cooldown
+        }
+
+        // Enter love mode
+        this.enterLoveMode();
+        return true;
+    };
+
+    /**
      * Check if this animal can breed.
      * @returns {boolean}
      */
     Donkeycraft.Animal.prototype.canBreed = function() {
-        return this._inLove && !this.isBaby;
+        return this._inLove && !this.isBaby && this._loveCooldown <= 0;
     };
 
     /**
@@ -120,21 +161,22 @@
 
     /**
      * Check if two animals can breed together.
+     * Both must be same type, in love mode, and not babies.
      * @param {Donkeycraft.Animal} other - Other animal.
      * @returns {boolean} True if both can breed.
      */
     Donkeycraft.Animal.prototype.canBreedWith = function(other) {
         if (!other || other.type !== this.type) {
-            return false;
+            return false; // Must be same type
         }
 
         return this.canBreed() && other.canBreed();
     };
 
     /**
-     * Breed with another animal — creates a baby animal.
+     * Breed with another animal — creates a baby animal at midpoint.
      * @param {Donkeycraft.Animal} partner - Breeding partner.
-     * @returns {Donkeycraft.Animal|null} Baby animal or null.
+     * @returns {Donkeycraft.Animal|null} Baby animal or null if breeding failed.
      */
     Donkeycraft.Animal.prototype.breedWith = function(partner) {
         if (!this.canBreedWith(partner)) {
@@ -206,6 +248,7 @@
 
     /**
      * Get the effective speed multiplier for this animal.
+     * Babies get 1.5x, led animals get 0.8x, both stack multiplicatively.
      * @returns {number}
      */
     Donkeycraft.Animal.prototype.getSpeedMultiplier = function() {
@@ -217,7 +260,7 @@
     };
 
     /**
-     * Tick method — handle love mode cooldown, lead following.
+     * Tick method — handle love mode cooldown, lead following, age progression.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Animal.prototype.tick = function(deltaTime) {
@@ -232,26 +275,35 @@
             }
         }
 
-        // Lead following behavior
-        if (this._onLead && this.leadOwner && this.leadOwner.getPosition) {
-            var ownerPos = this.leadOwner.getPosition();
-            var dx = ownerPos.x - this._position.x;
-            var dz = ownerPos.z - this._position.z;
-            var dist = Math.sqrt(dx * dx + dz * dz);
-
-            if (dist > 4) {
-                // Follow owner slowly — use getSpeedMultiplier() which accounts for baby speed and lead penalty
-                var speedMult = this.getSpeedMultiplier();
-                this._velocity.x = (dx / dist) * this.speed * speedMult * 0.5;
-                this._velocity.z = (dz / dist) * this.speed * speedMult * 0.5;
-            } else {
-                this._velocity.x = 0;
-                this._velocity.z = 0;
+        // Age progression (babies grow over time — 1000 ticks per second of game time)
+        if (this.isBaby && this.age < 0) {
+            this.age += Math.floor(deltaTime * 1000);
+            if (this.age >= 0) {
+                // Fully grown — transition to adult
+                this.isBaby = false;
+                this.age = 0;
             }
         }
 
-        // Baby animals have faster movement — apply via getSpeedMultiplier() in wander logic (parent class)
-        // No additional multiplication here to avoid double-applying the baby speed bonus.
+        // Lead following behavior
+        if (this._onLead && this.leadOwner && this.leadOwner.getPosition) {
+            var ownerPos = this.leadOwner.getPosition();
+            if (ownerPos) {
+                var dx = ownerPos.x - this._position.x;
+                var dz = ownerPos.z - this._position.z;
+                var dist = Math.sqrt(dx * dx + dz * dz);
+
+                if (dist > 4) {
+                    // Follow owner slowly — use getSpeedMultiplier() which accounts for baby speed and lead penalty
+                    var speedMult = this.getSpeedMultiplier();
+                    this._velocity.x = (dx / dist) * this.speed * speedMult * 0.5;
+                    this._velocity.z = (dz / dist) * this.speed * speedMult * 0.5;
+                } else {
+                    this._velocity.x = 0;
+                    this._velocity.z = 0;
+                }
+            }
+        }
     };
 
     /**

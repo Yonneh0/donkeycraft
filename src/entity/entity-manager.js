@@ -41,17 +41,21 @@
     /**
      * Spawn a new entity.
      * @param {Donkeycraft.Entity} entity - Entity to spawn.
-     * @param {string} [type] - Entity type (overrides entity.type).
-     * @returns {number} Entity ID.
+     * @returns {number|null} Entity ID, or null if spawn failed.
      */
-    Donkeycraft.EntityManager.prototype.spawn = function(entity, type) {
+    Donkeycraft.EntityManager.prototype.spawn = function(entity) {
         if (!entity || !entity.isAlive()) {
+            return null;
+        }
+
+        // Check entity limit
+        if (this.getAliveCount() >= this.maxEntities) {
             return null;
         }
 
         var id = this._nextId++;
         entity._id = id;
-        type = type || entity.type;
+        var type = entity.type;
 
         // Register by ID
         this._entities[id] = entity;
@@ -127,10 +131,87 @@
     /**
      * Get all entities of a given type.
      * @param {string} type - Entity type.
+     * @param {number} [maxResults=100] - Maximum number of results to return.
      * @returns {Donkeycraft.Entity[]} Array of entities.
      */
-    Donkeycraft.EntityManager.prototype.getByType = function(type) {
-        return this._byType[type] ? this._byType[type].slice() : [];
+    Donkeycraft.EntityManager.prototype.getByType = function(type, maxResults) {
+        maxResults = maxResults || 100;
+        var list = this._byType[type];
+        if (!list) {
+            return [];
+        }
+        // Return a copy limited to maxResults
+        var result = [];
+        for (var i = 0; i < list.length && result.length < maxResults; i++) {
+            if (list[i].isAlive()) {
+                result.push(list[i]);
+            }
+        }
+        return result;
+    };
+
+    /**
+     * Get all alive entities within a spherical range from a point.
+     * Supports both 2D (cx, cz, radius) and 3D (cx, cy, cz, range) signatures.
+     * @param {number} cx - Center X coordinate (or center Z if 2 args).
+     * @param {number} [cy] - Center Y coordinate (3D) or radius (2D).
+     * @param {number} [cz] - Center Z coordinate (3D only).
+     * @param {number} [range] - Maximum distance (blocks) (3D only).
+     * @returns {Donkeycraft.Entity[]} Array of entities within range.
+     */
+    Donkeycraft.EntityManager.prototype.getEntitiesInRange = function(cx, cy, cz, range) {
+        // Support 2D signature: getEntitiesInRange(cx, cz, radius)
+        var is3D = arguments.length >= 4;
+
+        if (is3D) {
+            // 3D spherical range
+            range = range || 16;
+            var result = [];
+            for (var id in this._entities) {
+                if (this._entities.hasOwnProperty(id)) {
+                    var entity = this._entities[id];
+                    if (!entity.isAlive()) {
+                        continue;
+                    }
+                    var pos = entity.getPosition();
+                    if (!pos) {
+                        continue;
+                    }
+                    var dx = pos.x - cx;
+                    var dy = pos.y - cy;
+                    var dz = pos.z - cz;
+                    var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    if (dist <= range) {
+                        result.push(entity);
+                    }
+                }
+            }
+            return result;
+        } else {
+            // 2D horizontal range (ignore Y)
+            var radius = cy || 10;
+            var radiusSq = radius * radius;
+            var cz2 = cz;
+            var result = [];
+            for (var id2 in this._entities) {
+                if (this._entities.hasOwnProperty(id2)) {
+                    var entity2 = this._entities[id2];
+                    if (!entity2.isAlive() || !entity2.getPosition) {
+                        continue;
+                    }
+                    var pos2 = entity2.getPosition();
+                    if (!pos2) {
+                        continue;
+                    }
+                    var dx2 = pos2.x - cx;
+                    var dz2 = pos2.z - cz2;
+                    if (dx2 * dx2 + dz2 * dz2 <= radiusSq) {
+                        result.push(entity2);
+                    }
+                }
+            }
+            return result;
+        }
     };
 
     /**
@@ -181,6 +262,7 @@
     Donkeycraft.EntityManager.prototype.tick = function(deltaTime) {
         var idsToRemove = [];
 
+        // Single pass: tick alive entities and collect dead ones
         for (var id in this._entities) {
             if (this._entities.hasOwnProperty(id)) {
                 var entity = this._entities[id];

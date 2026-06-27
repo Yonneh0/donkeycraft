@@ -90,8 +90,8 @@
          * Health points (0 = dead).
          * @type {number}
          */
-        this.health = 20;
-        this.maxHealth = 20;
+        this.maxHealth = config.maxHealth || 20;
+        this.health = config.health !== undefined ? Math.min(config.health, this.maxHealth) : this.maxHealth;
 
         /**
          * Custom name tag (if set by player).
@@ -109,9 +109,12 @@
 
     /**
      * Get the entity's current position.
-     * @returns {Donkeycraft.Vector3}
+     * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getPosition = function() {
+        if (this._destroyed || !this._position) {
+            return null;
+        }
         return this._position;
     };
 
@@ -122,6 +125,7 @@
      * @param {number} z - Z coordinate.
      */
     Donkeycraft.Entity.prototype.setPosition = function(x, y, z) {
+        if (this._destroyed) return;
         this._position.x = x;
         this._position.y = y;
         this._position.z = z;
@@ -129,9 +133,12 @@
 
     /**
      * Get the entity's current velocity.
-     * @returns {Donkeycraft.Vector3}
+     * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getVelocity = function() {
+        if (this._destroyed || !this._velocity) {
+            return null;
+        }
         return this._velocity;
     };
 
@@ -142,6 +149,7 @@
      * @param {number} vz - Z velocity (blocks/s).
      */
     Donkeycraft.Entity.prototype.setVelocity = function(vx, vy, vz) {
+        if (this._destroyed) return;
         this._velocity.x = vx;
         this._velocity.y = vy;
         this._velocity.z = vz;
@@ -149,9 +157,12 @@
 
     /**
      * Get the entity's current rotation.
-     * @returns {{yaw: number, pitch: number}} Rotation in radians.
+     * @returns {{yaw: number, pitch: number}|null} Rotation in radians.
      */
     Donkeycraft.Entity.prototype.getRotation = function() {
+        if (this._destroyed || !this._rotation) {
+            return null;
+        }
         return this._rotation;
     };
 
@@ -161,6 +172,7 @@
      * @param {number} pitch - Pitch angle in radians [-π/2, π/2].
      */
     Donkeycraft.Entity.prototype.setRotation = function(yaw, pitch) {
+        if (this._destroyed) return;
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
         this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
@@ -168,9 +180,10 @@
 
     /**
      * Get the entity's dimensions.
-     * @returns {{height: number, width: number}}
+     * @returns {{height: number, width: number}|null}
      */
     Donkeycraft.Entity.prototype.getDimensions = function() {
+        if (this._destroyed) return null;
         return {
             height: this.height,
             width: this.width
@@ -179,9 +192,12 @@
 
     /**
      * Get the entity's bounding box (AABB).
-     * @returns {{minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number}}
+     * @returns {{minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number}|null}
      */
     Donkeycraft.Entity.prototype.getBoundingBox = function() {
+        if (this._destroyed || !this._position) {
+            return null;
+        }
         var halfWidth = this.width / 2;
         return {
             minX: this._position.x - halfWidth,
@@ -195,9 +211,12 @@
 
     /**
      * Get the entity's eye position.
-     * @returns {Donkeycraft.Vector3}
+     * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getEyePosition = function() {
+        if (this._destroyed || !this._position) {
+            return null;
+        }
         return new Donkeycraft.Vector3(
             this._position.x,
             this._position.y + this.height * 0.85,
@@ -207,9 +226,12 @@
 
     /**
      * Get the forward direction vector based on entity rotation.
-     * @returns {Donkeycraft.Vector3}
+     * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getForwardDirection = function() {
+        if (this._destroyed || !this._rotation) {
+            return null;
+        }
         var yaw = this._rotation.yaw;
         return new Donkeycraft.Vector3(
             -Math.sin(yaw),
@@ -231,6 +253,7 @@
      * @param {boolean} alive - True if alive, false if dead.
      */
     Donkeycraft.Entity.prototype.setAlive = function(alive) {
+        if (this._destroyed) return;
         this.alive = !!alive;
         if (!alive) {
             this.onDeath();
@@ -246,11 +269,12 @@
     };
 
     /**
-     * Set the entity's health.
-     * @param {number} health - Health value (clamped to [0, maxHealth]).
+     * Set the entity's health (clamped to [0, maxHealth]).
+     * @param {number} health - Health value.
      */
     Donkeycraft.Entity.prototype.setHealth = function(health) {
-        this.health = Donkeycraft.clamp(Math.floor(health), 0, this.maxHealth);
+        if (this._destroyed) return;
+        this.health = Math.floor(Donkeycraft.clamp(health, 0, this.maxHealth));
         if (this.health <= 0) {
             this.setAlive(false);
         }
@@ -264,7 +288,7 @@
      */
     Donkeycraft.Entity.prototype.takeDamage = function(amount, source) {
         source = source || 'generic';
-        if (!this.isAlive()) {
+        if (!this.isAlive() || this._destroyed) {
             return 0;
         }
 
@@ -273,7 +297,7 @@
             return 0;
         }
 
-        this.health -= amount;
+        this.health = Math.floor(Donkeycraft.clamp(this.health - amount, 0, this.maxHealth));
         if (this.health <= 0) {
             this.setAlive(false);
         }
@@ -301,7 +325,7 @@
      * @param {number} amount - Healing amount.
      */
     Donkeycraft.Entity.prototype.heal = function(amount) {
-        if (!this.isAlive()) {
+        if (!this.isAlive() || this._destroyed) {
             return;
         }
 
@@ -322,6 +346,8 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function(deltaTime) {
+        if (this._destroyed) return;
+
         // Apply velocity to position
         this._position.x += this._velocity.x * deltaTime;
         this._position.y += this._velocity.y * deltaTime;
@@ -343,6 +369,7 @@
      * @returns {Function} Unsubscribe function.
      */
     Donkeycraft.Entity.prototype.onTick = function(callback) {
+        if (this._destroyed) return function() {};
         this._subscribers.push(callback);
         return (function() {
             var idx = this._subscribers.indexOf(callback);
@@ -356,6 +383,7 @@
      * Despawn the entity (mark as removed).
      */
     Donkeycraft.Entity.prototype.despawn = function() {
+        if (this._destroyed) return;
         this._despawned = true;
         this.alive = false;
     };
@@ -370,9 +398,12 @@
 
     /**
      * Serialize entity state for save/load.
-     * @returns {object} Serialized state.
+     * @returns {object|null} Serialized state, or null if destroyed.
      */
     Donkeycraft.Entity.prototype.serialize = function() {
+        if (this._destroyed || !this._position) {
+            return null;
+        }
         return {
             type: this.type,
             x: this._position.x,
@@ -390,6 +421,8 @@
      * @param {object} data - Serialized state.
      */
     Donkeycraft.Entity.prototype.fromObject = function(data) {
+        if (this._destroyed) return;
+        if (!data || !this._position) return;
         if (data.x !== undefined) this._position.x = data.x;
         if (data.y !== undefined) this._position.y = data.y;
         if (data.z !== undefined) this._position.z = data.z;
@@ -400,10 +433,13 @@
 
     /**
      * Destroy the entity and free resources.
+     * After calling destroy(), all getter methods return null.
      */
     Donkeycraft.Entity.prototype.destroy = function() {
         if (this._destroyed) return; // Guard against double-destroy
         this._destroyed = true;
+        this.alive = false;
+        this._despawned = true;
         this._position = null;
         this._velocity = null;
         this._rotation = null;

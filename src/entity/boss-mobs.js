@@ -1,5 +1,5 @@
 // Donkeycraft — Boss Mobs
-// Ender Dragon and Wither — health, phases, attacks.
+// Ender Dragon and Wither — health, phases, attacks, death rewards.
 (function() {
     'use strict';
 
@@ -17,9 +17,11 @@
             speed: 3.0,
             damage: 10,
             sightRange: 64,
-            phases: ['fly', 'land', 'breath'],
+            phases: ['fly', 'land', 'breath', 'death'],
             glow: true,
-            immuneToFallDamage: true
+            immuneToFallDamage: true,
+            floating: true,
+            deathLoot: { item: 'dragon_egg', count: 1 }
         },
         wither: {
             health: 300,
@@ -28,9 +30,11 @@
             speed: 1.5,
             damage: 8,
             sightRange: 32,
-            phases: ['charge', 'attack'],
+            phases: ['charge', 'attack', 'death'],
             glow: true,
-            shootsProjectiles: true
+            shootsProjectiles: true,
+            floating: true,
+            deathLoot: { item: 'nether_star', count: 1 }
         }
     };
 
@@ -68,6 +72,7 @@
         this.glow = stats.glow || false;
         this.immuneToFallDamage = stats.immuneToFallDamage || false;
         this.shootsProjectiles = stats.shootsProjectiles || false;
+        this.floating = stats.floating || false;
 
         /**
          * Boss phases.
@@ -146,6 +151,19 @@
          * @private
          */
         this._deathTimer = 0;
+
+        /**
+         * Death loot reward (item + count).
+         * @type {{item: string, count: number}|null}
+         */
+        this.deathLoot = stats.deathLoot || null;
+
+        /**
+         * Whether death loot has already been awarded.
+         * @type {boolean}
+         * @private
+         */
+        this._lootAwarded = false;
     };
 
     // Inherit from Entity
@@ -179,16 +197,16 @@
      * Switch to the next phase.
      */
     Donkeycraft.BossMob.prototype._nextPhase = function() {
+        // If already in death phase, never switch away
+        if (this.currentPhase === 'death') {
+            return;
+        }
+
         // Check if should enter death phase (at 25% health or below)
         if (!this._isDying && this.health < this.maxHealth * 0.25) {
             this._isDying = true;
             this.currentPhase = 'death';
             this._deathTimer = this.deathDuration;
-            return;
-        }
-
-        // If already in death phase, never switch away
-        if (this._isDying) {
             return;
         }
 
@@ -215,14 +233,29 @@
 
         this._attackCooldown = this.attackInterval;
 
-        // Deal damage to player — check if player has a hurtBox with takeDamage,
-        // otherwise use direct health system.
+        // Deal damage to player — check available damage systems
         if (this._targetPlayer.hurtBox && typeof this._targetPlayer.hurtBox.takeDamage === 'function') {
             this._targetPlayer.hurtBox.takeDamage(this.damage, this.type);
+        } else if (typeof this._targetPlayer.takeDamage === 'function') {
+            this._targetPlayer.takeDamage(this.damage, this.type);
         } else if (this._targetPlayer.health !== undefined) {
             this._targetPlayer.health = Math.max(0, this._targetPlayer.health - this.damage);
             if (this._targetPlayer.health <= 0) {
                 this._targetPlayer.setAlive(false);
+            }
+        }
+
+        // Emit damage event via global EventBus
+        if (Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('entity:damage', {
+                    attacker: this,
+                    target: this._targetPlayer,
+                    damage: this.damage,
+                    source: this.type
+                });
+            } catch (e) {
+                // EventBus may not be available in tests
             }
         }
     };
@@ -278,10 +311,31 @@
     };
 
     /**
-     * Called when the boss dies.
+     * Called when the boss dies — awards death loot and emits death event.
      * @private
      */
     Donkeycraft.BossMob.prototype.onDeath = function() {
+        // Award death loot once
+        if (!this._lootAwarded && this.deathLoot) {
+            this._lootAwarded = true;
+
+            // Emit loot drop event via global EventBus for item system to handle
+            if (Donkeycraft.EventBus) {
+                try {
+                    Donkeycraft.EventBus.emitSafe('boss:loot', {
+                        entity: this,
+                        item: this.deathLoot.item,
+                        count: this.deathLoot.count,
+                        x: this._position.x,
+                        y: this._position.y,
+                        z: this._position.z
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
+            }
+        }
+
         // Emit death event via global EventBus
         if (Donkeycraft.EventBus) {
             try {
@@ -300,13 +354,15 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.BossMob.prototype.tick = function(deltaTime) {
+        if (this._destroyed) return;
+
         // Call base tick (applies velocity to position)
         Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
 
         // Handle death animation
-        if (this._isDying) {
+        if (this.currentPhase === 'death') {
             this._deathTimer -= deltaTime;
-            if (this._deathTimer <= 0) {
+            if (this._deathTimer <= 0 && !this._isDying) {
                 this.setAlive(false);
             }
             return;
@@ -368,8 +424,8 @@
                 this._velocity.z *= 0.95;
         }
 
-        // Gravity (except for flying phases)
-        if (this.currentPhase !== 'fly') {
+        // Gravity (only for non-floating bosses)
+        if (!this.floating) {
             this._velocity.y -= Config.GRAVITY * deltaTime * 0.1;
         }
     };

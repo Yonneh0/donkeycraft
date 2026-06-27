@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Donkeycraft — Entity & Mob System Tests</title>
+<link rel="stylesheet" href="test.css">
+</head>
+<body>
+<h1>Donkeycraft — Entity & Mob System Tests</h1>
+<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+<div class="subtitle">Comprehensive functional tests for all 9 Entity & Mob System modules.</div>
+
+<!-- Summary is auto-created at top by TestFramework.init() -->
+<div id="results"></div>
+
+<!-- Load project scripts in dependency order -->
+<script src="../src/core/namespace.js"></script>
+<script src="../src/core/eventbus.js"></script>
+<script src="../src/core/config.js"></script>
+<script src="../src/core/logger.js"></script>
+<script src="../src/core/math-utils.js"></script>
+
+<!-- Load core modules that entity modules depend on -->
+<script src="../src/world/block.js"></script>
+
+<!-- Load entity modules in dependency order -->
+<script src="../src/entity/entity.js"></script>
+<script src="../src/entity/entity-manager.js"></script>
+<script src="../src/entity/passive-mobs.js"></script>
+<script src="../src/entity/hostile-mobs.js"></script>
+<script src="../src/entity/boss-mobs.js"></script>
+<script src="../src/entity/mob-ai.js"></script>
+<script src="../src/entity/projectiles.js"></script>
+<script src="../src/entity/animals.js"></script>
+<script src="../src/entity/mob-spawning.js"></script>
+
+<!-- Load shared test framework (MUST come before the test script) -->
+<script src="test.js"></script>
+
+<!-- Your test script -->
+<script>
+(function() {
+    'use strict';
+
+    // Get the shared framework instance
+    var F = TestFramework;
+
+    // Initialize: creates #test-summary at top, uses existing #results div
+    F.init('results');
+
+    // ============================================================
+    // Section 1: Entity — Base Class Tests
+    // ============================================================
+    F.section('1. Entity — Base Class');
+
+    // Constructor tests
+    var e = new Donkeycraft.Entity({ type: 'test', x: 5, y: 64, z: 10 });
+    F.assertType(e, 'object', 'Entity instance created');
+    F.assertEq(e.type, 'test', 'Entity type is "test"');
+    F.assertNear(e._position.x, 5, 0.001, 'Entity X position set correctly');
+    F.assertNear(e._position.y, 64, 0.001, 'Entity Y position set correctly');
+    F.assertNear(e._position.z, 10, 0.001, 'Entity Z position set correctly');
+
+    // Default values
+    var eDefault = new Donkeycraft.Entity({});
+    F.assertEq(eDefault.type, 'generic', 'Default type is "generic"');
+    F.assertEq(eDefault.height, 1.8, 'Default height is 1.8');
+    F.assertEq(eDefault.width, 0.6, 'Default width is 0.6');
+    F.assertEq(eDefault.health, 20, 'Default health is 20');
+    F.assertEq(eDefault.maxHealth, 20, 'Default maxHealth is 20');
+    F.assert(eDefault.isAlive(), 'Entity starts alive');
+
+    // getPosition / setPosition
+    var pos = e.getPosition();
+    F.assertType(pos, 'object', 'getPosition returns object');
+    e.setPosition(100, 200, 300);
+    F.assertEq(e._position.x, 100, 'setPosition X works');
+    F.assertEq(e._position.y, 200, 'setPosition Y works');
+    F.assertEq(e._position.z, 300, 'setPosition Z works');
+
+    // getVelocity / setVelocity
+    var vel = e.getVelocity();
+    F.assertType(vel, 'object', 'getVelocity returns object');
+    e.setVelocity(1, 2, 3);
+    F.assertEq(e._velocity.x, 1, 'setVelocity X works');
+    F.assertEq(e._velocity.y, 2, 'setVelocity Y works');
+    F.assertEq(e._velocity.z, 3, 'setVelocity Z works');
+
+    // getRotation / setRotation
+    var rot = e.getRotation();
+    F.assertType(rot, 'object', 'getRotation returns object');
+    e.setRotation(Math.PI, -Math.PI / 4);
+    F.assertNear(e._rotation.yaw, Math.PI, 0.001, 'setRotation yaw works');
+    F.assertNear(e._rotation.pitch, -Math.PI / 4, 0.001, 'setRotation pitch works');
+
+    // getDimensions
+    var dims = e.getDimensions();
+    F.assertEq(dims.height, 1.8, 'getDimensions height correct');
+    F.assertEq(dims.width, 0.6, 'getDimensions width correct');
+
+    // getBoundingBox
+    var box = e.getBoundingBox();
+    F.assert(box.minX < box.maxX, 'BoundingBox minX < maxX');
+    F.assert(box.minY < box.maxY, 'BoundingBox minY < maxY');
+    F.assert(box.minZ < box.maxZ, 'BoundingBox minZ < maxZ');
+
+    // getEyePosition
+    var eye = e.getEyePosition();
+    F.assertNear(eye.y, e._position.y + 1.8 * 0.85, 0.001, 'Eye Y offset is correct');
+
+    // getForwardDirection
+    var fwd = e.getForwardDirection();
+    F.assertType(fwd, 'object', 'getForwardDirection returns Vector3');
+
+    // setAlive / isAlive
+    e.setAlive(false);
+    F.assert(!e.isAlive(), 'Entity not alive after setAlive(false)');
+    e.setAlive(true);
+    F.assert(e.isAlive(), 'Entity alive after setAlive(true)');
+
+    // setHealth / getHealth
+    e.setHealth(10);
+    F.assertEq(e.getHealth(), 10, 'setHealth/getHealth works');
+    e.setHealth(-5);
+    F.assertEq(e.getHealth(), 0, 'setHealth clamps to 0');
+    e.setHealth(100);
+    F.assertEq(e.getHealth(), 20, 'setHealth clamps to maxHealth');
+
+    // takeDamage — entity starts at default health 20 (not clamped to 100)
+    e.setAlive(true);
+    e.setHealth(20); // Reset to default maxHealth
+    var dmg = e.takeDamage(5, 'sword');
+    F.assertEq(dmg, 5, 'takeDamage returns damage amount');
+    F.assertEq(e.getHealth(), 15, 'Health reduced by damage');
+
+    // takeDamage on dead entity
+    e.setAlive(false);
+    var dmg2 = e.takeDamage(10, 'fire');
+    F.assertEq(dmg2, 0, 'takeDamage returns 0 on dead entity');
+
+    // heal
+    e.setAlive(true);
+    e.setHealth(5);
+    e.heal(10);
+    F.assertEq(e.getHealth(), 15, 'heal adds health');
+    e.heal(100);
+    F.assertEq(e.getHealth(), 20, 'heal clamps to maxHealth');
+
+    // despawn / isDespawned
+    var e2 = new Donkeycraft.Entity({});
+    F.assert(!e2.isDespawned(), 'Entity not despawned initially');
+    e2.despawn();
+    F.assert(e2.isDespawned(), 'Entity despawned after despawn()');
+
+    // serialize / fromObject — Entity constructor accepts health/maxHealth via config now
+    var e3 = new Donkeycraft.Entity({ type: 'cow', x: 10, y: 64, z: 20, health: 8, maxHealth: 20 });
+    var serialized = e3.serialize();
+    F.assertType(serialized, 'object', 'serialize returns object');
+    F.assertEq(serialized.type, 'cow', 'Serialized type correct');
+    F.assertEq(serialized.health, 8, 'Serialized health correct');
+
+    var e4 = new Donkeycraft.Entity({});
+    e4.fromObject({ type: 'pig', x: 50, y: 70, z: 60, health: 15 });
+    F.assertEq(e4._position.x, 50, 'fromObject sets X');
+    F.assertEq(e4._position.y, 70, 'fromObject sets Y');
+    F.assertEq(e4._position.z, 60, 'fromObject sets Z');
+    F.assertEq(e4.health, 15, 'fromObject sets health');
+
+    // destroy / null guards
+    var e5 = new Donkeycraft.Entity({});
+    e5.destroy();
+    F.assert(e5.getPosition() === null, 'getPosition returns null after destroy');
+    F.assert(e5.getVelocity() === null, 'getVelocity returns null after destroy');
+    F.assert(e5.getRotation() === null, 'getRotation returns null after destroy');
+    F.assert(e5.getDimensions() === null, 'getDimensions returns null after destroy');
+    F.assert(e5.getBoundingBox() === null, 'getBoundingBox returns null after destroy');
+    F.assert(e5.getEyePosition() === null, 'getEyePosition returns null after destroy');
+    F.assert(e5.getForwardDirection() === null, 'getForwardDirection returns null after destroy');
+    F.assert(!e5.isAlive(), 'Entity not alive after destroy');
+    F.assertEq(e5.serialize(), null, 'serialize returns null after destroy');
+
+    // onTick / unsubscribe
+    var tickCalled = 0;
+    var unsub = e5.onTick ? null : null; // e5 is destroyed, test with fresh entity
+    var e6 = new Donkeycraft.Entity({});
+    var unsubFn = e6.onTick(function(dt) { tickCalled += dt; });
+    e6.tick(1);
+    F.assertEq(Math.floor(tickCalled), 1, 'onTick callback called with deltaTime');
+    unsubFn();
+    tickCalled = 0;
+    e6.tick(1);
+    F.assertEq(Math.floor(tickCalled), 0, 'unsubscribe prevents further calls');
+
+    // ============================================================
+    // Section 2: EntityManager — Lifecycle Tests
+    // ============================================================
+    F.section('2. EntityManager — Lifecycle');
+
+    var em = new Donkeycraft.EntityManager();
+    F.assertType(em, 'object', 'EntityManager instance created');
+    F.assertEq(em.getCount(), 0, 'Empty EntityManager has 0 entities');
+    F.assertEq(em.getAliveCount(), 0, 'Empty EntityManager has 0 alive entities');
+
+    // spawn
+    var mob = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    var id = em.spawn(mob);
+    F.assertType(id, 'number', 'spawn returns entity ID');
+    F.assertEq(em.getCount(), 1, 'EntityManager count is 1 after spawn');
+    F.assertEq(em.getAliveCount(), 1, 'EntityManager alive count is 1');
+
+    // getEntity
+    var retrieved = em.getEntity(id);
+    F.assert(retrieved === mob, 'getEntity returns correct entity');
+
+    // getByType
+    var cows = em.getByType('cow');
+    F.assertArrEq(cows, [mob], 'getByType returns correct entities');
+    var pigs = em.getByType('pig');
+    F.assertArrEq(pigs, [], 'getByType returns empty for unknown type');
+
+    // getEntitiesInRange
+    var pig = Donkeycraft.PassiveMob.create('pig', 5, 64, 0);
+    em.spawn(pig);
+    var nearby = em.getEntitiesInRange(0, 0, 10);
+    F.assert(nearby.length >= 1, 'getEntitiesInRange returns at least 1 entity');
+
+    // despawn
+    em.despawn(id);
+    F.assert(!em.hasEntity(id), 'hasEntity returns false after despawn');
+    F.assertEq(em.getAliveCount(), 1, 'Alive count decreased after despawn');
+
+    // spawn null/dead entity
+    var nullId = em.spawn(null);
+    F.assert(nullId === null, 'spawn(null) returns null');
+
+    // maxEntities check
+    var em2 = new Donkeycraft.EntityManager();
+    em2.maxEntities = 2;
+    var m1 = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    var m2 = Donkeycraft.PassiveMob.create('pig', 0, 64, 0);
+    var m3 = Donkeycraft.PassiveMob.create('sheep', 0, 64, 0);
+    em2.spawn(m1);
+    em2.spawn(m2);
+    var overflowId = em2.spawn(m3);
+    F.assert(overflowId === null, 'spawn returns null when at maxEntities');
+
+    // tick
+    var em3 = new Donkeycraft.EntityManager();
+    var tickMob = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    em3.spawn(tickMob);
+    em3.tick(0.05);
+    F.assertEq(em3.getAliveCount(), 1, 'tick preserves alive entity');
+
+    // clear / destroy
+    em.clear();
+    F.assertEq(em.getCount(), 0, 'clear removes all entities');
+    em.destroy();
+    F.assertEq(em.getCount(), 0, 'destroy also clears all entities');
+
+    // ============================================================
+    // Section 3: PassiveMob — Behavior Tests
+    // ============================================================
+    F.section('3. PassiveMob — Behavior');
+
+    // Constructor
+    var cow = Donkeycraft.PassiveMob.create('cow', 10, 64, 20);
+    F.assertType(cow, 'object', 'PassiveMob cow created');
+    F.assertEq(cow.type, 'cow', 'Cow type correct');
+    F.assertEq(cow.health, 10, 'Cow health is 10');
+    F.assertEq(cow.speed, 1.0, 'Cow speed is 1.0');
+    F.assertEq(cow.height, 1.4, 'Cow height is 1.4');
+    F.assertEq(cow.width, 1.4, 'Cow width is 1.4');
+
+    // Other passive mob types
+    var pig = Donkeycraft.PassiveMob.create('pig', 0, 64, 0);
+    F.assertEq(pig.health, 10, 'Pig health is 10');
+    F.assertEq(pig.speed, 1.2, 'Pig speed is 1.2');
+
+    var sheep = Donkeycraft.PassiveMob.create('sheep', 0, 64, 0);
+    F.assertEq(sheep.health, 8, 'Sheep health is 8');
+
+    var chicken = Donkeycraft.PassiveMob.create('chicken', 0, 64, 0);
+    F.assertEq(chicken.health, 4, 'Chicken health is 4');
+
+    // Unknown type
+    var unknown = Donkeycraft.PassiveMob.create('dragon', 0, 64, 0);
+    F.assert(unknown === null, 'Unknown mob type returns null');
+
+    // getDropItem / getDropCount
+    F.assertEq(cow.getDropItem(), 'leather', 'Cow drops leather');
+    F.assertArrEq(cow.getDropCount(), [0, 2], 'Cow drop count is [0, 2]');
+    F.assertArrEq(pig.getDropCount(), [1, 3], 'Pig drop count is [1, 3]');
+
+    // _pickWanderTarget (internal) — tick to verify movement changes
+    cow.tick(0.05);
+    var moved = cow.getPosition();
+    F.assert(moved !== null, 'Position not null after tick');
+
+    // fleeFrom
+    var fakePlayerPos = { x: 100, y: 64, z: 100 };
+    cow.fleeFrom(fakePlayerPos);
+    F.assert(cow._isFleeing, 'Mob is fleeing after fleeFrom()');
+    F.assert(cow._fleeTimer > 0, 'Flee timer is positive');
+
+    // isPlayerNearby
+    var mockPlayer = { getPosition: function() { return { x: 5, y: 64, z: 5 }; } };
+    cow.setPosition(0, 64, 0);
+    F.assert(cow.isPlayerNearby(mockPlayer, 10), 'Player nearby within range');
+    F.assert(!cow.isPlayerNearby(mockPlayer, 1), 'Player not nearby outside range');
+
+    // tick — verify wander timer decreases
+    var cow2 = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    var initialTimer = cow2._wanderTimer;
+    cow2.tick(1);
+    F.assert(cow2._wanderTimer < initialTimer || cow2._wanderTimer !== initialTimer, 'Wander timer changes on tick');
+
+    // ============================================================
+    // Section 4: HostileMob — Behavior Tests
+    // ============================================================
+    F.section('4. HostileMob — Behavior');
+
+    // Constructor
+    var zombie = Donkeycraft.HostileMob.create('zombie', 0, 64, 0);
+    F.assertType(zombie, 'object', 'HostileMob zombie created');
+    F.assertEq(zombie.type, 'zombie', 'Zombie type correct');
+    F.assertEq(zombie.health, 20, 'Zombie health is 20');
+    F.assertEq(zombie.speed, 1.0, 'Zombie speed is 1.0');
+    F.assertEq(zombie.damage, 3, 'Zombie damage is 3');
+    F.assertEq(zombie.sightRange, 16, 'Zombie sight range is 16');
+    F.assert(!zombie.glow, 'Zombie does not glow');
+    F.assert(!zombie.explodes, 'Zombie does not explode');
+    F.assert(!zombie.teleports, 'Zombie does not teleport');
+
+    // Skeleton
+    var skeleton = Donkeycraft.HostileMob.create('skeleton', 0, 64, 0);
+    F.assertEq(skeleton.sightRange, 20, 'Skeleton sight range is 20');
+
+    // Spider
+    var spider = Donkeycraft.HostileMob.create('spider', 0, 64, 0);
+    F.assertEq(spider.width, 1.4, 'Spider width is 1.4');
+
+    // Creeper
+    var creeper = Donkeycraft.HostileMob.create('creeper', 0, 64, 0);
+    F.assert(creeper.explodes, 'Creeper explodes');
+    F.assert(creeper.glow, 'Creeper glows');
+
+    // Enderman
+    var enderman = Donkeycraft.HostileMob.create('enderman', 0, 64, 0);
+    F.assert(enderman.teleports, 'Enderman teleports');
+    F.assertEq(enderman.health, 40, 'Enderman health is 40');
+
+    // findTargetPlayer
+    var mockPlayer2 = {
+        getPosition: function() { return { x: 5, y: 64, z: 5 }; },
+        isAlive: function() { return true; }
+    };
+    zombie.setPosition(0, 64, 0);
+    F.assert(zombie.findTargetPlayer(mockPlayer2), 'findTargetPlayer returns true within range');
+
+    var farPlayer = {
+        getPosition: function() { return { x: 100, y: 64, z: 100 }; },
+        isAlive: function() { return true; }
+    };
+    F.assert(!zombie.findTargetPlayer(farPlayer), 'findTargetPlayer returns false outside range');
+
+    // _moveToward with Y-level
+    zombie.setPosition(0, 64, 0);
+    zombie._moveToward(10, 10, 70);
+    F.assert(zombie._velocity.x > 0, '_moveToward sets positive X velocity');
+    F.assert(zombie._velocity.y > 0, '_moveToward sets positive Y velocity with targetY');
+
+    // attack
+    var mockTarget = {
+        getPosition: function() { return { x: 1, y: 64, z: 1 }; },
+        isAlive: function() { return true; },
+        health: 20
+    };
+    zombie._targetPlayer = mockTarget;
+    zombie._attackCooldown = 0;
+    zombie.attack();
+    F.assertEq(mockTarget.health, 17, 'Attack reduces target health');
+    F.assert(zombie._attackCooldown > 0, 'Attack sets cooldown');
+
+    // handleCreeperProximity
+    var creeper2 = Donkeycraft.HostileMob.create('creeper', 0, 64, 0);
+    var closePlayer = { getPosition: function() { return { x: 1, y: 64, z: 1 }; } };
+    creeper2.handleCreeperProximity(closePlayer);
+    F.assert(creeper2._isIgnited, 'Creeper ignites when player is close');
+
+    var farPlayer2 = { getPosition: function() { return { x: 10, y: 64, z: 10 }; } };
+    creeper2.handleCreeperProximity(farPlayer2);
+    F.assert(!creeper2._isIgnited, 'Creeper un-ignites when player moves away');
+
+    // explode
+    var creeper3 = Donkeycraft.HostileMob.create('creeper', 0, 64, 0);
+    creeper3._isIgnited = true;
+    var exploded = creeper3.explode();
+    F.assert(exploded, 'explode returns true when ignited');
+
+    // teleportRandomly
+    var enderman2 = Donkeycraft.HostileMob.create('enderman', 0, 64, 0);
+    var oldX = enderman2._position.x;
+    enderman2.teleportRandomly();
+    F.assert(Math.abs(enderman2._position.x - oldX) > 0, 'Teleport changes position');
+
+    // tick
+    zombie.setPosition(0, 64, 0);
+    zombie._targetPlayer = mockPlayer2;
+    zombie.tick(0.05);
+    F.assert(zombie.isAlive(), 'HostileMob alive after tick');
+
+    // ============================================================
+    // Section 5: BossMob — Behavior Tests
+    // ============================================================
+    F.section('5. BossMob — Behavior');
+
+    // Constructor
+    var dragon = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    F.assertType(dragon, 'object', 'BossMob ender_dragon created');
+    F.assertEq(dragon.type, 'ender_dragon', 'Dragon type correct');
+    F.assertEq(dragon.health, 200, 'Dragon health is 200');
+    F.assertEq(dragon.height, 8.0, 'Dragon height is 8.0');
+    F.assertEq(dragon.width, 11.4, 'Dragon width is 11.4');
+    F.assert(dragon.glow, 'Dragon glows');
+    F.assert(dragon.immuneToFallDamage, 'Dragon immune to fall damage');
+    F.assert(dragon.floating, 'Dragon is floating');
+    F.assert(dragon.deathLoot !== null, 'Dragon has death loot');
+    F.assertEq(dragon.deathLoot.item, 'dragon_egg', 'Dragon death loot is dragon_egg');
+
+    var wither = Donkeycraft.BossMob.create('wither', 0, 64, 0);
+    F.assertEq(wither.health, 300, 'Wither health is 300');
+    F.assert(wither.shootsProjectiles, 'Wither shoots projectiles');
+    F.assertEq(wither.deathLoot.item, 'nether_star', 'Wither death loot is nether_star');
+
+    // Unknown type
+    var unknownBoss = Donkeycraft.BossMob.create('ghost', 0, 64, 0);
+    F.assert(unknownBoss === null, 'Unknown boss type returns null');
+
+    // findTargetPlayer
+    dragon._targetPlayer = mockPlayer2;
+    F.assert(dragon._targetPlayer !== null, 'Dragon has target player');
+
+    // attack
+    var mockBossTarget = {
+        getPosition: function() { return { x: 5, y: 80, z: 5 }; },
+        isAlive: function() { return true; },
+        health: 200
+    };
+    dragon._targetPlayer = mockBossTarget;
+    dragon.attack();
+    F.assert(mockBossTarget.health < 200, 'Dragon attack reduces target health');
+
+    // emitBreathAttack / shootProjectile — just verify no errors
+    dragon.emitBreathAttack();
+    wither.shootProjectile();
+
+    // _nextPhase
+    var boss = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    var initialPhase = boss.currentPhase;
+    boss._phaseTimer = 0;
+    boss._nextPhase();
+    F.assert(boss.currentPhase !== initialPhase || boss._phaseIndex > 0, 'Phase changes after _nextPhase');
+
+    // Death phase at 25% health
+    var boss2 = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    boss2.health = 40; // 20% of 200
+    boss2._nextPhase();
+    F.assertEq(boss2.currentPhase, 'death', 'Boss enters death phase at <=25% health');
+
+    // tick — death animation
+    var boss3 = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    boss3.health = 40;
+    boss3._nextPhase();
+    F.assertEq(boss3.currentPhase, 'death', 'Boss in death phase');
+    boss3._deathTimer = 0.1; // Less than deathDuration
+    boss3.tick(0.05);
+    F.assert(boss3.isAlive(), 'Boss still alive during death animation');
+
+    // destroy null guards
+    var boss4 = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    boss4.destroy();
+    F.assert(!boss4.isAlive(), 'Boss not alive after destroy');
+
+    // ============================================================
+    // Section 6: MobAI — Utility Tests
+    // ============================================================
+    F.section('6. MobAI — Utilities');
+
+    // hasLineOfSight
+    var solidBlock = function(x, y, z) { return (x + y + z) % 10 === 0; };
+    var los = Donkeycraft.MobAI.hasLineOfSight(0, 0, 0, 5, 0, 0, solidBlock);
+    F.assertType(los, 'boolean', 'hasLineOfSight returns boolean');
+
+    // Same point — always has LOS
+    var losSame = Donkeycraft.MobAI.hasLineOfSight(0, 0, 0, 0, 0, 0, solidBlock);
+    F.assert(losSame, 'Same point has line of sight');
+
+    // findPath
+    var walkable = function(x, y, z) { return z >= 0; };
+    var path = Donkeycraft.MobAI.findPath(0, 0, 0, 5, 0, 5, walkable, 100);
+    F.assertType(path, 'object', 'findPath returns object');
+    if (path) {
+        F.assertType(path.steps, 'object', 'Path has steps array');
+        F.assertType(path.distance, 'number', 'Path has distance number');
+    }
+
+    // No path — all neighbors of start position are non-walkable
+    var wallBlocked = function(x, y, z) {
+        var key = x + ',' + y + ',' + z;
+        return key !== '0,0,0'; // Only start is walkable, everything else blocked
+    };
+    var noPath2 = Donkeycraft.MobAI.findPath(0, 0, 0, 5, 0, 5, wallBlocked, 100);
+    F.assert(noPath2 === null, 'findPath returns null when all neighbors are blocked');
+
+    // calculateChaseVelocity
+    var chase = Donkeycraft.MobAI.calculateChaseVelocity(0, 0, 10, 0, 2);
+    F.assert(chase.vx > 0, 'Chase velocity X is positive');
+    F.assertEq(chase.vz, 0, 'Chase velocity Z is 0 for direct chase');
+
+    var chaseDiag = Donkeycraft.MobAI.calculateChaseVelocity(0, 0, 10, 10, 2);
+    F.assert(chaseDiag.vx > 0, 'Chase diagonal X positive');
+    F.assert(chaseDiag.vz > 0, 'Chase diagonal Z positive');
+
+    // At target — zero velocity
+    var chaseClose = Donkeycraft.MobAI.calculateChaseVelocity(0, 0, 0.1, 0, 2);
+    F.assertEq(chaseClose.vx, 0, 'Chase velocity zero when close');
+
+    // calculateFleeVelocity
+    var flee = Donkeycraft.MobAI.calculateFleeVelocity(0, 0, 10, 0, 2);
+    F.assert(flee.vx < 0, 'Flee velocity X is negative (away from source)');
+
+    // Co-located — random direction
+    var fleeCo = Donkeycraft.MobAI.calculateFleeVelocity(0, 0, 0, 0, 2);
+    F.assertType(fleeCo.vx, 'number', 'Flee velocity defined when co-located');
+
+    // getWanderTarget
+    var wander = Donkeycraft.MobAI.getWanderTarget(0, 0, 10);
+    F.assertType(wander.x, 'number', 'Wander target has X');
+    F.assertType(wander.z, 'number', 'Wander target has Z');
+    F.assert(wander.x >= -10 && wander.x <= 10, 'Wander X within radius');
+    F.assert(wander.z >= -10 && wander.z <= 10, 'Wander Z within radius');
+
+    // canMobSeePlayer — with Block.isTransparent available
+    // Create mock mob and player
+    var testMob = new Donkeycraft.Entity({ type: 'zombie', x: 0, y: 64, z: 0 });
+    var testPlayer = new Donkeycraft.Entity({ type: 'player', x: 10, y: 64, z: 0 });
+
+    // Air-only world — should see
+    var airWorld = function(x, y, z) { return 0; }; // 0 = air
+    F.assert(Donkeycraft.MobAI.canMobSeePlayer(testMob, testPlayer, airWorld), 'Can see through air');
+
+    // Block in the way — use block ID 1 (stone) which is opaque in Donkeycraft.Block
+    var stoneWallWorld = function(x, y, z) { return (x >= 3 && x <= 7 && y === 64 && z === 0) ? 1 : 0; };
+    F.assert(!Donkeycraft.MobAI.canMobSeePlayer(testMob, testPlayer, stoneWallWorld), 'Cannot see through solid block');
+
+    // shouldFlee
+    var lowHealthMob = new Donkeycraft.Entity({ type: 'cow', x: 0, y: 64, z: 0 });
+    lowHealthMob.health = 3;
+    lowHealthMob.maxHealth = 20;
+    var nearbyPlayer2 = { getPosition: function() { return { x: 2, y: 64, z: 2 }; } };
+    F.assert(Donkeycraft.MobAI.shouldFlee(lowHealthMob, nearbyPlayer2, 5), 'Should flee when low health and player near');
+
+    var fullHealthMob = new Donkeycraft.Entity({ type: 'cow', x: 0, y: 64, z: 0 });
+    fullHealthMob.health = 20;
+    fullHealthMob.maxHealth = 20;
+    F.assert(!Donkeycraft.MobAI.shouldFlee(fullHealthMob, nearbyPlayer2, 5), 'Should not flee when full health');
+
+    // ============================================================
+    // Section 7: Projectile — Behavior Tests
+    // ============================================================
+    F.section('7. Projectile — Behavior');
+
+    // Constructor
+    var arrow = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    F.assertType(arrow, 'object', 'Projectile arrow created');
+    F.assertEq(arrow.type, 'arrow', 'Arrow type correct');
+    F.assertEq(arrow.speed, 2.0, 'Arrow speed is 2.0');
+    F.assertEq(arrow.damage, 3, 'Arrow damage is 3');
+    F.assertEq(arrow.gravity, 0.05, 'Arrow gravity is 0.05');
+    F.assertEq(arrow.lifetime, 60, 'Arrow lifetime is 60 ticks');
+
+    // Snowball
+    var snowball = Donkeycraft.Projectile.create('snowball', 0, 64, 0, 1, 0, 0);
+    F.assert(snowball.bounce, 'Snowball bounces');
+    F.assertEq(snowball.damage, 0, 'Snowball does no damage');
+
+    // Ender Pearl
+    var pearl = Donkeycraft.Projectile.create('ender_pearl', 0, 64, 0, 1, 0, 0);
+    F.assert(pearl.teleport, 'Ender pearl teleports');
+
+    // Dragon Breath
+    var breath = Donkeycraft.Projectile.create('dragon_breath', 0, 64, 0, 0.1, 0, 0.1);
+    F.assert(breath.area, 'Dragon breath is area effect');
+    F.assertEq(breath.gravity, 0, 'Dragon breath has no gravity');
+
+    // Lava Bucket
+    var lava = Donkeycraft.Projectile.create('lava_bucket', 0, 64, 0, 1, 0, 0);
+    F.assert(lava.explode, 'Lava bucket explodes');
+
+    // Unknown type
+    var unknownProj = Donkeycraft.Projectile.create('fireball', 0, 64, 0, 1, 0, 0);
+    F.assert(unknownProj === null, 'Unknown projectile type returns null');
+
+    // hitsEntity — inclusive AABB (projectile at origin, entity centered at 0.3 with width 0.6)
+    var proj2 = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    var targetEnt = new Donkeycraft.Entity({ x: 0.3, y: 64, z: 0, height: 1.8, width: 0.6 });
+    // Projectile AABB: minX=-0.125, maxX=0.125, minY=64, maxY=64.25, minZ=-0.125, maxZ=0.125
+    // Entity AABB: minX=0, maxX=0.6, minY=64, maxY=65.8, minZ=0, maxZ=0.6
+    // Overlap: X [0, 0.125], Y [64, 64.25], Z [0, 0.125] — YES overlap
+    F.assert(proj2.hitsEntity(targetEnt), 'Projectile hits overlapping entity');
+
+    // Owner check — should not hit own owner
+    var ownerEnt = new Donkeycraft.Entity({ x: -1, y: 64, z: 0 });
+    var proj3 = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0, ownerEnt);
+    F.assert(!proj3.hitsEntity(ownerEnt), 'Projectile does not hit owner');
+
+    // Dead entity — should not be hit
+    var deadEnt = new Donkeycraft.Entity({ x: 0.5, y: 64, z: 0 });
+    deadEnt.setAlive(false);
+    F.assert(!proj2.hitsEntity(deadEnt), 'Projectile does not hit dead entity');
+
+    // isExpired
+    var expiredProj = Donkeycraft.Projectile.create('snowball', 0, 64, 0, 1, 0, 0);
+    expiredProj._age = expiredProj.lifetime;
+    F.assert(expiredProj.isExpired(), 'Projectile expired when age >= lifetime');
+
+    // destroy
+    var proj4 = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    proj4.destroy();
+    F.assert(!proj4.isAlive(), 'Projectile not alive after destroy');
+
+    // onHit — teleport (ender pearl)
+    var owner2 = new Donkeycraft.Entity({ x: 0, y: 64, z: 0 });
+    var pearl2 = Donkeycraft.Projectile.create('ender_pearl', 0, 64, 0, 1, 0, 0, owner2);
+    pearl2.onHit(50, 70, 50);
+    F.assertNear(owner2._position.x, 50, 0.1, 'Ender pearl teleports owner to hit position');
+
+    // onHit — bounce
+    var snowball2 = Donkeycraft.Projectile.create('snowball', 0, 64, 0, 1, 5, 0);
+    var oldVy = snowball2._velocity.y;
+    snowball2.onHit(0, 64, 0);
+    F.assert(snowball2.isAlive(), 'Bouncing projectile survives onHit');
+
+    // calculateVelocity
+    var dir = new Donkeycraft.Vector3(0, 0, -1); // North
+    var vel = Donkeycraft.Projectile.calculateVelocity(dir, 2, 0);
+    F.assertEq(vel.vx, 0, 'calculateVelocity X is 0 for north');
+    F.assertEq(vel.vz, -2, 'calculateVelocity Z is -2 for north');
+
+    // tick — gravity application
+    var proj5 = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    var startVy = proj5._velocity.y;
+    proj5.tick(0.05);
+    F.assert(proj5._velocity.y < startVy, 'Gravity decreases Y velocity');
+
+    // ============================================================
+    // Section 8: Animal — Behavior Tests
+    // ============================================================
+    F.section('8. Animal — Breeding & Growth');
+
+    // Constructor
+    var babyCow = Donkeycraft.Animal.create('cow', 0, 64, 0, true);
+    F.assertType(babyCow, 'object', 'Baby cow created');
+    F.assert(babyCow.isBaby, 'Cow is a baby');
+    F.assertEq(babyCow.babySpeedMultiplier, 1.5, 'Baby speed multiplier is 1.5');
+    F.assertEq(babyCow.foodItem, 'wheat', 'Cow food item is wheat');
+    F.assert(babyCow.age < 0, 'Baby age is negative');
+
+    var adultCow = Donkeycraft.Animal.create('cow', 0, 64, 0, false);
+    F.assert(!adultCow.isBaby, 'Adult cow is not a baby');
+    F.assertEq(adultCow.age, 0, 'Adult age starts at 0');
+
+    // Unknown type
+    var unknownAnimal = Donkeycraft.Animal.create('dragon', 0, 64, 0);
+    F.assert(unknownAnimal === null, 'Unknown animal type returns null');
+
+    // feed — wrong food
+    F.assert(!adultCow.feed('carrot'), 'Wrong food rejected');
+
+    // feed — enters love mode
+    F.assert(adultCow.feed('wheat'), 'Correct food accepted');
+    F.assert(adultCow._inLove, 'Animal enters love mode after feeding');
+
+    // feed — on cooldown
+    var cowWithCooldown = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    cowWithCooldown.enterLoveMode();
+    cowWithCooldown._loveCooldown = 10;
+    F.assert(!cowWithCooldown.feed('wheat'), 'Food rejected on cooldown');
+
+    // feed — baby growth
+    var babyPig = Donkeycraft.Animal.create('pig', 0, 64, 0, true);
+    F.assert(babyPig.isBaby, 'Pig is baby before feeding');
+    for (var g = 0; g < 5; g++) {
+        babyPig.feed('carrot');
+    }
+    // 5 feeds * 6000 = 30000 > 24000, should be fully grown
+    F.assert(!babyPig.isBaby, 'Baby pig grows after sufficient feeding');
+
+    // canBreed / canBreedWith
+    var cowA = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    var cowB = Donkeycraft.Animal.create('cow', 10, 64, 0);
+    F.assert(!cowA.canBreed(), 'Not in love mode initially');
+    cowA.feed('wheat');
+    cowB.feed('wheat');
+    F.assert(cowA.canBreed(), 'Cow can breed after feeding');
+    F.assert(cowA.canBreedWith(cowB), 'Two fed cows can breed together');
+
+    // Baby cannot breed
+    var babyCow2 = Donkeycraft.Animal.create('cow', 0, 64, 0, true);
+    babyCow2.feed('wheat');
+    F.assert(!babyCow2.canBreed(), 'Baby cannot breed');
+
+    // Different types cannot breed
+    var chicken2 = Donkeycraft.Animal.create('chicken', 0, 64, 0);
+    chicken2.feed('seed');
+    F.assert(!cowA.canBreedWith(chicken2), 'Different types cannot breed');
+
+    // breedWith — creates baby
+    var cowC = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    var cowD = Donkeycraft.Animal.create('cow', 10, 64, 0);
+    cowC.feed('wheat');
+    cowD.feed('wheat');
+    var baby = cowC.breedWith(cowD);
+    F.assertType(baby, 'object', 'breedWith returns baby animal');
+    F.assert(baby.isBaby, 'Breeding produces baby');
+    F.assertEq(baby.type, 'cow', 'Baby is same type as parents');
+    F.assert(!cowC._inLove, 'Parent exits love mode after breeding');
+    F.assert(cowC._loveCooldown > 0, 'Love cooldown set after breeding');
+
+    // breedWith — fails for incompatible
+    var noBaby = cowC.breedWith(chicken2);
+    F.assert(noBaby === null, 'breedWith returns null for incompatible types');
+
+    // setOnLead / isOnLead
+    var cowE = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    F.assert(!cowE.isOnLead(), 'Cow not on lead initially');
+    cowE.setOnLead(true, { getPosition: function() { return { x: 5, y: 64, z: 5 }; } });
+    F.assert(cowE.isOnLead(), 'Cow on lead after setOnLead(true)');
+    F.assert(cowE.leadOwner !== null, 'Lead owner is set');
+    cowE.setOnLead(false);
+    F.assert(!cowE.isOnLead(), 'Cow not on lead after setOnLead(false)');
+
+    // getSpeedMultiplier
+    var adultCow3 = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    F.assertEq(adultCow3.getSpeedMultiplier(), 1.0, 'Adult speed multiplier is 1.0');
+    F.assertEq(babyCow2.getSpeedMultiplier(), 1.5, 'Baby speed multiplier is 1.5');
+
+    var ledCow = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    ledCow.setOnLead(true, {});
+    F.assert(ledCow.getSpeedMultiplier() < 1.0, 'Led animal has reduced speed');
+
+    // tick — age progression
+    var babyChicken = Donkeycraft.Animal.create('chicken', 0, 64, 0, true);
+    F.assert(babyChicken.isBaby, 'Chicken is baby before tick');
+    // Simulate 25 seconds of game time
+    for (var t = 0; t < 25; t++) {
+        babyChicken.tick(1);
+    }
+    F.assert(!babyChicken.isBaby, 'Chicken grows after sufficient ticks');
+
+    // ============================================================
+    // Section 9: MobSpawner — Spawning Logic Tests
+    // ============================================================
+    F.section('9. MobSpawner — Spawning');
+
+    // Constructor
+    var spawner = new Donkeycraft.MobSpawner();
+    F.assertType(spawner, 'object', 'MobSpawner instance created');
+    F.assertEq(spawner.totalMobCap, 256, 'Total mob cap is 256');
+    F.assertEq(spawner.monsterMobCap, 70, 'Monster mob cap is 70');
+    F.assertEq(spawner.creatureMobCap, 15, 'Creature mob cap is 15');
+    F.assert(spawner.enabled, 'Spawning enabled by default');
+
+    // registerSpawn / getDefinitions
+    var def = new Donkeycraft.MobSpawnDefinition({ type: 'zombie', spawnType: Donkeycraft.SpawnType.MONSTER });
+    spawner.registerSpawn(def);
+    F.assertEq(spawner.getDefinitions().length, 1, 'One definition registered');
+
+    // getCurrentCount / getTotalCount
+    F.assertEq(spawner.getCurrentCount('zombie'), 0, 'Zombie count is 0 initially');
+
+    // isMobCapReached
+    var zombieDef = new Donkeycraft.MobSpawnDefinition({ type: 'zombie', spawnType: Donkeycraft.SpawnType.MONSTER, maxCount: 5 });
+    var spawner2 = new Donkeycraft.MobSpawner();
+    spawner2.registerSpawn(zombieDef);
+    F.assert(!spawner2.isMobCapReached(zombieDef), 'Mob cap not reached at 0');
+
+    // validateSpawnPosition — use findSpawnPosition with proper callbacks
+    var testDef2 = new Donkeycraft.MobSpawnDefinition({ type: 'cow', spawnType: Donkeycraft.SpawnType.CREATURE, minLightLevel: 7, maxLightLevel: 15 });
+    var brightLight = function(x, y, z) { return 10; }; // Bright light
+    var mockGetHeight = function(x, z) { return 64; };
+
+    var validPos2 = spawner.findSpawnPosition(testDef2, 0, 0, brightLight, mockGetHeight, function() { return true; }, null);
+    F.assert(validPos2 !== null && validPos2.y === 65, 'Valid spawn position passes validation');
+
+    var darkLight = function(x, y, z) { return 0; }; // Dark
+    var darkPos2 = spawner.findSpawnPosition(testDef2, 0, 0, darkLight, mockGetHeight, function() { return true; }, null);
+    F.assert(darkPos2 === null, 'Dark spawn position fails validation for creature');
+
+    // findSpawnPosition — basic smoke test with monster spawn def (dark allowed)
+    var monsterDef = new Donkeycraft.MobSpawnDefinition({ type: 'zombie', spawnType: Donkeycraft.SpawnType.MONSTER, minLightLevel: 0, maxLightLevel: 7 });
+    var spawnPos2 = spawner.findSpawnPosition(monsterDef, 0, 0, function() { return 5; }, mockGetHeight, function() { return true; }, null);
+    F.assert(spawnPos2 !== null && spawnPos2.y === 65, 'findSpawnPosition returns valid position for monster');
+
+    // tick — no worldInfo
+    spawner.tick(1, null); // Should not throw
+    F.assert(true, 'tick(null) does not throw');
+
+    // tick — with empty chunks
+    spawner.tick(1, { getChunksInRange: function() { return []; } });
+    F.assert(true, 'tick([]) does not throw');
+
+    // defaultDefinitions
+    var defaults = Donkeycraft.MobSpawner.defaultDefinitions();
+    F.assert(defaults.length > 0, 'defaultDefinitions returns definitions');
+    F.assert(defaults.length >= 8, 'At least 8 default definitions (4 monster + 4 creature)');
+
+    // Check zombie is in defaults
+    var hasZombie = false;
+    for (var d = 0; d < defaults.length; d++) {
+        if (defaults[d].type === 'zombie') {
+            hasZombie = true;
+            break;
+        }
+    }
+    F.assert(hasZombie, 'Zombie in default definitions');
+
+    // resetCounts / destroy
+    spawner.resetCounts();
+    F.assertEq(spawner.getTotalCount(), 0, 'resetCounts resets total count');
+    spawner.destroy();
+    F.assert(spawner.getDefinitions().length === 0, 'destroy clears definitions');
+
+    // SpawnType constants
+    F.assertEq(Donkeycraft.SpawnType.MONSTER, 'monster', 'SpawnType.MONSTER is "monster"');
+    F.assertEq(Donkeycraft.SpawnType.CREATURE, 'creature', 'SpawnType.CREATURE is "creature"');
+    F.assertEq(Donkeycraft.SpawnType.AMBIENT, 'ambient', 'SpawnType.AMBIENT is "ambient"');
+    F.assertEq(Donkeycraft.SpawnType.WATER, 'water', 'SpawnType.WATER is "water"');
+
+    // MobSpawnDefinition defaults
+    var defaultDef = new Donkeycraft.MobSpawnDefinition({});
+    F.assertEq(defaultDef.type, 'zombie', 'Default type is "zombie"');
+    F.assertEq(defaultDef.spawnType, Donkeycraft.SpawnType.MONSTER, 'Default spawnType is MONSTER');
+    F.assert(defaultDef.requireSolidBelow, 'Default requireSolidBelow is true');
+
+    // ============================================================
+    // Section 10: Cross-Module Integration Tests
+    // ============================================================
+    F.section('10. Cross-Module Integration');
+
+    // EntityManager + PassiveMob integration
+    var em4 = new Donkeycraft.EntityManager();
+    var integratedCow = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    var cowId = em4.spawn(integratedCow);
+    F.assert(cowId !== null, 'PassiveMob spawned in EntityManager');
+    F.assertEq(em4.getByType('cow').length, 1, 'PassiveMob found by type in EntityManager');
+
+    // EntityManager + HostileMob integration
+    var em5 = new Donkeycraft.EntityManager();
+    var zombie2 = Donkeycraft.HostileMob.create('zombie', 0, 64, 0);
+    var zId = em5.spawn(zombie2);
+    F.assert(zId !== null, 'HostileMob spawned in EntityManager');
+
+    // EntityManager + BossMob integration
+    var em6 = new Donkeycraft.EntityManager();
+    var dragon2 = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    var dId = em6.spawn(dragon2);
+    F.assert(dId !== null, 'BossMob spawned in EntityManager');
+
+    // EntityManager + Projectile integration
+    var em7 = new Donkeycraft.EntityManager();
+    var arrow2 = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    var aId = em7.spawn(arrow2);
+    F.assert(aId !== null, 'Projectile spawned in EntityManager');
+
+    // EntityManager + Animal integration
+    var em8 = new Donkeycraft.EntityManager();
+    var animalCow = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    var acId = em8.spawn(animalCow);
+    F.assert(acId !== null, 'Animal spawned in EntityManager');
+
+    // Tick chain: EntityManager ticks all entity types
+    var em9 = new Donkeycraft.EntityManager();
+    em9.spawn(Donkeycraft.PassiveMob.create('cow', 0, 64, 0));
+    em9.spawn(Donkeycraft.HostileMob.create('zombie', 0, 64, 0));
+    em9.spawn(Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0));
+    em9.spawn(Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0));
+    em9.spawn(Donkeycraft.Animal.create('pig', 0, 64, 0));
+    em9.tick(0.05);
+    F.assertEq(em9.getAliveCount(), 5, 'All entity types ticked by EntityManager');
+
+    // Entity inheritance chain checks
+    var testCow = Donkeycraft.PassiveMob.create('cow', 0, 64, 0);
+    F.assert(testCow instanceof Donkeycraft.Entity, 'PassiveMob is instanceof Entity');
+
+    var testZombie = Donkeycraft.HostileMob.create('zombie', 0, 64, 0);
+    F.assert(testZombie instanceof Donkeycraft.Entity, 'HostileMob is instanceof Entity');
+
+    var testDragon = Donkeycraft.BossMob.create('ender_dragon', 0, 80, 0);
+    F.assert(testDragon instanceof Donkeycraft.Entity, 'BossMob is instanceof Entity');
+
+    var testArrow = Donkeycraft.Projectile.create('arrow', 0, 64, 0, 1, 0, 0);
+    F.assert(testArrow instanceof Donkeycraft.Entity, 'Projectile is instanceof Entity');
+
+    var testAnimal = Donkeycraft.Animal.create('cow', 0, 64, 0);
+    F.assert(testAnimal instanceof Donkeycraft.PassiveMob, 'Animal is instanceof PassiveMob');
+    F.assert(testAnimal instanceof Donkeycraft.Entity, 'Animal is instanceof Entity');
+
+    // MobType constants check
+    F.assert(Donkeycraft.MobType.PASSIVE !== undefined, 'MobType.PASSIVE exists');
+    F.assert(Donkeycraft.MobType.HOSTILE !== undefined, 'MobType.HOSTILE exists');
+    F.assertEq(Donkeycraft.MobType.PASSIVE.COW, 'cow', 'MobType.PASSIVE.COW is "cow"');
+    F.assertEq(Donkeycraft.MobType.HOSTILE.ZOMBIE, 'zombie', 'MobType.HOSTILE.ZOMBIE is "zombie"');
+
+    // MobStats check
+    F.assert(Donkeycraft.MobStats.cow !== undefined, 'MobStats.cow exists');
+    F.assertEq(Donkeycraft.MobStats.cow.health, 10, 'MobStats.cow.health is 10');
+
+    // HostileMobStats check
+    F.assert(Donkeycraft.HostileMobStats.zombie !== undefined, 'HostileMobStats.zombie exists');
+    F.assertEq(Donkeycraft.HostileMobStats.zombie.health, 20, 'HostileMobStats.zombie.health is 20');
+
+    // BossMobStats check
+    F.assert(Donkeycraft.BossMobStats.ender_dragon !== undefined, 'BossMobStats.ender_dragon exists');
+    F.assertEq(Donkeycraft.BossMobStats.ender_dragon.health, 200, 'BossMobStats.ender_dragon.health is 200');
+
+    // ProjectileStats check
+    F.assert(Donkeycraft.ProjectileStats.arrow !== undefined, 'ProjectileStats.arrow exists');
+    F.assertEq(Donkeycraft.ProjectileStats.arrow.speed, 2.0, 'ProjectileStats.arrow.speed is 2.0');
+
+    // AIDirection constants
+    F.assertEq(Donkeycraft.AIDirection.NONE, 0, 'AIDirection.NONE is 0');
+    F.assertEq(Donkeycraft.AIDirection.NORTH, 1, 'AIDirection.NORTH is 1');
+    F.assertEq(Donkeycraft.AIDirection.SOUTH, 2, 'AIDirection.SOUTH is 2');
+
+    // ProjectileType constants
+    F.assertEq(Donkeycraft.ProjectileType.ARROW, 'arrow', 'ProjectileType.ARROW is "arrow"');
+    F.assertEq(Donkeycraft.ProjectileType.ENDER_PEARL, 'ender_pearl', 'ProjectileType.ENDER_PEARL is "ender_pearl"');
+
+    // ============================================================
+    // Finish: renders summary at top of page
+    // ============================================================
+    F.finishTests();
+
+})();
+</script>
+</body>
+</html>

@@ -8,27 +8,29 @@
 
     /**
      * MobType — entity type constants for passive mobs.
+     * Merged safely to avoid overwriting HOSTILE or other types defined elsewhere.
      */
     Donkeycraft.MobType = Donkeycraft.MobType || {};
-    Donkeycraft.MobType.PASSIVE = {
-        COW: 'cow',
-        PIG: 'pig',
-        SHEEP: 'sheep',
-        CHICKEN: 'chicken'
-    };
+    if (!Donkeycraft.MobType.PASSIVE) {
+        Donkeycraft.MobType.PASSIVE = {};
+    }
+    Donkeycraft.MobType.PASSIVE.COW = 'cow';
+    Donkeycraft.MobType.PASSIVE.PIG = 'pig';
+    Donkeycraft.MobType.PASSIVE.SHEEP = 'sheep';
+    Donkeycraft.MobType.PASSIVE.CHICKEN = 'chicken';
 
     /**
      * MobStats — mob-specific statistics.
+     * Merged safely to avoid overwriting stats defined elsewhere.
      */
-    Donkeycraft.MobStats = {
-        cow:      { health: 10, height: 1.4, width: 1.4, speed: 1.0, dropItem: 'leather', dropCount: [0, 2] },
-        pig:      { health: 10, height: 0.9, width: 0.9, speed: 1.2, dropItem: 'porkchop', dropCount: [1, 3] },
-        sheep:    { health: 8,  height: 0.9, width: 0.9, speed: 1.0, dropItem: 'wool', dropCount: [1, 3] },
-        chicken:  { health: 4,  height: 0.6, width: 0.4, speed: 1.3, dropItem: 'feather', dropCount: [0, 2] }
-    };
+    Donkeycraft.MobStats = Donkeycraft.MobStats || {};
+    Donkeycraft.MobStats.cow = { health: 10, height: 1.4, width: 1.4, speed: 1.0, dropItem: 'leather', dropCount: [0, 2] };
+    Donkeycraft.MobStats.pig = { health: 10, height: 0.9, width: 0.9, speed: 1.2, dropItem: 'porkchop', dropCount: [1, 3] };
+    Donkeycraft.MobStats.sheep = { health: 8, height: 0.9, width: 0.9, speed: 1.0, dropItem: 'wool', dropCount: [1, 3] };
+    Donkeycraft.MobStats.chicken = { health: 4, height: 0.6, width: 0.4, speed: 1.3, dropItem: 'feather', dropCount: [0, 2] };
 
     /**
-     * PassiveMob — base class for passive (hostile-to-players) mobs.
+     * PassiveMob — base class for passive (non-hostile) mobs.
      * @param {object} config - Mob configuration.
      * @param {string} config.type - Mob type (cow, pig, sheep, chicken).
      * @param {number} [config.x=0] - Initial X position.
@@ -98,9 +100,9 @@
 
         /**
          * Min/max drop count.
-         * @type {Array}
+         * @type {number[]}
          */
-        this.dropCount = stats.dropCount;
+        this.dropCount = stats.dropCount.slice();
     };
 
     // Inherit from Entity
@@ -160,6 +162,7 @@
 
     /**
      * Called when the mob dies — drops items.
+     * Emits 'mob:drop' event via EventBus. The game's item system should listen for this event.
      * @private
      */
     Donkeycraft.PassiveMob.prototype.onDeath = function() {
@@ -186,6 +189,8 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.PassiveMob.prototype.tick = function(deltaTime) {
+        if (this._destroyed) return;
+
         // Call base tick (applies velocity to position)
         Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
 

@@ -1,5 +1,5 @@
 // Donkeycraft — Hostile Mobs
-// Zombie, skeleton, spider, creeper, enderman — spawn in dark, path toward players.
+// Zombie, skeleton, spider, creeper, enderman — chase, attack, explode.
 (function() {
     'use strict';
 
@@ -8,7 +8,9 @@
 
     /**
      * MobType.HOSTILE — entity type constants for hostile mobs.
+     * Merged safely to avoid overwriting PASSIVE or other types.
      */
+    Donkeycraft.MobType = Donkeycraft.MobType || {};
     Donkeycraft.MobType.HOSTILE = {
         ZOMBIE: 'zombie',
         SKELETON: 'skeleton',
@@ -21,15 +23,15 @@
      * HostileMobStats — mob-specific statistics for hostile mobs.
      */
     Donkeycraft.HostileMobStats = {
-        zombie:     { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 3, sightRange: 16, glow: false },
-        skeleton:   { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 2, sightRange: 20, glow: false },
-        spider:     { health: 16, height: 1.1, width: 1.4, speed: 1.2, damage: 2, sightRange: 16, glow: false },
-        creeper:    { health: 10, height: 1.7, width: 0.6, speed: 1.0, damage: 25, sightRange: 10, glow: true, explodes: true },
-        enderman:   { health: 40, height: 2.9, width: 0.6, speed: 1.5, damage: 5, sightRange: 32, glow: false, teleports: true }
+        zombie:     { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 3, sightRange: 16, glow: false, attackInterval: 2 },
+        skeleton:   { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 2, sightRange: 20, glow: false, attackInterval: 1.5 },
+        spider:     { health: 16, height: 1.1, width: 1.4, speed: 1.2, damage: 2, sightRange: 16, glow: false, attackInterval: 2 },
+        creeper:    { health: 10, height: 1.7, width: 0.6, speed: 1.0, damage: 25, sightRange: 10, glow: true, explodes: true, attackInterval: 1 },
+        enderman:   { health: 40, height: 2.9, width: 0.6, speed: 1.5, damage: 5, sightRange: 32, glow: false, teleports: true, attackInterval: 2 }
     };
 
     /**
-     * HostileMob — base class for hostile mobs that attack players.
+     * HostileMob — base class for hostile mobs that chase and attack players.
      * @param {object} config - Mob configuration.
      * @param {string} config.type - Mob type (zombie, skeleton, spider, creeper, enderman).
      * @param {number} [config.x=0] - Initial X position.
@@ -64,13 +66,13 @@
         this.speed = stats.speed;
 
         /**
-         * Melee damage dealt on contact.
+         * Melee/ranged damage dealt on hit.
          * @type {number}
          */
         this.damage = stats.damage;
 
         /**
-         * Sight range in blocks.
+         * Sight range in blocks for detecting players.
          * @type {number}
          */
         this.sightRange = stats.sightRange;
@@ -102,7 +104,7 @@
         this.attackInterval = stats.attackInterval || 2;
 
         /**
-         * Whether the mob explodes on death (creeper).
+         * Whether the mob explodes on death/approach (creeper).
          * @type {boolean}
          */
         this.explodes = stats.explodes || false;
@@ -126,6 +128,13 @@
          * @private
          */
         this._isIgnited = false;
+
+        /**
+         * Last known player position for teleport tracking (enderman).
+         * @type {{x: number, y: number, z: number}|null}
+         * @private
+         */
+        this._lastPlayerPos = null;
     };
 
     // Inherit from Entity
@@ -156,22 +165,29 @@
     };
 
     /**
-     * Move toward a target position.
+     * Move toward a target position with optional Y-level adjustment.
      * @param {number} targetX - Target X.
      * @param {number} targetZ - Target Z.
+     * @param {number} [targetY] - Optional target Y (for flying/jumping mobs).
      * @private
      */
-    Donkeycraft.HostileMob.prototype._moveToward = function(targetX, targetZ) {
+    Donkeycraft.HostileMob.prototype._moveToward = function(targetX, targetZ, targetY) {
         var dx = targetX - this._position.x;
+        var dy = (targetY !== undefined) ? targetY - this._position.y : 0;
         var dz = targetZ - this._position.z;
-        var dist = Math.sqrt(dx * dx + dz * dz);
+        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
         if (dist > 0.5) {
             this._velocity.x = (dx / dist) * this.speed;
             this._velocity.z = (dz / dist) * this.speed;
+            // Adjust vertical movement if target Y provided
+            if (targetY !== undefined) {
+                this._velocity.y = (dy / dist) * this.speed * 0.5;
+            }
         } else {
             this._velocity.x = 0;
             this._velocity.z = 0;
+            this._velocity.y = 0;
         }
     };
 
@@ -188,7 +204,7 @@
         var dx = this._position.x - this._targetPlayer.getPosition().x;
         var dz = this._position.z - this._targetPlayer.getPosition().z;
         var dist = Math.sqrt(dx * dx + dz * dz);
-        return dist < 2.0; // Melee range
+        return dist < 2.5; // Melee range
     };
 
     /**
@@ -211,29 +227,23 @@
 
         this._attackCooldown = this.attackInterval;
 
-        // Deal damage to player — check if player has a hurtBox with takeDamage,
-        // otherwise use direct health system, or emit event for external handling.
-        var damaged = false;
-
+        // Deal damage to player through available systems
         if (this._targetPlayer.hurtBox && typeof this._targetPlayer.hurtBox.takeDamage === 'function') {
             // Player has full hurt-box system (from hurt-box.js)
             this._targetPlayer.hurtBox.takeDamage(this.damage, this.type);
-            damaged = true;
         } else if (typeof this._targetPlayer.takeDamage === 'function') {
             // Player has direct takeDamage method
             this._targetPlayer.takeDamage(this.damage, this.type);
-            damaged = true;
         } else if (this._targetPlayer.health !== undefined) {
             // Player has simple health property (from entity.js)
             this._targetPlayer.health = Math.max(0, this._targetPlayer.health - this.damage);
             if (this._targetPlayer.health <= 0) {
                 this._targetPlayer.setAlive(false);
             }
-            damaged = true;
         }
 
-        // Emit damage event via global EventBus for external systems to handle
-        if (Donkeycraft.EventBus && !damaged) {
+        // Always emit damage event via global EventBus for external systems
+        if (Donkeycraft.EventBus) {
             try {
                 Donkeycraft.EventBus.emitSafe('entity:damage', {
                     attacker: this,
@@ -248,7 +258,7 @@
     };
 
     /**
-     * Handle creeper ignition when near a player.
+     * Handle creeper proximity ignition.
      * @param {Donkeycraft.Player} player - Player to check proximity against.
      */
     Donkeycraft.HostileMob.prototype.handleCreeperProximity = function(player) {
@@ -264,8 +274,8 @@
             // Start igniting
             this._isIgnited = true;
             this._creeperIgniteTimer = 1.5; // 1.5 seconds to explode
-        } else if (dist >= 3 && this._isIgnited) {
-            // Player moved away — cancel ignition
+        } else if (dist >= 4 && this._isIgnited) {
+            // Player moved away — cancel ignition (slightly larger range to prevent flickering)
             this._isIgnited = false;
             this._creeperIgniteTimer = 0;
         }
@@ -299,6 +309,41 @@
     };
 
     /**
+     * Teleport the enderman randomly (short-range teleport for repositioning).
+     */
+    Donkeycraft.HostileMob.prototype.teleportRandomly = function() {
+        if (!this.teleports) {
+            return;
+        }
+
+        // Teleport to a random position within 8 blocks
+        var offsetX = (Math.random() - 0.5) * 16;
+        var offsetY = (Math.random() - 0.5) * 4;
+        var offsetZ = (Math.random() - 0.5) * 16;
+
+        this._position.x += offsetX;
+        this._position.y += offsetY;
+        this._position.z += offsetZ;
+
+        // Emit teleport event via global EventBus
+        if (Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('entity:teleport', {
+                    entity: this,
+                    oldX: this._position.x - offsetX,
+                    oldY: this._position.y - offsetY,
+                    oldZ: this._position.z - offsetZ,
+                    newX: this._position.x,
+                    newY: this._position.y,
+                    newZ: this._position.z
+                });
+            } catch (e) {
+                // EventBus may not be available in tests
+            }
+        }
+    };
+
+    /**
      * Called when the mob dies.
      * @private
      */
@@ -313,6 +358,8 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.HostileMob.prototype.tick = function(deltaTime) {
+        if (this._destroyed) return;
+
         // Call base tick (applies velocity to position)
         Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
 
@@ -332,11 +379,16 @@
         // Chase target player (only if it has isAlive method and is alive)
         if (this._targetPlayer && (typeof this._targetPlayer.isAlive !== 'function' || this._targetPlayer.isAlive())) {
             var pPos = this._targetPlayer.getPosition();
-            this._moveToward(pPos.x, pPos.z);
+            this._moveToward(pPos.x, pPos.z, pPos.y);
 
             // Auto-ignite creepers when near target player
             if (this.explodes) {
                 this.handleCreeperProximity(this._targetPlayer);
+            }
+
+            // Enderman: periodically teleport randomly
+            if (this.teleports && Math.random() < 0.005) {
+                this.teleportRandomly();
             }
 
             // Attack if close enough
