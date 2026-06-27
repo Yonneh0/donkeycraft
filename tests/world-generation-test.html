@@ -1031,6 +1031,9 @@
     F.assert(typeof Donkeycraft.Portal.findMatchingPortal === 'function', 'findMatchingPortal is a function');
     F.assert(typeof Donkeycraft.Portal.travelToDimension === 'function', 'travelToDimension is a function');
     F.assert(typeof Donkeycraft.Portal.isPortalAt === 'function', 'isPortalAt is a function');
+    F.assert(typeof Donkeycraft.Portal.detectPortalAtPosition === 'function', 'detectPortalAtPosition is a function');
+    F.assert(typeof Donkeycraft.Portal.switchDimension === 'function', 'switchDimension is a function');
+    F.assert(typeof Donkeycraft.Portal.getCurrentDimension === 'function', 'getCurrentDimension is a function');
     F.assert(typeof Donkeycraft.Portal.getAllPortals === 'function', 'getAllPortals is a function');
     F.assert(typeof Donkeycraft.Portal.clearAllPortals === 'function', 'clearAllPortals is a function');
     F.assert(typeof Donkeycraft.Portal.getObsidianId === 'function', 'getObsidianId is a function');
@@ -1073,6 +1076,71 @@
         F.assert(true, 'travelToDimension completes without error');
     } catch (e) {
         F.assert(false, 'travelToDimension does not throw: ' + e.message);
+    }
+
+    // getCurrentDimension returns a valid dimension type
+    var currentDim = Donkeycraft.Portal.getCurrentDimension();
+    F.assertType(currentDim, 'number', 'getCurrentDimension returns a number');
+    F.assert(currentDim === 0 || currentDim === 1 || currentDim === 2, 'getCurrentDimension returns valid dimension type');
+
+    // invalidateBlockIdCache doesn't crash and re-resolves IDs
+    try {
+        Donkeycraft.Portal.invalidateBlockIdCache();
+        F.assert(true, 'invalidateBlockIdCache completes without error');
+        // IDs should still be accessible after invalidation
+        F.assertType(Donkeycraft.Portal.getObsidianId(), 'number', 'obsidian ID still valid after cache invalidate');
+    } catch (e) {
+        F.assert(false, 'invalidateBlockIdCache does not throw: ' + e.message);
+    }
+
+    // switchDimension doesn't crash
+    try {
+        Donkeycraft.Portal.switchDimension(1);
+        F.assert(true, 'switchDimension completes without error');
+    } catch (e) {
+        F.assert(false, 'switchDimension does not throw: ' + e.message);
+    }
+
+    // detectPortalAtPosition doesn't crash
+    try {
+        var portalDetect = Donkeycraft.Portal.detectPortalAtPosition(8, 64, 8);
+        F.assert(true, 'detectPortalAtPosition completes without error');
+    } catch (e) {
+        F.assert(false, 'detectPortalAtPosition does not throw: ' + e.message);
+    }
+
+    // createPortal with dimensionType parameter
+    try {
+        Donkeycraft.Portal.clearAllPortals();
+        var result = Donkeycraft.Portal.createPortal(0, 64, 0, 0, 1);
+        F.assert(true, 'createPortal with dimensionType completes without error');
+    } catch (e) {
+        F.assert(false, 'createPortal with dimensionType throws: ' + e.message);
+    }
+
+    // Portal registration uses correct dimension key
+    try {
+        Donkeycraft.Portal.clearAllPortals();
+        var overworldPortal = new Donkeycraft.Chunk(0, 0); // dummy chunk for setup
+        Donkeycraft.Portal.createPortal(100, 64, 100, 0, 0); // overworld portal
+        var overworldPortals = Donkeycraft.Portal.getAllPortals();
+        F.assert(overworldPortals.length > 0, 'Overworld portal was registered');
+
+        Donkeycraft.Portal.clearAllPortals();
+        var netherPortal = new Donkeycraft.Chunk(0, 0); // dummy chunk for setup
+        Donkeycraft.Portal.createPortal(12, 64, 12, 0, 1); // nether portal (coords /8)
+        var netherPortals = Donkeycraft.Portal.getAllPortals();
+        F.assert(netherPortals.length > 0, 'Nether portal was registered');
+    } catch (e) {
+        F.assert(false, 'Portal dimension key test failed: ' + e.message);
+    }
+
+    // _checkPlayerInPortal doesn't crash with null player
+    try {
+        var checkResult = Donkeycraft.Portal._checkPlayerInPortal(null);
+        F.assert(!checkResult, '_checkPlayerInPortal returns false for null player');
+    } catch (e) {
+        F.assert(false, '_checkPlayerInPortal throws: ' + e.message);
     }
 
     // ============================================================

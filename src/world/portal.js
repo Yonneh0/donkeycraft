@@ -18,6 +18,7 @@
         var _portalPositions = {};   // "dim,x,y,z" → portal state
         var _eventBus = null;         // EventBus for emitting events
         var _chunkManager = null;     // ChunkManager reference
+        var _currentDimension = 0;    // Current dimension type (for tracking)
         var _obsidianId = 0;          // Cached obsidian block ID from BlockRegistry
         var _cryingObsidianId = 0;    // Cached crying obsidian block ID from BlockRegistry
         var _netherPortalId = 0;      // Cached nether portal block ID from BlockRegistry
@@ -49,9 +50,10 @@
          * @param {Donkeycraft.EventBus} bus - The game EventBus.
          * @param {Donkeycraft.ChunkManager} chunkManager - The current dimension's ChunkManager.
          */
-        function init(bus, chunkManager) {
+        function init(bus, chunkManager, dimensionType) {
             _eventBus = bus;
             _chunkManager = chunkManager;
+            _currentDimension = dimensionType !== undefined ? dimensionType : Donkeycraft.DimensionType.OVERWORLD;
             _resolvePortalBlockIds();
 
             if (!chunkManager) {
@@ -76,20 +78,42 @@
         }
 
         /**
+         * Switch to a different dimension, updating the chunk manager reference.
+         * @param {number} dimensionType - Target dimension type constant.
+         */
+        function switchDimension(dimensionType) {
+            if (!Donkeycraft.Dimensions) return;
+            _currentDimension = dimensionType;
+            _chunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(dimensionType);
+            _resolvePortalBlockIds();
+            Donkeycraft.Logger.info('Portal', 'Switched to dimension: ' + dimensionType);
+        }
+
+        /**
          * Check if a block ID is portal-related (obsidian, crying obsidian).
+         * Re-resolves IDs if any are 0 (defensive against timing issues).
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block can be used for portal frames.
          */
         function isPortalBlock(blockId) {
+            // Defensive: re-resolve if cached IDs are 0
+            if (_obsidianId === 0 && _cryingObsidianId === 0) {
+                _resolvePortalBlockIds();
+            }
             return blockId === _obsidianId || blockId === _cryingObsidianId;
         }
 
         /**
          * Check if a block ID is an active portal block (nether_portal, end_portal).
+         * Re-resolves IDs if any are 0 (defensive against timing issues).
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block is a portal block.
          */
         function isPortalActive(blockId) {
+            // Defensive: re-resolve if cached IDs are 0
+            if (_netherPortalId === 0 && _endPortalId === 0) {
+                _resolvePortalBlockIds();
+            }
             return blockId === _netherPortalId || blockId === _endPortalId;
         }
 
@@ -284,15 +308,17 @@
          * @param {number} worldY - Global Y (bottom of frame).
          * @param {number} worldZ - Global Z.
          * @param {number} [direction=0] - Portal facing direction (0-3).
+         * @param {number} [dimensionType] - Dimension type for portal registration (uses current if omitted).
          * @returns {boolean} True if portal was created successfully.
          */
-        function createPortal(worldX, worldY, worldZ, direction) {
+        function createPortal(worldX, worldY, worldZ, direction, dimensionType) {
             if (!_chunkManager) {
                 Donkeycraft.Logger.error('Portal', 'Cannot create portal — ChunkManager is null');
                 return false;
             }
 
             direction = direction !== undefined ? direction : 0;
+            dimensionType = dimensionType !== undefined ? dimensionType : _currentDimension;
 
             // Determine frame orientation from direction
             var dx = 0, dz = 0;
@@ -335,10 +361,15 @@
                 }
             }
 
-            // Register portal position
-            var key = 'overworld,' + Math.round(worldX) + ',' + Math.round(worldY) + ',' + Math.round(worldZ);
+            // Register portal position with correct dimension type
+            var dimKey = typeof dimensionType === 'number' ? (
+                dimensionType === Donkeycraft.DimensionType.NETHER ? 'nether' :
+                dimensionType === Donkeycraft.DimensionType.END ? 'end' :
+                'overworld'
+            ) : 'overworld';
+            var key = dimKey + ',' + Math.round(worldX) + ',' + Math.round(worldY) + ',' + Math.round(worldZ);
             _portalPositions[key] = {
-                dimension: Donkeycraft.DimensionType.OVERWORLD,
+                dimension: dimensionType,
                 x: worldX,
                 y: worldY,
                 z: worldZ,
@@ -350,21 +381,36 @@
 
         /**
          * Find an existing portal near the given coordinates.
-         * Searches within a 16-block radius for portal blocks.
+         * Searches within a spherical radius for portal blocks.
+         * Temporarily switches chunk manager if dimensionType differs from current.
          * @param {number} x - Global X coordinate.
          * @param {number} y - Global Y coordinate.
          * @param {number} z - Global Z coordinate.
-         * @param {number} dimensionType - Dimension type to search in.
+         * @param {number} [dimensionType] - Dimension type to search in (uses current if omitted).
          * @returns {{x: number, y: number, z: number, type: string}|null} Portal info or null.
          */
         function findMatchingPortal(x, y, z, dimensionType) {
-            dimensionType = dimensionType !== undefined ? dimensionType : Donkeycraft.DimensionType.OVERWORLD;
+            dimensionType = dimensionType !== undefined ? dimensionType : _currentDimension;
 
-            // Search for nearby portal blocks first
+            // Temporarily switch chunk manager if searching a different dimension
+            var savedChunkManager = _chunkManager;
+            var savedDimension = _currentDimension;
+            if (dimensionType !== _currentDimension && Donkeycraft.Dimensions) {
+                _chunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(dimensionType);
+                _currentDimension = dimensionType;
+            }
+
+            // Search for nearby portal blocks using spherical radius
             var searchRadius = 16;
-            for (var sx = -searchRadius; sx <= searchRadius; sx++) {
-                for (var sy = -4; sy <= 4; sy++) {
-                    for (var sz = -searchRadius; sz <= searchRadius; sz++) {
+            var searchRadiusSq = searchRadius * searchRadius;
+            var foundPortal = null;
+
+            for (var sx = -searchRadius; sx <= searchRadius && !foundPortal; sx++) {
+                for (var sy = -searchRadius; sy <= searchRadius && !foundPortal; sy++) {
+                    for (var sz = -searchRadius; sz <= searchRadius && !foundPortal; sz++) {
+                        var distSq = sx * sx + sy * sy + sz * sz;
+                        if (distSq > searchRadiusSq) continue;
+
                         var bx = Math.round(x + sx);
                         var by = Math.round(y + sy);
                         var bz = Math.round(z + sz);
@@ -375,7 +421,7 @@
                         var block = getBlockAt(bx, by, bz);
 
                         if (isPortalActive(block)) {
-                            return {
+                            foundPortal = {
                                 x: bx,
                                 y: by,
                                 z: bz,
@@ -386,7 +432,13 @@
                 }
             }
 
-            return null;
+            // Restore saved chunk manager and dimension
+            if (dimensionType !== _currentDimension || savedChunkManager !== _chunkManager) {
+                _chunkManager = savedChunkManager;
+                _currentDimension = savedDimension;
+            }
+
+            return foundPortal;
         }
 
         /**
@@ -427,8 +479,18 @@
                 }
             }
 
-            // Emit travel event via global EventBus
-            if (Donkeycraft.EventBus && Donkeycraft.EventBus.emitSafe) {
+            // Emit travel event via instance EventBus (fallback to global if not set)
+            if (_eventBus && _eventBus.emitSafe) {
+                try {
+                    _eventBus.emitSafe('portal:travel', {
+                        fromDimension: fromDimension,
+                        toDimension: toDimension,
+                        position: { x: transformed.x, y: transformed.y, z: transformed.z }
+                    });
+                } catch (e) {
+                    // EventBus may not be available in tests
+                }
+            } else if (Donkeycraft.EventBus && Donkeycraft.EventBus.emitSafe) {
                 try {
                     Donkeycraft.EventBus.emitSafe('portal:travel', {
                         fromDimension: fromDimension,
@@ -486,6 +548,86 @@
             if (!_chunkManager) return false;
             var block = getBlockAt(x, y, z);
             return isPortalActive(block);
+        }
+
+        /**
+         * Detect a nether portal at or near the given position.
+         * First checks if the position itself contains a portal block,
+         * then falls back to frame detection from nearby obsidian blocks.
+         * @param {number} x - Global X coordinate.
+         * @param {number} y - Global Y coordinate.
+         * @param {number} z - Global Z coordinate.
+         * @returns {{valid: boolean, direction: number, width: number, height: number}|null} Portal info or null.
+         */
+        function detectPortalAtPosition(x, y, z) {
+            // First check if this position contains a portal block
+            if (isPortalAt(x, y, z)) {
+                // Search nearby for the frame by checking adjacent blocks
+                var offsets = [
+                    { ox: 0, oy: -1, oz: 0 },  // above
+                    { ox: 0, oy: 1, oz: 0 },   // below
+                    { ox: 1, oy: 0, oz: 0 },   // east
+                    { ox: -1, oy: 0, oz: 0 },  // west
+                    { ox: 0, oy: 0, oz: 1 },   // south
+                    { ox: 0, oy: 0, oz: -1 }   // north
+                ];
+                for (var i = 0; i < offsets.length; i++) {
+                    var result = detectNetherPortal(x + offsets[i].ox, y + offsets[i].oy, z + offsets[i].oz);
+                    if (result) return result;
+                }
+                // If we can't find a frame, return a default portal at this position
+                return { valid: true, direction: 0, width: 3, height: 4 };
+            }
+
+            // Fall back to standard frame detection
+            return detectNetherPortal(x, y, z);
+        }
+
+        /**
+         * Check if any player is currently inside a portal block and trigger travel.
+         * This is called during game ticks to handle automatic dimension travel.
+         * @param {Object} player - Player entity with position properties.
+         * @returns {boolean} True if a portal travel was triggered.
+         */
+        function _checkPlayerInPortal(player) {
+            if (!player || !_chunkManager) return false;
+
+            var px = Math.round(player.x);
+            var py = Math.round(player.y);
+            var pz = Math.round(player.z);
+
+            // Check the block at player's feet and head
+            for (var checkY = 0; checkY < 2; checkY++) {
+                if (isPortalAt(px, py + checkY, pz)) {
+                    var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : _currentDimension;
+
+                    // Determine target dimension
+                    var targetDim;
+                    if (currentDim === Donkeycraft.DimensionType.OVERWORLD) {
+                        targetDim = Donkeycraft.DimensionType.NETHER;
+                    } else if (currentDim === Donkeycraft.DimensionType.NETHER) {
+                        targetDim = Donkeycraft.DimensionType.OVERWORLD;
+                    } else {
+                        continue; // No portal travel from other dimensions yet
+                    }
+
+                    // Travel to the other dimension
+                    var result = travelToDimension(currentDim, targetDim, px, py + checkY, pz);
+                    if (result) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /**
+         * Get the current dimension type.
+         * @returns {number} Current dimension type constant.
+         */
+        function getCurrentDimension() {
+            return _currentDimension;
         }
 
         /**
@@ -560,6 +702,7 @@
             _portalPositions = {};
             _eventBus = null;
             _chunkManager = null;
+            _currentDimension = Donkeycraft.DimensionType.OVERWORLD;
             _obsidianId = 0;
             _cryingObsidianId = 0;
             _netherPortalId = 0;
@@ -577,6 +720,10 @@
             findMatchingPortal: findMatchingPortal,
             travelToDimension: travelToDimension,
             isPortalAt: isPortalAt,
+            detectPortalAtPosition: detectPortalAtPosition,
+            _checkPlayerInPortal: _checkPlayerInPortal,
+            getCurrentDimension: getCurrentDimension,
+            switchDimension: switchDimension,
             getAllPortals: getAllPortals,
             clearAllPortals: clearAllPortals,
             getObsidianId: getObsidianId,

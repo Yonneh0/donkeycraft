@@ -212,11 +212,11 @@
                 Donkeycraft.OreGenerator.init();
             }
 
-            // Initialize portal system with chunk manager reference
+            // Initialize portal system with chunk manager reference and dimension type
             if (Donkeycraft.Portal && Donkeycraft.Portal.init) {
                 var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
                 var dimChunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(currentDim);
-                Donkeycraft.Portal.init(this._eventBus, dimChunkManager || this._chunkManager);
+                Donkeycraft.Portal.init(this._eventBus, dimChunkManager || this._chunkManager, currentDim);
             }
 
             Donkeycraft.Logger.info('Game', 'Initialization complete');
@@ -1205,6 +1205,16 @@
                 this._levelData.tickAutoSave(dt);
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'LevelData auto-save tick failed: ' + e.message);
+            }
+        }
+
+        // Check for player in portal (automatic dimension travel)
+        if (Donkeycraft.Portal && Donkeycraft.Portal._checkPlayerInPortal && this._player) {
+            try {
+                var playerPos = this._player.getPosition();
+                Donkeycraft.Portal._checkPlayerInPortal(playerPos);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Portal tick check failed: ' + e.message);
             }
         }
 
