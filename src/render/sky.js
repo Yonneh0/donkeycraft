@@ -231,6 +231,9 @@
         var gl = this._gl;
         if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return;
 
+        // Switch to 'gui' shader — sun discs use uModel which the sky shader lacks.
+        this._shaderManager.use('gui');
+
         // Build a model matrix: translate to sun position + scale
         var sunPos = new Donkeycraft.Vector3(
             sunDir.x * 350,
@@ -302,6 +305,9 @@
     Donkeycraft.Sky.prototype._renderMoonDisc = function(moonDir) {
         var gl = this._gl;
         if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return;
+
+        // Switch to 'gui' shader — moon discs use uModel which the sky shader lacks.
+        this._shaderManager.use('gui');
 
         // Moon is opposite the sun
         var moonPos = new Donkeycraft.Vector3(
@@ -454,6 +460,7 @@
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
 
         // ---- Sun disc (visible during day) ----
+        // Switch to 'gui' shader because sun/moon discs use uModel which the sky shader lacks.
         if (this._sunMoonVisible && sunIntensity > 0.1) {
             var sunDir = lighting.getSunDirection();
             this._renderSunDisc(sunDir, sunIntensity);
@@ -464,6 +471,12 @@
             var sunD = lighting.getSunDirection();
             var moonDir = new Donkeycraft.Vector3(-sunD.x, -sunD.y, -sunD.z).normalized();
             this._renderMoonDisc(moonDir);
+        }
+
+        // Restore sky shader after sun/moon rendering.
+        if (!this._shaderManager.use('sky')) {
+            gl.depthMask(true);
+            return;
         }
 
         // Re-enable depth writing before stars
