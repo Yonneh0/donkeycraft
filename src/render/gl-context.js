@@ -7,6 +7,7 @@
 
     /**
      * GLContext — WebGL 1 context wrapper with error handling, capability queries, and extension management.
+     * Listens for 'webglcontextlost' and 'webglcontextrestored' events on the canvas.
      * @param {HTMLCanvasElement} canvas - The canvas element to create the WebGL context from.
      */
     Donkeycraft.GLContext = function(canvas) {
@@ -16,6 +17,8 @@
         this._extensions = {};
         this._errorCount = 0;
         this._contextLost = false;
+        this._onContextLost = null;
+        this._onContextRestored = null;
 
         var success = this._createContext();
         if (!success) {
@@ -24,11 +27,30 @@
     };
 
     /**
-     * Create the WebGL 1 context from the canvas element.
+     * Create the WebGL 1 context from the canvas element and bind context lost/restored handlers.
      * @private
      * @returns {boolean}
      */
     Donkeycraft.GLContext.prototype._createContext = function() {
+        var self = this;
+
+        // Bind webglcontextlost handler
+        this._onContextLost = function(event) {
+            self._contextLost = true;
+            event.preventDefault();
+            Donkeycraft.Logger.error('GLContext', 'WebGL context lost — browser-initiated (GPU reset, tab crash, driver update)');
+        };
+
+        // Bind webglcontextrestored handler
+        this._onContextRestored = function() {
+            self._contextLost = false;
+            self._queryCapabilities();
+            Donkeycraft.Logger.info('GLContext', 'WebGL context restored — capabilities re-queried');
+        };
+
+        this._canvas.addEventListener('webglcontextlost', this._onContextLost, false);
+        this._canvas.addEventListener('webglcontextrestored', this._onContextRestored, false);
+
         try {
             this._context = this._canvas.getContext('webgl', {
                 alpha: false,
@@ -143,19 +165,23 @@
     };
 
     /**
-     * Get the last WebGL error and clear the error flag.
-     * Calls getError() repeatedly to fully drain the WebGL error queue.
-     * @returns {number|null} WebGL error code (e.g., 0x0501 for INVALID_ENUM), or null if no error / context lost.
+     * Get the first WebGL error code and drain the entire error queue.
+     * Logs each error found via Logger.warn. Returns null if no errors were found.
+     * @returns {number|null} First WebGL error code (e.g., 0x0501 for INVALID_ENUM), or null if the queue was empty.
      */
     Donkeycraft.GLContext.prototype.getError = function() {
         if (!this._context || this._contextLost) return null;
+        var firstErr = null;
         var err = this._context.getError();
         while (err !== 0) {
             this._errorCount++;
-            Donkeycraft.Logger.warn('GLContext', 'WebGL error 0x' + err.toString(16) + ': ' + err);
+            if (firstErr === null) {
+                firstErr = err;
+            }
+            Donkeycraft.Logger.warn('GLContext', 'WebGL error 0x' + err.toString(16));
             err = this._context.getError();
         }
-        return err === 0 ? null : err;
+        return firstErr;
     };
 
     /**
@@ -214,10 +240,31 @@
     };
 
     /**
+     * Check whether the browser supports WebGL context restoration after a context lost event.
+     * @returns {boolean} True if the context attribute 'preserveDrawingBuffer' is true (enabling restore).
+     */
+    Donkeycraft.GLContext.prototype.hasContextRestoreSupport = function() {
+        var attrs = this.getContextAttributes();
+        return attrs !== null && !!attrs.preserveDrawingBuffer;
+    };
+
+    /**
      * Destroy the context and free all WebGL resources.
-     * Gracefully loses the WebGL context via loseContext().
+     * Unbinds context lost/restored event listeners and gracefully loses the WebGL context via loseContext().
      */
     Donkeycraft.GLContext.prototype.destroy = function() {
+        // Unbind context lost/restored event listeners
+        if (this._canvas) {
+            if (this._onContextLost) {
+                this._canvas.removeEventListener('webglcontextlost', this._onContextLost, false);
+                this._onContextLost = null;
+            }
+            if (this._onContextRestored) {
+                this._canvas.removeEventListener('webglcontextrestored', this._onContextRestored, false);
+                this._onContextRestored = null;
+            }
+        }
+
         if (this._context && !this._contextLost) {
             try {
                 // Attempt graceful context loss (preserves drawing buffer if preserveDrawingBuffer was true)
