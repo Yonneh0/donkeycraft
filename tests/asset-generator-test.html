@@ -365,32 +365,72 @@ body { max-width: 1400px; }
     document.getElementById('results').insertAdjacentHTML('beforeend', woolTable);
 
     // ============================================================
-    // SECTION 5: Glass, Bricks & Ores
+    // SECTION 5: Glass & Bricks
     // ============================================================
     totalSections++;
-    F.section('5. Glass, Bricks & Ore Textures');
+    F.section('5. Glass & Brick Textures');
 
-    var specialTests = [
+    var glassBrickTests = [
         { name: 'Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(200, 220, 255); } },
-        { name: 'Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateBricks(160, 60, 50); } },
-        { name: 'Coal Ore', fn: function() { return Donkeycraft.TextureGenerator.generateCoalOre(); } },
-        { name: 'Diamond Ore', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondOre(); } }
+        { name: 'Tinted Glass', fn: function() { return Donkeycraft.TextureGenerator.generateGlass(60, 50, 80); } },
+        { name: 'Bricks (Red)', fn: function() { return Donkeycraft.TextureGenerator.generateBricks(160, 60, 50); } },
+        { name: 'Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateNetherBrick(); } },
+        { name: 'Red Nether Bricks', fn: function() { return Donkeycraft.TextureGenerator.generateRedNetherBrick(); } },
+        { name: 'Prismarine (normal)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('normal'); } },
+        { name: 'Prismarine (bricks)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('bricks'); } },
+        { name: 'Prismarine (dark)', fn: function() { return Donkeycraft.TextureGenerator.generatePrismarine('dark'); } }
     ];
 
-    var specialTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
-    for (var sp = 0; sp < specialTests.length; sp++) {
-        var test4 = specialTests[sp];
-        var img4 = test4.fn();
-        var pass4 = isImageLike(img4);
-        if (pass4) passedSections++; else failedSections++;
-        specialTable += '<tr>';
-        specialTable += '<td class="texture-name">' + test4.name + '</td>';
-        specialTable += '<td><img src="' + img4.src + '" class="texture-preview" title="' + test4.name + '"></td>';
-        specialTable += '<td class="' + (pass4 ? 'pass-cell' : 'fail-cell') + '">' + (pass4 ? '✓ PASS' : '✗ FAIL') + '</td>';
-        specialTable += '</tr>';
+    var glassBrickTable = '<table class="texture-table"><tr><th>Block</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
+    for (var gb = 0; gb < glassBrickTests.length; gb++) {
+        var testGB = glassBrickTests[gb];
+        var imgGB = testGB.fn();
+        var passGB = isImageLike(imgGB);
+        if (passGB) passedSections++; else failedSections++;
+        glassBrickTable += '<tr>';
+        glassBrickTable += '<td class="texture-name">' + testGB.name + '</td>';
+        glassBrickTable += '<td><img src="' + imgGB.src + '" class="texture-preview" title="' + testGB.name + '"></td>';
+        glassBrickTable += '<td class="' + (passGB ? 'pass-cell' : 'fail-cell') + '">' + (passGB ? '✓ PASS' : '✗ FAIL') + '</td>';
+        glassBrickTable += '</tr>';
     }
-    specialTable += '</table>';
-    document.getElementById('results').insertAdjacentHTML('beforeend', specialTable);
+    glassBrickTable += '</table>';
+    document.getElementById('results').insertAdjacentHTML('beforeend', glassBrickTable);
+
+    // ============================================================
+    // SECTION 5B: ALL Ore Textures (12 variations)
+    // ============================================================
+    totalSections++;
+    F.section('5B. All Ore Textures (Complete Variations)');
+
+    var oreTests = [
+        { name: 'Coal Ore', fn: function() { return Donkeycraft.TextureGenerator.generateCoalOre(); } },
+        { name: 'Iron Ore', fn: function() { return Donkeycraft.TextureGenerator.generateIronOre(); } },
+        { name: 'Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateGoldOre(); } },
+        { name: 'Diamond Ore', fn: function() { return Donkeycraft.TextureGenerator.generateDiamondOre(); } },
+        { name: 'Emerald Ore', fn: function() { return Donkeycraft.TextureGenerator.generateEmeraldOre(); } },
+        { name: 'Redstone Ore (unlit)', fn: function() { return Donkeycraft.TextureGenerator.generateRedstoneOre(); } },
+        { name: 'Lit Redstone Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLitRedstoneOre(); } },
+        { name: 'Lapis Ore', fn: function() { return Donkeycraft.TextureGenerator.generateLapisOre(); } },
+        { name: 'Nether Quartz Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherQuartzOre(); } },
+        { name: 'Nether Gold Ore', fn: function() { return Donkeycraft.TextureGenerator.generateNetherGoldOre(); } },
+        { name: 'Ancient Debris', fn: function() { return Donkeycraft.TextureGenerator.generateAncientDebris(); } },
+        { name: 'Gilded Blackstone', fn: function() { return Donkeycraft.TextureGenerator.generateGildedBlackstone(); } }
+    ];
+
+    var oreTable = '<table class="texture-table"><tr><th>Ore Type</th><th>Texture Preview (64×64)</th><th>Status</th></tr>';
+    for (var ot = 0; ot < oreTests.length; ot++) {
+        var testOT = oreTests[ot];
+        var imgOT = testOT.fn();
+        var passOT = isImageLike(imgOT);
+        if (passOT) passedSections++; else failedSections++;
+        oreTable += '<tr>';
+        oreTable += '<td class="texture-name">' + testOT.name + '</td>';
+        oreTable += '<td><img src="' + imgOT.src + '" class="texture-preview" title="' + testOT.name + '"></td>';
+        oreTable += '<td class="' + (passOT ? 'pass-cell' : 'fail-cell') + '">' + (passOT ? '✓ PASS' : '✗ FAIL') + '</td>';
+        oreTable += '</tr>';
+    }
+    oreTable += '</table>';
+    document.getElementById('results').insertAdjacentHTML('beforeend', oreTable);
 
     // ============================================================
     // SECTION 6: Liquids & Special Blocks
