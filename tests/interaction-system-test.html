@@ -116,15 +116,26 @@
     // ============================================================
     function createMockPlayer() {
         var pos = { x: 0, y: 0, z: 0 };
-        var hurtBox = { minX: -0.3, maxX: 0.3, minY: 0, maxY: 1.8 };
+        var dimensions = { width: 0.6, height: 1.8 };
 
         return {
             getPosition: function() { return pos; },
             setPosition: function(x, y, z) { pos.x = x; pos.y = y; pos.z = z; },
-            getHurtBox: function() { return hurtBox; },
-            setHurtBox: function(mbX, mbY, mbZ, mxX, mxY, mxZ) {
-                hurtBox.minX = mbX; hurtBox.minY = mbY; hurtBox.minZ = mbZ;
-                hurtBox.maxX = mxX; hurtBox.maxY = mxY; hurtBox.maxZ = mxZ;
+            getHurtBox: function() {
+                // Return AABB centered on player position with dimensions
+                var halfWidth = dimensions.width / 2;
+                return {
+                    minX: pos.x - halfWidth,
+                    maxX: pos.x + halfWidth,
+                    minY: pos.y,
+                    maxY: pos.y + dimensions.height,
+                    minZ: pos.z - halfWidth,
+                    maxZ: pos.z + halfWidth
+                };
+            },
+            setHurtBox: function(w, h) {
+                dimensions.width = w;
+                dimensions.height = h;
             }
         };
     }
@@ -319,12 +330,15 @@
     F.assert(placeValid === true, 'placeBlock returns true for valid placement');
 
     // 3f. getPlacementPosition — floors coordinates
+    // hitX=10.7, faceNormalX=-1 → placementX = 10.7 - (-1) = 11.7 → floor = 11
     var posResult = Donkeycraft.BlockPlacement.getPlacementPosition(10.7, 20.3, 5.9, -1, 0, 0);
-    F.assertEq(posResult.x, 9, 'getPlacementPosition floors x: floor(10.7 - (-1)) = floor(11.7) = 11... wait, hitX-faceNormalX = 10.7-(-1) = 11.7, floor = 11');
-    // Actually: hitX=10.7, faceNormalX=-1, so placementX = 10.7 - (-1) = 11.7, floor = 11
-    F.assertEq(posResult.x, 11, 'getPlacementPosition floors x correctly');
-    F.assertEq(posResult.y, 20, 'getPlacementPosition floors y: floor(20.3) = 20');
-    F.assertEq(posResult.z, 5, 'getPlacementPosition floors z: floor(5.9) = 5');
+    F.assertEq(posResult.x, 11, 'getPlacementPosition floors x: floor(10.7 - (-1)) = floor(11.7) = 11');
+    F.assertEq(posResult.y, 20, 'getPlacementPosition floors y: floor(20.3 - 0) = floor(20.3) = 20');
+    F.assertEq(posResult.z, 5, 'getPlacementPosition floors z: floor(5.9 - 0) = floor(5.9) = 5');
+
+    // Additional: positive face normal
+    var posResult2 = Donkeycraft.BlockPlacement.getPlacementPosition(10.7, 20.3, 5.9, 1, 0, 0);
+    F.assertEq(posResult2.x, 10, 'getPlacementPosition floors x: floor(10.7 - 1) = floor(9.7) = 9');
 
     // 3g. placeBlockFromRaycast — null checks
     var raycastPlace = Donkeycraft.BlockPlacement.placeBlockFromRaycast(null, 5, 10, 5, 0, -1, 0, 1, mockPlayer);
@@ -546,12 +560,12 @@
 
     // 5b. Raycast → BlockPlacement pipeline: find face, place adjacent block
     mockCM.createMockChunk(1, 1);
-    mockCM.fillArea(mockCM, 16, 0, 16, 31, 255, 31, 0); // air in chunk (1,1)
+    mockCM.fillArea(mockCM, 16, 0, 16, 31, 255, 31, 1); // stone in chunk (1,1)
 
     var rayOrigin2 = new Donkeycraft.Vector3(24, 50, 24);
     var rayDir2 = new Donkeycraft.Vector3(0, -1, 0);
     var rayHit2 = Donkeycraft.Raycast.raycast(mockCM, rayOrigin2, rayDir2, 60.0);
-    F.assert(rayHit2 !== null, 'Raycast finds block below in air chunk');
+    F.assert(rayHit2 !== null, 'Raycast finds stone block below in filled chunk');
 
     if (rayHit2) {
         // Get placement position from face normal

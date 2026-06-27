@@ -478,11 +478,13 @@
 
         /**
          * Clear all interactive block states (for reset/shutdown).
+         * Also resets the tick counter and button chunk index.
          */
         function clearAllStates() {
             _interactiveStateStore = {};
             _buttonStates = {};
             _buttonChunkIndex = {};
+            _currentTick = 0;
         }
 
         /**

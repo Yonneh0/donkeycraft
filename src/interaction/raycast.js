@@ -229,13 +229,27 @@
             var faceNormalZ = -stepZ;
 
             // DDA traversal loop.
-            // Note: We do NOT return null when origin is inside a solid block.
-            // The DDA naturally steps away from the origin, so adjacent blocks
-            // will be found on the first iteration — allowing the player to
-            // break blocks around them even if spawned/glitched inside one.
+            // First, check the starting voxel — if origin is inside a solid block,
+            // return it immediately. This allows players to break blocks they're
+            // spawned/glitched inside of.
             var t = 0;
             var maxSteps = Donkeycraft.WorldUtils.calculateRaycastMaxSteps(reach);
             var steps = 0;
+
+            // Check starting voxel before stepping
+            var startBlockId = _getBlockId(chunkManager, currentX, currentY, currentZ);
+            if (startBlockId !== 0 && !_shouldIgnore(startBlockId)) {
+                var startHitPos = new Donkeycraft.Vector3(
+                    origin.x + dirX * t,
+                    origin.y + dirY * t,
+                    origin.z + dirZ * t
+                );
+                return new Donkeycraft.RaycastResult(
+                    currentX, currentY, currentZ,
+                    0, 0, 0, // face normal is undefined when inside block
+                    t, startHitPos
+                );
+            }
 
             while (t <= reach && steps < maxSteps) {
                 // Advance along the axis with smallest tMax

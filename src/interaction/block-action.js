@@ -245,9 +245,10 @@
                 // This prevents drift: if chunks unload (tab backgrounded) and
                 // reload, accumulated deltaTime would cause instant breaks.
                 // If no chunk manager is set, assume chunk is loaded (backward compat with tests).
-                var chunkLoaded = !_chunkManager || Donkeycraft.WorldUtils.isChunkLoaded(
-                    _chunkManager, state.x, state.z
-                );
+                var chunkLoaded = true;
+                if (_chunkManager && Donkeycraft.WorldUtils && typeof Donkeycraft.WorldUtils.isChunkLoaded === 'function') {
+                    chunkLoaded = Donkeycraft.WorldUtils.isChunkLoaded(_chunkManager, state.x, state.z);
+                }
                 if (!chunkLoaded) continue;
 
                 var progressIncrement = deltaTime / breakTime;
