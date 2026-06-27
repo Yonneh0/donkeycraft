@@ -713,14 +713,104 @@ void main() {
                     var guiManager = new Donkeycraft.GuiManager(guiContainer, guiBackdrop);
                     game2.setGuiManager(guiManager);
 
-                    // Close GUI on backdrop click
+                    // Close GUI on backdrop click (only when no panels exist to avoid double-close)
                     if (guiBackdrop) {
                         guiBackdrop.addEventListener('click', function() {
-                            if (guiManager.hasOpenScreens()) {
-                                guiManager.closeTopScreen();
+                            if (guiManager.isOpen()) {
+                                guiManager.close();
                             }
                         });
                     }
+
+                    // Register all GUI component types with the manager
+                    try {
+                        // Register proper GUI wrapper classes instead of data classes
+                        if (Donkeycraft.InventoryGui) {
+                            guiManager.registerComponent('inventory', Donkeycraft.InventoryGui);
+                        } else if (Donkeycraft.Inventory) {
+                            guiManager.registerComponent('inventory', Donkeycraft.Inventory);
+                        }
+                        if (Donkeycraft.CraftingGrid) {
+                            guiManager.registerComponent('crafting_table', Donkeycraft.CraftingGrid);
+                        }
+                        if (Donkeycraft.FurnaceUI) {
+                            guiManager.registerComponent('furnace', Donkeycraft.FurnaceUI);
+                        }
+                        if (Donkeycraft.ChestUI) {
+                            guiManager.registerComponent('chest', Donkeycraft.ChestUI);
+                        }
+                        if (Donkeycraft.AnvilUI) {
+                            guiManager.registerComponent('anvil', Donkeycraft.AnvilUI);
+                        }
+                        if (Donkeycraft.EnchantingUI) {
+                            guiManager.registerComponent('enchanting_table', Donkeycraft.EnchantingUI);
+                        }
+                        if (Donkeycraft.CreativeInventory) {
+                            guiManager.registerComponent('creative_inventory', Donkeycraft.CreativeInventory);
+                        }
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'GUI component registration failed: ' + e.message);
+                    }
+
+                    // --- Wire up DebugOverlay (F3) ---
+                    try {
+                        var debugOverlay = new Donkeycraft.DebugOverlay(game2.getEventBus(), Donkeycraft.Config);
+                        debugOverlay.setPlayer(game2._player);
+                        debugOverlay.setChunkManager(game2._chunkManager);
+                        debugOverlay.setTimer(game2._timer);
+                        debugOverlay.setBiome(Donkeycraft.Biome || null);
+                        debugOverlay.setGameMode(game2._gameMode);
+
+                        // Store reference for toggleDebugOverlay to use
+                        game2._debugOverlay = debugOverlay;
+
+                        // Auto-start listening when debug is toggled on
+                        var origToggle = game2.toggleDebugOverlay.bind(game2);
+                        game2.toggleDebugOverlay = function() {
+                            var visible = origToggle();
+                            if (visible) {
+                                debugOverlay.startListening();
+                            } else {
+                                debugOverlay.stopListening();
+                            }
+                            return visible;
+                        };
+
+                        // Also wire EventBus listener for debug:update events to render on overlay
+                        try {
+                            game2.getEventBus().on('debug:update', function(data) {
+                                var overlayEl = document.getElementById('dk-debug-overlay');
+                                if (overlayEl && game2.isDebugVisible()) {
+                                    overlayEl.textContent =
+                                        'FPS: ' + data.fps +
+                                        ' | X:' + data.coordinates.x +
+                                        ' Y:' + data.coordinates.y +
+                                        ' Z:' + data.coordinates.z +
+                                        ' | Chunk: [' + data.chunkInfo.loaded + '/' + data.chunkInfo.renderDistance + ']' +
+                                        ' | Biome: ' + data.biome +
+                                        ' | Mode: ' + data.gameMode;
+                                }
+                            });
+                        } catch (e2) {}
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
+                    }
+
+                    // --- Wire FurnaceUI timer auto-start when furnace GUI opens ---
+                    var origGuiOpen = guiManager.open.bind(guiManager);
+                    guiManager.open = function(type, data) {
+                        var result = origGuiOpen(type, data);
+                        if (type === 'furnace' && this._guiStack.length > 0) {
+                            var topEntry = this._guiStack[this._guiStack.length - 1];
+                            if (topEntry.ui && topEntry.ui.setTimer && topEntry.ui.startListening) {
+                                try {
+                                    topEntry.ui.setTimer(game2._timer);
+                                    topEntry.ui.startListening();
+                                } catch (e3) {}
+                            }
+                        }
+                        return result;
+                    };
                 } catch (e) {
                     Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
                 }

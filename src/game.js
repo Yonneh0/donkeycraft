@@ -1258,6 +1258,21 @@
         // Process interactions (block break/place)
         this._processInteractions();
 
+        // Periodically sync player inventory hotbar to Hotbar UI display (every 30 ticks ≈ 1.5s)
+        if (this._hotbar && this._player && tickCount % 30 === 0) {
+            try {
+                var inv = this._player.getInventory();
+                if (inv && typeof inv.getHotbarStacks === 'function') {
+                    var hotbarStacks = inv.getHotbarStacks();
+                    if (hotbarStacks && hotbarStacks.setSlots) {
+                        this._hotbar.setSlots(hotbarStacks);
+                    } else if (Array.isArray(hotbarStacks)) {
+                        this._hotbar.setSlots(hotbarStacks);
+                    }
+                }
+            } catch (e) {}
+        }
+
         // Auto-save chunks: accumulate time and save at Config.AUTO_SAVE_INTERVAL
         // Only handle chunk saving here; LevelData handles its own level data auto-save separately
         if (this._worldStore && this._chunkManager) {

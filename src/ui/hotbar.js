@@ -126,6 +126,9 @@
                 }
             }
         }
+
+        // Re-apply selection highlight after updating all slots
+        this._updateSelectionHighlight();
     };
 
     /**

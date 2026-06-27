@@ -345,13 +345,29 @@
 
         // Determine which slot the item belongs to
         var itemBlockId = this._inputSlot.getItemId ? this._inputSlot.getItemId() : 0;
+
+        // Use BlockRegistry if available for accurate classification
         var isArmor = false;
         var isWeapon = false;
+        var blockInfo = null;
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlockById === 'function') {
+            try { blockInfo = Donkeycraft.BlockRegistry.getBlockById(itemBlockId); } catch (e) {}
+        }
 
-        if ([300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315].indexOf(itemBlockId) >= 0) {
+        // Armor items: helmet, chestplate, leggings, boots (vanilla IDs 300-303 for leather, 304-307 for chainmail, 308-311 for iron, 312-315 for gold, 316-319 for diamond)
+        // Also include NBT-tagged maxDurability items that exceed tool thresholds
+        var armorItemIds = [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319];
+        if (blockInfo && blockInfo.category === 'armor') {
             isArmor = true;
+        } else if (armorItemIds.indexOf(itemBlockId) >= 0) {
+            isArmor = true;
+        } else if (blockInfo && (blockInfo.category === 'weapon' || blockInfo.category === 'tool')) {
+            isWeapon = true;
+        } else if (itemBlockId >= 195 && itemBlockId <= 213) {
+            // Tools and weapons (crafting table through diamond items)
+            isWeapon = true;
         } else {
-            // Assume weapon for anything that isn't armor (swords, tools, bows, etc.)
+            // Default: assume weapon for anything that isn't armor (swords, tools, bows, etc.)
             isWeapon = true;
         }
 

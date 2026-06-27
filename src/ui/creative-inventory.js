@@ -237,12 +237,11 @@
         var oldTab = this._currentTab;
         this._currentTab = tabName;
 
-        // Update tab button styles
+        // Update tab button styles — use dataset.tabName for reliable identification
         if (this._tabBarEl) {
             var btns = this._tabBarEl.querySelectorAll('.dk-inv-tab');
             for (var i = 0; i < btns.length; i++) {
                 var btn = btns[i];
-                // Use dataset.tabName for reliable identification instead of textContent
                 if (btn.dataset.tabName === tabName) {
                     btn.style.background = 'rgba(80,120,200,0.5)';
                     btn.style.color = '#fff';

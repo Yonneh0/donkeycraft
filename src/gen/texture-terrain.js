@@ -385,6 +385,7 @@
 
     /**
      * Generate a snow texture (white with slight blue tint) using seeded noise.
+     * Used for snow layers and snow blocks — has subtle noise variation for organic look.
      * @returns {HTMLImageElement}
      */
     function generateSnow() {
@@ -398,6 +399,30 @@
                 var idx = (y * TEX_SIZE + x) * 4;
                 imgData.data[idx]     = 245 + n;
                 imgData.data[idx + 1] = 248 + n;
+                imgData.data[idx + 2] = 255;
+                imgData.data[idx + 3] = 255;
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        return _canvasToImage(canvas);
+    }
+
+    /**
+     * Generate a solid snow block texture (uniform white with minimal noise).
+     * Distinct from snow layer — fully opaque and visually consistent across the block.
+     * @returns {HTMLImageElement}
+     */
+    function generateSnowBlock() {
+        _seedRng(0);
+        var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        var ctx = canvas.getContext('2d');
+        var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+        for (var y = 0; y < TEX_SIZE; y++) {
+            for (var x = 0; x < TEX_SIZE; x++) {
+                var n = (_rng() - 0.5) * 6;
+                var idx = (y * TEX_SIZE + x) * 4;
+                imgData.data[idx]     = 248 + n;
+                imgData.data[idx + 1] = 250 + n;
                 imgData.data[idx + 2] = 255;
                 imgData.data[idx + 3] = 255;
             }
@@ -685,7 +710,7 @@
 
     // Aliases for cross-module use.
     Donkeycraft.TextureGenerator.generateRedSand = function() { return generateSand(183, 105, 63); };
-    Donkeycraft.TextureGenerator.generateSnowBlock = function() { return generateSnow(); };
+    Donkeycraft.TextureGenerator.generateSnowBlock = function() { return generateSnowBlock(); };
     Donkeycraft.TextureGenerator.generateGrass = function() { return generateGrassTop(); };
 
 })();

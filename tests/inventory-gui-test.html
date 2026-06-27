@@ -527,7 +527,8 @@
 
     var consumed = false;
     var bus = new Donkeycraft.EventBus();
-    var guiManager = new Donkeycraft.GuiManager(bus);
+    // GuiManager now accepts (container, backdrop) — pass null for test mode
+    var guiManager = new Donkeycraft.GuiManager(null, null);
 
     // isOpen / getCurrentType
     F.assert(!guiManager.isOpen(), 'No GUI open initially');
@@ -841,7 +842,8 @@
 
     // GUI Manager opens inventory GUI
     var invBus = new Donkeycraft.EventBus();
-    var invGuiManager = new Donkeycraft.GuiManager(invBus);
+    // GuiManager now accepts (container, backdrop) — pass null for test mode
+    var invGuiManager = new Donkeycraft.GuiManager(null, null);
 
     // Register inventory-like UI component
     invGuiManager.registerComponent('inventory', function(data) {

@@ -277,6 +277,8 @@
 
     /**
      * _updateBurningState — updates the burning state based on fuel and input.
+     * Starts burning if fuel + input present and fuel has valid burn time.
+     * Stops burning when progress completes or input is removed.
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._updateBurningState = function() {
@@ -288,10 +290,12 @@
             var fuelStack = this._slots[0];
             var burnTime = this._getFuelBurnTime(fuelStack);
 
+            // Only start burning if fuel has a valid burn time (> 0 ticks)
             if (burnTime > 0) {
                 this._isBurning = true;
                 this._totalBurnTime = burnTime;
                 this._burnProgress = 0;
+                this.setProgress(0); // Reset progress bar display
                 this._consumeFuel(); // Consume one fuel unit
             }
         }
@@ -309,6 +313,7 @@
 
     /**
      * _consumeFuel — consumes one unit of fuel from the fuel slot.
+     * Decrement the stack count by 1 and clear the slot if depleted.
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._consumeFuel = function() {
@@ -317,6 +322,13 @@
         this._slots[0].decrement(1);
         if (this._slots[0].isEmpty()) {
             this._slots[0] = null;
+        }
+
+        // Emit slot change event for fuel slot
+        if (this._listeners.onSlotChange) {
+            for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                try { this._listeners.onSlotChange[i](0, this._slots[0], null); } catch (e) {}
+            }
         }
     };
 

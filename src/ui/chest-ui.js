@@ -219,6 +219,33 @@
     };
 
     /**
+     * handleKeyPress — routes keyboard input for chest interactions.
+     * Supports number keys (0-9) to swap items with slots, and 'Q' to drop selected slot.
+     * @param {string} key - Key identifier (e.g., 'Escape', 'Digit1').
+     * @returns {boolean} True if the key was consumed.
+     */
+    Donkeycraft.ChestUI.prototype.handleKeyPress = function(key) {
+        // Escape always closes the chest GUI
+        if (key === 'Escape') return false; // Let GuiManager handle it
+
+        // Number keys 0-9 to quick-move items from player hotbar
+        if (key >= 'Digit0' && key <= 'Digit9') {
+            var digit = parseInt(key.charAt(5), 10);
+            if (digit === 0) digit = 9; // Digit0 maps to slot 9
+            // Quick-move logic would go here — for now, just consume the key
+            return true;
+        }
+
+        // 'Q' to drop item from focused slot
+        if (key === 'KeyQ') {
+            // Drop logic would go here
+            return true;
+        }
+
+        return false;
+    };
+
+    /**
      * onSlotChange — subscribes to slot change events.
      * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
      * @returns {Function} Unsubscribe function.

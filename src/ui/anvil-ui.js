@@ -172,6 +172,25 @@
     };
 
     /**
+     * _calculateRepairDurability — calculates the repaired durability for an item.
+     * Uses average of both current durabilities + 25% of max, capped at max durability.
+     * @param {Donkeycraft.ItemStack} leftStack - Left input stack.
+     * @param {Donkeycraft.ItemStack} rightStack - Right input stack.
+     * @returns {number} Repaired durability value.
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._calculateRepairDurability = function(leftStack, rightStack) {
+        var leftMaxDurability = this._getMaxDurability(leftStack);
+        var leftCurrentDurability = leftStack.getDurability ? leftStack.getDurability() : 0;
+        var rightCurrentDurability = rightStack.getDurability ? rightStack.getDurability() : 0;
+
+        // Calculate repaired durability: average of both current durabilities + bonus
+        var repairedDurability = Math.floor((leftCurrentDurability + rightCurrentDurability) / 2 + leftMaxDurability * 0.25);
+        // Cap at max durability (items can't be restored beyond original condition)
+        return Math.min(repairedDurability, leftMaxDurability);
+    };
+
+    /**
      * _getItemDisplayChar — gets a display character for an item ID.
      * @param {number} itemId - Block/item ID.
      * @returns {string}
@@ -243,20 +262,7 @@
             }
 
             // Repair: average remaining durability + bonus, capped at max durability
-            var leftMaxDurability = 100; // Default max durability for most items
-            var leftDurability = left.getDurability() || 0;
-            var rightDurability = right.getDurability() || 0;
-
-            // Use tag.maxDurability if available, otherwise default to 100
-            var leftTag = left.getTag();
-            if (leftTag && leftTag.maxDurability !== undefined) {
-                leftMaxDurability = leftTag.maxDurability;
-            }
-
-            // Calculate repaired durability: average of both current durabilities + bonus
-            var repairedDurability = Math.floor((leftDurability + rightDurability) / 2 + leftMaxDurability * 0.25);
-            // Cap at max durability (items can't be restored beyond original condition)
-            repairedDurability = Math.min(repairedDurability, leftMaxDurability);
+            var repairedDurability = this._calculateRepairDurability(left, right);
             combined.setDurability(repairedDurability);
 
             // Apply rename if present — rename takes precedence over repair
@@ -411,6 +417,27 @@
         this._resultStack = null;
         this._updateSlotDisplay(2);
         return result;
+    };
+
+    /**
+     * handleKeyPress — routes keyboard input for anvil interactions.
+     * Supports 'Enter' to accept the result, and 'Escape' to close.
+     * @param {string} key - Key identifier (e.g., 'Escape', 'Enter').
+     * @returns {boolean} True if the key was consumed.
+     */
+    Donkeycraft.AnvilUI.prototype.handleKeyPress = function(key) {
+        // Escape always closes the anvil GUI
+        if (key === 'Escape') return false; // Let GuiManager handle it
+
+        // Enter to accept result
+        if (key === 'Enter') {
+            if (this._resultStack && !this._resultStack.isEmpty()) {
+                this.takeResult();
+            }
+            return true;
+        }
+
+        return false;
     };
 
     /**

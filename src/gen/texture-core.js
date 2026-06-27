@@ -34,11 +34,20 @@
     var _textureCache = {};
 
     /**
+     * Ordered insertion list for LRU-style eviction tracking.
+     * Keys stored here in order they were added for reliable oldest-entry removal.
+     * @type {string[]|null}
+     * @private
+     */
+    var _cacheInsertionOrder = null;
+
+    /**
      * Maximum number of textures to cache (prevents unbounded memory growth).
+     * Set to 4096 to accommodate all block variants without premature eviction.
      * @type {number}
      * @private
      */
-    var MAX_CACHE_SIZE = 512;
+    var MAX_CACHE_SIZE = 4096;
 
     /**
      * Color definitions for block families.
@@ -80,6 +89,7 @@
 
     /**
      * Cache a generated texture by key with generator prefix to prevent collisions.
+     * Implements LRU-style eviction using insertion order tracking for reliable removal.
      * @param {string} prefix - Generator prefix (e.g., "stone", "dirt").
      * @param {string} key - Unique cache key within the prefix.
      * @param {HTMLImageElement} img - Generated image.
@@ -90,21 +100,27 @@
         var fullKey = prefix + ':' + key;
         if (!_textureCache[fullKey]) {
             _textureCache[fullKey] = img;
-            // Evict oldest entries if cache exceeds max size.
-            var keys = Object.keys(_textureCache);
-            if (keys.length > MAX_CACHE_SIZE) {
-                delete _textureCache[keys[0]];
+            // Initialize insertion order tracking on first use.
+            if (_cacheInsertionOrder === null) {
+                _cacheInsertionOrder = [];
             }
+            // Evict oldest entries if cache exceeds max size (FIFO eviction).
+            if (_cacheInsertionOrder.length > MAX_CACHE_SIZE) {
+                var oldestKey = _cacheInsertionOrder.shift();
+                delete _textureCache[oldestKey];
+            }
+            _cacheInsertionOrder.push(fullKey);
         }
         return _textureCache[fullKey];
     }
 
     /**
-     * clearTextureCache — clear the internal texture cache.
+     * clearTextureCache — clear the internal texture cache and insertion order tracking.
      * Call during game reset/shutdown to free memory.
      */
     function clearTextureCache() {
         _textureCache = {};
+        _cacheInsertionOrder = null;
     }
 
     /**
@@ -121,7 +137,9 @@
 
     // Export shared infrastructure on the TextureGenerator object.
     // _textureCache is exposed for cache-read checks (storage goes through _cacheTexture).
+    // _cacheInsertionOrder is exposed for debugging cache size: .length
     Donkeycraft.TextureGenerator._textureCache = _textureCache;
+    Donkeycraft.TextureGenerator._cacheInsertionOrder = _cacheInsertionOrder;
     Donkeycraft.TextureGenerator._createCanvas = _createCanvas;
     Donkeycraft.TextureGenerator._cacheTexture = _cacheTexture;
     Donkeycraft.TextureGenerator.clearTextureCache = clearTextureCache;

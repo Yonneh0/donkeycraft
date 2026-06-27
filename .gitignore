@@ -26,3 +26,4 @@ assets/sounds/*.mp3
 # Local config
 .local
 changes.diff
+ref/

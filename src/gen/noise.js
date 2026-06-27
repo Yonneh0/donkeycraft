@@ -25,13 +25,31 @@
     }
 
     /**
+     * _basePerm — identity permutation table (indices 0-255). Saved before any shuffle
+     * so that _shufflePerm can always restore a clean state. This prevents cross-module
+     * noise pollution where one generator's shuffle corrupts another's expected pattern.
+     * @type {number[]}
+     * @private
+     */
+    var _basePerm = [];
+    for (var _bp = 0; _bp < 256; _bp++) {
+        _basePerm[_bp] = _bp;
+    }
+
+    /**
      * _shufflePerm — shuffle the permutation table deterministically from a seed.
-     * Uses a Mulberry32-derived mixer to permute indices 0-255, then duplicates
+     * Uses a Fisher-Yates shuffle with a LCG mixer, then duplicates
      * the table to 512 entries for overflow-safe indexing.
+     * IMPORTANT: Callers should save/restore the perm table around this call if they need
+     * isolated noise generation. This function mutates the shared `_perm` array.
      * @param {number} seed - Numeric seed value.
      * @private
      */
     function _shufflePerm(seed) {
+        // Restore from clean base before shuffling to avoid compounding mutations
+        for (var _ri = 0; _ri < 256; _ri++) {
+            _perm[_ri] = _basePerm[_ri];
+        }
         var x = seed | 0;
         x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
         x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
@@ -47,6 +65,39 @@
         for (var k = 0; k < 512; k++) {
             _perm[k] = _perm[k & 255];
         }
+    }
+
+    /**
+     * _createShuffledPerm — create a NEW permutation table shuffled deterministically from a seed.
+     * Does NOT mutate global state. Returns a fresh array suitable for isolated texture generation.
+     * Uses the same algorithm as _shufflePerm but operates on a local copy.
+     * @param {number} seed - Numeric seed value.
+     * @returns {number[]} New perm array of length 512.
+     * @private
+     */
+    function _createShuffledPerm(seed) {
+        // Start with identity mapping
+        var perm = [];
+        for (var i = 0; i < 512; i++) {
+            perm[i] = i & 255;
+        }
+        // Shuffle using the same algorithm as _shufflePerm
+        var x = seed | 0;
+        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
+        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
+        x = (x ^ (x >>> 16)) | 0;
+        if (x < 0) x = -x;
+        for (var i = 255; i > 0; i--) {
+            x = (x * 16807) % 65536;
+            var j = x % (i + 1);
+            var tmp = perm[i];
+            perm[i] = perm[j];
+            perm[j] = tmp;
+        }
+        for (var k = 0; k < 512; k++) {
+            perm[k] = perm[k & 255];
+        }
+        return perm;
     }
 
     /**
@@ -92,21 +143,23 @@
      * based on interpolated gradients at grid corners surrounding (x, y).
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
+     * @param {number[]} [perm] - Optional permutation table. Uses global _perm if not provided.
      * @returns {number} Noise value in [-1, 1].
      * @private
      */
-    function _noise2D(x, y) {
+    function _noise2D(x, y, perm) {
+        var table = perm || _perm;
         var X = Math.floor(x) & 255;
         var Y = Math.floor(y) & 255;
         x -= Math.floor(x);
         y -= Math.floor(y);
         var u = _fade(x);
         var v = _fade(y);
-        var a = (_perm[X] + Y) & 255;
-        var b = (_perm[X + 1] + Y) & 255;
+        var a = (table[X] + Y) & 255;
+        var b = (table[X + 1] + Y) & 255;
         return _lerp(
-            _lerp(_grad(_perm[a], x, y), _grad(_perm[b], x - 1, y), u),
-            _lerp(_grad(_perm[a + 1], x, y - 1), _grad(_perm[b + 1], x - 1, y - 1), u),
+            _lerp(_grad(table[a], x, y), _grad(table[b], x - 1, y), u),
+            _lerp(_grad(table[a + 1], x, y - 1), _grad(table[b + 1], x - 1, y - 1), u),
             v
         );
     }
@@ -153,13 +206,15 @@
      * @param {number} octaves - Number of noise octaves to sum.
      * @param {number} frequency - Base frequency multiplier.
      * @param {number} amplitude - Base amplitude multiplier.
+     * @param {number[]} [perm] - Optional permutation table. Uses global _perm if not provided.
      * @returns {number} Normalized result in [-1, 1].
      */
-    function _fbm(x, y, octaves, frequency, amplitude) {
+    function _fbm(x, y, octaves, frequency, amplitude, perm) {
+        var table = perm || _perm;
         var total = 0;
         var maxVal = 0;
         for (var i = 0; i < octaves; i++) {
-            total += _noise2D(x * frequency, y * frequency) * amplitude;
+            total += _noise2D(x * frequency, y * frequency, table) * amplitude;
             maxVal += amplitude;
             frequency *= 2;
             amplitude *= 0.5;
@@ -181,6 +236,7 @@
      */
     Donkeycraft._gen = Donkeycraft._gen || {};
     Donkeycraft._gen._shufflePerm = _shufflePerm;
+    Donkeycraft._gen._createShuffledPerm = _createShuffledPerm;
     Donkeycraft._gen._noise2D = _noise2D;
     Donkeycraft._gen._fbm = _fbm;
     Donkeycraft._gen._seedRng = _seedRng;

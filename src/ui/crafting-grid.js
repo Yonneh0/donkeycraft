@@ -235,13 +235,14 @@
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._tryMatchRecipe = function(gridChanged) {
-        gridChanged = (gridChanged !== false);
-
-        if (!this._recipeRegistry || !gridChanged) {
-            // If grid didn't change but we need to recalculate (e.g., on init)
-            if (!gridChanged && this._resultStack) return;
+        // If no recipe registry, no matching possible — clear result
+        if (!this._recipeRegistry) {
+            this._resultStack = null;
+            this._updateResultDisplay();
+            return;
         }
 
+        // Always recalculate when grid changes or on explicit call
         var recipe = this.matchRecipe();
         if (recipe) {
             this._resultStack = new Donkeycraft.ItemStack(
@@ -337,6 +338,25 @@
             310: '🥢', 312: '🔦'
         };
         return displayMap[itemId] || '▪';
+    };
+
+    /**
+     * handleKeyPress — routes keyboard input for crafting grid interactions.
+     * Supports 'Enter' to craft the result, and 'Escape' to close.
+     * @param {string} key - Key identifier (e.g., 'Escape', 'Enter').
+     * @returns {boolean} True if the key was consumed.
+     */
+    Donkeycraft.CraftingGrid.prototype.handleKeyPress = function(key) {
+        // Escape always closes the crafting GUI
+        if (key === 'Escape') return false; // Let GuiManager handle it
+
+        // Enter to craft result
+        if (key === 'Enter') {
+            this.takeResult();
+            return true;
+        }
+
+        return false;
     };
 
     /**

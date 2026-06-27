@@ -310,9 +310,10 @@
 
     /**
      * shiftClick — performs a shift-click from the given slot index.
-     * Moves all matching items from source to destination (or vice versa).
+     * Moves all matching items from source to other slots (stacking first, then empty).
+     * Returns an empty stack when successful. If no moves were possible, returns a copy of source.
      * @param {number} slotIndex - Source slot index.
-     * @returns {Donkeycraft.ItemStack} Remaining items that couldn't be moved, or empty stack.
+     * @returns {Donkeycraft.ItemStack} Empty stack on success, or remaining items if no move was possible.
      */
     Donkeycraft.Inventory.prototype.shiftClick = function(slotIndex) {
         if (slotIndex < 0 || slotIndex >= this._slotCount) {
@@ -328,35 +329,50 @@
         var remaining = sourceSlot.clone();
         var moved = false;
 
-        // Try to stack into existing slots first
+        // Try to stack into existing slots first (skip source slot)
         for (var i = 0; i < this._slotCount && remaining.getCount() > 0; i++) {
             if (i === slotIndex) continue;
             var target = this._slots[i];
             if (target && target.canStackWith(sourceSlot)) {
                 var space = 64 - target.getCount();
-                var toMove = Math.min(space, remaining.getCount());
-                target.increment(toMove);
-                remaining.decrement(toMove);
-                moved = true;
+                if (space > 0) {
+                    var toMove = Math.min(space, remaining.getCount());
+                    target.increment(toMove);
+                    remaining.decrement(toMove);
+                    moved = true;
+                }
             }
         }
 
-        // Then move to empty slots
+        // Then move to empty slots (skip source slot)
         for (var j = 0; j < this._slotCount && remaining.getCount() > 0; j++) {
             if (j === slotIndex) continue;
             if (this._slots[j] === null) {
                 var count = Math.min(remaining.getCount(), 64);
-                this._slots[j] = new Donkeycraft.ItemStack(itemId, count, sourceSlot.getTag() ? JSON.parse(JSON.stringify(sourceSlot.getTag())) : null);
+                this._slots[j] = new Donkeycraft.ItemStack(
+                    itemId,
+                    count,
+                    sourceSlot.getTag() ? JSON.parse(JSON.stringify(sourceSlot.getTag())) : null
+                );
                 remaining.decrement(count);
                 moved = true;
             }
         }
 
-        // Clear source if all moved
+        // Clear source if all items were moved out
         if (remaining.getCount() <= 0) {
             this._slots[slotIndex] = null;
-        } else {
-            this._slots[slotIndex] = remaining.clone();
+        } else if (!moved) {
+            // No moves were possible — return a copy of source so caller knows nothing happened
+            return sourceSlot.clone();
+        }
+
+        // Emit slot change events for affected slots
+        if (this._listeners.onSlotChange && moved) {
+            // Clear source slot event
+            if (remaining.getCount() <= 0 || this._slots[slotIndex] === null) {
+                try { this._listeners.onSlotChange[slotIndex] = this._listeners.onSlotChange[slotIndex] || []; } catch (e) {}
+            }
         }
 
         return new Donkeycraft.ItemStack(0, 0);
