@@ -108,6 +108,9 @@
             var block = blocks[b];
             var id = block.id;
 
+            // Skip block IDs that don't fit in the atlas grid
+            if (id >= ATLAS_COLS * ATLAS_ROWS) continue;
+
             // Calculate atlas position: column and row in the grid
             var col = id % ATLAS_COLS;
             var row = Math.floor(id / ATLAS_COLS);
@@ -135,9 +138,10 @@
                 tempCtx.drawImage(img, 0, 0, TEX_SIZE, TEX_SIZE);
 
                 // Upload this tile to the atlas at the correct position
+                var imageData = tempCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
                 gl.texSubImage2D(gl.TEXTURE_2D, 0,
                     u, v, TEX_SIZE, TEX_SIZE,
-                    gl.RGBA, gl.UNSIGNED_BYTE, tempCtx.getImageData(0, 0, TEX_SIZE, TEX_SIZE));
+                    gl.RGBA, gl.UNSIGNED_BYTE, imageData.data);
             }
         }
 
