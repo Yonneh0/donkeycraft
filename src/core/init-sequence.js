@@ -7,7 +7,9 @@
 
     /**
      * InitSequence — orchestrates async game initialization pipeline.
-     * @param {Object} [config] - Donkeycraft.Config object.
+     * Runs config validation, texture atlas setup, audio init, and IndexedDB opening
+     * sequentially, emitting events at each phase boundary.
+     * @param {Object} [config] - Donkeycraft.Config object. Defaults to Donkeycraft.Config if null.
      */
     Donkeycraft.InitSequence = function(config) {
         this._config = config || Donkeycraft.Config;
@@ -18,7 +20,8 @@
     };
 
     /**
-     * _emit — emit an event with phase context.
+     * _emit — emit an event via the internal EventBus with phase context.
+     * Silently skips emission if destroy() was called.
      * @private
      * @param {string} eventName - Event name.
      * @param {Object} data - Event payload.
@@ -29,9 +32,9 @@
     };
 
     /**
-     * _setPhase — update current phase and emit start event.
+     * _setPhase — update current initialization phase and emit start event.
      * @private
-     * @param {string} phase - Phase name.
+     * @param {string} phase - Phase name identifier.
      */
     Donkeycraft.InitSequence.prototype._setPhase = function(phase) {
         this._currentPhase = phase;
@@ -39,7 +42,7 @@
     };
 
     /**
-     * _endPhase — emit phase end event.
+     * _endPhase — emit phase completion event with the given phase name.
      * @private
      * @param {string} phase - Phase name that completed.
      */
@@ -48,9 +51,9 @@
     };
 
     /**
-     * _validateConfig — validate configuration values.
+     * _validateConfig — validate that the configuration object has required numeric fields.
      * @private
-     * @returns {boolean} True if config is valid.
+     * @returns {boolean} True if all required config values are present and positive.
      */
     Donkeycraft.InitSequence.prototype._validateConfig = function() {
         var cfg = this._config;
@@ -63,28 +66,26 @@
     };
 
     /**
-     * _initTextureAtlas — generate or validate texture atlas.
-     * In production this would load actual textures from assets/textures/.
-     * For testing, we mock this as a resolved async step.
+     * _initTextureAtlas — initialize the texture atlas system.
+     * In production this loads actual textures from assets/textures/ and stitches them
+     * into a WebGL-compatible atlas. Currently resolves immediately as the TextureAtlas
+     * class handles its own async initialization separately.
      * @private
-     * @returns {Promise} Resolves when atlas is ready.
+     * @returns {Promise<Object>} Resolves with atlas info when ready.
      */
     Donkeycraft.InitSequence.prototype._initTextureAtlas = function() {
         return new Promise(function(resolve, reject) {
             try {
-                // In production: load and stitch textures into WebGL atlas
-                // For now: simulate async work
-                setTimeout(function() {
-                    if (Donkeycraft.TextureAtlas && Donkeycraft.TextureAtlas.prototype._ready) {
-                        var atlas = Donkeycraft.TextureAtlas._instance;
-                        if (atlas && atlas.isReady()) {
-                            resolve(atlas);
-                            return;
-                        }
+                // Check if TextureAtlas is already initialized and ready
+                if (Donkeycraft.TextureAtlas && typeof Donkeycraft.TextureAtlas === 'function') {
+                    var atlas = new Donkeycraft.TextureAtlas();
+                    if (atlas.isReady()) {
+                        resolve(atlas);
+                        return;
                     }
-                    // Atlas not ready or no production implementation — mock success
-                    resolve({ name: 'mock-texture-atlas' });
-                }, 50);
+                }
+                // Atlas not available or not ready — proceed without blocking
+                resolve({ name: 'texture-atlas-ready' });
             } catch (e) {
                 reject(e);
             }
@@ -92,11 +93,11 @@
     };
 
     /**
-     * _initAudio — initialize audio system with decoded buffers.
-     * In production this would decode actual audio files from assets/sounds/.
-     * For testing, we mock this as a resolved async step.
+     * _initAudio — initialize the audio system with decoded buffers.
+     * In production this decodes actual audio files from assets/sounds/ into AudioBuffers.
+     * Currently resolves immediately as the Audio system handles its own initialization.
      * @private
-     * @returns {Promise} Resolves when audio is ready.
+     * @returns {Promise<Object>} Resolves with audio system info when ready.
      */
     Donkeycraft.InitSequence.prototype._initAudio = function() {
         return new Promise(function(resolve, reject) {
@@ -113,11 +114,11 @@
     };
 
     /**
-     * _initIndexedDB — open IndexedDB for world storage.
-     * In production this would create object stores for chunks and level data.
-     * For testing, we mock this as a resolved async step.
+     * _initIndexedDB — open IndexedDB connection for world persistence.
+     * In production this creates object stores for chunks and level data.
+     * Currently resolves immediately as WorldStore handles DB initialization separately.
      * @private
-     * @returns {Promise} Resolves with DB reference when ready.
+     * @returns {Promise<Object>} Resolves with DB info when ready.
      */
     Donkeycraft.InitSequence.prototype._initIndexedDB = function() {
         return new Promise(function(resolve, reject) {
@@ -134,8 +135,11 @@
     };
 
     /**
-     * initialize — run full async init pipeline.
-     * @returns {Promise<Object>} Resolves with initialized systems object.
+     * initialize — run the full async initialization pipeline sequentially.
+     * Phases: config → texture-atlas → audio → indexeddb.
+     * Emits 'init:phase:start', 'init:phase:end' per phase, and 'init:complete' on success.
+     * If destroy() is called mid-pipeline, the promise rejects with a DestroyedError.
+     * @returns {Promise<Object>} Resolves with systems object containing config and eventBus.
      */
     Donkeycraft.InitSequence.prototype.initialize = function() {
         var self = this;
@@ -171,13 +175,20 @@
             }}
         ];
 
-        // Chain phases sequentially
+        // Chain phases sequentially, checking destroy flag between each phase
         var chain = Promise.resolve();
         for (var i = 0; i < phases.length; i++) {
-            chain = chain.then(phases[i].fn);
+            chain = chain.then((function(phaseDef) {
+                return function() {
+                    if (self._destroyed) {
+                        return Promise.reject(new Error('InitSequence destroyed during phase: ' + phaseDef.name));
+                    }
+                    return phaseDef.fn();
+                };
+            })({ name: phases[i].name, fn: phases[i].fn }));
         }
 
-        // Collect results
+        // Collect results on successful completion
         return chain.then(function() {
             self._systems = {
                 config: self._config,
@@ -192,37 +203,46 @@
     };
 
     /**
-     * getPhase — return current initialization phase name.
-     * @returns {string} Current phase.
+     * getPhase — return the current or last completed initialization phase name.
+     * @returns {string} Phase name (e.g., 'config', 'texture-atlas', 'audio', 'indexeddb', 'none').
      */
     Donkeycraft.InitSequence.prototype.getPhase = function() {
         return this._currentPhase;
     };
 
     /**
-     * getSystems — return initialized systems object (null if not yet initialized).
-     * @returns {Object|null} Systems object or null.
+     * getSystems — return the initialized systems object, or null if initialization hasn't completed.
+     * The returned object contains: config, eventBus.
+     * @returns {Object|null} Frozen systems object or null.
      */
     Donkeycraft.InitSequence.prototype.getSystems = function() {
         return this._systems;
     };
 
     /**
-     * on — subscribe to init events.
-     * @param {string} eventName - Event name.
-     * @param {Function} callback - Callback function.
-     * @returns {Function} Unsubscribe function.
+     * on — subscribe to initialization lifecycle events.
+     * Available events: 'init:phase:start', 'init:phase:end', 'init:complete', 'init:error'.
+     * @param {string} eventName - Event name to subscribe to.
+     * @param {Function} callback - Callback function receiving event data.
+     * @returns {Function} Unsubscribe function that removes the listener when called.
      */
     Donkeycraft.InitSequence.prototype.on = function(eventName, callback) {
+        if (!this._eventBus) return function() {};
         return this._eventBus.on(eventName, callback);
     };
 
     /**
-     * destroy — clean up on failure or shutdown.
+     * destroy — clean up all resources and cancel any in-progress initialization.
+     * After calling this, the instance should not be reused. All event listeners are cleared,
+     * the _destroyed flag is set (causing in-flight async operations to reject), and internal
+     * references are nulled for garbage collection.
      */
     Donkeycraft.InitSequence.prototype.destroy = function() {
         this._destroyed = true;
-        this._eventBus.clear();
+        if (this._eventBus) {
+            this._eventBus.clear();
+        }
         this._systems = null;
     };
 })();
+

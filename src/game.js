@@ -490,6 +490,22 @@
     };
 
     /**
+     * isPointerLocked — check if pointer lock is currently active.
+     * @returns {boolean} True if pointer is locked.
+     */
+    Donkeycraft.Game.prototype.isPointerLocked = function() {
+        return document.pointerLockElement !== null;
+    };
+
+    /**
+     * setOverlay — set the overlay DOM element used for pointer lock target.
+     * @param {HTMLElement} overlayEl - The overlay container element.
+     */
+    Donkeycraft.Game.prototype.setOverlay = function(overlayEl) {
+        this._overlay = overlayEl;
+    };
+
+    /**
      * Enable or disable camera synchronization with player.
      * @param {boolean} enabled - Whether to sync camera to player.
      */

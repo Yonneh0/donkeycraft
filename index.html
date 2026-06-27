@@ -450,7 +450,7 @@ void main() {
         );
 
         // Set overlay reference for pointer lock
-        game._overlay = document.getElementById('dk-overlay');
+        game.setOverlay(document.getElementById('dk-overlay'));
 
         // --- Input: Pointer Lock ---
         var overlay = document.getElementById('dk-overlay');
@@ -460,26 +460,27 @@ void main() {
             }
         });
 
-        document.addEventListener('pointerlockchange', function() {
-            game._pointerLocked = !!document.pointerLockElement;
-        });
-
         // --- Input: Mouse Movement (camera rotation) ---
         overlay.addEventListener('mousemove', function(e) {
-            if (!game._pointerLocked) return;
+            if (!document.pointerLockElement) return;
             var dx = e.movementX || 0;
             var dy = e.movementY || 0;
-            if (game._camera) {
-                game._camera.applyMouseDelta(dx, dy);
+            var camera = game.getCamera();
+            if (camera) {
+                camera.applyMouseDelta(dx, dy);
             }
         });
 
         // --- Input: Keyboard (block break/place) ---
         document.addEventListener('keydown', function(e) {
             // F — toggle creative flying
-            if (e.code === 'KeyF' && game._player) {
-                if (game._player.gameMode === 'creative' || game._player.gameMode === 'spectator') {
-                    game._flyingSystem.toggleFlyMode(game._player);
+            if (e.code === 'KeyF') {
+                var player = game.getPlayer();
+                if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
+                    var flyingSystem = game._flyingSystem;
+                    if (flyingSystem) {
+                        flyingSystem.toggleFlyMode(player);
+                    }
                 }
             }
             // Escape — exit pointer lock
@@ -543,15 +544,21 @@ void main() {
     var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
 
     // Wire loading screen progress updates to init phases
+    // Progress: before config=0%, after config=25%, after texture-atlas=50%, after audio=75%, after indexeddb=100%
     initSeq.on('init:phase:start', function(data) {
         loadingScreen.setMessage('Initializing ' + data.phase.replace('-', ' ') + '...');
     });
 
     initSeq.on('init:phase:end', function(data) {
-        var phaseNames = ['config', 'texture-atlas', 'audio', 'indexeddb'];
-        var idx = phaseNames.indexOf(data.phase);
-        loadingScreen.updateProgress((idx + 1) * 25);
+        var phaseOrder = ['config', 'texture-atlas', 'audio', 'indexeddb'];
+        var idx = phaseOrder.indexOf(data.phase);
+        if (idx >= 0) {
+            loadingScreen.updateProgress((idx + 1) * 25);
+        }
     });
+
+    // Set initial progress to 0% before pipeline starts
+    loadingScreen.updateProgress(0);
 
     initSeq.on('init:error', function(data) {
         loadingScreen.showError(data.error.message || 'Unknown error');
