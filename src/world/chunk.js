@@ -30,10 +30,11 @@
         this.chunkZ = chunkZ;
 
         /**
-         * Block data: 1D Uint8Array of size CHUNK_SIZE × WORLD_HEIGHT × CHUNK_SIZE.
-         * @type {Uint8Array}
+         * Block data: 1D Uint16Array of size CHUNK_SIZE × WORLD_HEIGHT × CHUNK_SIZE.
+         * Uses Uint16Array to support block IDs beyond 255 (nether/end blocks).
+         * @type {Uint16Array}
          */
-        this.blocks = new Uint8Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
+        this.blocks = new Uint16Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
 
         /**
          * Sky light data: 1 byte per block (0-15).

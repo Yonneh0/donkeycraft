@@ -432,6 +432,41 @@
         registerBlock(255, 'red_stained_glass', 0.3, 0.3, -1, 0, true, false, 0, 0);
         registerBlock(256, 'black_stained_glass', 0.3, 0.3, -1, 0, true, false, 0, 0);
 
+        // Nether blocks (IDs 257-274)
+        registerBlock(257, 'netherrack', 1.0, 0.0, 257, 1, false, false, 0, 15);
+        registerBlock(258, 'soul_sand', 0.5, 0.5, 258, 1, false, false, 0, 15);
+        registerBlock(259, 'soul_soil', 0.8, 0.8, 259, 1, false, false, 0, 15);
+        registerBlock(260, 'gilded_blackstone', 1.5, 6.0, 260, 1, false, false, 0, 15);
+        registerBlock(261, 'polished_blackstone', 2.0, 6.0, 261, 1, false, false, 0, 15);
+        registerBlock(262, 'polished_blackstone_bricks', 2.0, 6.0, 263, 1, false, false, 0, 15);
+        registerBlock(263, 'nether_wart_block', 1.0, 0.0, 263, 1, false, false, 0, 15);
+        registerBlock(264, 'warped_stem', 1.0, 0.0, 265, 1, false, false, 0, 15);
+        registerBlock(265, 'warped_hyphae', 1.0, 0.0, 265, 1, false, false, 0, 15);
+        registerBlock(266, 'warped_planks', 1.0, 0.0, 266, 1, false, false, 0, 15);
+        registerBlock(267, 'warped_nylium', 1.0, 0.0, 267, 1, false, false, 0, 15);
+        registerBlock(268, 'crimson_stem', 1.0, 0.0, 269, 1, false, false, 0, 15);
+        registerBlock(269, 'crimson_hyphae', 1.0, 0.0, 269, 1, false, false, 0, 15);
+        registerBlock(270, 'crimson_planks', 1.0, 0.0, 270, 1, false, false, 0, 15);
+        registerBlock(271, 'crimson_nylium', 1.0, 0.0, 271, 1, false, false, 0, 15);
+        registerBlock(272, 'nether_gold_ore', 3.0, 6.0, 272, 1, false, false, 0, 15);
+        registerBlock(273, 'ancient_debris', 30.0, 1200.0, 273, 1, false, false, 0, 15);
+        registerBlock(274, 'magma', 0.5, 0.5, 274, 1, false, false, 0, 15);
+
+        // Respawn anchor & portal blocks (IDs 275-278)
+        registerBlock(275, 'respawn_anchor', 0.0, 1200.0, -1, 0, false, true, 11, 15);
+        registerBlock(276, 'nether_portal', 0.0, 0.0, -1, 0, true, true, 11, 0);
+        registerBlock(277, 'end_portal', 0.0, 0.0, -1, 0, true, true, 15, 0);
+
+        // End blocks (IDs 278-285)
+        registerBlock(278, 'chorus_plant', 0.4, 0.4, 278, 1, false, false, 0, 15);
+        registerBlock(279, 'chorus_flower', 0.4, 0.4, -1, 0, false, false, 0, 15);
+        registerBlock(280, 'purpur_block', 1.5, 3.0, 280, 1, false, false, 0, 15);
+        registerBlock(281, 'purpur_pillar', 1.5, 3.0, 280, 1, false, false, 0, 15);
+        registerBlock(282, 'end_stone_brick_wall', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(283, 'end_stone_bricks_stairs', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(284, 'shroomlight', 1.0, 0.0, 284, 1, false, true, 15, 15);
+        registerBlock(285, 'pitcher_pod', 0.0, 0.0, -1, 0, true, false, 0, 0);
+
         // ============================================================
         // Public API
         // ============================================================
