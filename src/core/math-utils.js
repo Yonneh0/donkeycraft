@@ -659,7 +659,7 @@
             scale0 = 1 - t + flip * t;
             scale1 = flip * t;
         } else {
-            angle = Math.acos(cosClamped);
+            var angle = Math.acos(cosClamped);
             sin = Math.sin(angle);
             scale0 = Math.sin((1 - t) * angle) / sin;
             scale1 = Math.sin(t * angle) / sin;
