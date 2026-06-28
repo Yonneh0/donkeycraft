@@ -948,7 +948,7 @@
     pointer-events: none;
 }
 
-/* Row container for heart slots */
+/* Row container for heart slots — no border, slight blur to blend with background */
 .dk-health-bar-row {
     display: flex;
     gap: 2px;
@@ -956,9 +956,10 @@
     padding: 2px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
+    filter: blur(0.3px);
 }
 
-/* Individual heart container */
+/* Individual heart container — no border, subtle glow */
 .dk-heart-container {
     width: 18px;
     height: 20px;
@@ -967,6 +968,8 @@
     justify-content: center;
     transition: filter 150ms ease, transform 150ms ease;
     position: relative;
+    border: none;
+    box-shadow: none;
 }
 
 /* Heart SVG base styles */
@@ -1003,9 +1006,9 @@
     z-index: 10;
 }
 
-/* Full-screen red overlay for low health */
+/* Full-screen red overlay for low health — more opaque */
 .dk-health-overlay {
-    background: radial-gradient(ellipse at center, rgba(180, 0, 0, 0.15) 0%, rgba(100, 0, 0, 0.35) 100%);
+    background: radial-gradient(ellipse at center, rgba(220, 0, 0, 0.3) 0%, rgba(140, 0, 0, 0.6) 100%);
 }
 
 /* ============================================================
@@ -1025,7 +1028,7 @@
     pointer-events: none;
 }
 
-/* Row container for drumstick slots (right-aligned) */
+/* Row container for drumstick slots (right-aligned) — no border, slight blur */
 .dk-hunger-bar-row {
     display: flex;
     gap: 2px;
@@ -1034,9 +1037,10 @@
     padding: 2px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
+    filter: blur(0.3px);
 }
 
-/* Individual drumstick container */
+/* Individual drumstick container — no border, subtle glow */
 .dk-drumstick-container {
     width: 18px;
     height: 20px;
@@ -1045,6 +1049,8 @@
     justify-content: center;
     transition: filter 150ms ease, transform 150ms ease;
     position: relative;
+    border: none;
+    box-shadow: none;
 }
 
 /* Drumstick SVG base styles */
@@ -1076,7 +1082,7 @@
     z-index: 10;
 }
 
-/* Full-screen brown overlay for low hunger */
+/* Full-screen brown overlay for low hunger — more opaque */
 .dk-hunger-overlay {
-    background: radial-gradient(ellipse at center, rgba(140, 80, 0, 0.1) 0%, rgba(80, 50, 0, 0.25) 100%);
+    background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
 }

@@ -92,13 +92,17 @@
      */
     Donkeycraft.HealthBar.prototype._getHeartSVG = function(state) {
         if (state === 'half') {
-            // Horizontal half: bottom half filled only
+            // Full heart outline with bottom half filled red, top half dark
             return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-half">' +
                 '<defs>' +
                 '<clipPath id="dk-heart-clip-bottom"><rect x="0" y="9" width="16" height="9"/></clipPath>' +
+                '<clipPath id="dk-heart-clip-top"><rect x="0" y="0" width="16" height="9"/></clipPath>' +
                 '</defs>' +
+                // Dark outline (always visible)
+                '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="rgba(50,30,30,0.3)" stroke="#5a1a1a" stroke-width="0.8"/>' +
+                // Bottom half filled red
                 '<g clip-path="url(#dk-heart-clip-bottom)">' +
-                '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="#5a1a1a" stroke-width="0.8"/>' +
+                '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="none"/>' +
                 '</g>' +
                 '</svg>';
         }
@@ -255,18 +259,22 @@
     Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(damageAmount) {
         if (!this._row) return;
 
-        var currentHealth = this._prevHealth;
-        var oldHealth = currentHealth + damageAmount;
+        var newHealth = this._prevHealth;
+        var oldHealth = newHealth + damageAmount;
 
-        // Flash each heart that changed state due to damage
+        // Flash each heart that changed state due to damage.
+        // Hearts are filled left-to-right (0→9). Damage removes from the rightmost filled hearts first.
+        // Heart index i covers HP range [i*2, i*2+1]. It was damaged if oldHealth > i*2.
         var flashCount = Math.min(Math.ceil(damageAmount / 2), 5);
-        for (var i = 0; i < flashCount && i < this._heartContainers.length; i++) {
-            var heartIndex = this._getHeartIndex(oldHealth - (i * 2));
+        for (var i = 0; i < flashCount; i++) {
+            // The rightmost damaged heart index: floor((oldHealth - 1) / 2) - i
+            var heartIndex = Math.floor((oldHealth - 1) / 2) - i;
             if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
+            // Only flash if this heart is still within the damaged range
+            if (heartIndex * 2 >= oldHealth) continue;
             var container = this._heartContainers[heartIndex];
             if (!container) continue;
 
-            // Apply red flash class
             container.classList.add('dk-heart-flash');
 
             var self = this;
@@ -284,14 +292,19 @@
     Donkeycraft.HealthBar.prototype._flashHealedHearts = function(healAmount) {
         if (!this._row) return;
 
-        var currentHealth = this._prevHealth;
-        var oldHealth = currentHealth - healAmount;
+        var newHealth = this._prevHealth;
+        var oldHealth = newHealth - healAmount;
 
-        // Flash each heart that changed state due to healing
+        // Flash each heart that changed state due to healing.
+        // Hearts are filled left-to-right (0→9). Healing fills from the rightmost damaged heart first.
+        // Heart index i covers HP range [i*2, i*2+1]. It was healed if newHealth > i*2 and oldHealth <= i*2+1.
         var flashCount = Math.min(Math.ceil(healAmount / 2), 5);
-        for (var i = 0; i < flashCount && i < this._heartContainers.length; i++) {
-            var heartIndex = this._getHeartIndex(oldHealth + (i * 2));
+        for (var i = 0; i < flashCount; i++) {
+            // The rightmost healed heart index: floor((newHealth - 1) / 2) - i
+            var heartIndex = Math.floor((newHealth - 1) / 2) - i;
             if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
+            // Only flash if this heart was actually below new health
+            if (heartIndex * 2 + 1 >= newHealth) continue;
             var container = this._heartContainers[heartIndex];
             if (!container) continue;
 
@@ -342,10 +355,10 @@
         if (!this._overlay) return;
 
         var h = Math.max(0, Math.min(maxHealth || 20, health));
-        // 66% opacity at 0 HP → 0% opacity at 6 HP → stays 0% above 6 HP
+        // 85% opacity at 0 HP → 0% opacity at 6 HP → stays 0% above 6 HP
         var opacity = 0;
         if (h < 6) {
-            opacity = 0.66 - ((h / 6) * 0.66); // 0.66 at h=0, 0 at h=6
+            opacity = 0.85 - ((h / 6) * 0.85); // 0.85 at h=0, 0 at h=6
         }
         this._overlay.style.opacity = Math.max(0, opacity);
     };
@@ -359,8 +372,8 @@
         overlay.className = 'dk-health-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
             'pointer-events:none;z-index:5;opacity:0;' +
-            'transition:opacity 400ms ease;' +
-            'background:radial-gradient(ellipse at center,rgba(180,0,0,0.15) 0%,rgba(100,0,0,0.35) 100%);';
+            'transition:opacity 300ms ease;' +
+            'background:radial-gradient(ellipse at center,rgba(200,0,0,0.2) 0%,rgba(120,0,0,0.5) 100%);';
         document.body.appendChild(overlay);
         this._overlay = overlay;
     };

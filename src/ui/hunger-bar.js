@@ -148,12 +148,11 @@
      */
     Donkeycraft.HungerBar.prototype._renderDrumsticks = function(foodLevel) {
         // Each drumstick represents 2 food: full=2, half=1, empty=0
-        // Mirrors health: fills right-to-left (9→0), depletes left-to-right (0→9).
-        // Health: fills left-to-right (0→9), depletes right-to-left (9→0).
+        // Fills left-to-right so the RIGHTMOST icon is the "low" one (empty/partial when hunger is low).
         var remainingFood = Math.max(0, Math.round(foodLevel));
 
-        // Fill from right to left (index 9 first, then 8, ..., down to 0)
-        for (var i = 9; i >= 0; i--) {
+        // Fill from left to right (index 0 first, then 1, ..., up to 9)
+        for (var i = 0; i < 10; i++) {
             var container = this._drumstickContainers[i];
             if (!container) continue;
 
@@ -193,16 +192,6 @@
     };
 
     /**
-     * _getDrumstickIndex — convert food level to drumstick container index.
-     * @private
-     * @param {number} food - Food level (0-20).
-     * @returns {number} Drumstick container index (0-9).
-     */
-    Donkeycraft.HungerBar.prototype._getDrumstickIndex = function(food) {
-        return Math.floor(Math.max(0, food) / 2);
-    };
-
-    /**
      * _pulseEatenDrumsticks — pulse on drumsticks that were just eaten.
      * @private
      * @param {number} foodGain - Amount of food restored.
@@ -210,14 +199,19 @@
     Donkeycraft.HungerBar.prototype._pulseEatenDrumsticks = function(foodGain) {
         if (!this._row) return;
 
-        var currentFood = this._prevFood;
-        var oldFood = currentFood - foodGain;
+        var newFood = this._prevFood;
+        var oldFood = newFood - foodGain;
 
-        // Pulse each drumstick that changed state due to eating
+        // Hunger fills left-to-right, so the RIGHTMOST drumstick is the "active" one.
+        // Eating restores from the rightmost empty drumstick first (index 9, then 8, ...).
+        // Drumstick index i covers food range [i*2, i*2+1]. It was eaten if newFood > i*2.
         var pulseCount = Math.min(Math.ceil(foodGain / 2), 5);
-        for (var i = 0; i < pulseCount && i < this._drumstickContainers.length; i++) {
-            var drumIndex = this._getDrumstickIndex(oldFood + (i * 2));
+        for (var i = 0; i < pulseCount; i++) {
+            // The rightmost eaten drumstick index: floor((newFood - 1) / 2) - i
+            var drumIndex = Math.floor((newFood - 1) / 2) - i;
             if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) continue;
+            // Only pulse if this drumstick was actually below new food level
+            if (drumIndex * 2 + 1 >= newFood) continue;
             var container = this._drumstickContainers[drumIndex];
             if (!container) continue;
 
@@ -238,14 +232,19 @@
     Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function(foodLoss) {
         if (!this._row) return;
 
-        var currentFood = this._prevFood;
-        var oldFood = currentFood + foodLoss;
+        var newFood = this._prevFood;
+        var oldFood = newFood + foodLoss;
 
-        // Dim each drumstick that changed state due to starving
+        // Hunger depletes from the rightmost drumstick first (index 9, then 8, ...).
+        // The RIGHTMOST full drumsticks are the ones that get depleted.
+        // Drumstick index i covers food range [i*2, i*2+1]. It was depleted if oldFood > i*2.
         var dimCount = Math.min(Math.ceil(foodLoss / 2), 5);
-        for (var i = 0; i < dimCount && i < this._drumstickContainers.length; i++) {
-            var drumIndex = this._getDrumstickIndex(oldFood - (i * 2));
+        for (var i = 0; i < dimCount; i++) {
+            // The rightmost depleted drumstick index: floor((oldFood - 1) / 2) - i
+            var drumIndex = Math.floor((oldFood - 1) / 2) - i;
             if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) continue;
+            // Only dim if this drumstick is still within the depleted range
+            if (drumIndex * 2 >= oldFood) continue;
             var container = this._drumstickContainers[drumIndex];
             if (!container) continue;
 
@@ -312,8 +311,7 @@
         overlay.className = 'dk-hunger-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
             'pointer-events:none;z-index:6;opacity:0;' +
-            'transition:opacity 400ms ease;' +
-            'background:radial-gradient(ellipse at center,rgba(140,80,0,0.15) 0%,rgba(80,50,0,0.35) 100%);';
+            'transition:opacity 300ms ease;';
         document.body.appendChild(overlay);
         this._overlay = overlay;
     };
