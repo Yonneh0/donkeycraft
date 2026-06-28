@@ -186,9 +186,10 @@
      * @returns {boolean} True if the key was consumed.
      */
     Donkeycraft.GuiManager.prototype.handleKeyPress = function(key) {
-        // Guard: reject empty/invalid keys
+        // Guard: reject empty/invalid keys early
         if (!key || typeof key !== 'string') return false;
 
+        // No GUI open — let the key pass through (e.g., Escape to exit pointer lock)
         if (this._guiStack.length === 0) return false;
 
         var top = this._guiStack[this._guiStack.length - 1];
@@ -215,10 +216,9 @@
     /**
      * handleMouseClick — routes a mouse click to the top GUI.
      * Coordinates are passed as-is to the UI component; components built with
-     * DOM-based gui-elements.js use pixel coordinates from MouseEvent objects,
-     * while this method accepts normalized (0-1) values for direct API calls.
-     * @param {number} x - Click X coordinate (normalized 0-1 or pixel value).
-     * @param {number} y - Click Y coordinate (normalized 0-1 or pixel value).
+     * DOM-based gui-elements.js use pixel coordinates from MouseEvent objects.
+     * @param {number} x - Click X coordinate (pixel value).
+     * @param {number} y - Click Y coordinate (pixel value).
      * @param {number} [button=0] - Mouse button (0=left, 1=right, 2=middle).
      */
     Donkeycraft.GuiManager.prototype.handleMouseClick = function(x, y, button) {
@@ -227,6 +227,7 @@
         // Guard: validate coordinates are numbers
         if (typeof x !== 'number' || typeof y !== 'number') return;
 
+        // No GUI open — nothing to route to
         if (this._guiStack.length === 0) return;
 
         var top = this._guiStack[this._guiStack.length - 1];
@@ -294,7 +295,7 @@
     /**
      * getPlayer — gets the optional player reference if set.
      * GuiManager does not own a player by default; returns null when not set.
-     * This is used by GUI wrapper classes that need direct player access.
+     * Used by GUI wrapper classes that need direct player access.
      * @returns {Donkeycraft.Player|null}
      */
     Donkeycraft.GuiManager.prototype.getPlayer = function() {

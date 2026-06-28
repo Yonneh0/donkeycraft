@@ -99,7 +99,9 @@
         var tempCanvas = document.createElement('canvas');
         tempCanvas.width = TEX_SIZE;
         tempCanvas.height = TEX_SIZE;
-        var tempCtx = tempCanvas.getContext('2d');
+        // willReadFrequently: true — prevents Chrome warning about multiple getImageData calls
+        // during atlas generation (284 blocks × 1 readback each).
+        var tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
         var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
         var blockCount = blocks.length;
@@ -275,7 +277,8 @@
             var tempCanvas = document.createElement('canvas');
             tempCanvas.width = TEX_SIZE;
             tempCanvas.height = TEX_SIZE;
-            var tempCtx = tempCanvas.getContext('2d');
+            // willReadFrequently: true — prevents Chrome warning during procedural atlas generation.
+            var tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
             var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
             for (var i = 0; i < blocks.length; i++) {

@@ -28,12 +28,12 @@
 
         /**
          * Ensure PerlinNoise is initialized before terrain generation.
+         * Checks the _initialized flag set by PerlinNoise.init() in math-utils.js.
          * @private
          */
         function _ensureNoiseInit() {
             if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init && !Donkeycraft.PerlinNoise._initialized) {
                 Donkeycraft.PerlinNoise.init(SEED);
-                Donkeycraft.PerlinNoise._initialized = true;
             }
         }
 

@@ -836,12 +836,14 @@
      */
     Donkeycraft.PerlinNoise = (function() {
         var _perm = new Uint8Array(512);
+        var _initialized = false;
 
         /**
          * Initialize with a seed.
          * @param {number} [seed] - Seed value (default: 42). Use any integer for a custom seed.
          */
         function init(seed) {
+            _initialized = true;
             var p = new Uint8Array(256);
             for (var i = 0; i < 256; i++) p[i] = i;
 

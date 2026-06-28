@@ -29,13 +29,25 @@ body {
     cursor: none;
 }
 
-/* Pointer lock indicator — use :focus-within since :pointer-lock is not a valid CSS pseudo-element */
-#dk-overlay:has(#dk-canvas:focus) {
+/* Pointer lock cursor hiding — controlled via JS by toggling .dk-pointer-locked class on body.
+   CSS-only approaches (:focus-within, :has) are unreliable because pointer lock is independent
+   of DOM focus state. */
+body.dk-pointer-locked #dk-canvas {
     cursor: none;
 }
 
-/* When pointer is locked, hide cursor over canvas */
-body:has(#dk-overlay:focus-within) #dk-canvas {
+/* Also hide cursor on overlay elements when locked */
+body.dk-pointer-locked #dk-overlay * {
+    cursor: none !important;
+}
+
+/* Hide cursor for canvas container too */
+body.dk-pointer-locked #dk-canvas-container {
+    cursor: none;
+}
+
+/* Also hide cursor when overlay has focus (fallback for browsers that support it) */
+#dk-overlay:focus-within {
     cursor: none;
 }
 

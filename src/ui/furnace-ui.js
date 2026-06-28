@@ -70,7 +70,8 @@
 
         this._fuelSlotEl = document.createElement('div');
         this._fuelSlotEl.className = 'dk-fuel-slot';
-        this._fuelSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(60,50,40,0.8); border: 2px solid #886644; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
+        this._fuelSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(60,50,40,0.8); border: 2px solid #886644; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._fuelSlotEl.dataset.slotIndex = 0;
         this._fuelSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Fuel</span>';
         leftPanel.appendChild(this._fuelSlotEl);
 
@@ -97,7 +98,8 @@
 
         this._inputSlotEl = document.createElement('div');
         this._inputSlotEl.className = 'dk-furnace-input';
-        this._inputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
+        this._inputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._inputSlotEl.dataset.slotIndex = 1;
         this._inputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Input</span>';
         rightPanel.appendChild(this._inputSlotEl);
 
@@ -109,7 +111,8 @@
 
         this._outputSlotEl = document.createElement('div');
         this._outputSlotEl.className = 'dk-furnace-output';
-        this._outputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
+        this._outputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._outputSlotEl.dataset.slotIndex = 2;
         this._outputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Output</span>';
         rightPanel.appendChild(this._outputSlotEl);
 

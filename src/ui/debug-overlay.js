@@ -35,6 +35,9 @@
         // Game mode (set via setGameMode)
         this._gameMode = 'survival';
 
+        // Wireframe renderer reference (set via setWireframeRenderer)
+        this._wireframeRenderer = null;
+
         // Listeners for timer render events
         this._unsubscribeRender = null;
     };
@@ -78,6 +81,14 @@
      */
     Donkeycraft.DebugOverlay.prototype.setGameMode = function(mode) {
         this._gameMode = mode || 'survival';
+    };
+
+    /**
+     * setWireframeRenderer — sets a reference to the wireframe renderer.
+     * @param {Object} wireframeRenderer - WireframeRenderer instance.
+     */
+    Donkeycraft.DebugOverlay.prototype.setWireframeRenderer = function(wireframeRenderer) {
+        this._wireframeRenderer = wireframeRenderer || null;
     };
 
     /**
@@ -273,6 +284,20 @@
             var biomeName = this.getBiomeName();
             var gameMode = this.getGameMode();
 
+            // Get wireframe status
+            var wireframeEnabled = false;
+            var showBedrock = true;
+            var showClouds = true;
+            var showSolidBlocks = true;
+            if (this._wireframeRenderer) {
+                try {
+                    wireframeEnabled = this._wireframeRenderer._enabled || false;
+                    showBedrock = this._wireframeRenderer._showBedrock !== false;
+                    showClouds = this._wireframeRenderer._showClouds !== false;
+                    showSolidBlocks = this._wireframeRenderer._showSolidBlocks !== false;
+                } catch (e) {}
+            }
+
             return {
                 fps: this._fps,
                 coordinates: coords,
@@ -280,7 +305,11 @@
                 lightLevels: lightLevels,
                 biome: biomeName,
                 gameMode: gameMode,
-                deltaTime: this._getDeltaTime()
+                deltaTime: this._getDeltaTime(),
+                wireframeEnabled: wireframeEnabled,
+                wireframeShowBedrock: showBedrock,
+                wireframeShowClouds: showClouds,
+                wireframeShowSolidBlocks: showSolidBlocks
             };
         } finally {
             // Always restore original references, even if an exception occurred
@@ -386,6 +415,7 @@
         this._player = null;
         this._chunkManager = null;
         this._biome = null;
+        this._wireframeRenderer = null;
         this._timer = null;
     };
 

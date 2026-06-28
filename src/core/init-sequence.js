@@ -193,10 +193,18 @@
             try {
                 // Seed the shared permutation table and PRNG for terrain generation.
                 // The noise module exposes _gen._seedRng() for this purpose.
+                // Also seed Donkeycraft.PerlinNoise (from math-utils.js) independently,
+                // since terrain-generator.js uses PerlinNoise.fbm/noise2D while textures
+                // use _gen._noise2D — they are intentionally independent noise systems.
                 if (Donkeycraft._gen && Donkeycraft._gen._seedRng) {
                     var seed = self._config ? self._config.SEED : 42;
                     Donkeycraft._gen._seedRng(seed);
-                    Donkeycraft.Logger.info('InitSequence', 'Noise PRNG seeded with: ' + seed);
+                    Donkeycraft.Logger.info('InitSequence', 'Noise PRNG (_gen) seeded with: ' + seed);
+                }
+                // Seed PerlinNoise from math-utils.js with the same seed for terrain generation.
+                if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
+                    Donkeycraft.PerlinNoise.init(seed);
+                    Donkeycraft.Logger.info('InitSequence', 'PerlinNoise seeded with: ' + seed);
                 }
 
                 if (typeof window.AudioContext === 'undefined' && typeof window.webkitAudioContext === 'undefined') {

@@ -664,13 +664,15 @@
     justify-content: center;
 }
 
-/* Progress bar base styles — used by LoadingScreen */
+/* Progress bar base styles — used by LoadingScreen.
+   Parent must have position: relative for the pseudo-element overlay to work. */
 .dk-loading-progress {
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, #4CAF50, #66BB6A);
     transition: width 0.3s ease;
     border-radius: 10px;
+    position: relative; /* Required for ::after pseudo-element positioning */
 }
 
 .dk-loading-progress::after {
@@ -682,6 +684,7 @@
     bottom: 0;
     background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
     border-radius: 10px;
+    pointer-events: none; /* Let clicks pass through to the progress bar */
 }
 
 .dk-loading-steps {
@@ -709,25 +712,4 @@
 .dk-loading-step-icon {
     width: 16px;
     text-align: center;
-}
-
-/* ============================================================
-   LOADING SCREEN (style.css)
-   ============================================================ */
-
-#dk-loading-screen .dk-progress-bar-container {
-    width: 300px;
-    height: 20px;
-    background: #1a1a1a;
-    border: 2px solid #555;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 12px;
-}
-
-#dk-loading-screen .dk-progress-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #2ecc71, #27ae60);
-    transition: width 0.3s ease;
 }

@@ -461,20 +461,18 @@
         registerBlock(276, 'nether_portal', 0.0, 0.0, -1, 0, true, true, 11, 0);
         registerBlock(277, 'end_portal', 0.0, 0.0, -1, 0, true, true, 15, 0);
 
-        // End blocks (IDs 278-285)
-        // Note: ID 167 (fern duplicate) removed — ID 160 already covers fern
-        registerBlock(278, 'chorus_plant', 0.4, 0.4, 278, 1, false, false, 0, 15);
-        registerBlock(279, 'chorus_flower', 0.4, 0.4, -1, 0, false, false, 0, 15);
-        registerBlock(280, 'purpur_block', 1.5, 3.0, 280, 1, false, false, 0, 15);
-        registerBlock(281, 'purpur_pillar', 1.5, 3.0, 280, 1, false, false, 0, 15);
-        registerBlock(282, 'end_stone_brick_wall', 3.0, 9.0, 45, 1, false, false, 0, 15);
-        registerBlock(283, 'end_stone_bricks_stairs', 3.0, 9.0, 45, 1, false, false, 0, 15);
-        registerBlock(284, 'shroomlight', 1.0, 0.0, 284, 1, false, true, 15, 15);
-        registerBlock(285, 'pitcher_pod', 0.0, 0.0, -1, 0, true, false, 0, 0);
+        // Clouds (ID 286) — transparent decorative block for sky rendering
+        registerBlock(286, 'cloud', 0.0, 0.0, -1, 0, true, false, 0, 0);
 
-        // ============================================================
-        // Public API
-        // ============================================================
+        // End blocks (IDs 287-294)
+        registerBlock(287, 'chorus_plant', 0.4, 0.4, 287, 1, false, false, 0, 15);
+        registerBlock(288, 'chorus_flower', 0.4, 0.4, -1, 0, false, false, 0, 15);
+        registerBlock(289, 'purpur_block', 1.5, 3.0, 289, 1, false, false, 0, 15);
+        registerBlock(290, 'purpur_pillar', 1.5, 3.0, 289, 1, false, false, 0, 15);
+        registerBlock(291, 'end_stone_brick_wall', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(292, 'end_stone_bricks_stairs', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(293, 'shroomlight', 1.0, 0.0, 293, 1, false, true, 15, 15);
+        registerBlock(294, 'pitcher_pod', 0.0, 0.0, -1, 0, true, false, 0, 0);
 
         /**
          * Get a block by its ID.

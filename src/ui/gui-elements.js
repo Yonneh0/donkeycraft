@@ -146,12 +146,12 @@
 
     /**
      * _highlightDropTarget — highlights the slot under the cursor.
-     * Only removes highlights from this._container to avoid affecting other GUI panels.
+     * Removes highlights from this._container only, then adds highlight to target if within container.
      * @param {MouseEvent} e - Mouse move event.
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._highlightDropTarget = function(e) {
-        // Remove previous highlights only from this container
+        // Remove previous highlights only from this container (scoped to avoid affecting other drag-drop instances)
         if (this._container) {
             var prev = this._container.querySelectorAll('.dk-slot.drag-over, .dk-hotbar-slot.drag-over, .dk-item-slot.drag-over');
             for (var i = 0; i < prev.length; i++) {

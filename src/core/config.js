@@ -49,6 +49,10 @@
             TERMINAL_VELOCITY: -40.0,              // Max fall speed (blocks/s)
             FLYING_TERMINAL_VELOCITY: -20.0,       // Max downward fly speed (blocks/s)
 
+            // Flying vertical speed normalization baseline — used to convert dt to a frame-rate-independent value.
+            // Matches RENDER_FPS_TARGET by default; change both if targeting a different fixed framerate.
+            FLY_BASELINE_FPS: 60,                  // Delta-time normalization baseline for flying movement
+
             // Player mechanics
             SWIM_BOOST: 0.15,            // Upward velocity boost when swimming with jump (blocks/s)
             JUMP_COOLDOWN: 0.1,          // Cooldown between jumps (seconds)
