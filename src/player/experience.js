@@ -14,11 +14,11 @@
         this._player = player;
 
         /**
-         * Current XP level.
+         * Current XP level (starts at 1).
          * @type {number}
          * @private
          */
-        this._level = 0;
+        this._level = 1;
 
         /**
          * XP points within the current level (0 to level threshold).
@@ -49,6 +49,17 @@
      */
     Donkeycraft.Experience.prototype.setLevel = function(level) {
         this._level = Math.max(0, level);
+
+        // Emit XP change event so UI updates
+        if (EventBus) {
+            try {
+                EventBus.emitSafe('xp:changed', {
+                    level: this._level,
+                    points: this._points,
+                    totalXP: this._totalXP
+                });
+            } catch (e) {}
+        }
     };
 
     /**
@@ -203,6 +214,17 @@
     Donkeycraft.Experience.prototype.setLevelToZero = function(level) {
         this._level = Math.max(0, level);
         this._points = 0;
+
+        // Emit XP change event so UI updates
+        if (EventBus) {
+            try {
+                EventBus.emitSafe('xp:changed', {
+                    level: this._level,
+                    points: this._points,
+                    totalXP: this._totalXP
+                });
+            } catch (e) {}
+        }
     };
 
     /**
@@ -260,6 +282,17 @@
         this._level = 0;
         this._points = 0;
         this._totalXP = 0;
+
+        // Emit XP change event so UI updates
+        if (EventBus) {
+            try {
+                EventBus.emitSafe('xp:changed', {
+                    level: this._level,
+                    points: this._points,
+                    totalXP: this._totalXP
+                });
+            } catch (e) {}
+        }
     };
 
     /**
