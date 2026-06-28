@@ -95,11 +95,13 @@
         var boneCircle = '<circle cx="14" cy="4.5" r="1.8" fill="#f5deb3" stroke="#8b6914" stroke-width="0.5"/>';
 
         if (state === 'half') {
+            // Store unique ID once and reuse it for both clipPath and clip-path reference
+            var id = this._uniqueId();
             return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-half">' +
                 '<defs>' +
-                '<clipPath id="dk-drum-clip-right-' + this._uniqueId() + '"><rect x="8" y="0" width="8" height="18"/></clipPath>' +
+                '<clipPath id="dk-drum-clip-right-' + id + '"><rect x="8" y="0" width="8" height="18"/></clipPath>' +
                 '</defs>' +
-                '<g clip-path="url(#dk-drum-clip-right-' + this._uniqueId() + ')">' +
+                '<g clip-path="url(#dk-drum-clip-right-' + id + ')">' +
                 '<path d="' + drumstickPath + '" fill="#d4a574" stroke="#8b6914" stroke-width="0.6"/>' +
                 boneCircle +
                 '</g>' +
@@ -157,10 +159,12 @@
      */
     Donkeycraft.HungerBar.prototype._renderDrumsticks = function(foodLevel) {
         // Each drumstick represents 2 food: full=2, half=1, empty=0
-        // Right-aligned: rightmost icon depletes first
+        // Mirrors health: fills right-to-left (9→0), depletes left-to-right (0→9).
+        // Health: fills left-to-right (0→9), depletes right-to-left (9→0).
         var remainingFood = Math.max(0, Math.round(foodLevel));
 
-        for (var i = 0; i < 10; i++) {
+        // Fill from right to left (index 9 first, then 8, ..., down to 0)
+        for (var i = 9; i >= 0; i--) {
             var container = this._drumstickContainers[i];
             if (!container) continue;
 
@@ -200,16 +204,17 @@
     };
 
     /**
-     * _pulseEatenDrumsticks — pulse green on drumsticks that were just eaten.
+     * _pulseEatenDrumsticks — pulse on drumsticks that were just eaten.
      * @private
      * @param {number} foodGain - Amount of food restored.
      */
     Donkeycraft.HungerBar.prototype._pulseEatenDrumsticks = function(foodGain) {
         if (!this._row) return;
 
-        var pulseCount = Math.min(Math.ceil(foodGain / 2), 5); // pulse up to 5 drumsticks
+        // Eaten drumsticks are the rightmost (first filled, indices 9→0)
+        var pulseCount = Math.min(Math.ceil(foodGain / 2), 5);
         for (var i = 0; i < pulseCount && i < this._drumstickContainers.length; i++) {
-            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i];
+            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i]; // 9,8,7,...
             if (!container) continue;
 
             container.classList.add('dk-drumstick-eat-pulse');
@@ -229,9 +234,10 @@
     Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function(foodLoss) {
         if (!this._row) return;
 
-        var dimCount = Math.min(Math.ceil(foodLoss / 2), 5); // dim up to 5 drumsticks
+        // Depleted drumsticks are the leftmost (first depleted, indices 0→9)
+        var dimCount = Math.min(Math.ceil(foodLoss / 2), 5);
         for (var i = 0; i < dimCount && i < this._drumstickContainers.length; i++) {
-            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i];
+            var container = this._drumstickContainers[i]; // 0,1,2,...
             if (!container) continue;
 
             container.classList.add('dk-drumstick-dim');
@@ -293,9 +299,9 @@
         var overlay = document.createElement('div');
         overlay.className = 'dk-hunger-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-            'pointer-events:none;z-index:5;opacity:0;' +
+            'pointer-events:none;z-index:6;opacity:0;' +
             'transition:opacity 400ms ease;' +
-            'background:radial-gradient(ellipse at center,rgba(140,80,0,0.1) 0%,rgba(80,50,0,0.25) 100%);';
+            'background:radial-gradient(ellipse at center,rgba(140,80,0,0.15) 0%,rgba(80,50,0,0.35) 100%);';
         document.body.appendChild(overlay);
         this._overlay = overlay;
     };
