@@ -142,18 +142,54 @@
     /**
      * _getItemDisplayChar — gets a display character for an item ID.
      * @param {number} itemId - Block/item ID.
-     * @returns {string}
+     * @returns {string} Display emoji character, or '▪' for unknown IDs.
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._getItemDisplayChar = function(itemId) {
+        if (typeof itemId !== 'number' || !Number.isFinite(itemId) || itemId <= 0) return '\u25A0';
+
         var displayMap = {
-            1: '🪨', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
-            12: '🟡', 24: '🪵', 30: '🟨', 45: '🔲', 54: '📦',
-            61: '🔥', 138: '🪨', 187: '📦', 191: '🔥', 214: '⚫',
-            218: '💎', 219: '🟢', 220: '🔵', 221: '⚪', 222: '🟡',
-            225: '🟡', 226: '⚪', 227: '💎', 310: '🥢', 312: '🔦'
+            // Basic blocks
+            1: '\u{1F9E8}',   // stone
+            3: '\u{1F7EB}',   // dirt
+            4: '\u{1F7E9}',   // grass_block
+            5: '\u{1F332}',   // oak_log
+            6: '\u{1F343}',   // oak_planks
+            7: '\u{1F332}',   // sand (fallback)
+            12: '\u{1F7E1}',  // gold_ore
+            24: '\u{1F333}',  // spruce_log
+            25: '\u{1F334}',  // birch_log
+            26: '\u{1F335}',  // jungle_log
+            27: '\u{1F336}',  // acacia_log
+            28: '\u{1F337}',  // dark_oak_log
+            29: '\u{1F338}',  // mangrove_log
+            30: '\u{1F339}',  // oak_planks
+            31: '\u{1F33A}',  // spruce_planks
+            32: '\u{1F33B}',  // birch_planks
+            33: '\u{1F33C}',  // jungle_planks
+            34: '\u{1F33D}',  // acacia_planks
+            35: '\u{1F33E}',  // dark_oak_planks
+            45: '\u{1F9F2}',  // iron_ingot
+            54: '\u{1F4E6}',  // crafting_table
+            61: '\u{1F525}',  // furnace
+            11: '\u{1F4E7}',  // iron_ore
+            14: '\u2B1C',     // coal
+            138: '\u{1F9E8}', // deepslate
+            187: '\u{1F4E6}', // anvil
+            191: '\u{1F525}', // furnace (explicit)
+            214: '\u{1F534}', // coal
+            218: '\u{1F48E}', // diamond
+            219: '\u{1F7E2}', // emerald
+            220: '\u{1F535}', // lapis_lazuli
+            221: '\u26AA',    // quartz
+            222: '\u{1F7E1}', // gold_ingot
+            225: '\u{1F7E1}', // gold_block
+            226: '\u26AA',    // quartz_block
+            227: '\u{1F48E}', // diamond_block
+            310: '\u{1F953}', // stick
+            312: '\u{1F526}'  // flint
         };
-        return displayMap[itemId] || '▪';
+        return displayMap[itemId] || '\u25A0';
     };
 
     /**
@@ -178,6 +214,16 @@
      */
     Donkeycraft.FurnaceUI.prototype.getOutputSlot = function() {
         return this._slots[2];
+    };
+
+    /**
+     * setOutputSlot — sets the output slot content with validation.
+     * This is typically called internally by _produceOutput, but exposed for test/debug use.
+     * @param {Donkeycraft.ItemStack|null} stack - Stack to set in output slot.
+     * @returns {boolean} True if the slot was set successfully.
+     */
+    Donkeycraft.FurnaceUI.prototype.setOutputSlot = function(stack) {
+        return this.setSlot(2, stack);
     };
 
     /**
@@ -481,7 +527,9 @@
 
     /**
      * _produceOutput — smelts one unit of input and places the result in the output slot.
-     * @returns {Object|null} Result object with outputStack, or null if no output produced.
+     * Validates recipe object has required properties before creating output.
+     * Handles output slot stacking, overflow prevention, and input consumption.
+     * @returns {Object|null} Result object with {outputStack: Donkeycraft.ItemStack}, or null if no output produced.
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._produceOutput = function() {
@@ -493,12 +541,18 @@
         var recipe = this._getSmeltRecipe(inputSlot.getItemId());
         if (!recipe) return null;
 
-        // Create output item
-        var outputStack = new Donkeycraft.ItemStack(
-            recipe.outputBlockId,
-            recipe.outputCount || 1,
-            null
-        );
+        // Validate recipe has required properties to prevent creating invalid stacks
+        var outputBlockId = recipe.outputBlockId;
+        if (typeof outputBlockId !== 'number' || !Number.isFinite(outputBlockId) || outputBlockId <= 0) {
+            return null;
+        }
+        var outputCount = recipe.outputCount || 1;
+        if (typeof outputCount !== 'number' || outputCount <= 0) {
+            outputCount = 1;
+        }
+
+        // Create output item with validated values
+        var outputStack = new Donkeycraft.ItemStack(outputBlockId, outputCount, null);
 
         // Check if output slot can accept the result
         if (outputSlot === null || outputSlot.isEmpty()) {
@@ -510,7 +564,7 @@
             return null;
         }
 
-        // Consume input
+        // Consume one input item
         inputSlot.decrement(1);
         if (inputSlot.isEmpty()) {
             this._slots[1] = null;
@@ -523,14 +577,18 @@
      * _updateBurningState — updates the burning state based on fuel and input.
      * Starts burning if fuel + input present, tracks recipe cooking time.
      * Stops burning when progress completes or input is removed.
+     * Guards against re-entrant calls (e.g., from slot-change event listeners).
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._updateBurningState = function() {
+        // Guard: prevent re-entrant calls from event listeners
+        if (this._isBurning) return;
+
         var hasFuel = this._slots[0] && !this._slots[0].isEmpty();
         var hasInput = this._slots[1] && !this._slots[1].isEmpty();
 
         // If not burning and both fuel + input present, start burning
-        if (!this._isBurning && hasFuel && hasInput) {
+        if (hasFuel && hasInput) {
             var fuelStack = this._slots[0];
             var burnTime = this._getFuelBurnTime(fuelStack);
 
@@ -565,6 +623,7 @@
      * _consumeFuel — consumes one unit of fuel from the fuel slot.
      * Decrements the stack count by 1 and clears the slot if depleted.
      * Emits a slot change event for the fuel slot (index 0).
+     * Used internally when a fuel item is fully consumed after burning out.
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._consumeFuel = function() {
@@ -588,12 +647,41 @@
     /**
      * tick — advances furnace state by one tick. Called by the game loop.
      * Advances burn progress and produces output when complete.
-     * Decrements remaining fuel ticks each tick.
-     * Uses recipe cookingTime for accurate smelting duration.
-     * @returns {Object|null} Result object with {outputStack} if output ready, else null.
+     * Each tick consumes 1 unit of burn time from remainingFuelTicks.
+     * When a new recipe is detected, cookingTime is set from the recipe.
+     * Handles fuel refueling from remaining stack count automatically.
+     * @returns {Object|null} Result object with {outputStack: Donkeycraft.ItemStack} if output ready, else null.
      */
     Donkeycraft.FurnaceUI.prototype.tick = function() {
         if (!this._isBurning) return null;
+
+        // Guard against zero/negative cookingTime to prevent division by zero
+        if (this._cookingTime <= 0) {
+            // Look up the recipe for current input to get cooking time
+            var inputSlot = this._slots[1];
+            if (!inputSlot || inputSlot.isEmpty()) {
+                this._isBurning = false;
+                this._burnProgress = 0;
+                this._cookingTime = 0;
+                this._lastProgressPercent = -1;
+                this.setProgress(0);
+                return null;
+            }
+
+            var recipe = this._getSmeltRecipe(inputSlot.getItemId());
+            if (!recipe) {
+                this._isBurning = false;
+                this._burnProgress = 0;
+                this._cookingTime = 0;
+                this._lastProgressPercent = -1;
+                this.setProgress(0);
+                return null;
+            }
+
+            // Set cooking time from recipe with safe default (>= 1 tick)
+            var ct = recipe.cookingTime;
+            this._cookingTime = (typeof ct === 'number' && ct > 0) ? ct : 200;
+        }
 
         // Decrement remaining fuel ticks — each tick consumes 1 tick of burn time
         this._remainingFuelTicks--;
@@ -605,8 +693,15 @@
             if (fuelSlot && !fuelSlot.isEmpty()) {
                 var newBurnTime = this._getFuelBurnTime(fuelSlot);
                 if (newBurnTime > 0) {
-                    // Refuel: total burn time from remaining stack
+                    // Refuel: total burn time from remaining stack count
                     this._remainingFuelTicks = newBurnTime * fuelSlot.getCount();
+                    // Consume the entire fuel stack when refueling
+                    // (single-item fuels are consumed via decrement below; multi-stacks refuel once)
+                    fuelSlot.decrement(fuelSlot.getCount());
+                    if (fuelSlot.isEmpty()) {
+                        this._slots[0] = null;
+                    }
+                    this._updateSlotDisplay(0);
                 } else {
                     // Fuel item is not valid — stop burning
                     this._isBurning = false;
@@ -627,9 +722,9 @@
             }
         }
 
-        // Look up the recipe for current input to get cooking time
-        var inputSlot = this._slots[1];
-        if (!inputSlot || inputSlot.isEmpty()) {
+        // Verify input slot still has a valid recipe
+        var verifyInput = this._slots[1];
+        if (!verifyInput || verifyInput.isEmpty()) {
             this._isBurning = false;
             this._burnProgress = 0;
             this._cookingTime = 0;
@@ -638,20 +733,14 @@
             return null;
         }
 
-        var recipe = this._getSmeltRecipe(inputSlot.getItemId());
-        if (!recipe) {
-            // No valid recipe — stop burning
+        var verifyRecipe = this._getSmeltRecipe(verifyInput.getItemId());
+        if (!verifyRecipe) {
             this._isBurning = false;
             this._burnProgress = 0;
             this._cookingTime = 0;
             this._lastProgressPercent = -1;
             this.setProgress(0);
             return null;
-        }
-
-        // Set cooking time from recipe if not already set
-        if (this._cookingTime === 0) {
-            this._cookingTime = recipe.cookingTime || 200; // default 200 ticks (10 seconds)
         }
 
         // Advance burn progress by one tick using recipe cooking time
@@ -660,7 +749,7 @@
         // Clamp progress to 1.0 max
         if (this._burnProgress > 1.0) this._burnProgress = 1.0;
 
-        // Update DOM display and emit event only on meaningful changes (throttle to 5% increments)
+        // Update DOM display and emit event only on meaningful changes (throttle to 1% increments)
         var currentPercent = Math.floor(this._burnProgress * 100);
         if (currentPercent !== this._lastProgressPercent) {
             this._lastProgressPercent = currentPercent;
@@ -671,7 +760,7 @@
         if (this._burnProgress >= 1.0) {
             var result = this._produceOutput();
 
-            // Reset progress and cooking time
+            // Reset progress and cooking time for next recipe
             this._burnProgress = 0;
             this._cookingTime = 0;
             this._lastProgressPercent = -1;
@@ -714,7 +803,9 @@
     };
 
     /**
-     * startListening — starts auto-ticking on each render frame when burning.
+     * startListening — starts auto-ticking on each render frame while the furnace is burning.
+     * Subscribes to Timer.onRender() and calls tick() each frame when _isBurning is true.
+     * Safe to call multiple times — only subscribes once.
      */
     Donkeycraft.FurnaceUI.prototype.startListening = function() {
         if (this._unsubscribeRender) return;
@@ -732,7 +823,8 @@
     };
 
     /**
-     * stopListening — stops auto-ticking.
+     * stopListening — stops auto-ticking by unsubscribing from the timer render callback.
+     * Safe to call multiple times — no-op if already stopped.
      */
     Donkeycraft.FurnaceUI.prototype.stopListening = function() {
         if (this._unsubscribeRender) {
@@ -779,6 +871,11 @@
                 this._container.removeChild(this._container.firstChild);
             }
         }
+        this._container = null;
+        this._fuelSlotEl = null;
+        this._inputSlotEl = null;
+        this._outputSlotEl = null;
+        this._progressBarEl = null;
         this._slots = [];
         this._listeners = {};
     };
