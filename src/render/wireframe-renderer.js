@@ -107,8 +107,9 @@
     }
 
     /**
-     * Build wireframe geometry for all visible solid blocks in the given chunks.
-     * Strictly limits rendering to a small area around player to avoid OOM.
+     * Build wireframe geometry for all solid blocks in the given chunks.
+     * Draws wireframes around all non-air blocks within render distance.
+     * Uses a small epsilon offset to avoid depth fighting with terrain faces.
      * @private
      * @param {Object[]} chunks - Array of chunk objects with getBlock method.
      * @param {number} chunkX - Chunk X coordinate (unused, kept for API compat).
@@ -125,7 +126,7 @@
         cloudIds[17] = true; // cloud (block ID 17)
 
         // Hard limits — each wireframe block adds exactly 84 floats (12 edges * 2 verts * 7 floats)
-        var MAX_BLOCKS = 5000; // ~420KB float data, safe for all systems
+        var MAX_BLOCKS = 16384; // ~1.4MB float data, reasonable for modern GPUs
         var _blockCount = 0;
 
         // Player position for culling (use origin as fallback)
@@ -138,19 +139,22 @@
             }
         } catch (e) {}
 
-        // Max render radius in world coords — 48 blocks
-        var MAX_RADIUS = 48;
+        // Max render radius in world coords — 64 blocks for better visibility
+        var MAX_RADIUS = 64;
         var MAX_RADIUS_SQ = MAX_RADIUS * MAX_RADIUS;
-        // Y-range: ±32 from player Y
-        var MIN_Y = Math.max(0, py - 32);
-        var MAX_Y = Math.min(WORLD_HEIGHT - 1, py + 32);
+        // Y-range: full world height but clamped reasonably
+        var MIN_Y = Math.max(0, py - 48);
+        var MAX_Y = Math.min(WORLD_HEIGHT - 1, py + 48);
+
+        // Small epsilon offset to avoid depth fighting with terrain faces
+        var EPS = 0.002;
 
         // Iterate over all loaded chunks
         for (var c = 0; c < chunks.length; c++) {
             var chunk = chunks[c];
             if (!chunk) continue;
 
-            // Skip chunks too far from player
+            // Skip chunks too far from player (4x radius squared = ~128 block chunk culling)
             var chunkCX = chunk.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             var chunkCZ = chunk.chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             var dxChunk = chunkCX - px;
@@ -187,54 +191,27 @@
                             color = this._colors.clouds;
                             shouldDraw = true;
                         } else if (this._showSolidBlocks) {
-                            // Check if block is solid using BlockTypes
-                            var isSolid = Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isSolid(blockId);
-                            var isOpaque = Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isOpaque(blockId);
-
-                            if (isSolid && isOpaque) {
-                                // Check if at least one face is exposed (adjacent to transparent block or air)
-                                var exposed = false;
-                                var neighbors = [
-                                    [x+1, y, z], [x-1, y, z],
-                                    [x, y+1, z], [x, y-1, z],
-                                    [x, y, z+1], [x, y, z-1]
-                                ];
-                                for (var n = 0; n < neighbors.length; n++) {
-                                    var nb = getBlockFunc(neighbors[n][0], neighbors[n][1], neighbors[n][2]);
-                                    if (nb === 0 || (Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isTransparent(nb))) {
-                                        exposed = true;
-                                        break;
-                                    }
-                                }
-                                if (exposed) {
-                                    color = this._colors.solid;
-                                    shouldDraw = true;
-                                }
+                            // Draw all non-air, non-transparent blocks (no exposed face check needed)
+                            var isTransparent = Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isTransparent(blockId);
+                            if (!isTransparent) {
+                                color = this._colors.solid;
+                                shouldDraw = true;
                             }
                         }
 
                         if (!shouldDraw || !color) continue;
 
-                        // Build wireframe for this block — inline 84 floats
+                        // Build wireframe for this block with small epsilon offset to avoid depth fighting
                         var ex = x + 1, ey = y + 1, ez = z + 1;
                         var cr = color[0], cg = color[1], cb = color[2], ca = color[3];
 
-                        // 12 edges: each edge has 2 vertices, each vertex is (px,py,pz, r,g,b,a) = 7 floats
-                        // Edge 0-1: (minX,minY,minZ) to (minX,maxY,minZ) — wait, let me use the correct corners
-                        // Corner indices from _buildBoxWireframe:
-                        // 0:(minX,minY,minZ), 1:(minX,maxY,minZ), 2:(minX,minY,maxZ), 3:(minX,maxY,maxZ)
-                        // 4:(maxX,minY,minZ), 5:(maxX,maxY,minZ), 6:(maxX,minY,maxZ), 7:(maxX,maxY,maxZ)
+                        // 8 corners with epsilon offset so wireframes render slightly above terrain
+                        var c0=[x+EPS,y+EPS,z+EPS],     c1=[ex-EPS,y+EPS,z+EPS];
+                        var c2=[x+EPS,ey-EPS,z+EPS],    c3=[ex-EPS,ey-EPS,z+EPS];
+                        var c4=[x+EPS,y+EPS,ez-EPS],    c5=[ex-EPS,y+EPS,ez-EPS];
+                        var c6=[x+EPS,ey-EPS,ez-EPS],   c7=[ex-EPS,ey-EPS,ez-EPS];
 
-                        // Bottom square: [0,1] is wrong — let me use proper box edges
-                        // Actually the original _buildBoxWireframe uses corners differently. Let me just inline the 12 edges properly:
-                        // Bottom: (minX,minY,minZ)->(maxX,minY,minZ), (maxX,minY,minZ)->(maxX,minY,maxZ), etc.
-                        // Using proper axis-aligned box corners:
-                        var c0=[x,y,z],     c1=[ex,y,z],   // X edges at minY,minZ and minY,maxZ
-                            c2=[x,ey,z],    c3=[ex,ey,z];  // X edges at maxY,minZ and maxY,maxZ
-                        var c4=[x,y,ez],    c5=[ex,y,ez];
-                        var c6=[x,ey,ez],   c7=[ex,ey,ez];
-
-                        // 12 edges as corner pairs
+                        // 12 edges as corner pairs forming box outline
                         var edges = [
                             [c0,c1],[c1,c5],[c5,c4],[c4,c0],   // bottom (Y=min)
                             [c2,c3],[c3,c7],[c7,c6],[c6,c2],   // top (Y=max)
@@ -273,6 +250,9 @@
 
     /**
      * Render wireframes for visible chunks.
+     * Uses polygon offset to push wireframes slightly forward of terrain faces,
+     * avoiding depth fighting. Disables depth write so wireframes overlay without
+     * modifying the depth buffer.
      * @param {Camera} camera - The camera instance.
      * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
      * @param {Object[]} activeChunks - Array of currently loaded chunk objects.
@@ -285,62 +265,75 @@
         var geometry = this._buildWireframeGeometry(activeChunks, 0, 0, getBlockFunc);
         if (geometry.vertexCount === 0) return;
 
-        // Upload buffers
+        // Upload vertex buffer
         if (!this._vertexBuffer) {
             this._vertexBuffer = gl.createBuffer();
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, geometry.vertices, gl.DYNAMIC_DRAW);
 
-        // Use wireframe shader
+        // Use wireframe shader program
         if (!this._shaderManager.use('wireframe')) return;
 
-        // Set camera matrices using raw WebGL calls
-        var matrices = camera.getMatrices();
-        var activeProg = this._shaderManager._getActiveProgram ? this._shaderManager._getActiveProgram() : null;
+        // Get active program for direct uniform/attribute access
+        var activeProg = this._shaderManager._getActiveProgram();
+        if (!activeProg) return;
 
-        // Set uProjection — matrices may be Matrix4 instances or Float32Array
+        // Set camera matrices — matrices may be Matrix4 instances (with getData()) or Float32Array
+        var matrices = camera.getMatrices();
         var projData = matrices.projection && matrices.projection.getData ? matrices.projection.getData() : matrices.projection;
-        var projLoc = activeProg ? gl.getUniformLocation(activeProg, 'uProjection') : null;
+        var projLoc = gl.getUniformLocation(activeProg, 'uProjection');
         if (projLoc) gl.uniformMatrix4fv(projLoc, false, projData);
 
-        // Set uView — same handling
         var viewData = matrices.view && matrices.view.getData ? matrices.view.getData() : matrices.view;
-        var viewLoc = activeProg ? gl.getUniformLocation(activeProg, 'uView') : null;
+        var viewLoc = gl.getUniformLocation(activeProg, 'uView');
         if (viewLoc) gl.uniformMatrix4fv(viewLoc, false, viewData);
 
-        // Identity model matrix using Matrix4 class (required by setMat4)
+        // Identity model matrix (required by shader uniform)
         var identityMatrix = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uModel', identityMatrix);
 
-        // Set line width (if supported)
-        try { gl.lineWidth(2.0); } catch (e) {}
+        // Set line width for visibility (may not work on all platforms)
+        try { gl.lineWidth(1.5); } catch (e) {}
 
-        // Bind vertex buffer and set up attribute pointers
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+        // Enable polygon offset to push wireframes slightly forward of terrain faces.
+        // This prevents depth fighting where wireframes would be hidden behind terrain.
+        var polyOffsetExt = gl.getExtension('POLYGON_OFFSET_UNRESTRICTED') || null;
+        if (gl.polygonOffset) {
+            gl.enable(gl.POLYGON_OFFSET_FILL);
+            gl.polygonOffset(2.0, 4.0); // slope and constant factor
+        }
 
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
+        // Get attribute locations directly from the active program
+        var posLoc = gl.getAttribLocation(activeProg, 'aPosition');
+        var colorLoc = gl.getAttribLocation(activeProg, 'aColor');
 
+        // Enable attribute arrays and set pointers (interleaved: 3 pos + 4 color = 7 floats)
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 7 * 4, 0);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 28, 0); // 7*4=28 bytes per vertex
         }
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
-            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 7 * 4, 12);
+            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 28, 12); // offset 3*4=12 bytes
         }
 
-        // Render wireframes on top: disable depth write, enable depth test
+        // Render wireframes ON TOP of terrain:
+        // - Disable depth write so wireframes don't modify the depth buffer
+        // - Keep depth test enabled so hidden lines are still filtered
         gl.depthMask(false);
         gl.enable(gl.DEPTH_TEST);
 
-        // Render as lines
+        // Draw all line segments
         gl.drawArrays(gl.LINES, 0, geometry.vertexCount);
 
-        // Restore state
+        // Restore WebGL state
         gl.depthMask(true);
+        if (gl.polygonOffset) {
+            gl.disable(gl.POLYGON_OFFSET_FILL);
+        }
 
+        // Disable attribute arrays
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
     };
