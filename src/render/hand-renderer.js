@@ -108,7 +108,11 @@
 
         if (!this._shaderManager.use('gui')) return;
 
-        // Orthographic projection for screen-space rendering (cached)
+        // Disable depth writes so the hand renders on top of terrain (translucent overlay).
+        gl.depthMask(false);
+
+        try {
+            // Orthographic projection for screen-space rendering (cached)
         var projMatrix = this._getCachedProjMatrix(canvasWidth, canvasHeight);
         this._shaderManager.setMat4('uProjection', projMatrix);
         this._shaderManager.setMat4('uView', Donkeycraft.Matrix4.createIdentity());
@@ -188,6 +192,10 @@
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        } finally {
+            // Always restore depth writes, even on error.
+            gl.depthMask(true);
+        }
     };
 
     /**

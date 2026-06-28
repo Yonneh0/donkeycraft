@@ -273,7 +273,7 @@
 
         // Build wireframe geometry
         var geometry = this._buildWireframeGeometry(activeChunks, 0, 0, getBlockFunc);
-        Donkeycraft.Logger.info('WireframeRenderer', 'Built geometry: ' + geometry.vertexCount + ' vertices');
+        // Donkeycraft.Logger.info('WireframeRenderer', 'Built geometry: ' + geometry.vertexCount + ' vertices');
         if (geometry.vertexCount === 0) {
             Donkeycraft.Logger.warn('WireframeRenderer', 'No geometry to render (0 vertices)');
             return;
@@ -288,7 +288,7 @@
 
         // Use wireframe shader program
         var shaderUsed = this._shaderManager.use('wireframe');
-        Donkeycraft.Logger.info('WireframeRenderer', 'Shader "wireframe" used: ' + shaderUsed);
+        // Donkeycraft.Logger.info('WireframeRenderer', 'Shader "wireframe" used: ' + shaderUsed);
         if (!shaderUsed) {
             Donkeycraft.Logger.error('WireframeRenderer', 'Wireframe shader program not found — check that it was compiled in game.js');
             return;
@@ -296,7 +296,7 @@
 
         // Get active program for direct uniform/attribute access
         var activeProg = this._shaderManager._getActiveProgram();
-        Donkeycraft.Logger.info('WireframeRenderer', 'Active program: ' + (activeProg ? '0x' + activeProg.toString(16) : 'null'));
+        // Donkeycraft.Logger.info('WireframeRenderer', 'Active program: ' + (activeProg ? '0x' + activeProg.toString(16) : 'null'));
         if (!activeProg) {
             Donkeycraft.Logger.error('WireframeRenderer', 'No active program after use()');
             return;
@@ -306,18 +306,18 @@
         var matrices = camera.getMatrices();
         var projData = matrices.projection && matrices.projection.getData ? matrices.projection.getData() : matrices.projection;
         var projLoc = gl.getUniformLocation(activeProg, 'uProjection');
-        Donkeycraft.Logger.info('WireframeRenderer', 'uProjection loc: ' + (projLoc !== null ? 'valid' : 'NULL'));
+        // Donkeycraft.Logger.info('WireframeRenderer', 'uProjection loc: ' + (projLoc !== null ? 'valid' : 'NULL'));
         if (projLoc) gl.uniformMatrix4fv(projLoc, false, projData);
 
         var viewData = matrices.view && matrices.view.getData ? matrices.view.getData() : matrices.view;
         var viewLoc = gl.getUniformLocation(activeProg, 'uView');
-        Donkeycraft.Logger.info('WireframeRenderer', 'uView loc: ' + (viewLoc !== null ? 'valid' : 'NULL'));
+        // Donkeycraft.Logger.info('WireframeRenderer', 'uView loc: ' + (viewLoc !== null ? 'valid' : 'NULL'));
         if (viewLoc) gl.uniformMatrix4fv(viewLoc, false, viewData);
 
         // Identity model matrix (required by shader uniform)
         var identityMatrix = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uModel', identityMatrix);
-        Donkeycraft.Logger.info('WireframeRenderer', 'uModel set via setMat4');
+        // Donkeycraft.Logger.info('WireframeRenderer', 'uModel set via setMat4');
 
         // Set line width for visibility (may not work on all platforms)
         try { gl.lineWidth(1.5); } catch (e) {}
@@ -327,26 +327,26 @@
         if (gl.polygonOffset) {
             gl.enable(gl.POLYGON_OFFSET_FILL);
             gl.polygonOffset(2.0, 4.0); // slope and constant factor
-            Donkeycraft.Logger.info('WireframeRenderer', 'POLYGON_OFFSET_FILL enabled');
+            // Donkeycraft.Logger.info('WireframeRenderer', 'POLYGON_OFFSET_FILL enabled');
         }
 
         // Get attribute locations directly from the active program
         var posLoc = gl.getAttribLocation(activeProg, 'aPosition');
         var colorLoc = gl.getAttribLocation(activeProg, 'aColor');
-        Donkeycraft.Logger.info('WireframeRenderer', 'aPosition loc: ' + posLoc + ', aColor loc: ' + colorLoc);
+        // Donkeycraft.Logger.info('WireframeRenderer', 'aPosition loc: ' + posLoc + ', aColor loc: ' + colorLoc);
 
         // Enable attribute arrays and set pointers (interleaved: 3 pos + 4 color = 7 floats)
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 28, 0); // 7*4=28 bytes per vertex
-            Donkeycraft.Logger.info('WireframeRenderer', 'Enabled attribute aPosition at loc ' + posLoc);
+            // Donkeycraft.Logger.info('WireframeRenderer', 'Enabled attribute aPosition at loc ' + posLoc);
         } else {
             Donkeycraft.Logger.error('WireframeRenderer', 'aPosition attribute not found in shader');
         }
         if (colorLoc >= 0) {
             gl.enableVertexAttribArray(colorLoc);
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 28, 12); // offset 3*4=12 bytes
-            Donkeycraft.Logger.info('WireframeRenderer', 'Enabled attribute aColor at loc ' + colorLoc);
+            // Donkeycraft.Logger.info('WireframeRenderer', 'Enabled attribute aColor at loc ' + colorLoc);
         } else {
             Donkeycraft.Logger.error('WireframeRenderer', 'aColor attribute not found in shader');
         }
@@ -363,7 +363,7 @@
 
         // Check for WebGL errors after draw
         var err = gl.getError();
-        Donkeycraft.Logger.info('WireframeRenderer', 'drawArrays result: WebGL error code = 0x' + (err || 0).toString(16));
+        // Donkeycraft.Logger.info('WireframeRenderer', 'drawArrays result: WebGL error code = 0x' + (err || 0).toString(16));
         if (err !== gl.NO_ERROR) {
             Donkeycraft.Logger.error('WireframeRenderer', 'WebGL error after drawArrays: 0x' + err.toString(16));
         }

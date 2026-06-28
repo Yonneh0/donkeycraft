@@ -35,6 +35,10 @@
         this._weatherRenderer = null;
         this._wireframeRenderer = null;
 
+        // Survival subsystems (health, hunger) for HUD rendering
+        this._hurtBox = null;
+        this._hungerSystem = null;
+
         // Game systems
         this._timer = null;
         this._input = null;
@@ -382,22 +386,25 @@
 
     /**
      * setSystems — set external system references (called after Game.init()).
-     * If constructor functions are passed instead of instances, they will be instantiated
-     * using the systems created during Game.init() (input, player, collision, chunkManager).
-     * @param {Function|Object} movementSystem - Movement physics system (constructor or instance).
-     * @param {Function|Object} collisionSystem - Collision detection system (constructor or instance).
-     * @param {Function|Object} jumpSystem - Jump mechanics system (constructor or instance).
-     * @param {Function|Object} flyingSystem - Flying mechanics system (constructor or instance).
-     * @param {Object} raycastSystem - Raycasting system (static module, not a constructor).
-     * @param {Object} blockActionSystem - Block breaking system (static module, not a constructor).
-     * @param {Object} blockPlacementSystem - Block placement system (static module, not a constructor).
-     * @param {Object} interactableBlocksSystem - Interactable blocks system (static module, not a constructor).
+     * Also accepts optional HurtBox and Hunger constructor functions that will be instantiated
+     * using the player, chunkManager, and input created during Game.init().
+     * @param {Function|Object} movementSystem - Movement physics system.
+     * @param {Function|Object} collisionSystem - Collision detection system.
+     * @param {Function|Object} jumpSystem - Jump mechanics system.
+     * @param {Function|Object} flyingSystem - Flying mechanics system.
+     * @param {Object} raycastSystem - Raycasting system (static module).
+     * @param {Object} blockActionSystem - Block breaking system (static module).
+     * @param {Object} blockPlacementSystem - Block placement system (static module).
+     * @param {Object} interactableBlocksSystem - Interactable blocks system (static module).
      * @param {Object} [redstoneEngine] - Redstone engine instance (optional).
+     * @param {Function} [hurtBoxConstructor] - HurtBox constructor function (optional).
+     * @param {Function} [hungerConstructor] - Hunger system constructor function (optional).
      * @returns {boolean} True if all systems were set successfully.
      */
     Donkeycraft.Game.prototype.setSystems = function(
         movementSystem, collisionSystem, jumpSystem, flyingSystem,
-        raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem, redstoneEngine
+        raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem,
+        redstoneEngine, hurtBoxConstructor, hungerConstructor
     ) {
         var self = this;
 
@@ -492,6 +499,31 @@
         this._blockActionSystem = blockActionSystem;
         this._blockPlacementSystem = blockPlacementSystem;
         this._interactableBlocksSystem = interactableBlocksSystem;
+
+        // Wire up HurtBox and Hunger systems (if passed as constructor functions, instantiate them)
+        if (hurtBoxConstructor && typeof hurtBoxConstructor === 'function') {
+            try {
+                this._hurtBox = new hurtBoxConstructor(this._player);
+                Donkeycraft.Logger.info('Game', 'HurtBox system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'HurtBox instantiation failed: ' + e.message);
+                this._hurtBox = null;
+            }
+        } else if (hurtBoxConstructor) {
+            this._hurtBox = hurtBoxConstructor;
+        }
+
+        if (hungerConstructor && typeof hungerConstructor === 'function') {
+            try {
+                this._hungerSystem = new hungerConstructor(this._player, this._hurtBox || null);
+                Donkeycraft.Logger.info('Game', 'Hunger system instantiated from constructor');
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Hunger instantiation failed: ' + e.message);
+                this._hungerSystem = null;
+            }
+        } else if (hungerConstructor) {
+            this._hungerSystem = hungerConstructor;
+        }
 
         // Assign redstone engine if provided
         if (redstoneEngine) {
@@ -1870,7 +1902,30 @@
 
         // Render GUI overlay (crosshair, HUD elements)
         if (this._guiRenderer && this._canvas) {
-            this._guiRenderer.renderAll(null, this._canvas.width, this._canvas.height);
+            // Gather health/food values from HurtBox and Hunger systems.
+            var health = 20, maxHealth = 20, food = 20, maxFood = 20;
+            try {
+                if (this._hurtBox) {
+                    health = this._hurtBox.getHealth !== undefined ? this._hurtBox.getHealth() : 20;
+                    maxHealth = this._hurtBox.getMaxHealth !== undefined ? this._hurtBox.getMaxHealth() : 20;
+                }
+            } catch (e) { /* ignore */ }
+            try {
+                if (this._hungerSystem) {
+                    food = this._hungerSystem.getFoodLevel !== undefined ? this._hungerSystem.getFoodLevel() : 20;
+                    maxFood = 20;
+                }
+            } catch (e) { /* ignore */ }
+
+            this._guiRenderer.renderAll({
+                health: health,
+                maxHealth: maxHealth,
+                food: food,
+                maxFood: maxFood,
+                selectedSlot: this._hotbar ? this._hotbar.getSelectedSlot() : 0,
+                crosshair: true,
+                hotbar: true
+            }, this._canvas.width, this._canvas.height);
         }
     };
 

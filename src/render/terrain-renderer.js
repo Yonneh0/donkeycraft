@@ -123,7 +123,12 @@
      */
     Donkeycraft.TerrainRenderer.prototype.updateChunks = function(playerChunkX, playerChunkZ) {
         var gl = this._gl;
-        if (!gl || !this._getBlockFunc) return;
+        if (!gl || !this._getBlockFunc) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'updateChunks skipped: gl=' + (gl ? 'ok' : 'null') + ', _getBlockFunc=' + (this._getBlockFunc ? 'ok' : 'null'));
+            return;
+        }
+
+        // Donkeycraft.Logger.info('TerrainRenderer', 'updateChunks called: playerChunk=(' + playerChunkX + ',' + playerChunkZ + '), renderDistance=' + this._renderDistance);
 
         // First, process any pending meshes (deferred from previous frames)
         this._processPendingMeshes();
@@ -172,6 +177,8 @@
             Donkeycraft.Logger.error('TerrainRenderer', 'WebGL context is null — cannot create chunk mesh');
             return;
         }
+
+        // Donkeycraft.Logger.info('TerrainRenderer', 'Creating chunk mesh at (' + chunkX + ',' + chunkZ + ')...');
         if (!this._getBlockFunc) {
             Donkeycraft.Logger.warn('TerrainRenderer', '_getBlockFunc not set — cannot create chunk mesh');
             return;
@@ -189,6 +196,8 @@
         // Build geometry (face culling already done during build)
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
 
+        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] geometry: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
+
         // If geometry is empty (all air), defer mesh building.
         // The chunk may not have terrain data yet — it will be built on the next frame.
         if (geometry.vertexCount === 0) {
@@ -204,6 +213,8 @@
         var cameraPos = this._camera ? this._camera.getPosition() : null;
         geometry = this._meshOptimizer.optimize(geometry, cameraPos);
 
+        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] after optimization: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
+
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
         chunkMesh.update(geometry);
@@ -213,6 +224,8 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
+
+        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] created successfully. Total chunks: ' + this._chunkCount);
     };
 
     /**
@@ -411,9 +424,17 @@
      */
     Donkeycraft.TerrainRenderer.prototype.render = function(camera) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager || !this._getBlockFunc || !camera) return;
+        if (!gl || !this._shaderManager || !this._getBlockFunc || !camera) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: gl=' + (gl ? 'ok' : 'null') + ', shaderMgr=' + (this._shaderManager ? 'ok' : 'null') + ', blockFunc=' + (this._getBlockFunc ? 'ok' : 'null') + ', camera=' + (camera ? 'ok' : 'null'));
+            return;
+        }
 
-        if (!this._shaderManager.use('terrain')) return;
+        // Donkeycraft.Logger.info('TerrainRenderer', 'render called: chunks=' + this._chunkCount);
+
+        if (!this._shaderManager.use('terrain')) {
+            Donkeycraft.Logger.error('TerrainRenderer', 'terrain shader program not available!');
+            return;
+        }
 
         // Set camera matrices
         var matrices = camera.getMatrices();
@@ -472,6 +493,7 @@
 
         // Draw each chunk, skipping those outside the frustum
         var cs = CHUNK_SIZE;
+        var drawnCount = 0;
         for (var key in this._chunks) {
             if (!this._chunks.hasOwnProperty(key)) continue;
 
@@ -488,7 +510,9 @@
             }
 
             this._drawChunk(chunkMesh);
+            drawnCount++;
         }
+        // Donkeycraft.Logger.info('TerrainRenderer', 'render complete: drew ' + drawnCount + '/' + this._chunkCount + ' chunks');
     };
 
     /**

@@ -503,7 +503,11 @@
 
         if (!this._shaderManager.use('gui')) return;
 
-        var matrices = camera.getMatrices();
+        // Disable depth writes so weather particles render on top of terrain (translucent overlay).
+        gl.depthMask(false);
+
+        try {
+            var matrices = camera.getMatrices();
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
         this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
@@ -601,7 +605,12 @@
 
         var totalVertices = this._particleCount * vertsPerParticle;
         gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
+        } finally {
+            // Always restore depth writes, even on error.
+            gl.depthMask(true);
+        }
 
+        // Disable attribute pointers (after try/finally to ensure state cleanup).
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);

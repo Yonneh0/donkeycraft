@@ -225,6 +225,7 @@
     /**
      * Render the sun disc at the given position using solid color rendering.
      * Uses a persistent vertex buffer with per-vertex color data.
+     * Depth write is disabled so the sun renders on top of terrain without corrupting depth.
      * @private
      */
     Donkeycraft.Sky.prototype._renderSunDisc = function(sunDir, sunIntensity) {
@@ -276,33 +277,41 @@
             buf[base + 8] = a;               // color a
         }
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._sunVertBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
+        try {
+            // Disable depth write so sun renders on top of terrain without corrupting depth buffer.
+            gl.depthMask(false);
 
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var uvLoc = this._shaderManager.getAttribute('aUV');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._sunVertBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
 
-        if (posLoc >= 0) {
-            gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+            var posLoc = this._shaderManager.getAttribute('aPosition');
+            var colorLoc = this._shaderManager.getAttribute('aColor');
+
+            if (posLoc >= 0) {
+                gl.enableVertexAttribArray(posLoc);
+                gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+            }
+            // UV is unused for sun — skip enabling it
+            if (colorLoc >= 0) {
+                gl.enableVertexAttribArray(colorLoc);
+                gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
+            }
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._sunIndexBuf);
+            gl.drawElements(gl.TRIANGLES, this._sunGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
+
+            if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+            if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        } finally {
+            // Always restore depth write state.
+            gl.depthMask(true);
         }
-        // UV is unused for sun — skip
-        if (colorLoc >= 0) {
-            gl.enableVertexAttribArray(colorLoc);
-            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
-        }
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._sunIndexBuf);
-        gl.drawElements(gl.TRIANGLES, this._sunGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
-
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
     };
 
     /**
      * Render the moon disc at the given position.
      * Uses a persistent vertex buffer with per-vertex color data.
+     * Depth write is disabled so the moon renders on top of terrain without corrupting depth.
      * @private
      */
     Donkeycraft.Sky.prototype._renderMoonDisc = function(moonDir) {
@@ -354,26 +363,34 @@
             buf[base + 8] = a;
         }
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._moonVertBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
+        try {
+            // Disable depth write so moon renders on top of terrain without corrupting depth buffer.
+            gl.depthMask(false);
 
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._moonVertBuf);
+            gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
 
-        if (posLoc >= 0) {
-            gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+            var posLoc = this._shaderManager.getAttribute('aPosition');
+            var colorLoc = this._shaderManager.getAttribute('aColor');
+
+            if (posLoc >= 0) {
+                gl.enableVertexAttribArray(posLoc);
+                gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+            }
+            if (colorLoc >= 0) {
+                gl.enableVertexAttribArray(colorLoc);
+                gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
+            }
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._moonIndexBuf);
+            gl.drawElements(gl.TRIANGLES, this._moonGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
+
+            if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+            if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        } finally {
+            // Always restore depth write state.
+            gl.depthMask(true);
         }
-        if (colorLoc >= 0) {
-            gl.enableVertexAttribArray(colorLoc);
-            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
-        }
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._moonIndexBuf);
-        gl.drawElements(gl.TRIANGLES, this._moonGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
-
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
     };
 
     /**
@@ -397,7 +414,7 @@
             gl.disableVertexAttribArray(colorLoc);
         }
 
-        // Render as points (one per star)
+        // Render as points (one per star) — gl.POINTS is a primitive constant passed to drawArrays, NOT a capability to enable.
         gl.drawArrays(gl.POINTS, 0, this._starGeometry.count);
 
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
@@ -417,7 +434,11 @@
         gl.depthMask(false);
 
         if (!this._shaderManager.use('sky')) {
+            // CRITICAL: Always restore depth writes even on shader failure.
+            // If we return with depthMask(false), terrain/particles/hand/GUI
+            // cannot write to the depth buffer and will silently depth-fail.
             gl.depthMask(true);
+            Donkeycraft.Logger.error('Sky', 'Sky shader unavailable — sky dome and stars not rendered');
             return;
         }
 
@@ -465,13 +486,13 @@
 
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
 
-        // ---- Sun disc (visible during day) ----
+        // ---- Sun disc (visible during day) — translucent overlay, depth write disabled ----
         if (this._sunMoonVisible && sunIntensity > 0.1) {
             var sunDir = lighting.getSunDirection();
             this._renderSunDisc(sunDir, sunIntensity);
         }
 
-        // ---- Moon disc (visible at night or twilight) ----
+        // ---- Moon disc (visible at night or twilight — translucent overlay) ----
         if (this._sunMoonVisible && sunIntensity < 0.8) {
             var sunD = lighting.getSunDirection();
             var moonDir = new Donkeycraft.Vector3(-sunD.x, -sunD.y, -sunD.z).normalized();
@@ -488,8 +509,9 @@
         // Re-enable depth writing before stars
         gl.depthMask(true);
 
-        // ---- Stars (visible at night, drawn with depth write enabled) ----
+        // ---- Stars (visible at night, translucent point sprites — disable depth write) ----
         if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
+            gl.depthMask(false);
             // Switch to GUI shader for star rendering (solid color points).
             if (this._shaderManager.use('gui')) {
                 var starMatrices = camera.getMatrices();
@@ -509,6 +531,7 @@
             } else {
                 Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — stars not rendered');
             }
+            gl.depthMask(true);
         }
     };
 
