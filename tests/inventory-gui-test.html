@@ -724,19 +724,23 @@
     F.assert(!consumed, 'handleKeyPress(Space) returns false');
 
     // --- onResultChange event subscription (MUST be before destroy) ---
+    // Directly clear internal state to avoid triggering _calculateResult() before listener is registered
+    anvil._slots[0] = null;
+    anvil._renameText = '';
+    anvil._resultStack = null;
+    anvil._price = 0;
+
     var resultChangeMarker = 'not_fired';
     var unsubscribe2 = anvil.onResultChange(function(stack) {
         resultChangeMarker = stack;
     });
-    // Clear left slot and set no rename text so result is null
-    anvil.setLeftSlot(null);
-    anvil.setRenameText('');
+    // Trigger calculateResult to fire the event with current state (result is null)
     anvil.calculateResult();
     F.assert(resultChangeMarker !== 'not_fired', 'onResultChange callback fired');
     F.assert(resultChangeMarker === null, 'Result change event fired with null when no result');
 
-    // Unsubscribe
-    unsubscribe();
+    // Unsubscribe from the anvil result change listener
+    unsubscribe2();
     var eventFiredAfterUnsub = null;
     anvil.onResultChange(function(stack) { eventFiredAfterUnsub = stack; });
     // Re-subscribe and trigger — the previous unsubscribe should have stopped the first listener

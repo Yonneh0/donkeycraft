@@ -300,6 +300,12 @@
             this._price = 0;
             this._updateSlotDisplay(2);
             this._priceEl.textContent = 'Level 0';
+            // Emit result change event even in early-return path
+            if (this._listeners.onResultChange) {
+                for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+                    try { this._listeners.onResultChange[i](null); } catch (e) {}
+                }
+            }
             return;
         }
 
