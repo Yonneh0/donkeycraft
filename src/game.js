@@ -33,6 +33,7 @@
         this._guiRenderer = null;
         this._weather = null;
         this._weatherRenderer = null;
+        this._wireframeRenderer = null;
 
         // Game systems
         this._timer = null;
@@ -86,7 +87,10 @@
 
         // Interaction cooldown tracking (prevents rapid block break/place)
         this._lastInteractionTime = 0;
-        this._INTERACTION_COOLDOWN_MS = 150; // Minimum ms between interactions
+        this._INTERACTION_COOLDOWN_MS = 60; // Minimum ms between interactions — responsive gameplay
+
+        // One-time chunk force-load flag (breaks render-before-tick deadlock on first frame)
+        this._chunkForceLoaded = false;
 
         // Player hitbox dimensions (from Config)
         this._playerWidth = Config.PLAYER_WIDTH;
@@ -141,11 +145,22 @@
             // Create lighting system
             this._lighting = new Donkeycraft.Lighting();
 
-            // Create Web Audio Context for sound generation and initialize AssetManager
+            // Web Audio Context is created during init-sequence.js pipeline.
+            // Access it via the global systems object if available, otherwise
+            // create a fallback context for AssetManager (sounds will still work).
             try {
                 var AudioContext = window.AudioContext || window.webkitAudioContext;
                 if (AudioContext) {
-                    this._audioContext = new AudioContext();
+                    // Use existing context from init-sequence if available, otherwise create new one.
+                    // The init-sequence creates an AudioSystem with its own context — we reuse it.
+                    this._audioContext = null;
+                    if (window._dkInitSystems && window._dkInitSystems.audioSystem && window._dkInitSystems.audioSystem._context) {
+                        this._audioContext = window._dkInitSystems.audioSystem._context;
+                        Donkeycraft.Logger.info('Game', 'Reusing AudioContext from init-sequence');
+                    } else {
+                        this._audioContext = new AudioContext();
+                        Donkeycraft.Logger.info('Game', 'Created fallback AudioContext');
+                    }
                     Donkeycraft.AssetManager.init(this._audioContext);
                 }
             } catch (e) {
@@ -202,6 +217,9 @@
 
             // Create GUI renderer
             this._guiRenderer = new Donkeycraft.GUIRenderer(this._gl, this._shaderManager);
+
+            // Create wireframe renderer (debug overlay)
+            this._wireframeRenderer = new Donkeycraft.WireframeRenderer(this._gl, this._shaderManager);
 
             // Create weather state manager and weather renderer
             if (Donkeycraft.Weather) {
@@ -385,14 +403,14 @@
             return false;
         }
 
-        // Instantiate Collision first (so Movement can reference it without creating a temp instance)
+        // Instantiate Collision first (so Movement/Jump can reference it)
         if (collisionSystem && typeof collisionSystem === 'function') {
             try {
                 this._collisionSystem = new collisionSystem(this._chunkManager);
                 Donkeycraft.Logger.info('Game', 'Collision system instantiated from constructor');
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Collision instantiation failed: ' + e.message);
-                return false;
+                this._collisionSystem = null;
             }
         } else if (collisionSystem) {
             this._collisionSystem = collisionSystem;
@@ -406,13 +424,13 @@
                 this._movementSystem = new movementSystem(
                     this._input,
                     this._player,
-                    this._collisionSystem,
+                    this._collisionSystem || null,
                     this._chunkManager
                 );
                 Donkeycraft.Logger.info('Game', 'Movement system instantiated from constructor');
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Movement instantiation failed: ' + e.message);
-                return false;
+                this._movementSystem = null;
             }
         } else if (movementSystem) {
             this._movementSystem = movementSystem;
@@ -426,12 +444,12 @@
                 this._jumpSystem = new jumpSystem(
                     this._player,
                     this._input,
-                    this._collisionSystem
+                    this._collisionSystem || null
                 );
                 Donkeycraft.Logger.info('Game', 'Jump system instantiated from constructor');
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Jump instantiation failed: ' + e.message);
-                return false;
+                this._jumpSystem = null;
             }
         } else if (jumpSystem) {
             this._jumpSystem = jumpSystem;
@@ -449,7 +467,7 @@
                 Donkeycraft.Logger.info('Game', 'Flying system instantiated from constructor');
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Flying instantiation failed: ' + e.message);
-                return false;
+                this._flyingSystem = null;
             }
         } else if (flyingSystem) {
             this._flyingSystem = flyingSystem;
@@ -815,6 +833,11 @@
             this._weatherRenderer = null;
         }
 
+        if (this._wireframeRenderer) {
+            this._wireframeRenderer.destroy();
+            this._wireframeRenderer = null;
+        }
+
         if (this._weather) {
             this._weather.destroy();
             this._weather = null;
@@ -888,21 +911,31 @@
         // Clean up interaction cooldown state
         this._lastInteractionTime = 0;
 
-        // Persist final state before shutdown
+        // Persist final state before shutdown — await LevelData persist before destroying WorldStore
+        // to prevent data loss from async race conditions.
+        var self = this;
         if (this._levelData && this._levelData.persistToStore) {
             try {
                 this._levelData.persistToStore().then(function() {
                     Donkeycraft.Logger.info('Game', 'Final world state saved on destroy');
+                    // Now destroy WorldStore after LevelData persist completes
+                    if (self._worldStore && self._worldStore.destroy) {
+                        try { self._worldStore.destroy(); } catch (e2) {}
+                    }
                 }).catch(function() {
-                    Donkeycraft.Logger.warn('Game', 'Final world save failed on destroy');
+                    Donkeycraft.Logger.warn('Game', 'Final world save failed on destroy — destroying WorldStore anyway');
+                    if (self._worldStore && self._worldStore.destroy) {
+                        try { self._worldStore.destroy(); } catch (e2) {}
+                    }
                 });
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Final world save error: ' + e.message);
+                if (this._worldStore && this._worldStore.destroy) {
+                    try { this._worldStore.destroy(); } catch (e2) {}
+                }
             }
-        }
-
-        // Close WorldStore connection if active
-        if (this._worldStore && this._worldStore.destroy) {
+        } else if (this._worldStore && this._worldStore.destroy) {
+            // No LevelData to persist — destroy WorldStore directly
             try {
                 this._worldStore.destroy();
             } catch (e) {}
@@ -1011,6 +1044,7 @@
         _compileShaderPair('gui', 'GUI_VERTEX_SHADER', 'GUI_FRAGMENT_SHADER');
         _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
         _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
+        _compileShaderPair('wireframe', 'WIREFRAME_VERTEX_SHADER', 'WIREFRAME_FRAGMENT_SHADER');
 
         // Log compilation results
         var stats = this._shaderManager.getStats();
@@ -1315,6 +1349,12 @@
             }
         }
 
+        // Toggle wireframe rendering with G key (debug)
+        if (this._input && this._wireframeRenderer && this._input.isKeyJustPressed('KeyG')) {
+            var enabled = this._wireframeRenderer.toggle();
+            Donkeycraft.Logger.info('Game', 'Wireframes ' + (enabled ? 'enabled' : 'disabled'));
+        }
+
         // Emit tick event
         if (this._eventBus) {
             try {
@@ -1455,9 +1495,10 @@
     };
 
     /**
-     * Update flying movement based on input.
+     * _updateFlyingMovement — Update flying movement based on input.
+     * Normalizes diagonal movement and applies delta-time for consistent speed across framerates.
      * @private
-     * @param {number} dt - Delta time.
+     * @param {number} dt - Delta time in seconds.
      * @param {number} moveX - Horizontal input X.
      * @param {number} moveZ - Horizontal input Z.
      * @param {boolean} isSprinting - Whether sprinting.
@@ -1468,16 +1509,24 @@
         // Get flying speed from Config based on sprint state
         var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
 
-        // Apply horizontal movement
+        // Normalize diagonal movement (same as walking — prevents 41% speed boost)
+        if (moveX !== 0 && moveZ !== 0) {
+            var invSqrt2 = 0.70710678118;
+            moveX *= invSqrt2;
+            moveZ *= invSqrt2;
+        }
+
+        // Apply horizontal movement (delta-time normalized)
         vel.x = moveX * speed;
         vel.z = moveZ * speed;
 
-        // Handle up/down flying
+        // Handle up/down flying (delta-time normalized for consistent vertical speed at any framerate)
+        // Uses Config.FLY_BASELINE_FPS instead of hardcoded 60 to handle high-refresh-rate monitors correctly.
         if (this._input.isKeyDown('Space')) {
-            vel.y += speed * 0.5;
+            vel.y += speed * 0.5 * dt * Config.FLY_BASELINE_FPS;
         }
         if (this._input.isKeyDown('ShiftLeft')) {
-            vel.y -= speed * 0.5;
+            vel.y -= speed * 0.5 * dt * Config.FLY_BASELINE_FPS;
         }
     };
 
@@ -1511,11 +1560,16 @@
     };
 
     /**
-     * Force initial chunk load — ensures chunks exist before first render frame.
+     * _forceChunkLoad — ensures chunks exist before first render frame.
      * Called from _render() on the very first frame to break the render-before-tick deadlock.
+     * Uses _chunkForceLoaded flag to run exactly once, avoiding per-frame overhead.
      * @private
      */
     Donkeycraft.Game.prototype._forceChunkLoad = function() {
+        // Guard: only run once per game session
+        if (this._chunkForceLoaded) return;
+        this._chunkForceLoaded = true;
+
         if (!this._player || !this._chunkManager || !this._terrainRenderer) return;
 
         var pos = this._player.getPosition();
@@ -1767,6 +1821,19 @@
                 this._weatherRenderer.render(this._camera, particleDensity, particleType);
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Weather render error: ' + e.message);
+            }
+        }
+
+        // Render wireframes (debug overlay — after terrain, before GUI)
+        if (this._wireframeRenderer && this._camera) {
+            try {
+                var activeChunks = this._chunkManager ? this._chunkManager.getAllChunks() : [];
+                var self = this;
+                this._wireframeRenderer.render(this._camera, function(wx, wy, wz) {
+                    return self._getBlockAt(wx, wy, wz);
+                }, activeChunks);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Wireframe render failed: ' + e.message);
             }
         }
 

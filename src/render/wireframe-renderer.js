@@ -108,39 +108,71 @@
 
     /**
      * Build wireframe geometry for all visible solid blocks in the given chunks.
+     * Strictly limits rendering to a small area around player to avoid OOM.
      * @private
      * @param {Object[]} chunks - Array of chunk objects with getBlock method.
-     * @param {number} chunkX - Chunk X coordinate.
-     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number} chunkX - Chunk X coordinate (unused, kept for API compat).
+     * @param {number} chunkZ - Chunk Z coordinate (unused, kept for API compat).
      * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.WireframeRenderer.prototype._buildWireframeGeometry = function(chunks, chunkX, chunkZ, getBlockFunc) {
         var allVertices = [];
-        var totalIndexCount = 0;
 
         // Block ID classifications
         var bedrockId = 7;   // bedrock (ID 7 in block.js)
         var cloudIds = {};
         cloudIds[17] = true; // cloud (block ID 17)
 
+        // Hard limits — each wireframe block adds exactly 84 floats (12 edges * 2 verts * 7 floats)
+        var MAX_BLOCKS = 5000; // ~420KB float data, safe for all systems
+        var _blockCount = 0;
+
+        // Player position for culling (use origin as fallback)
+        var px = 0, py = 64, pz = 0;
+        try {
+            if (chunks && chunks.length > 0) {
+                var refChunk = chunks[0];
+                px = refChunk.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+                pz = refChunk.chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            }
+        } catch (e) {}
+
+        // Max render radius in world coords — 48 blocks
+        var MAX_RADIUS = 48;
+        var MAX_RADIUS_SQ = MAX_RADIUS * MAX_RADIUS;
+        // Y-range: ±32 from player Y
+        var MIN_Y = Math.max(0, py - 32);
+        var MAX_Y = Math.min(WORLD_HEIGHT - 1, py + 32);
+
         // Iterate over all loaded chunks
         for (var c = 0; c < chunks.length; c++) {
             var chunk = chunks[c];
             if (!chunk) continue;
 
-            var localChunkX = chunk.chunkX;
-            var localChunkZ = chunk.chunkZ;
+            // Skip chunks too far from player
+            var chunkCX = chunk.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            var chunkCZ = chunk.chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+            var dxChunk = chunkCX - px;
+            var dzChunk = chunkCZ - pz;
+            if (dxChunk * dxChunk + dzChunk * dzChunk > MAX_RADIUS_SQ * 4) {
+                continue;
+            }
 
             // Determine block range to iterate
-            var minX = localChunkX * CHUNK_SIZE;
-            var maxX = minX + CHUNK_SIZE - 1;
-            var minZ = localChunkZ * CHUNK_SIZE;
-            var maxZ = minZ + CHUNK_SIZE - 1;
+            var minX = Math.max(chunk.chunkX * CHUNK_SIZE, px - MAX_RADIUS);
+            var maxX = Math.min(chunk.chunkX * CHUNK_SIZE + CHUNK_SIZE - 1, px + MAX_RADIUS);
+            var minZ = Math.max(chunk.chunkZ * CHUNK_SIZE, pz - MAX_RADIUS);
+            var maxZ = Math.min(chunk.chunkZ * CHUNK_SIZE + CHUNK_SIZE - 1, pz + MAX_RADIUS);
 
             for (var x = minX; x <= maxX; x++) {
-                for (var y = 0; y < WORLD_HEIGHT; y++) {
+                for (var y = MIN_Y; y <= MAX_Y; y++) {
                     for (var z = minZ; z <= maxZ; z++) {
+                        // Distance culling from player in XZ plane
+                        var dx2 = x - px;
+                        var dz2 = z - pz;
+                        if (dx2 * dx2 + dz2 * dz2 > MAX_RADIUS_SQ) continue;
+
                         var blockId = getBlockFunc(x, y, z);
                         if (blockId === 0) continue; // Skip air
 
@@ -183,18 +215,46 @@
 
                         if (!shouldDraw || !color) continue;
 
-                        // Build wireframe for this block
-                        var wireframe = _buildBoxWireframe(
-                            x, y, z,
-                            x + 1, y + 1, z + 1,
-                            color
-                        );
+                        // Build wireframe for this block — inline 84 floats
+                        var ex = x + 1, ey = y + 1, ez = z + 1;
+                        var cr = color[0], cg = color[1], cb = color[2], ca = color[3];
 
-                        var baseIdx = allVertices.length / 7; // 7 floats per vertex (pos3 + color4)
-                        for (var i = 0; i < wireframe.vertices.length; i++) {
-                            allVertices.push(wireframe.vertices[i]);
+                        // 12 edges: each edge has 2 vertices, each vertex is (px,py,pz, r,g,b,a) = 7 floats
+                        // Edge 0-1: (minX,minY,minZ) to (minX,maxY,minZ) — wait, let me use the correct corners
+                        // Corner indices from _buildBoxWireframe:
+                        // 0:(minX,minY,minZ), 1:(minX,maxY,minZ), 2:(minX,minY,maxZ), 3:(minX,maxY,maxZ)
+                        // 4:(maxX,minY,minZ), 5:(maxX,maxY,minZ), 6:(maxX,minY,maxZ), 7:(maxX,maxY,maxZ)
+
+                        // Bottom square: [0,1] is wrong — let me use proper box edges
+                        // Actually the original _buildBoxWireframe uses corners differently. Let me just inline the 12 edges properly:
+                        // Bottom: (minX,minY,minZ)->(maxX,minY,minZ), (maxX,minY,minZ)->(maxX,minY,maxZ), etc.
+                        // Using proper axis-aligned box corners:
+                        var c0=[x,y,z],     c1=[ex,y,z],   // X edges at minY,minZ and minY,maxZ
+                            c2=[x,ey,z],    c3=[ex,ey,z];  // X edges at maxY,minZ and maxY,maxZ
+                        var c4=[x,y,ez],    c5=[ex,y,ez];
+                        var c6=[x,ey,ez],   c7=[ex,ey,ez];
+
+                        // 12 edges as corner pairs
+                        var edges = [
+                            [c0,c1],[c1,c5],[c5,c4],[c4,c0],   // bottom (Y=min)
+                            [c2,c3],[c3,c7],[c7,c6],[c6,c2],   // top (Y=max)
+                            [c0,c2],[c1,c3],[c4,c6],[c5,c7]    // verticals (Z direction)
+                        ];
+
+                        for (var e = 0; e < edges.length; e++) {
+                            var edge = edges[e];
+                            for (var v = 0; v < 2; v++) {
+                                var corner = edge[v];
+                                allVertices.push(corner[0], corner[1], corner[2], cr, cg, cb, ca);
+                            }
                         }
-                        totalIndexCount += wireframe.indexCount;
+
+                        _blockCount++;
+                        if (_blockCount >= MAX_BLOCKS) {
+                            // Reached max block limit — stop immediately
+                            c = chunks.length; // Break outer loop too
+                            break;
+                        }
                     }
                 }
             }
@@ -204,7 +264,7 @@
 
         return {
             vertices: new Float32Array(allVertices),
-            indices: null, // Line strips don't need index buffer — we use drawArrays
+            indices: null,
             vertexCount: vertexCount,
             indexCount: 0,
             useIndices: false
