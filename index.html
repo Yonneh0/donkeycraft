@@ -77,6 +77,7 @@
 <script src="src/render/hand-renderer.js"></script>
 <script src="src/render/break-particles.js"></script>
 <script src="src/render/gui-renderer.js"></script>
+<script src="src/render/wireframe-renderer.js"></script>
 
 <!-- Block System -->
 <script src="src/world/block.js"></script>
@@ -298,6 +299,23 @@ void main() {
     vColor = vec4(aLight, aLight, aLight, 1.0);
 }
 `;
+
+// Wireframe Vertex Shader (debug wireframe rendering)
+var WIREFRAME_VERTEX_SHADER = `
+attribute vec3 aPosition;
+attribute vec4 aColor;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec4 vColor;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vColor = aColor;
+}
+`;
 </script>
 
 <script type="text/plain" id="dk-fragment-shaders">
@@ -412,6 +430,17 @@ void main() {
     gl_FragColor = vec4(vColor.rgb, vColor.a * texColor.a);
 }
 `;
+
+// Wireframe Fragment Shader (debug wireframe rendering)
+var WIREFRAME_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec4 vColor;
+
+void main() {
+    gl_FragColor = vColor;
+}
+`;
 </script>
 
 <!-- Main Entry Point & Game Loop -->
@@ -510,25 +539,39 @@ void main() {
         game.setOverlay(document.getElementById('dk-overlay'));
 
         // --- Input: Pointer Lock & AudioContext Resume ---
-        var overlay = document.getElementById('dk-overlay');
-        overlay.addEventListener('click', function() {
-            // Resume AudioContext if suspended — required on mobile browsers
-            // and some desktop browsers that defer audio until user gesture.
-            if (window._dkGame && window._dkGame._audioContext) {
-                try {
-                    var ac = window._dkGame._audioContext;
-                    if (ac.state === 'suspended') {
-                        ac.resume().catch(function() {});
-                    }
-                } catch (e) {}
-            }
+        // NOTE: Click handler must be on canvas, NOT overlay. The overlay has
+        // pointer-events: none in CSS, so clicks pass through to the canvas.
+        var canvas = document.getElementById('dk-canvas');
+        canvas.addEventListener('click', function() {
+            // Hide cursor class — set on body when pointer is locked so CSS can hide it.
             if (!document.pointerLockElement) {
                 game.requestPointerLock();
+            }
+            // Resume AudioContext if suspended — required on mobile browsers
+            // and some desktop browsers that defer audio until user gesture.
+            // Check both the Game instance's _audioContext and any AudioSystem from init-sequence.
+            var audioCtx = null;
+            if (window._dkGame && window._dkGame._audioContext) {
+                audioCtx = window._dkGame._audioContext;
+            } else if (window._dkInitSystems && window._dkInitSystems.audioSystem && window._dkInitSystems.audioSystem._context) {
+                audioCtx = window._dkInitSystems.audioSystem._context;
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                try { audioCtx.resume().catch(function() {}); } catch (e) {}
+            }
+        });
+
+        // --- Input: Pointer Lock state change — toggle cursor hiding class ---
+        document.addEventListener('pointerlockchange', function() {
+            if (document.pointerLockElement) {
+                document.body.classList.add('dk-pointer-locked');
+            } else {
+                document.body.classList.remove('dk-pointer-locked');
             }
         });
 
         // --- Input: Mouse Movement (camera rotation) ---
-        overlay.addEventListener('mousemove', function(e) {
+        canvas.addEventListener('mousemove', function(e) {
             if (!document.pointerLockElement) return;
             var dx = e.movementX || 0;
             var dy = e.movementY || 0;
@@ -543,7 +586,13 @@ void main() {
             // F3 — toggle debug overlay
             if (e.code === 'F3') {
                 e.preventDefault();
-                game.toggleDebugOverlay();
+                var visible = game.toggleDebugOverlay();
+                // Start/stop DebugOverlay auto-listening on toggle
+                if (visible && game._debugOverlay && game._debugOverlay.startListening) {
+                    game._debugOverlay.startListening();
+                } else if (!visible && game._debugOverlay && game._debugOverlay.stopListening) {
+                    game._debugOverlay.stopListening();
+                }
             }
             // Escape — close GUI first, then exit pointer lock
             if (e.code === 'Escape') {
@@ -588,7 +637,7 @@ void main() {
         // uses isMouseButtonPressed('left') and isMouseButtonPressed('right').
 
         // Prevent context menu on right-click
-        overlay.addEventListener('contextmenu', function(e) {
+        canvas.addEventListener('contextmenu', function(e) {
             e.preventDefault();
         });
 
@@ -600,11 +649,23 @@ void main() {
     }
 
     /**
+     * Hide the loading screen before showing an error.
+     * @private
+     */
+    function hideLoadingScreen() {
+        if (typeof loadingScreen !== 'undefined' && loadingScreen && loadingScreen.dispose) {
+            try { loadingScreen.dispose(); } catch (e) {}
+        }
+    }
+
+    /**
      * Show error screen on fatal error.
+     * Disposes the loading screen first to prevent it from staying visible.
      * @private
      * @param {string} message - Error message to display.
      */
     function showError(message) {
+        hideLoadingScreen();
         var errorScreen = document.getElementById('dk-error-screen');
         var errorMessage = document.getElementById('dk-error-message');
         if (errorScreen && errorMessage) {
@@ -658,8 +719,14 @@ void main() {
         loadingScreen.showError(data.error.message || 'Unknown error');
     });
 
+    // Store init systems globally for audio context resume and debugging
+    window._dkInitSystems = null;
+
     // Start the async pipeline and handle completion
     initSeq.initialize().then(function(systems) {
+        // Store globally so the click handler can access the AudioContext
+        window._dkInitSystems = systems;
+
         // Update progress to 100%
         loadingScreen.updateProgress(100);
         loadingScreen.setMessage('Ready!');
@@ -670,8 +737,8 @@ void main() {
             gameMode: 'survival',
             movementSystem: Donkeycraft.Movement,
             collisionSystem: Donkeycraft.Collision,
-            jumpSystem: Donkeycraft.JumpSystem,
-            flyingSystem: Donkeycraft.FlyingSystem,
+            jumpSystem: Donkeycraft.Jumping,
+            flyingSystem: Donkeycraft.Flying,
             raycastSystem: Donkeycraft.Raycast,
             blockActionSystem: Donkeycraft.BlockAction,
             blockPlacementSystem: Donkeycraft.BlockPlacement,
@@ -767,38 +834,30 @@ void main() {
                         debugOverlay.setBiome(Donkeycraft.Biome || null);
                         debugOverlay.setGameMode(game2._gameMode);
 
+                        // Wire wireframe renderer reference into DebugOverlay for status display
+                        if (game2._wireframeRenderer) {
+                            debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
+                        }
+
                         // Store reference for toggleDebugOverlay to use
                         game2._debugOverlay = debugOverlay;
 
-                        // Wire EventBus listener for debug:update events to render on overlay FIRST
-                        // so data is available when debug is toggled on.
-                        try {
-                            var debugOverlayEl = document.getElementById('dk-debug-overlay');
-                            if (debugOverlayEl) {
-                                game2.getEventBus().on('debug:update', function(data) {
-                                    if (game2.isDebugVisible()) {
-                                        debugOverlayEl.textContent =
-                                            'FPS: ' + data.fps +
-                                            ' | X:' + data.coordinates.x +
-                                            ' Y:' + data.coordinates.y +
-                                            ' Z:' + data.coordinates.z +
-                                            ' | Chunk: [' + data.chunkInfo.loaded + '/' + data.chunkInfo.renderDistance + ']' +
-                                            ' | Biome: ' + data.biome +
-                                            ' | Mode: ' + data.gameMode;
-                                    }
-                                });
-                            }
-                        } catch (e2) {
-                            Donkeycraft.Logger.warn('Game', 'Debug EventBus listener failed: ' + e2.message);
+                        // --- Input: Wireframe toggle (G key) ---
+                        if (game2._wireframeRenderer) {
+                            document.addEventListener('keydown', function(e) {
+                                if (e.code === 'KeyG' && !e.ctrlKey && !e.altKey && !e.repeat) {
+                                    game2._wireframeRenderer.toggle();
+                                }
+                            });
                         }
 
                         // Override toggleDebugOverlay to start/stop auto-listening
                         var origToggle = game2.toggleDebugOverlay.bind(game2);
                         game2.toggleDebugOverlay = function() {
                             var visible = origToggle();
-                            if (visible) {
+                            if (visible && debugOverlay.startListening) {
                                 debugOverlay.startListening();
-                            } else {
+                            } else if (!visible && debugOverlay.stopListening) {
                                 debugOverlay.stopListening();
                             }
                             return visible;
@@ -861,13 +920,8 @@ void main() {
                                 });
                             });
 
-                            // Listen for guiClose:chest to save data
-                            eventBus.on('guiClose:chest', function(data) {
-                                var chestKey = data.chestKey;
-                                if (chestKey && _chestDataStore[chestKey]) {
-                                    // Data is saved when GUI closes — handled by onClose listener below
-                                }
-                            });
+                            // guiClose:chest events are handled by the guiManager.close override above,
+                            // which saves chest data before closing. No separate event listener needed.
                         }
                     } catch (e4) {
                         Donkeycraft.Logger.warn('Game', 'Chest event wiring failed: ' + e4.message);
@@ -892,26 +946,48 @@ void main() {
                         return origGuiClose();
                     };
 
-                    // Register chest close event handler for onClose listener
-                    guiManager.onClose(function(type) {
-                        // Emit guiClose:chest for external systems
-                        try {
-                            var globalBus = Donkeycraft.EventBus.getGlobal ? Donkeycraft.EventBus.getGlobal() : null;
-                            if (globalBus && type === 'chest' && guiManager._guiStack.length > 0) {
-                                // Data saved above in override
-                            }
-                        } catch (e5) {}
-                    });
                 } catch (e) {
                     Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
                 }
+            }
+
+            // ============================================================
+            // Post-init validation: ensure critical systems are wired.
+            // If key subsystems failed to initialize, log a warning so
+            // the user knows which features may be missing.
+            // ============================================================
+            var _missingSystems = [];
+            if (!game2._camera) _missingSystems.push('Camera');
+            if (!game2._player) _missingSystems.push('Player');
+            if (!game2._chunkManager) _missingSystems.push('Chunk Manager');
+            if (!game2._terrainRenderer) _missingSystems.push('Terrain Renderer');
+            if (_missingSystems.length > 0) {
+                Donkeycraft.Logger.warn('Game', 'Critical systems missing after init: ' + _missingSystems.join(', ') + ' — some features may not work.');
+            } else {
+                Donkeycraft.Logger.info('Game', 'All critical systems initialized successfully');
+            }
+
+            // ============================================================
+            // Post-init validation: check that the WebGL context and shader programs are functional.
+            // If WebGL failed silently, surface an error instead of a black screen.
+            // ============================================================
+            var _glIssues = [];
+            if (!game2._gl) _glIssues.push('WebGL context null');
+            var _shaderStats = game2._shaderManager ? game2._shaderManager.getStats() : null;
+            if (!_shaderStats || _shaderStats.programs === 0) {
+                _glIssues.push('No shader programs compiled');
+            }
+            if (_glIssues.length > 0) {
+                Donkeycraft.Logger.error('Game', 'WebGL issues detected: ' + _glIssues.join('; '));
             }
 
             // Dispose loading screen after game starts and UI is wired up
             loadingScreen.dispose();
         }
     }).catch(function(err) {
-        loadingScreen.showError(err.message || 'Initialization failed');
+        if (loadingScreen) {
+            loadingScreen.showError(err.message || 'Initialization failed');
+        }
     });
 
 })();
