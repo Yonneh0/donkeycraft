@@ -295,13 +295,20 @@
         // Use wireframe shader
         if (!this._shaderManager.use('wireframe')) return;
 
-        // Set camera matrices
+        // Set camera matrices using raw WebGL calls (projection/view are Float32Array, not Matrix4 instances)
         var matrices = camera.getMatrices();
-        this._shaderManager.setMat4('uProjection', matrices.projection);
-        this._shaderManager.setMat4('uView', matrices.view);
+        var activeProg = this._shaderManager._getActiveProgram ? this._shaderManager._getActiveProgram() : null;
 
-        // Identity model matrix — use a 4x4 identity array directly
-        var identityMatrix = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
+        // Set uProjection
+        var projLoc = activeProg ? gl.getUniformLocation(activeProg, 'uProjection') : null;
+        if (projLoc) gl.uniformMatrix4fv(projLoc, false, matrices.projection);
+
+        // Set uView
+        var viewLoc = activeProg ? gl.getUniformLocation(activeProg, 'uView') : null;
+        if (viewLoc) gl.uniformMatrix4fv(viewLoc, false, matrices.view);
+
+        // Identity model matrix using Matrix4 class (required by setMat4)
+        var identityMatrix = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uModel', identityMatrix);
 
         // Set line width (if supported)
