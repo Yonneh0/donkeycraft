@@ -369,10 +369,14 @@
 
         // Emit slot change events for affected slots
         if (this._listeners.onSlotChange && moved) {
-            // Clear source slot event
-            if (remaining.getCount() <= 0 || this._slots[slotIndex] === null) {
-                try { this._listeners.onSlotChange[slotIndex] = this._listeners.onSlotChange[slotIndex] || []; } catch (e) {}
-            }
+            var self = this;
+            // Emit event for source slot (may have been cleared or modified)
+            try {
+                var srcStack = this._slots[slotIndex];
+                for (var _i = 0; _i < this._listeners.onSlotChange.length; _i++) {
+                    try { this._listeners.onSlotChange[_i](slotIndex, srcStack, null); } catch (e) {}
+                }
+            } catch (e) {}
         }
 
         return new Donkeycraft.ItemStack(0, 0);

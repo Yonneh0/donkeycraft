@@ -270,6 +270,23 @@
     };
 
     /**
+     * getPlayer — gets the player entity reference if available.
+     * GuiManager does not own a player reference; returns null when no player is set.
+     * @returns {Donkeycraft.Player|null}
+     */
+    Donkeycraft.GuiManager.prototype.getPlayer = function() {
+        return this._player || null;
+    };
+
+    /**
+     * setPlayer — sets an optional player reference for GUI interaction.
+     * @param {Donkeycraft.Player} player - Player instance.
+     */
+    Donkeycraft.GuiManager.prototype.setPlayer = function(player) {
+        this._player = player || null;
+    };
+
+    /**
      * clearAll — closes all open GUIs.
      */
     Donkeycraft.GuiManager.prototype.clearAll = function() {
@@ -285,6 +302,7 @@
         this.clearAll();
         this._listeners = {};
         this._uiComponents = {};
+        this._player = null;
         this._container = null;
         this._backdrop = null;
     };
