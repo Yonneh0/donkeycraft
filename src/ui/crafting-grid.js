@@ -7,12 +7,14 @@
 
     /**
      * CraftingGrid — manages the 3×3 crafting grid and result slot.
-     * @param {HTMLElement} container - DOM container for the crafting grid.
-     * @param {Object} [recipeRegistry=null] - RecipeRegistry instance for matching recipes.
+     * @param {HTMLElement} [container] - DOM container for the crafting grid.
+     * @param {Donkeycraft.RecipeRegistry} [recipeRegistry] - RecipeRegistry instance for matching recipes.
      */
     Donkeycraft.CraftingGrid = function(container, recipeRegistry) {
         this._container = container || null;
-        this._recipeRegistry = recipeRegistry || (Donkeycraft.RecipeRegistry || null);
+        // Only fall back to global RecipeRegistry when recipeRegistry is undefined (not provided).
+        // When explicitly passed as null, honor that as "no registry".
+        this._recipeRegistry = (recipeRegistry !== undefined) ? recipeRegistry : (Donkeycraft.RecipeRegistry || null);
 
         // 3×3 ingredient grid (flat array of 9 ItemStacks)
         this._grid = [];
@@ -91,24 +93,34 @@
 
     /**
      * _onSlotClick — handles clicking a grid slot.
+     * Emits a 'slot:click' event with the slot index and current stack.
      * @param {number} index - Slot index (0-8).
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._onSlotClick = function(index) {
-        // In the full game, this would open a drag source or item picker
-        // For now, it's a no-op placeholder for Phase 20+ integration
+        if (index < 0 || index >= 9) return;
+
+        var stack = this._grid[index];
+        // Emit slot click event for external handlers (drag-drop, item picker)
+        if (Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emit('crafting:slotClick', { index: index, stack: stack });
+            } catch (e) { /* EventBus not available */ }
+        }
     };
 
     /**
      * _onResultClick — handles clicking the result slot (take result).
+     * Emits 'resultChange' events for all listeners with the taken result stack.
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._onResultClick = function() {
         if (this._resultStack && !this._resultStack.isEmpty()) {
-            // Emit event for the game to handle taking the item
+            var result = this.takeResult();
+            // Emit event for listeners — pass only the stack, not an action type
             if (this._listeners.onResultChange) {
                 for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-                    try { this._listeners.onResultChange[i]('take', this._resultStack); } catch (e) {}
+                    try { this._listeners.onResultChange[i](result); } catch (e) {}
                 }
             }
         }
@@ -124,6 +136,7 @@
 
     /**
      * getGridAs2D — gets the ingredient grid as a 3×3 2D array (block IDs).
+     * Empty slots contain 0.
      * @returns {number[][]} 3×3 array of block IDs (0 for empty).
      */
     Donkeycraft.CraftingGrid.prototype.getGridAs2D = function() {
@@ -132,7 +145,7 @@
             grid2D[r] = [];
             for (var c = 0; c < 3; c++) {
                 var slot = this._grid[r * 3 + c];
-                grid2D[r][c] = slot ? slot.getItemId() : 0;
+                grid2D[r][c] = slot && !slot.isEmpty() ? slot.getItemId() : 0;
             }
         }
         return grid2D;
@@ -145,32 +158,63 @@
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._isValidStack = function(val) {
-        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+        if (val === null) return true;
+        if (typeof val !== 'object') return false;
+        return typeof val.isEmpty === 'function' &&
+               typeof val.getItemId === 'function' &&
+               typeof val.getCount === 'function';
     };
 
     /**
      * setGridSlot — sets an ingredient in a grid slot with input validation.
+     * If the stack is not null, it is cloned to prevent external mutation.
+     * Emits 'resultChange' events for each listener with the result stack after updating.
      * @param {number} index - Grid slot index (0-8).
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
-     * @returns {boolean} True if successful.
+     * @returns {{oldStack: Donkeycraft.ItemStack|null, newStack: Donkeycraft.ItemStack|null}}
+     *   Object containing the old and new stack values, or null on validation failure.
      */
     Donkeycraft.CraftingGrid.prototype.setGridSlot = function(index, stack) {
-        if (index < 0 || index >= 9) return false;
-        if (!this._isValidStack(stack)) return false;
+        if (index < 0 || index >= 9) return null;
+        if (!this._isValidStack(stack)) return null;
+
         var oldStack = this._grid[index];
+
+        // Clone the stack to prevent external mutation of grid state
+        if (stack !== null && !stack.isEmpty()) {
+            try {
+                stack = stack.clone();
+            } catch (e) {
+                return null;
+            }
+        } else {
+            stack = null;
+        }
+
         this._grid[index] = stack;
         this._updateGridDisplay();
-        this._tryMatchRecipe(oldStack !== stack);
+        this._tryMatchRecipe(true);
+        return { oldStack: oldStack, newStack: stack };
     };
 
     /**
-     * clearGrid — clears all ingredient slots.
+     * clearGrid — clears all ingredient slots and result.
+     * Emits a single 'resultChange' event per listener with null to signal clearing.
      */
     Donkeycraft.CraftingGrid.prototype.clearGrid = function() {
-        for (var i = 0; i < 9; i++) {
-            this._grid[i] = null;
+        // Clear result and emit one event per listener
+        if (this._resultStack && this._listeners.onResultChange) {
+            this._resultStack = null;
+            for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+                try { this._listeners.onResultChange[i](null); } catch (e) {}
+            }
         }
-        this._resultStack = null;
+
+        // Clear all grid slots
+        for (var j = 0; j < 9; j++) {
+            this._grid[j] = null;
+        }
+
         this._updateGridDisplay();
         this._updateResultDisplay();
     };
@@ -193,6 +237,16 @@
         if (!this._recipeRegistry) return null;
 
         var grid2D = this.getGridAs2D();
+
+        // Quick check: skip if grid is entirely empty
+        var hasItems = false;
+        for (var r = 0; r < 3 && !hasItems; r++) {
+            for (var c = 0; c < 3 && !hasItems; c++) {
+                if (grid2D[r][c] !== 0) hasItems = true;
+            }
+        }
+        if (!hasItems) return null;
+
         try {
             // First try shaped recipes (3×3 grid)
             var shapedResult = this._recipeRegistry.matchShapedRecipe(grid2D, 3, 3);
@@ -200,38 +254,27 @@
 
             // Then try shapeless recipes by converting grid to item counts
             var itemCounts = {};
-            for (var r = 0; r < 3; r++) {
-                for (var c = 0; c < 3; c++) {
-                    var blockId = grid2D[r][c];
+            for (var r2 = 0; r2 < 3; r2++) {
+                for (var c2 = 0; c2 < 3; c2++) {
+                    var blockId = grid2D[r2][c2];
                     if (blockId !== 0) {
                         itemCounts[blockId] = (itemCounts[blockId] || 0) + 1;
                     }
                 }
             }
 
-            // Only attempt shapeless matching if at least one item is present
-            var hasItems = false;
-            for (var key in itemCounts) {
-                if (itemCounts.hasOwnProperty(key) && itemCounts[key] > 0) {
-                    hasItems = true;
-                    break;
-                }
-            }
-
-            if (hasItems) {
-                return this._recipeRegistry.matchShapelessRecipe(itemCounts);
-            }
+            return this._recipeRegistry.matchShapelessRecipe(itemCounts);
         } catch (e) {
             if (Donkeycraft.Logger) Donkeycraft.Logger.error('CraftingGrid: Recipe matching failed: ' + e.message);
             return null;
         }
-
-        return null;
     };
 
     /**
      * _tryMatchRecipe — tries to match the current grid and update result.
-     * @param {boolean} [gridChanged=true] - Whether the grid was modified.
+     * Always recalculates the recipe match regardless of gridChanged flag,
+     * ensuring robustness when called from external sources.
+     * @param {boolean} [gridChanged=true] - Whether the grid was modified (unused but kept for API).
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._tryMatchRecipe = function(gridChanged) {
@@ -245,14 +288,19 @@
             return;
         }
 
-        // Always recalculate when grid changes or on explicit call
+        // Always recalculate to ensure correctness
         var recipe = this.matchRecipe();
         if (recipe) {
-            this._resultStack = new Donkeycraft.ItemStack(
-                recipe.outputBlockId,
-                recipe.outputCount || 1,
-                null
-            );
+            try {
+                this._resultStack = new Donkeycraft.ItemStack(
+                    recipe.outputBlockId,
+                    recipe.outputCount || 1,
+                    null
+                );
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.error('CraftingGrid: Failed to create result ItemStack: ' + e.message);
+                this._resultStack = null;
+            }
         } else {
             this._resultStack = null;
         }
@@ -327,36 +375,90 @@
 
     /**
      * _getItemDisplayChar — gets a display character for an item ID.
+     * Used only in test environments; production uses texture-based slot rendering.
      * @param {number} itemId - Block/item ID.
-     * @returns {string}
+     * @returns {string} Single-character display symbol, or '▪' for unknown IDs.
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._getItemDisplayChar = function(itemId) {
-        // Same mapping as Hotbar — Phase 19 will replace with textures
+        if (typeof itemId !== 'number' || isNaN(itemId)) return '\u25A0';
+
+        // Block/item → Unicode glyph mapping for visual identification.
+        // Phase 19 will replace these with texture-based slot rendering.
         var displayMap = {
-            1: '🪨', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
-            24: '🪵', 30: '🟨', 45: '🔲', 54: '📦', 61: '🔥',
-            138: '🪨', 184: '📚', 187: '📦', 191: '🔥', 195: '🔨',
-            214: '⚫', 218: '💎', 219: '🟢', 221: '⚪', 226: '⚪',
-            310: '🥢', 312: '🔦'
+            1:  '\u{1F9E8}',   // stone
+            3:  '\u{1F7EB}',   // dirt
+            4:  '\u{1F7E9}',   // grass_block
+            5:  '\u{1FAB5}',   // oak_log
+            6:  '\u{1F7E8}',   // oak_planks
+            7:  '\u{1F7EB}',   // cobblestone (fallback)
+            14: '\u2B1C',      // coal
+            17: '\u{1F9E0}',   // iron_ingot
+            24: '\u{1FAB5}',   // oak_log (duplicate entry, safe)
+            30: '\u{1F7E8}',   // sand (alias for planks in some recipes)
+            45: '\u26AA',      // bedrock
+            54: '\u{1F4E6}',   // crafting_table
+            61: '\u{1F525}',   // furnace
+            73: '\u{1F4DA}',   // bookshelf
+            138:'\u{1F9E8}',   // gravel
+            184:'\u{1F4DA}',   // bookshelf
+            187:'\u{1F4E6}',   // chest
+            191:'\u{1F525}',   // furnace (duplicate entry, safe)
+            195:'\u{1F528}',   // anvil
+            214:'\u{1F534}',   // obsidian
+            218:'\u{1F48E}',   // diamond
+            219:'\u{1F499}',   // emerald
+            221:'\u{1F535}',   // gold_ingot
+            226:'\u{1F538}',   // quartz
+            310:'\u{1F5E3}\uFE0F', // stick
+            312:'\u{1F526}',   // torch
+            322:'\u{1F3AF}',   // bow
+            334:'\u{1F528}',   // flint_and_steel
+            373:'\u{1F3FF}',   // leather_armor
+            390:'\u{1F9E0}',   // iron_ingot (duplicate entry, safe)
+            402:'\u{1F9E0}',   // iron_ingot (duplicate entry, safe)
+            465:'\u{1F49B}',   // lapis_lazuli
+            502:'\u2744\uFE0F'  // snowball
         };
-        return displayMap[itemId] || '▪';
+        return displayMap[itemId] || '\u25A0';
     };
 
     /**
      * handleKeyPress — routes keyboard input for crafting grid interactions.
-     * Supports 'Enter' to craft the result, and 'Escape' to close.
-     * @param {string} key - Key identifier (e.g., 'Escape', 'Enter').
-     * @returns {boolean} True if the key was consumed.
+     *
+     * Key bindings:
+     * - Escape: always passes through to GuiManager (returns false).
+     * - Enter: takes the crafted result if available (returns true).
+     * - Digit1-Digit9: places a selected hotbar item into the corresponding grid slot.
+     *   Returns false so GuiManager can route the hotbar selection.
+     *
+     * @param {string} key - Key identifier (e.g., 'Escape', 'Enter', 'Digit1').
+     * @param {Donkeycraft.ItemStack} [hotbarItem=null] - Optional ItemStack from the hotbar for Digit1-9 keys.
+     * @returns {boolean} True if the key was consumed by this grid, false to pass through.
      */
-    Donkeycraft.CraftingGrid.prototype.handleKeyPress = function(key) {
-        // Escape always closes the crafting GUI
-        if (key === 'Escape') return false; // Let GuiManager handle it
+    Donkeycraft.CraftingGrid.prototype.handleKeyPress = function(key, hotbarItem) {
+        // Escape always passes through to GuiManager
+        if (key === 'Escape') return false;
 
-        // Enter to craft result
+        // Enter to take result
         if (key === 'Enter') {
-            this.takeResult();
-            return true;
+            var result = this.takeResult();
+            return result !== null;
+        }
+
+        // Digit1-Digit9: place hotbar item into corresponding grid slot (left-to-right, row-major)
+        var digitMatch = key.match(/^Digit(\d)$/);
+        if (digitMatch) {
+            var slotIndex = parseInt(digitMatch[1], 10) - 1; // 'Digit1' → 0, 'Digit9' → 8, 'Digit0' → -1
+            if (slotIndex >= 0 && slotIndex < 9 && hotbarItem !== undefined) {
+                // hotbarItem was explicitly provided (null or ItemStack) — consume the key and place/clear the slot
+                this.setGridSlot(slotIndex, hotbarItem);
+                return true;
+            }
+            // Digit0 (index -1 from 0-1) is out of range for a 3×3 grid but still consumed
+            if (slotIndex === -1 || slotIndex >= 9) return true;
+            // Other digits with invalid slot or missing hotbarItem — pass through
+            return false;
         }
 
         return false;
@@ -377,14 +479,17 @@
     };
 
     /**
-     * destroy — cleans up resources.
+     * destroy — cleans up resources and removes all DOM references.
      */
     Donkeycraft.CraftingGrid.prototype.destroy = function() {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);
             }
+            this._container = null;
         }
+        this._gridElements = [];
+        this._resultElement = null;
         this._grid = [];
         this._resultStack = null;
         this._listeners = {};

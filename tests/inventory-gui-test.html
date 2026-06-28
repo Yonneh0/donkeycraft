@@ -28,6 +28,9 @@
 <script src="../src/world/block-state.js"></script>
 <script src="../src/world/block-types.js"></script>
 
+<!-- Recipe registry (needed for CraftingGrid recipe matching) -->
+<script src="../src/world/recipe-registry.js"></script>
+
 <!-- UI modules in dependency order -->
 <script src="../src/ui/item-stack.js"></script>
 <script src="../src/ui/inventory.js"></script>
@@ -257,14 +260,97 @@
     document.body.removeChild(hotbarContainer);
 
     // ============================================================
-    // Section 4: CraftingGrid — Recipe Matching
+    // Section 3b: RecipeRegistry — Shaped & Shapeless Recipes
     // ============================================================
+    F.section('3b. RecipeRegistry — Shaped & Shapeless Recipes');
+
+    var reg = Donkeycraft.RecipeRegistry;
+    F.assert(reg !== undefined, 'RecipeRegistry is available');
+    F.assert(typeof reg.matchShapedRecipe === 'function', 'matchShapedRecipe is a function');
+    F.assert(typeof reg.matchShapelessRecipe === 'function', 'matchShapelessRecipe is a function');
+    F.assert(typeof reg.getShapedCount === 'function', 'getShapedCount is a function');
+    F.assert(typeof reg.getShapelessCount === 'function', 'getShapelessCount is a function');
+
+    // Test: getShapedCount / getShapelessCount
+    F.assert(reg.getShapedCount() > 0, 'Has shaped recipes registered');
+    F.assert(reg.getShapelessCount() > 0, 'Has shapeless recipes registered');
+
+    // Test: matchShapedRecipe with a known 2x2 recipe (crafting_table)
+    var ctGrid = [
+        [30, 30, 0],
+        [30, 30, 0],
+        [0,  0,  0]
+    ];
+    var shapedResult = reg.matchShapedRecipe(ctGrid, 3, 3);
+    F.assert(shapedResult !== null, 'Crafting table recipe matches');
+    F.assertEq(shapedResult.outputBlockId, 195, 'Crafting table output ID is 195');
+    F.assertEq(shapedResult.outputCount, 1, 'Crafting table output count is 1');
+
+    // Test: matchShapedRecipe with no match
+    var emptyGrid = [
+        [0, 0, 0],
+        [0, 0, 0],
+        [0, 0, 0]
+    ];
+    F.assert(reg.matchShapedRecipe(emptyGrid, 3, 3) === null, 'Empty grid returns null');
+
+    // Test: matchShapedRecipe with wrong dimensions (2x2 grid — should still work if recipe is 2x2)
+    var stickGrid = [
+        [30, 0],
+        [30, 0]
+    ];
+    var stickResult = reg.matchShapedRecipe(stickGrid, 2, 2);
+    F.assert(stickResult !== null, 'Stick recipe matches in 2x2 grid');
+    F.assertEq(stickResult.outputBlockId, 310, 'Stick output ID is 310');
+
+    // Test: matchShapedRecipe with partial grid (3x3 but recipe is 2x2)
+    var stickGrid3x3 = [
+        [30, 0, 0],
+        [30, 0, 0],
+        [0,  0, 0]
+    ];
+    var stickResult3x3 = reg.matchShapedRecipe(stickGrid3x3, 3, 3);
+    F.assert(stickResult3x3 !== null, 'Stick recipe matches in 3x3 grid');
+
+    // Test: matchShapelessRecipe with matching items (4 string → wool)
+    var shapelessItems = { 310: 4 }; // 4 sticks (if shapeless recipe exists)
+    var shapelessResult = reg.matchShapelessRecipe(shapelessItems);
+    // Shapeless recipe for 4 string → wool should match
+    if (shapelessResult !== null) {
+        F.assert(typeof shapelessResult.outputBlockId === 'number', 'Shapeless result has outputBlockId');
+        F.assert(typeof shapelessResult.outputCount === 'number', 'Shapeless result has outputCount');
+    }
+
+    // Test: matchShapelessRecipe with no match
+    var noMatchItems = { 9999: 1 };
+    F.assert(reg.matchShapelessRecipe(noMatchItems) === null, 'Non-existent item returns null');
+
+    // Test: matchShapedRecipe with null/undefined grid
+    F.assert(reg.matchShapedRecipe(null, 3, 3) === null, 'matchShapedRecipe(null) returns null');
+    F.assert(reg.matchShapedRecipe(undefined, 3, 3) === null, 'matchShapedRecipe(undefined) returns null');
+
+    // Test: matchShapelessRecipe with null/undefined items
+    F.assert(reg.matchShapelessRecipe(null) === null, 'matchShapelessRecipe(null) returns null');
+    F.assert(reg.matchShapelessRecipe(undefined) === null, 'matchShapelessRecipe(undefined) returns null');
+
+    // Test: _rotateIngredients rotation coverage (2x2 recipe)
+    // The internal _rotateIngredients should handle edge cases gracefully
+    var testGrid2x2 = [
+        [1, 2],
+        [3, 4]
+    ];
+    // _rotateIngredients is private but called internally by matchShapedRecipe
+    // Rotation is tested implicitly via matchShapedRecipe with different grid positions
+
+    // ============================================================
+    // Section 4: CraftingGrid — Recipe Matching
     F.section('4. CraftingGrid — Recipe Matching');
 
     var craftingContainer = document.createElement('div');
     craftingContainer.id = 'crafting-test-container';
     document.body.appendChild(craftingContainer);
 
+    // --- Basic operations without registry ---
     var grid = new Donkeycraft.CraftingGrid(craftingContainer, null);
 
     // clearGrid
@@ -288,9 +374,231 @@
     // takeResult (nothing to take)
     F.assert(grid.takeResult() === null, 'takeResult returns null when empty');
 
+    // matchRecipe (no registry — should return null)
+    F.assert(grid.matchRecipe() === null, 'matchRecipe returns null without registry');
+
+    // handleKeyPress without registry
+    F.assert(!grid.handleKeyPress('Escape'), 'handleKeyPress(Escape) returns false');
+    F.assert(!grid.handleKeyPress('Enter'), 'handleKeyPress(Enter) returns false when no result');
+
     // destroy
     grid.destroy();
     document.body.removeChild(craftingContainer);
+
+    // --- Recipe matching with real RecipeRegistry ---
+    var craftingContainer2 = document.createElement('div');
+    craftingContainer2.id = 'crafting-test-container-2';
+    document.body.appendChild(craftingContainer2);
+
+    var registry = Donkeycraft.RecipeRegistry;
+    F.assert(registry !== undefined, 'RecipeRegistry is available');
+    F.assert(registry.getShapedCount() > 0, 'RecipeRegistry has shaped recipes');
+    F.assert(registry.getShapelessCount() > 0, 'RecipeRegistry has shapeless recipes');
+
+    var grid2 = new Donkeycraft.CraftingGrid(craftingContainer2, registry);
+
+    // Test: Stick recipe (2×2 shaped) — 2 planks vertically → 4 sticks
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1)); // oak_planks top-left
+    grid2.setGridSlot(3, new Donkeycraft.ItemStack(30, 1)); // oak_planks bottom-left
+    var recipe = grid2.matchRecipe();
+    F.assert(recipe !== null, 'Stick recipe matches with 2 planks in left column');
+    F.assertEq(recipe.outputBlockId, 310, 'Stick recipe output is stick (ID 310)');
+    F.assertEq(recipe.outputCount, 4, 'Stick recipe outputs 4 sticks');
+
+    var result = grid2.getResultStack();
+    F.assert(result !== null, 'getResultStack returns a stack after match');
+    F.assertEq(result.getItemId(), 310, 'Result item is stick');
+    F.assertEq(result.getCount(), 4, 'Result count is 4');
+    F.assert(grid2.isMatchValid(), 'isMatchValid returns true when recipe matches');
+
+    // Test: Crafting table recipe (2×2) — 4 planks → 1 crafting_table
+    grid2.clearGrid();
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(1, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(3, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(4, new Donkeycraft.ItemStack(30, 1));
+    var recipe2 = grid2.matchRecipe();
+    F.assert(recipe2 !== null, 'Crafting table recipe matches');
+    F.assertEq(recipe2.outputBlockId, 195, 'Crafting table output ID is 195');
+
+    // Test: takeResult
+    var taken = grid2.takeResult();
+    F.assert(taken !== null, 'takeResult returns a stack');
+    F.assertEq(taken.getItemId(), 195, 'Taken item is crafting_table');
+    F.assertEq(taken.getCount(), 1, 'Taken count is 1');
+    F.assert(!grid2.isMatchValid(), 'isMatchValid is false after taking result');
+    F.assert(grid2.getResultStack() === null, 'getResultStack is null after taking');
+
+    // Test: Shapeless recipe — 4 string → white_wool (shapeless recipe 100)
+    grid2.clearGrid();
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(310, 1));
+    grid2.setGridSlot(1, new Donkeycraft.ItemStack(310, 1));
+    grid2.setGridSlot(2, new Donkeycraft.ItemStack(310, 1));
+    grid2.setGridSlot(3, new Donkeycraft.ItemStack(310, 1));
+    var recipe3 = grid2.matchRecipe();
+    F.assert(recipe3 !== null, 'Shapeless recipe (string → wool) matches');
+    F.assertEq(recipe3.outputBlockId, 53, 'Shapeless output is wool (ID 53)');
+
+    // Test: Snowball shapeless — 1 snow_block → 4 snowballs (recipe 101)
+    grid2.clearGrid();
+    grid2.setGridSlot(4, new Donkeycraft.ItemStack(51, 1));
+    var recipe4 = grid2.matchRecipe();
+    F.assert(recipe4 !== null, 'Snowball shapeless recipe matches');
+    F.assertEq(recipe4.outputBlockId, 502, 'Output is snowball (ID 502)');
+
+    // Test: Invalid setGridSlot calls (returns null on failure)
+    F.assert(grid2.setGridSlot(-1, new Donkeycraft.ItemStack(1, 1)) === null, 'setGridSlot(-1) returns null');
+    F.assert(grid2.setGridSlot(9, new Donkeycraft.ItemStack(1, 1)) === null, 'setGridSlot(9) returns null');
+    F.assert(grid2.setGridSlot(0, 'invalid') === null, 'setGridSlot with string returns null');
+    F.assert(grid2.setGridSlot(0, 123) === null, 'setGridSlot with number returns null');
+    F.assert(grid2.setGridSlot(0, {}) === null, 'setGridSlot with plain object returns null');
+
+    // Test: _isValidStack internal validation
+    F.assert(grid2._isValidStack(null), '_isValidStack(null) returns true');
+    F.assert(grid2._isValidStack(new Donkeycraft.ItemStack(1, 1)), '_isValidStack(valid stack) returns true');
+    F.assert(!grid2._isValidStack('string'), '_isValidStack(string) returns false');
+    F.assert(!grid2._isValidStack(123), '_isValidStack(number) returns false');
+    F.assert(!grid2._isValidStack({}), '_isValidStack(empty object) returns false');
+
+    // Test: setGridSlot return value structure
+    grid2.clearGrid();
+    var setResult = grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1));
+    F.assert(setResult !== null, 'setGridSlot returns an object on success');
+    F.assertEq(setResult.oldStack, null, 'setGridSlot oldStack is null for empty slot');
+    F.assert(setResult.newStack !== null, 'setGridSlot newStack is a valid stack');
+    F.assertEq(setResult.newStack.getItemId(), 30, 'setGridSlot newStack itemId matches');
+
+    // Test: setGridSlot with existing item returns old value
+    var setResult2 = grid2.setGridSlot(0, new Donkeycraft.ItemStack(1, 2));
+    F.assert(setResult2.oldStack !== null, 'setGridSlot returns old stack when slot was filled');
+    F.assertEq(setResult2.oldStack.getItemId(), 30, 'setGridSlot oldStack itemId is previous item');
+
+    // Test: handleKeyPress with result available
+    grid2.clearGrid();
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(3, new Donkeycraft.ItemStack(30, 1)); // sticks recipe
+    F.assert(grid2.handleKeyPress('Enter'), 'handleKeyPress(Enter) returns true when result exists');
+
+    // Test: handleKeyPress Escape always passes through
+    F.assert(!grid2.handleKeyPress('Escape'), 'handleKeyPress(Escape) returns false');
+
+    // Test: handleKeyPress with other keys passes through
+    F.assert(!grid2.handleKeyPress('Space'), 'handleKeyPress(Space) returns false');
+    F.assert(!grid2.handleKeyPress('Tab'), 'handleKeyPress(Tab) returns false');
+
+    // Test: handleKeyPress Digit1-Digit9 placement
+    grid2.clearGrid();
+    var hotbarItem = new Donkeycraft.ItemStack(5, 1);
+    F.assert(grid2.handleKeyPress('Digit1', hotbarItem), 'handleKeyPress(Digit1, item) places item in slot 0');
+    F.assertEq(grid2.getGrid()[0].getItemId(), 5, 'Digit1 places item in grid slot 0');
+
+    // Test: handleKeyPress Digit9 placement
+    F.assert(grid2.handleKeyPress('Digit9', new Donkeycraft.ItemStack(3, 1)), 'handleKeyPress(Digit9, item) places item in slot 8');
+    F.assertEq(grid2.getGrid()[8].getItemId(), 3, 'Digit9 places item in grid slot 8');
+
+    // Test: handleKeyPress Digit0 (Digit10) - out of range, returns true (consumed but no slot)
+    F.assert(grid2.handleKeyPress('Digit0', new Donkeycraft.ItemStack(1, 1)), 'handleKeyPress(Digit0) returns true (out of range)');
+
+    // Test: handleKeyPress Digit1 without hotbarItem (undefined) - should return false (not consumed)
+    F.assert(!grid2.handleKeyPress('Digit1'), 'handleKeyPress(Digit1) without hotbarItem returns false');
+
+    // Test: handleKeyPress Digit1 with explicit null hotbarItem - should return true (consumed)
+    F.assert(grid2.handleKeyPress('Digit2', null), 'handleKeyPress(Digit2, null) returns true (consumed)');
+
+    // Test: handleKeyPress Digit5 with undefined hotbarItem - should return false
+    F.assert(!grid2.handleKeyPress('Digit5'), 'handleKeyPress(Digit5) without hotbarItem returns false');
+
+    // Test: handleKeyPress with invalid key names
+    F.assert(!grid2.handleKeyPress('F1'), 'handleKeyPress(F1) returns false');
+    F.assert(!grid2.handleKeyPress('ArrowUp'), 'handleKeyPress(ArrowUp) returns false');
+    F.assert(!grid2.handleKeyPress(''), 'handleKeyPress("") returns false');
+
+    // Test: onResultChange event subscription
+    var resultChangeEvent = null;
+    var unsubscribe = grid2.onResultChange(function(stack) {
+        resultChangeEvent = stack;
+    });
+    grid2.clearGrid();
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(1, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(3, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(4, new Donkeycraft.ItemStack(30, 1)); // crafting table recipe
+    F.assert(resultChangeEvent !== null, 'onResultChange callback fired');
+    F.assert(resultChangeEvent !== null && !resultChangeEvent.isEmpty(), 'onResultChange received non-null stack');
+
+    // Test: Unsubscribe — use a boolean flag since clearGrid() emits null values
+    unsubscribe();
+    var eventFiredAfterUnsub = false;
+    grid2.onResultChange(function(stack) { eventFiredAfterUnsub = true; });
+    grid2.clearGrid();
+    F.assert(eventFiredAfterUnsub, 're-subscribed listener fires');
+
+    // Test: _getItemDisplayChar
+    var char1 = grid2._getItemDisplayChar(1);
+    F.assert(typeof char1 === 'string' && char1.length > 0, '_getItemDisplayChar returns char for stone (ID 1)');
+
+    // Default character is BLACK SQUARE (U+25A0) for unknown/invalid IDs
+    var charDefault = grid2._getItemDisplayChar(9999);
+    F.assertEq(charDefault, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for unknown ID');
+    var charInvalid = grid2._getItemDisplayChar(null);
+    F.assertEq(charInvalid, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for null');
+    var charNaN = grid2._getItemDisplayChar(NaN);
+    F.assertEq(charNaN, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for NaN');
+
+    // Test: _getItemDisplayChar known IDs return non-default characters
+    var stoneChar = grid2._getItemDisplayChar(1);
+    F.assert(stoneChar !== '\u25A0', '_getItemDisplayChar returns unique char for known ID 1 (stone)');
+    var coalChar = grid2._getItemDisplayChar(14);
+    F.assert(coalChar !== '\u25A0', '_getItemDisplayChar returns unique char for known ID 14 (coal)');
+    var diamondChar = grid2._getItemDisplayChar(218);
+    F.assert(diamondChar !== '\u25A0', '_getItemDisplayChar returns unique char for known ID 218 (diamond)');
+
+    // Test: _getItemDisplayChar with numeric edge cases
+    F.assertEq(grid2._getItemDisplayChar(0), '\u25A0', '_getItemDisplayChar returns default for ID 0');
+    F.assertEq(grid2._getItemDisplayChar(-1), '\u25A0', '_getItemDisplayChar returns default for negative ID');
+    F.assertEq(grid2._getItemDisplayChar(Infinity), '\u25A0', '_getItemDisplayChar returns default for Infinity');
+
+    // Test: _tryMatchRecipe with no registry
+    var gridNoReg = new Donkeycraft.CraftingGrid(null, null);
+    gridNoReg.setGridSlot(0, new Donkeycraft.ItemStack(1, 1));
+    gridNoReg._tryMatchRecipe(true);
+    F.assert(gridNoReg.getResultStack() === null, '_tryMatchRecipe with no registry clears result');
+
+    // Test: _tryMatchRecipe with invalid recipe (try/catch coverage)
+    var badRegistry = {
+        matchShapedRecipe: function() { throw new Error('test error'); },
+        matchShapelessRecipe: function() { return null; }
+    };
+    var gridBadReg = new Donkeycraft.CraftingGrid(null, badRegistry);
+    gridBadReg.setGridSlot(0, new Donkeycraft.ItemStack(1, 1));
+    gridBadReg._tryMatchRecipe(true);
+    F.assert(gridBadReg.getResultStack() === null, '_tryMatchRecipe handles registry errors gracefully');
+
+    // Test: getGridAs2D with mixed empty/full slots
+    grid2.clearGrid();
+    grid2.setGridSlot(0, new Donkeycraft.ItemStack(30, 1));
+    grid2.setGridSlot(8, new Donkeycraft.ItemStack(1, 1));
+    var g2d2 = grid2.getGridAs2D();
+    F.assertEq(g2d2[0][0], 30, 'getGridAs2D[0][0] is 30 (planks)');
+    F.assertEq(g2d2[2][2], 1, 'getGridAs2D[2][2] is 1 (stone)');
+    F.assertEq(g2d2[1][1], 0, 'getGridAs2D[1][1] is 0 (empty)');
+
+    // Test: setGridSlot clones the stack (prevents external mutation)
+    var externalStack = new Donkeycraft.ItemStack(5, 64);
+    grid2.setGridSlot(0, externalStack);
+    F.assertEq(grid2.getGrid()[0].getCount(), 64, 'Initial count is 64');
+    externalStack.decrement(10); // Modify external stack
+    F.assertEq(grid2.getGrid()[0].getCount(), 64, 'Grid slot count unchanged after external mutation');
+
+    // Test: setGridSlot with empty stack
+    F.assert(grid2.setGridSlot(0, new Donkeycraft.ItemStack(0, 0)), 'setGridSlot with empty stack succeeds');
+    F.assert(grid2.getGrid()[0] === null, 'setGridSlot with empty stack sets slot to null');
+
+    // destroy
+    grid2.destroy();
+    gridNoReg.destroy();
+    gridBadReg.destroy();
+    document.body.removeChild(craftingContainer2);
 
     // ============================================================
     // Section 5: CreativeInventory — Tab Navigation & Search

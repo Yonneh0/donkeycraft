@@ -100,18 +100,46 @@
 
         /**
          * Match a shaped recipe against an input grid.
-         * @param {number[][]} inputGrid - 2D array of block IDs (null for empty slots).
+         * Tries matching against the provided grid size first, then falls back to
+         * smaller grid sizes (e.g., 2×2 recipes on a 3×3 grid).
+         * @param {number[][]} inputGrid - 2D array of block IDs (0 for empty slots).
          * @param {number} rows - Number of rows in the grid.
          * @param {number} cols - Number of columns in the grid.
          * @returns {Donkeycraft.Recipe|null} The first matching recipe, or null.
          */
         function matchShapedRecipe(inputGrid, rows, cols) {
+            // Validate inputs early to prevent downstream errors.
+            if (!inputGrid || !Array.isArray(inputGrid) || typeof rows !== 'number' || typeof cols !== 'number') {
+                return null;
+            }
+            if (rows <= 0 || cols <= 0) return null;
+
+            // Build a list of candidate grid sizes to try: start with exact match,
+            // then fall back to smaller grids (e.g., 3×3 → 2×2).
+            var candidates = [];
+
+            // Try exact grid size first
+            candidates.push({ rows: rows, cols: cols });
+
+            // Fall back to smaller square grids if the input is larger
+            if (rows >= 3 && cols >= 3) {
+                candidates.push({ rows: 2, cols: 2 });
+            } else if (rows === 2 && cols === 3) {
+                // No smaller standard grid to fall back to for 2×3
+            } else if (rows === 3 && cols === 2) {
+                // No smaller standard grid to fall back to for 3×2
+            }
+
             for (var r = 0; r < _shapedRecipes.length; r++) {
                 var recipe = _shapedRecipes[r];
-                if (recipe.gridSize !== cols || recipe.ingredients.length / recipe.gridSize !== rows) continue;
 
-                if (_checkShapedMatch(recipe, inputGrid, rows, cols)) {
-                    return recipe;
+                for (var c = 0; c < candidates.length; c++) {
+                    var cand = candidates[c];
+                    if (recipe.gridSize !== cand.cols || recipe.ingredients.length / recipe.gridSize !== cand.rows) continue;
+
+                    if (_checkShapedMatch(recipe, inputGrid, cand.rows, cand.cols)) {
+                        return recipe;
+                    }
                 }
             }
             return null;
@@ -130,6 +158,9 @@
             var ingRows = recipe.ingredients.length / recipe.gridSize;
             var ingCols = recipe.gridSize;
 
+            // Validate that the input grid has the expected number of rows.
+            if (!Array.isArray(inputGrid) || inputGrid.length < rows) return false;
+
             // Try all possible positions in the grid
             for (var gr = 0; gr <= rows - ingRows; gr++) {
                 for (var gc = 0; gc <= cols - ingCols; gc++) {
@@ -142,8 +173,12 @@
             // Try all 4 rotations
             for (var rot = 1; rot < 4; rot++) {
                 var rotated = _rotateIngredients(recipe, rot);
-                for (var gr2 = 0; gr2 <= rows - ingRows; gr2++) {
-                    for (var gc2 = 0; gc2 <= cols - ingCols; gc2++) {
+                // Recalculate dimensions for the rotated recipe — rotation may swap rows/cols.
+                var rIngRows = rotated.ingredients.length / rotated.gridSize;
+                var rIngCols = rotated.gridSize;
+
+                for (var gr2 = 0; gr2 <= rows - rIngRows; gr2++) {
+                    for (var gc2 = 0; gc2 <= cols - rIngCols; gc2++) {
                         if (_matchAtPosition(rotated, inputGrid, gr2, gc2, rows, cols)) {
                             return true;
                         }
@@ -175,12 +210,16 @@
                     var gridC = gridCol + ic;
                     if (gridR >= rows || gridC >= cols) return false;
 
-                    var ingId = recipe.ingredients[ir * ingCols + ic];
-                    var gridId = inputGrid[gridR][gridC];
+                    // Defensive check: ensure inputGrid[gridR] is a valid array.
+                    var gridRowArr = inputGrid[gridR];
+                    if (!Array.isArray(gridRowArr)) return false;
 
-                    // Null ingredient requires empty slot (gridId must be null)
-                    if (ingId === null) {
-                        if (gridId !== null) return false;
+                    var ingId = recipe.ingredients[ir * ingCols + ic];
+                    var gridId = gridRowArr[gridC];
+
+                    // Null ingredient requires empty slot (gridId must be null or 0)
+                    if (ingId === null || ingId === 0) {
+                        if (gridId !== null && gridId !== 0) return false;
                         continue;
                     }
                     // Non-null ingredient must match grid block
@@ -193,6 +232,8 @@
         /**
          * Rotate ingredients array clockwise N times.
          * Converts flat array → grid → rotate → flat array.
+         * For non-square recipes (e.g., 2×3), rotation swaps dimensions and the
+         * resulting flat array is padded with nulls to maintain gridSize × gridSize shape.
          * @param {Donkeycraft.Recipe} recipe - The recipe to rotate.
          * @param {number} times - Number of 90° rotations (1-4).
          * @returns {Donkeycraft.Recipe}
@@ -200,7 +241,7 @@
          */
         function _rotateIngredients(recipe, times) {
             times = ((times % 4) + 4) % 4; // normalize to 0-3
-            if (times === 0) {
+            if (times === 0 || !recipe.ingredients || recipe.gridSize <= 0) {
                 return new Donkeycraft.Recipe(
                     recipe.id, recipe.type,
                     recipe.ingredients.slice(),
@@ -213,40 +254,63 @@
 
             var cols = recipe.gridSize;
             var rows = recipe.ingredients.length / cols;
+
+            // Guard against malformed recipes.
+            if (rows <= 0 || cols <= 0) {
+                return new Donkeycraft.Recipe(
+                    recipe.id, recipe.type,
+                    recipe.ingredients.slice(),
+                    recipe.gridSize,
+                    recipe.outputBlockId,
+                    recipe.outputCount,
+                    recipe.cookingTime
+                );
+            }
+
             var grid = [];
 
             // Step 1: Convert flat array to 2D grid
             for (var r = 0; r < rows; r++) {
                 grid[r] = [];
                 for (var c = 0; c < cols; c++) {
-                    grid[r][c] = recipe.ingredients[r * cols + c];
+                    var idx = r * cols + c;
+                    grid[r][c] = recipe.ingredients[idx] !== undefined ? recipe.ingredients[idx] : null;
                 }
             }
 
             // Step 2: Rotate the grid clockwise N times
             var rotatedGrid = grid;
+            var curRows = rows;
+            var curCols = cols;
             for (var rot = 0; rot < times; rot++) {
                 var newGrid = [];
-                for (var nr = 0; nr < cols; nr++) {
+                for (var nr = 0; nr < curCols; nr++) {
                     newGrid[nr] = [];
-                    for (var nc = 0; nc < rows; nc++) {
-                        newGrid[nr][nc] = rotatedGrid[rows - 1 - nc][nr];
+                    for (var nc = 0; nc < curRows; nc++) {
+                        newGrid[nr][nc] = rotatedGrid[curRows - 1 - nc][nr];
                     }
                 }
                 rotatedGrid = newGrid;
                 // Swap rows and cols after rotation
-                var tempRows = rows;
-                rows = cols;
-                cols = tempRows;
+                var tempRows = curRows;
+                curRows = curCols;
+                curCols = tempRows;
             }
 
-            // Step 3: Convert rotated grid back to flat array
-            var finalCols = recipe.gridSize; // preserve original gridSize for matching
-            var finalRows = rotatedGrid.length;
+            // Step 3: Convert rotated grid back to flat array.
+            // The rotated grid may have different dimensions than the original,
+            // but we preserve the original gridSize for matching purposes.
+            // Pad with nulls if the rotated grid is smaller, truncate if larger.
+            var finalCols = recipe.gridSize;
+            var finalRows = Math.ceil(recipe.ingredients.length / recipe.gridSize);
             var flatIngredients = [];
             for (var fr = 0; fr < finalRows; fr++) {
                 for (var fc = 0; fc < finalCols; fc++) {
-                    flatIngredients.push(rotatedGrid[fr] && rotatedGrid[fr][fc] !== undefined ? rotatedGrid[fr][fc] : null);
+                    if (fr < rotatedGrid.length && rotatedGrid[fr] && rotatedGrid[fr][fc] !== undefined) {
+                        flatIngredients.push(rotatedGrid[fr][fc]);
+                    } else {
+                        flatIngredients.push(null);
+                    }
                 }
             }
 
@@ -270,6 +334,11 @@
          * @returns {Donkeycraft.Recipe|null} The first matching recipe, or null.
          */
         function matchShapelessRecipe(itemCounts) {
+            // Guard: validate that itemCounts is a valid object.
+            if (!itemCounts || typeof itemCounts !== 'object' || Array.isArray(itemCounts)) {
+                return null;
+            }
+
             for (var r = 0; r < _shapelessRecipes.length; r++) {
                 var recipe = _shapelessRecipes[r];
                 if (_checkShapelessMatch(recipe, itemCounts)) {
@@ -287,6 +356,9 @@
          * @private
          */
         function _checkShapelessMatch(recipe, itemCounts) {
+            // Guard: ensure itemCounts is a valid lookup object.
+            if (!itemCounts || typeof itemCounts !== 'object') return false;
+
             var needed = {};
             for (var i = 0; i < recipe.ingredients.length; i++) {
                 var ing = recipe.ingredients[i];
