@@ -21,7 +21,7 @@
      * 6. `math-utils.js` — Donkeycraft.Vector3, Donkeycraft.Matrix4, Donkeycraft.Quaternion,
      *    Donkeycraft.PerlinNoise, Donkeycraft.lerp, Donkeycraft.clamp, Donkeycraft.map,
      *    Donkeycraft.round, Donkeycraft.inRange
-     * 7. `audio.js` — Donkeycraft.Audio
+     * 7. `audio.js` — Donkeycraft.AudioSystem
      *
      * ## Properties
      * @property {string} VERSION - Semantic version string (e.g., '0.1.0').
@@ -41,33 +41,5 @@
     Donkeycraft.NAME = Donkeycraft.NAME || 'Donkeycraft';
     Donkeycraft.systems = Donkeycraft.systems || {};
     Donkeycraft.isRunning = (Donkeycraft.isRunning !== undefined) ? Donkeycraft.isRunning : false;
-
-    // ============================================================
-    // Minimal Utility Functions (also available in math-utils.js)
-    // These are provided here as fallbacks for tests that don't
-    // load the full math-utils module.
-    // ============================================================
-
-    /**
-     * clamp — clamps a value between min and max.
-     * @param {number} value - The value to clamp.
-     * @param {number} min - Minimum bound.
-     * @param {number} max - Maximum bound.
-     * @returns {number} Clamped value.
-     */
-    Donkeycraft.clamp = function(value, min, max) {
-        return Math.max(min, Math.min(max, value));
-    };
-
-    /**
-     * lerp — linear interpolation between a and b by t [0,1].
-     * @param {number} a - Start value.
-     * @param {number} b - End value.
-     * @param {number} t - Interpolation factor [0,1].
-     * @returns {number} Interpolated value.
-     */
-    Donkeycraft.lerp = function(a, b, t) {
-        return a + (b - a) * t;
-    };
 
 })();

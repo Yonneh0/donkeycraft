@@ -18,6 +18,7 @@
         this._currentPhase = 'none';
         this._destroyed = false;
         this._systems = null;
+        this._phaseResults = {}; // Named map for phase results (keyed by phase name)
     };
 
     /**
@@ -57,6 +58,26 @@
     };
 
     /**
+     * _storePhaseResult — store a phase result by named key for later retrieval.
+     * @private
+     * @param {string} phaseName - Phase name to use as the map key.
+     * @param {*} result - Result data to store.
+     */
+    Donkeycraft.InitSequence.prototype._storePhaseResult = function(phaseName, result) {
+        this._phaseResults[phaseName] = result;
+    };
+
+    /**
+     * _getPhaseResult — retrieve a stored phase result by named key.
+     * @private
+     * @param {string} phaseName - Phase name to look up.
+     * @returns {*} The stored result, or undefined if not found.
+     */
+    Donkeycraft.InitSequence.prototype._getPhaseResult = function(phaseName) {
+        return this._phaseResults[phaseName];
+    };
+
+    /**
      * _validateConfig — validate that the configuration object has required numeric fields.
      * Checks all critical config values used by Game, ChunkManager, and Player systems.
      * @private
@@ -80,6 +101,9 @@
 
         // Interaction
         if (typeof cfg.PLAYER_REACH !== 'number' || cfg.PLAYER_REACH <= 0) return false;
+
+        // Camera
+        if (typeof cfg.FOV !== 'number' || cfg.FOV <= 0 || cfg.FOV >= 180) return false;
 
         return true;
     };
@@ -339,8 +363,8 @@
                         return Promise.reject(new Error('InitSequence destroyed during phase: ' + phases[idx].name));
                     }
                     return phases[idx].fn().then(function(phaseResult) {
-                        // Store phase results for later merging
-                        self['_phaseResult' + idx] = phaseResult;
+                        // Store phase results by named key for later retrieval
+                        self._storePhaseResult(phases[idx].name, phaseResult);
                         return prevResult;
                     });
                 });
@@ -354,12 +378,12 @@
                 eventBus: self._eventBus
             };
             // Merge texture-atlas phase results (generated textures)
-            var texResult = self['_phaseResult1'];
+            var texResult = self._getPhaseResult('texture-atlas');
             if (texResult && texResult.textures) {
                 self._systems.generatedTextures = texResult.textures;
             }
             // Merge audio phase results (audioSystem, perlinNoiseReady)
-            var audioResult = self['_phaseResult2'];
+            var audioResult = self._getPhaseResult('audio');
             if (audioResult) {
                 if (audioResult.audioSystem) {
                     self._systems.audioSystem = audioResult.audioSystem;
@@ -369,7 +393,7 @@
                 }
             }
             // Merge indexedDB phase results (worldStore, assetCache) if available
-            var idbResult = self['_phaseResult3'];
+            var idbResult = self._getPhaseResult('indexeddb');
             if (idbResult) {
                 if (idbResult.worldStore) {
                     self._systems.worldStore = idbResult.worldStore;
@@ -378,9 +402,11 @@
                     self._systems.assetCache = idbResult.assetCache;
                 }
             }
-            // Clean up temporary phase results
-            for (var k = 0; k < 4; k++) {
-                delete self['_phaseResult' + k];
+            // Clean up stored phase results
+            for (var k in self._phaseResults) {
+                if (Object.prototype.hasOwnProperty.call(self._phaseResults, k)) {
+                    delete self._phaseResults[k];
+                }
             }
             self._emit('init:complete', { systems: self._systems });
             return self._systems;
@@ -422,14 +448,17 @@
     /**
      * destroy — clean up all resources and cancel any in-progress initialization.
      * After calling this, the instance should not be reused. All event listeners are cleared,
-     * the _destroyed flag is set (causing in-flight async operations to reject), and internal
-     * references are nulled for garbage collection.
+     * the _destroyed flag is set (causing in-flight async operations to reject), internal
+     * references are nulled for garbage collection, and temporary phase result maps
+     * are cleaned up.
      */
     Donkeycraft.InitSequence.prototype.destroy = function() {
         this._destroyed = true;
         if (this._eventBus) {
             this._eventBus.clear();
         }
+        // Clean up stored phase results
+        this._phaseResults = {};
         this._systems = null;
     };
 })();

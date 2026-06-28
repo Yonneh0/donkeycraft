@@ -114,12 +114,12 @@
         }
         this._context.decodeAudioData(buffer, function(audioBuffer) {
             self._soundCache[name] = audioBuffer;
-            if (resolve) resolve();
+            resolve();
         }, function(e) {
             if (Donkeycraft.Logger) {
                 Donkeycraft.Logger.error('Failed to decode audio:', name);
             }
-            if (reject) reject(new Error('Failed to decode audio: ' + name));
+            reject(new Error('Failed to decode audio: ' + name));
         });
     };
 
@@ -180,7 +180,7 @@
                 gainNode.connect(panner);
                 panner.connect(this._masterGain);
             } catch (e) {
-                // Panner creation failed — fall back to non-posional audio
+                // Panner creation failed — fall back to non-positional audio
                 source.connect(gainNode);
                 gainNode.connect(this._masterGain);
             }
@@ -239,14 +239,30 @@
 
     /**
      * Destroy the audio system and free resources.
+     * Returns a Promise that resolves when the AudioContext is fully closed.
+     * @returns {Promise}
      */
     Donkeycraft.AudioSystem.prototype.destroy = function() {
+        var self = this;
         if (this._context) {
-            this._context.close();
-            this._context = null;
+            // AudioContext.close() returns a Promise in modern browsers
+            return this._context.close().then(function() {
+                self._context = null;
+                self._soundCache = {};
+                self._masterGain = null;
+            }).catch(function(e) {
+                // If close() fails, clean up manually anyway
+                if (Donkeycraft.Logger) {
+                    Donkeycraft.Logger.warn('AudioSystem', 'Failed to close AudioContext:', e);
+                }
+                self._context = null;
+                self._soundCache = {};
+                self._masterGain = null;
+            });
         }
         this._soundCache = {};
         this._masterGain = null;
+        return Promise.resolve();
     };
 
 })();

@@ -613,10 +613,10 @@
      * @param {number} [w=1]
      */
     Donkeycraft.Quaternion = function(x, y, z, w) {
-        this.x = x || 0;
-        this.y = y || 0;
-        this.z = z || 0;
-        this.w = w !== undefined ? w : 1;
+        this.x = (x !== undefined && !isNaN(x)) ? x : 0;
+        this.y = (y !== undefined && !isNaN(y)) ? y : 0;
+        this.z = (z !== undefined && !isNaN(z)) ? z : 0;
+        this.w = (w !== undefined && !isNaN(w)) ? w : 1;
     };
 
     /**
@@ -845,9 +845,12 @@
             var p = new Uint8Array(256);
             for (var i = 0; i < 256; i++) p[i] = i;
 
-            // Shuffle using seed — use 42 as default, but allow any integer including 0
+            // Shuffle using seed — use 42 as default, but allow any non-negative integer
             var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed)) ? Math.floor(Math.abs(seed)) : 42;
-            if (s <= 0 || s >= 2147483647) s = 42;
+            if (s <= 0 || s >= 2147483647) {
+                // Seed 0 is valid for Mulberry32 PRNG (it produces a deterministic sequence)
+                s = (seed === 0) ? 1 : 42;
+            }
             for (var i = 255; i > 0; i--) {
                 s = (s * 16807) % 2147483647;
                 var j = s % (i + 1);

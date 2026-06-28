@@ -10,7 +10,7 @@
      * @param {number} [ticksPerSecond=20] - Game ticks per second.
      */
     Donkeycraft.Timer = function(ticksPerSecond) {
-        ticksPerSecond = ticksPerSecond || Donkeycraft.Config.GAME_TICKS_PER_SECOND;
+        ticksPerSecond = ticksPerSecond || (Donkeycraft.Config && typeof Donkeycraft.Config.GAME_TICKS_PER_SECOND === 'number' ? Donkeycraft.Config.GAME_TICKS_PER_SECOND : 20);
         this._tickInterval = 1000 / ticksPerSecond; // ms per tick
         this._accumulator = 0;
         this._tickCount = 0;
