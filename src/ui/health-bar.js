@@ -143,23 +143,21 @@
      * @param {number} maxHealth - Maximum health points.
      */
     Donkeycraft.HealthBar.prototype._renderHearts = function(health, maxHealth) {
-        // Each heart = 2 HP (full), 1 HP (half), 0 HP (empty) for 20 max health
-        var totalHearts = 10;
-        var hpPerHeart = maxHealth / totalHearts;
+        // Each heart represents 2 HP: full=2, half=1, empty=0
+        var totalHP = maxHealth || 20;
+        var remainingHP = Math.max(0, Math.round(health));
 
-        for (var i = 0; i < totalHearts; i++) {
+        for (var i = 0; i < 10; i++) {
             var container = this._heartContainers[i];
             if (!container) continue;
 
-            // Calculate how much of this heart is filled
-            var remainingHP = Math.max(0, health - i * hpPerHeart);
-            var fillRatio = Math.min(1, remainingHP / hpPerHeart);
-
             var state = 'empty';
-            if (fillRatio >= 0.99) {
+            if (remainingHP >= 2) {
                 state = 'full';
-            } else if (fillRatio >= 0.4) {
+                remainingHP -= 2;
+            } else if (remainingHP === 1) {
                 state = 'half';
+                remainingHP -= 1;
             }
 
             // Update class and SVG
@@ -345,7 +343,8 @@
         overlay.className = 'dk-health-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
             'pointer-events:none;z-index:5;opacity:0;' +
-            'transition:opacity 400ms ease;';
+            'transition:opacity 400ms ease;' +
+            'background:radial-gradient(ellipse at center,rgba(180,0,0,0.15) 0%,rgba(100,0,0,0.35) 100%);';
         document.body.appendChild(overlay);
         this._overlay = overlay;
     };

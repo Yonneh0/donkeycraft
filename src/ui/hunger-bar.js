@@ -156,25 +156,21 @@
      * @param {number} foodLevel - Current food level (0-20).
      */
     Donkeycraft.HungerBar.prototype._renderDrumsticks = function(foodLevel) {
-        // Each drumstick = 2 food points (full), 1 point (half), 0 (empty)
-        var totalDrumsticks = 10;
-        var foodPerDrumstick = 2;
+        // Each drumstick represents 2 food: full=2, half=1, empty=0
+        // Right-aligned: rightmost icon depletes first
+        var remainingFood = Math.max(0, Math.round(foodLevel));
 
-        for (var i = 0; i < totalDrumsticks; i++) {
+        for (var i = 0; i < 10; i++) {
             var container = this._drumstickContainers[i];
             if (!container) continue;
 
-            // Right-aligned: rightmost drumstick depletes first
-            // Index 9 = rightmost, index 0 = leftmost
-            var drumIndex = totalDrumsticks - 1 - i; // flip: 0→rightmost, 9→leftmost
-            var drumMinFood = drumIndex * foodPerDrumstick;
-            var drumMaxFood = (drumIndex + 1) * foodPerDrumstick;
-
             var state = 'empty';
-            if (foodLevel >= drumMaxFood) {
+            if (remainingFood >= 2) {
                 state = 'full';
-            } else if (foodLevel >= drumMinFood + foodPerDrumstick / 2) {
+                remainingFood -= 2;
+            } else if (remainingFood === 1) {
                 state = 'half';
+                remainingFood -= 1;
             }
 
             // Update class and SVG
@@ -298,7 +294,8 @@
         overlay.className = 'dk-hunger-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
             'pointer-events:none;z-index:5;opacity:0;' +
-            'transition:opacity 400ms ease;';
+            'transition:opacity 400ms ease;' +
+            'background:radial-gradient(ellipse at center,rgba(140,80,0,0.1) 0%,rgba(80,50,0,0.25) 100%);';
         document.body.appendChild(overlay);
         this._overlay = overlay;
     };
