@@ -27,7 +27,7 @@
             if (_blocks.resolved) return;
             if (!Donkeycraft.BlockRegistry) return;
 
-            var names = ['grass_block', 'stone', 'dirt', 'sand', 'snow_block', 'clay'];
+            var names = ['grass_block', 'stone', 'dirt', 'sand', 'snow_block', 'snow_layer', 'clay'];
             for (var i = 0; i < names.length; i++) {
                 var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
                 if (block) {
@@ -57,30 +57,31 @@
          */
         function applySurfaceLayer(chunk, biomeId, heightmap) {
             switch (biomeId) {
-                case 1: // Plains
-                case 3: // Forest
-                case 10: // Flower Forest
-                case 13: // Woods
+                case Donkeycraft.BiomeID.PLAINS:     // 1
+                case Donkeycraft.BiomeID.FOREST:     // 3
+                case Donkeycraft.BiomeID.FLOWER_FOREST: // 10
+                case Donkeycraft.BiomeID.FOREST_HILL:   // 13
                     _applyGrassSurface(chunk, heightmap);
                     break;
-                case 2: // Desert
+                case Donkeycraft.BiomeID.DESERT:     // 2
+                case Donkeycraft.BiomeID.DESERT_M:   // 12
                     _applySandSurface(chunk, heightmap);
                     break;
-                case 5: // Taiga
-                case 14: // Cold Taiga
+                case Donkeycraft.BiomeID.TAIGA:      // 5
+                case Donkeycraft.BiomeID.TAIGA_HILL: // 14
+                case Donkeycraft.BiomeID.ICE_PLAINS: // 11
+                case Donkeycraft.BiomeID.SNOWY_TUNDRA: // 8 (handled by ID check)
                     _applySnowSurface(chunk, heightmap);
                     break;
-                case 6: // Ocean
-                case 9: // Deep Ocean
+                case Donkeycraft.BiomeID.OCEAN:      // 6
+                case Donkeycraft.BiomeID.SUNFLOWER_PLAINS: // 9 (treated as plains-like)
+                    _applyGrassSurface(chunk, heightmap);
+                    break;
+                case Donkeycraft.BiomeID.EXTREME_HILLS: // 7
+                case Donkeycraft.BiomeID.SNOWY_TUNDRA:  // 8
                     _applyStoneSurface(chunk, heightmap);
                     break;
-                case 7: // Extreme Hills
-                case 8: // Mountain
-                case 15: // Jagged Peaks
-                    _applyStoneSurface(chunk, heightmap);
-                    break;
-                case 4: // Swamp
-                case 11: // Deep Swamp
+                case Donkeycraft.BiomeID.SWAMP:      // 4
                     _applySwampSurface(chunk, heightmap);
                     break;
                 default:
@@ -156,19 +157,21 @@
         }
 
         /**
-         * Apply snow surface: snow block on top of grass, dirt layer below stone, snow layer on top.
-         * The snow layer sits ABOVE the grass_block (like vanilla Minecraft's snow layer).
+         * Apply snow surface: grass block as base, dirt layer below, thin snow layer on top.
+         * Uses snow_layer (ID 50, transparent) for the top decorative snow, not snow_block.
+         * The snow layer sits ABOVE the grass_block surface.
          * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
         function _applySnowSurface(chunk, heightmap) {
+            var snowLayerId = _getBlockId('snow_layer');
             var snowBlockId = _getBlockId('snow_block');
             var dirtId = _getBlockId('dirt');
             var stoneId = _getBlockId('stone');
             var grassBlockId = _getBlockId('grass_block');
 
-            if (!snowBlockId) return;
+            if (!snowLayerId && !snowBlockId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -182,7 +185,7 @@
                         chunk.setBlock(x, surfaceY, z, dirtId);
                     }
 
-                    // Dirt layer below
+                    // Dirt layer below — only replace stone, don't overwrite existing dirt
                     for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
                         if (stoneId && chunk.getBlock(x, surfaceY - dy, z) === stoneId) {
                             chunk.setBlock(x, surfaceY - dy, z, dirtId);
@@ -192,8 +195,12 @@
                     }
 
                     // Snow layer on top of the surface block (if space is empty)
-                    if (snowBlockId && surfaceY + 1 < WORLD_HEIGHT && chunk.getBlock(x, surfaceY + 1, z) === 0) {
-                        chunk.setBlock(x, surfaceY + 1, z, snowBlockId);
+                    if (surfaceY + 1 < WORLD_HEIGHT && chunk.getBlock(x, surfaceY + 1, z) === 0) {
+                        if (snowLayerId) {
+                            chunk.setBlock(x, surfaceY + 1, z, snowLayerId);
+                        } else if (snowBlockId) {
+                            chunk.setBlock(x, surfaceY + 1, z, snowBlockId);
+                        }
                     }
                 }
             }
@@ -243,9 +250,13 @@
                     // Replace top block with dirt (swamp has dirt, not grass)
                     chunk.setBlock(x, surfaceY, z, dirtId);
 
-                    // Add 1 layer of clay below
-                    if (stoneId && surfaceY - 1 >= 0 && chunk.getBlock(x, surfaceY - 1, z) === stoneId) {
-                        chunk.setBlock(x, surfaceY - 1, z, clayId || dirtId);
+                    // Add 1-2 layers of clay below stone
+                    for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
+                        if (stoneId && chunk.getBlock(x, surfaceY - dy, z) === stoneId) {
+                            chunk.setBlock(x, surfaceY - dy, z, clayId || dirtId);
+                        } else {
+                            break;
+                        }
                     }
                 }
             }

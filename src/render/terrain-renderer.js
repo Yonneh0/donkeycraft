@@ -526,13 +526,17 @@
      * Get or create a placeholder texture.
      * Uses generateMissing() checkerboard if TextureGenerator is available,
      * otherwise falls back to a 1x1 white texture.
+     * The texture is cached so it persists across frames.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function() {
-        if (!this._gl) return null;
-        if (this._placeholderTexture) return this._placeholderTexture;
-
         var gl = this._gl;
+        if (!gl) return null;
+
+        // Return cached texture if already created and valid.
+        if (this._placeholderTexture && gl.isTexture(this._placeholderTexture)) {
+            return this._placeholderTexture;
+        }
 
         // Try to use generateMissing() texture for visual consistency.
         // generateMissing() returns an HTMLImageElement built from a canvas toDataURL().
@@ -547,10 +551,10 @@
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
 
             if (missingTex.getContext) {
-                // It's a canvas — upload directly
+                // It's a canvas — upload directly.
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
             } else if (missingTex.complete && missingTex.naturalWidth > 0) {
-                // Image already loaded — draw to canvas first
+                // Image already loaded — draw to canvas first.
                 var tempCanvas = document.createElement('canvas');
                 tempCanvas.width = 16;
                 tempCanvas.height = 16;
@@ -558,7 +562,7 @@
                 tempCtx.drawImage(missingTex, 0, 0, 16, 16);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
             } else {
-                // Image not loaded yet — defer to next frame via pending texture
+                // Image not loaded yet — set a flag to retry next frame.
                 this._placeholderTexture = null;
                 return null;
             }
@@ -568,7 +572,7 @@
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         } else {
-            // Fallback to white 1×1 if generateMissing not available
+            // Fallback to white 1×1 if generateMissing not available.
             this._placeholderTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));

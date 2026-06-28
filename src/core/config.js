@@ -102,7 +102,9 @@
 
             // Dimension settings
             NETHER_SCALE: 8,          // Overworld coords / 8 = Nether coords (and vice versa)
-            END_SCALE: 1              // Overworld coords × 1 = End coords
+            END_SCALE: 1,             // Overworld coords × 1 = End coords
+            NETHER_HEIGHT: 128,       // Nether world height (Y: 0-127)
+            END_HEIGHT: 256           // End world height (Y: 0-255)
         };
     })();
 

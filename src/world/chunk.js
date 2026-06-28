@@ -66,6 +66,13 @@
          * @type {number}
          */
         this.biomeId = 0;
+
+        /**
+         * Block entity storage: key = "x,y,z" → value = { type: string, data: Object }.
+         * Used for chunks like chests, furnaces, doors, etc.
+         * @type {Map<string, Object>}
+         */
+        this._blockEntities = new Map();
     };
 
     /**
@@ -253,6 +260,95 @@
     };
 
     /**
+     * Get the block entity at local coordinates, or null if none exists.
+     * @param {number} x - Local X [0, 15].
+     * @param {number} y - Local Y [0, 255].
+     * @param {number} z - Local Z [0, 15].
+     * @returns {Object|null} Block entity data, or null.
+     */
+    Donkeycraft.Chunk.prototype.getBlockEntity = function(x, y, z) {
+        var key = x + ',' + y + ',' + z;
+        return this._blockEntities.get(key) || null;
+    };
+
+    /**
+     * Set a block entity at local coordinates.
+     * @param {number} x - Local X [0, 15].
+     * @param {number} y - Local Y [0, 255].
+     * @param {number} z - Local Z [0, 15].
+     * @param {Object} entity - Entity data with { type: string, data: Object }.
+     */
+    Donkeycraft.Chunk.prototype.setBlockEntity = function(x, y, z, entity) {
+        var key = x + ',' + y + ',' + z;
+        this._blockEntities.set(key, entity);
+    };
+
+    /**
+     * Remove a block entity at local coordinates.
+     * @param {number} x - Local X [0, 15].
+     * @param {number} y - Local Y [0, 255].
+     * @param {number} z - Local Z [0, 15].
+     * @returns {boolean} True if an entity was removed.
+     */
+    Donkeycraft.Chunk.prototype.removeBlockEntity = function(x, y, z) {
+        var key = x + ',' + y + ',' + z;
+        return this._blockEntities.delete(key);
+    };
+
+    /**
+     * Get all block entities in this chunk as an array.
+     * @returns {Object[]} Array of { x, y, z, entity } objects.
+     */
+    Donkeycraft.Chunk.prototype.getAllBlockEntities = function() {
+        var result = [];
+        var self = this;
+        this._blockEntities.forEach(function(entity, key) {
+            var parts = key.split(',');
+            result.push({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10), z: parseInt(parts[2], 10), entity: entity });
+        });
+        return result;
+    };
+
+    /**
+     * Clear all block entities in this chunk.
+     */
+    Donkeycraft.Chunk.prototype.clearBlockEntities = function() {
+        this._blockEntities.clear();
+    };
+
+    /**
+     * Serialize block entities for storage (array of { x, y, z, type, data }).
+     * @returns {Array.<Object>}
+     */
+    Donkeycraft.Chunk.prototype.serializeBlockEntities = function() {
+        var result = [];
+        var self = this;
+        this._blockEntities.forEach(function(entity, key) {
+            var parts = key.split(',');
+            result.push({
+                x: parseInt(parts[0], 10),
+                y: parseInt(parts[1], 10),
+                z: parseInt(parts[2], 10),
+                type: entity.type || 'unknown',
+                data: entity.data || {}
+            });
+        });
+        return result;
+    };
+
+    /**
+     * Deserialize and restore block entities from an array.
+     * @param {Array.<Object>} entities - Array of { x, y, z, type, data }.
+     */
+    Donkeycraft.Chunk.prototype.deserializeBlockEntities = function(entities) {
+        var self = this;
+        for (var i = 0; i < entities.length; i++) {
+            var e = entities[i];
+            this._blockEntities.set(e.x + ',' + e.y + ',' + e.z, { type: e.type, data: e.data });
+        }
+    };
+
+    /**
      * Destroy and free chunk resources — nulls internal arrays.
      * Call this when the chunk is no longer needed.
      */
@@ -260,6 +356,8 @@
         this.blocks = null;
         this.skyLight = null;
         this.blockLight = null;
+        this._blockEntities.clear();
+        this._blockEntities = null;
     };
 
     // ============================================================

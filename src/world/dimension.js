@@ -6,6 +6,8 @@
     var Donkeycraft = window.Donkeycraft;
     var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
     var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    var NETHER_HEIGHT = Donkeycraft.Config.NETHER_HEIGHT || 128;
+    var END_HEIGHT = Donkeycraft.Config.END_HEIGHT || 256;
     var NETHER_SCALE = Donkeycraft.Config.NETHER_SCALE;
     var END_SCALE = Donkeycraft.Config.END_SCALE;
 
@@ -147,7 +149,7 @@
          * @private
          */
         function init() {
-            // Overworld — standard dimension
+            // Overworld — standard dimension (Y: 0-255)
             _dimensions[Donkeycraft.DimensionType.OVERWORLD] = new Donkeycraft.Dimension(
                 Donkeycraft.DimensionType.OVERWORLD,
                 'overworld',
@@ -155,26 +157,26 @@
                 true, false, 0, true, false, true, null, true, 1
             );
 
-            // Nether — ceiling blocks sky light, piglins, no weather
+            // Nether — ceiling blocks sky light, piglins, no weather (Y: 0-127)
             _dimensions[Donkeycraft.DimensionType.NETHER] = new Donkeycraft.Dimension(
                 Donkeycraft.DimensionType.NETHER,
                 'nether',
-                WORLD_HEIGHT, 0, WORLD_HEIGHT,
+                NETHER_HEIGHT, 0, NETHER_HEIGHT,
                 false, true, 0, false, true, false, 'music_nether', false, NETHER_SCALE
             );
 
-            // End — pitch black ambient, no weather, no beds work
+            // End — pitch black ambient, no weather, no beds work (Y: 0-255)
             _dimensions[Donkeycraft.DimensionType.END] = new Donkeycraft.Dimension(
                 Donkeycraft.DimensionType.END,
                 'end',
-                WORLD_HEIGHT, 0, WORLD_HEIGHT,
+                END_HEIGHT, 0, END_HEIGHT,
                 false, false, 1, false, false, false, null, false, END_SCALE
             );
 
-            // Default spawn positions
+            // Default spawn positions (Y adjusted per dimension)
             _spawnPositions[Donkeycraft.DimensionType.OVERWORLD] = { x: 0, y: 64, z: 0 };
-            _spawnPositions[Donkeycraft.DimensionType.NETHER] = { x: 0, y: 64, z: 0 };
-            _spawnPositions[Donkeycraft.DimensionType.END] = { x: 0, y: 64, z: 0 };
+            _spawnPositions[Donkeycraft.DimensionType.NETHER] = { x: 0, y: 50, z: 0 };
+            _spawnPositions[Donkeycraft.DimensionType.END] = { x: 0, y: 80, z: 0 };
         }
 
         /**
@@ -344,18 +346,18 @@
                             try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
-                    default: // Overworld — delegate to ChunkManager's built-in generation
-                        if (chunkManager._generateTerrain) {
-                            chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ);
-                            terrainGenerated = true;
-                        }
-                        break;
-                }
+                     default: // Overworld — delegate to ChunkManager's built-in generation
+                         if (chunkManager.generateChunkTerrain) {
+                             chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
+                             terrainGenerated = true;
+                         }
+                         break;
+                 }
 
-                // Fallback: if terrain generation callback didn't run, try direct generation
-                if (!terrainGenerated && chunkManager._generateTerrain) {
-                    try { chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
-                }
+                 // Fallback: if terrain generation callback didn't run, try direct generation
+                 if (!terrainGenerated && chunkManager.generateChunkTerrain) {
+                     try { chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                 }
 
                 // Mark as generated so getChunk won't attempt regeneration on future lookups
                 chunk.generated = true;

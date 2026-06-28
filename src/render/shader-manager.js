@@ -529,18 +529,27 @@
         }
         var breakProg = this.createProgram('break', breakVert, guiFrag);
 
+        // Create wireframe program (wireframe vertex + wireframe fragment — debug wireframe rendering)
+        var wireframeVert = vertexShaders.WIREFRAME_VERTEX_SHADER;
+        var wireframeFrag = fragmentShaders.WIREFRAME_FRAGMENT_SHADER;
+        if (!wireframeVert || !wireframeFrag) {
+            Donkeycraft.Logger.error('ShaderManager', 'Missing wireframe shader sources');
+        }
+        var wireframeProg = this.createProgram('wireframe', wireframeVert, wireframeFrag);
+
         // Verify all programs were created
-        if (!terrainProg || !skyProg || !guiProg || !breakProg) {
+        if (!terrainProg || !skyProg || !guiProg || !breakProg || !wireframeProg) {
             Donkeycraft.Logger.error('ShaderManager', 'One or more shader programs failed to compile/link');
             return null;
         }
 
-        Donkeycraft.Logger.info('ShaderManager', 'All shader programs created successfully: terrain, sky, gui, break');
+        Donkeycraft.Logger.info('ShaderManager', 'All shader programs created successfully: terrain, sky, gui, break, wireframe');
         return {
             terrain: terrainProg,
             sky: skyProg,
             gui: guiProg,
-            break: breakProg
+            break: breakProg,
+            wireframe: wireframeProg
         };
     };
 

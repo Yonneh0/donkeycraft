@@ -110,8 +110,8 @@
         registerBlock(14, 'emerald_ore', 3.0, 6.0, 14, 1, false, false, 0, 15);
         registerBlock(15, 'redstone_ore', 3.0, 6.0, 15, 1, false, false, 0, 15);
         registerBlock(16, 'lapis_ore', 3.0, 6.0, 16, 1, false, false, 0, 15);
-        registerBlock(17, 'obsidian', 50.0, 1200.0, 26, 1, false, false, 0, 15);
-        registerBlock(18, 'crying_obsidian', 50.0, 1200.0, 26, 1, false, true, 10, 15);
+        registerBlock(17, 'obsidian', 50.0, 1200.0, 17, 1, false, false, 0, 15);
+        registerBlock(18, 'crying_obsidian', 50.0, 1200.0, 18, 1, false, true, 10, 15);
 
         // Sand and related (IDs 19-23)
         registerBlock(19, 'sand', 0.5, 0.5, 19, 1, false, false, 0, 15);
@@ -311,7 +311,7 @@
         // Redstone components (IDs 173-180)
         registerBlock(173, 'redstone_wire', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(174, 'redstone_torch', 0.0, 0.0, -1, 0, false, true, 7, 0);
-        registerBlock(175, 'redstone_lamp', 0.8, 6.0, 176, 1, false, false, 0, 15);
+        registerBlock(175, 'redstone_lamp', 0.8, 6.0, 175, 1, false, false, 0, 15);
         registerBlock(176, 'lit_redstone_lamp', 0.8, 6.0, 176, 1, false, true, 15, 15);
         registerBlock(177, 'dispenser', 3.0, 6.0, 177, 1, false, false, 0, 15);
         registerBlock(178, 'dropper', 3.0, 6.0, 178, 1, false, false, 0, 15);
@@ -331,14 +331,14 @@
         registerBlock(186, 'lectern', 2.0, 6.0, -1, 0, false, false, 0, 0);
 
         // Chests and storage (IDs 187-190)
-        registerBlock(187, 'chest', 2.5, 6.0, 188, 1, false, false, 0, 15);
+        registerBlock(187, 'chest', 2.5, 6.0, 187, 1, false, false, 0, 15);
         registerBlock(188, 'trapped_chest', 2.5, 6.0, 188, 1, false, false, 0, 15);
         registerBlock(189, 'ender_chest', 22.5, 600.0, -1, 0, false, true, 11, 15);
         registerBlock(190, 'barrel', 2.5, 6.0, 190, 1, false, false, 0, 15);
 
         // Furnaces (IDs 191-193)
-        registerBlock(191, 'furnace', 3.5, 6.0, 192, 1, false, false, 0, 15);
-        registerBlock(192, 'lit_furnace', 3.5, 6.0, 192, 1, false, true, 13, 15);
+        registerBlock(191, 'furnace', 3.5, 6.0, 191, 1, false, false, 0, 15);
+        registerBlock(192, 'lit_furnace', 3.5, 6.0, 191, 1, false, true, 13, 15);
         registerBlock(193, 'blast_furnace', 3.5, 6.0, 193, 1, false, false, 0, 15);
         registerBlock(194, 'smoker', 3.5, 6.0, 194, 1, false, false, 0, 15);
 
@@ -401,9 +401,9 @@
         registerBlock(230, 'redstone_block', 3.0, 6.0, 230, 1, false, false, 0, 15);
         registerBlock(231, 'lapis_block', 3.0, 6.0, 231, 1, false, false, 0, 15);
         registerBlock(232, 'coal_block', 3.0, 6.0, 232, 1, false, false, 0, 15);
-        registerBlock(233, 'quartz_block', 1.0, 6.0, 234, 1, false, false, 0, 15);
+        // ID 233 reserved
 
-        // Quartz variants (IDs 234-237)
+        // Quartz blocks (IDs 234-237)
         registerBlock(234, 'quartz_block', 1.0, 6.0, 234, 1, false, false, 0, 15);
         registerBlock(235, 'chiseled_quartz_block', 1.0, 6.0, 234, 1, false, false, 0, 15);
         registerBlock(236, 'quartz_pillar', 1.0, 6.0, 234, 1, false, false, 0, 15);

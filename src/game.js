@@ -1186,6 +1186,25 @@
             '}\n'
         );
 
+        // Minimal wireframe shader (debug overlay)
+        this._shaderManager.createProgram('wireframe',
+            'attribute vec3 aPosition;\n' +
+            'attribute vec4 aColor;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec4 vColor;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vColor = aColor;\n' +
+            '}\n',
+            'precision mediump float;\n' +
+            'varying vec4 vColor;\n' +
+            'void main() {\n' +
+            '  gl_FragColor = vColor;\n' +
+            '}\n'
+        );
+
         // Minimal hand shader
         this._shaderManager.createProgram('hand',
             'attribute vec3 aPosition;\n' +

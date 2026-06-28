@@ -191,18 +191,73 @@
     };
 
     /**
-     * Get the color for a given item ID.
+     * Get the color for a given item/block ID.
+     * Delegates to Donkeycraft.BlockRegistry.getBlock() when available for accurate colors.
      * @private
+     * @param {number} itemId - The item/block ID.
+     * @returns {{r: number, g: number, b: number}} RGB color object.
      */
     Donkeycraft.HandRenderer.prototype._getItemColor = function(itemId) {
-        switch (itemId) {
-            case 1: return { r: 0.5, g: 0.5, b: 0.5 };  // stone — gray
-            case 2: return { r: 0.3, g: 0.6, b: 0.2 };  // grass — green
-            case 3: return { r: 0.6, g: 0.4, b: 0.2 };  // dirt — brown
-            case 4: return { r: 0.8, g: 0.8, b: 0.2 };  // gold — yellow
-            case 5: return { r: 0.7, g: 0.7, b: 0.8 };  // diamond — light blue
-            default: return { r: 0.5, g: 0.5, b: 0.5 }; // fallback gray
+        // Use BlockRegistry for accurate block colors when available.
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlock === 'function') {
+            var blockInfo = Donkeycraft.BlockRegistry.getBlock(itemId);
+            if (blockInfo && blockInfo.hardness !== undefined) {
+                // Block exists — compute a color from its properties.
+                return this._colorFromBlockInfo(blockInfo);
+            }
         }
+        // Fallback: known item colors + generic gray.
+        switch (itemId) {
+            case 1: return { r: 0.50, g: 0.50, b: 0.50 };  // stone
+            case 2: return { r: 0.30, g: 0.60, b: 0.20 };  // grass
+            case 3: return { r: 0.60, g: 0.40, b: 0.20 };  // dirt
+            case 4: return { r: 0.80, g: 0.78, b: 0.35 };  // sand
+            case 5: return { r: 0.80, g: 0.75, b: 0.30 };  // gold block
+            case 6: return { r: 0.40, g: 0.50, b: 0.80 };  // diamond
+            case 7: return { r: 0.55, g: 0.35, b: 0.20 };  // oak log
+            case 8: return { r: 0.65, g: 0.45, b: 0.25 };  // oak plank
+            case 9: return { r: 0.45, g: 0.25, b: 0.15 };  // cobblestone
+            case 10: return { r: 0.70, g: 0.15, b: 0.15 };  // redstone ore
+            default: return { r: 0.50, g: 0.50, b: 0.50 };  // fallback gray
+        }
+    };
+
+    /**
+     * Compute an RGB color from a block info object.
+     * @private
+     * @param {Object} blockInfo - Block info from BlockRegistry.
+     * @returns {{r: number, g: number, b: number}}
+     */
+    Donkeycraft.HandRenderer.prototype._colorFromBlockInfo = function(blockInfo) {
+        // Use texture name to derive a color hint.
+        var tex = blockInfo.texture || blockInfo.textures || '';
+        if (typeof tex === 'string') {
+            // Map common texture names to approximate colors.
+            var t = tex.toLowerCase();
+            if (t.indexOf('stone') !== -1) return { r: 0.50, g: 0.50, b: 0.50 };
+            if (t.indexOf('grass') !== -1) return { r: 0.30, g: 0.60, b: 0.20 };
+            if (t.indexOf('dirt') !== -1) return { r: 0.60, g: 0.40, b: 0.20 };
+            if (t.indexOf('sand') !== -1) return { r: 0.80, g: 0.78, b: 0.35 };
+            if (t.indexOf('iron') !== -1 || t.indexOf('iron_block') !== -1) return { r: 0.75, g: 0.70, b: 0.65 };
+            if (t.indexOf('gold') !== -1) return { r: 0.80, g: 0.75, b: 0.20 };
+            if (t.indexOf('diamond') !== -1) return { r: 0.40, g: 0.70, b: 0.85 };
+            if (t.indexOf('emerald') !== -1) return { r: 0.15, g: 0.70, b: 0.30 };
+            if (t.indexOf('lapis') !== -1) return { r: 0.15, g: 0.30, b: 0.70 };
+            if (t.indexOf('coal') !== -1) return { r: 0.20, g: 0.20, b: 0.20 };
+            if (t.indexOf('wood') !== -1 || t.indexOf('log') !== -1) return { r: 0.45, g: 0.30, b: 0.18 };
+            if (t.indexOf('plank') !== -1) return { r: 0.62, g: 0.45, b: 0.25 };
+            if (t.indexOf('water') !== -1) return { r: 0.20, g: 0.40, b: 0.80 };
+            if (t.indexOf('lava') !== -1) return { r: 0.80, g: 0.30, b: 0.05 };
+            if (t.indexOf('glass') !== -1) return { r: 0.75, g: 0.85, b: 0.90 };
+            if (t.indexOf('brick') !== -1) return { r: 0.55, g: 0.25, b: 0.18 };
+            if (t.indexOf('snow') !== -1) return { r: 0.95, g: 0.95, b: 0.97 };
+            if (t.indexOf('leaf') !== -1 || t.indexOf('leaves') !== -1) return { r: 0.20, g: 0.55, b: 0.15 };
+            if (t.indexOf('wool') !== -1) return { r: 0.70, g: 0.70, b: 0.70 };
+            if (t.indexOf('bedrock') !== -1) return { r: 0.20, g: 0.20, b: 0.20 };
+            if (t.indexOf('obsidian') !== -1) return { r: 0.12, g: 0.10, b: 0.18 };
+        }
+        // Default: medium gray.
+        return { r: 0.50, g: 0.50, b: 0.50 };
     };
 
     /**

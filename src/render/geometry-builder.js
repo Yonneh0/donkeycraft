@@ -26,16 +26,25 @@
 
     /**
      * Check if a block is transparent (should show adjacent faces).
-     * Delegates to Donkeycraft.BlockRegistry.isTransparent() when available.
+     * Delegates to Donkeycraft.BlockTypes.isTransparent() when available.
      * @param {number} blockId - The block ID to check.
      * @returns {boolean} True if the block is transparent/non-solid.
      */
     Donkeycraft.GeometryBuilder.prototype.isTransparent = function(blockId) {
-        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isTransparent === 'function') {
-            return Donkeycraft.BlockRegistry.isTransparent(blockId);
+        // Prefer BlockTypes for accurate transparency checks.
+        if (Donkeycraft.BlockTypes && typeof Donkeycraft.BlockTypes.isTransparent === 'function') {
+            return Donkeycraft.BlockTypes.isTransparent(blockId);
         }
-        // Fallback: air, water, lava
-        return blockId === 0 || blockId === 9 || blockId === 10 || blockId === 11;
+        // Fallback: air, water, lava, and common transparent blocks.
+        switch (blockId) {
+            case 0:  // air
+            case 9:  // water
+            case 10: // lava
+            case 11: // still lava
+                return true;
+            default:
+                return false;
+        }
     };
 
     /**
@@ -127,15 +136,27 @@
     };
 
     /**
-     * Get UV coordinates for a block face.
+     * Get UV coordinates for a block face from the texture atlas.
+     * Delegates to Donkeycraft.TextureAtlas.getBlockUV() when available,
+     * falling back to a simple tile-based calculation.
      * @private
+     * @param {number} blockId - The block ID.
+     * @param {string} faceName - Face name (unused by atlas, kept for API compat).
+     * @returns {{u0: number, v0: number, u1: number, v1: number}} UV coordinates.
      */
     Donkeycraft.GeometryBuilder.prototype._getBlockUV = function(blockId, faceName) {
+        // Use texture atlas UV mapping if available (proper block-to-tile lookup).
+        if (Donkeycraft.TextureAtlas && typeof Donkeycraft.TextureAtlas.getBlockUV === 'function') {
+            return Donkeycraft.TextureAtlas.getBlockUV(blockId);
+        }
+
+        // Fallback: tile-based UV calculation.
+        // Assumes a 16-tile-wide atlas where blockId maps to tile (id%16, floor(id/16)).
         var atlasSize = 16;
         var tileU = blockId % atlasSize;
         var tileV = Math.floor(blockId / atlasSize);
 
-        // Clamp tileV to atlas bounds to prevent UV overflow for blockId >= 256
+        // Clamp tileV to atlas bounds to prevent UV overflow for blockId >= 256.
         if (tileV >= atlasSize) tileV = atlasSize - 1;
 
         return {

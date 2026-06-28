@@ -229,10 +229,13 @@
      */
     Donkeycraft.Sky.prototype._renderSunDisc = function(sunDir, sunIntensity) {
         var gl = this._gl;
-        if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return;
+        if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return false;
 
         // Switch to 'gui' shader — sun discs use uModel which the sky shader lacks.
-        this._shaderManager.use('gui');
+        if (!this._shaderManager.use('gui')) {
+            Donkeycraft.Logger.error('Sky', 'GUI shader unavailable — sun disc not rendered');
+            return false;
+        }
 
         // Build a model matrix: translate to sun position + scale
         var sunPos = new Donkeycraft.Vector3(
@@ -304,10 +307,13 @@
      */
     Donkeycraft.Sky.prototype._renderMoonDisc = function(moonDir) {
         var gl = this._gl;
-        if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return;
+        if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return false;
 
         // Switch to 'gui' shader — moon discs use uModel which the sky shader lacks.
-        this._shaderManager.use('gui');
+        if (!this._shaderManager.use('gui')) {
+            Donkeycraft.Logger.error('Sky', 'GUI shader unavailable — moon disc not rendered');
+            return false;
+        }
 
         // Moon is opposite the sun
         var moonPos = new Donkeycraft.Vector3(
@@ -460,7 +466,6 @@
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
 
         // ---- Sun disc (visible during day) ----
-        // Switch to 'gui' shader because sun/moon discs use uModel which the sky shader lacks.
         if (this._sunMoonVisible && sunIntensity > 0.1) {
             var sunDir = lighting.getSunDirection();
             this._renderSunDisc(sunDir, sunIntensity);
@@ -475,6 +480,7 @@
 
         // Restore sky shader after sun/moon rendering.
         if (!this._shaderManager.use('sky')) {
+            Donkeycraft.Logger.error('Sky', 'Failed to restore sky shader — sky dome and stars will not render');
             gl.depthMask(true);
             return;
         }
@@ -484,12 +490,12 @@
 
         // ---- Stars (visible at night, drawn with depth write enabled) ----
         if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
-            // Switch to GUI shader for star rendering (solid color points)
+            // Switch to GUI shader for star rendering (solid color points).
             if (this._shaderManager.use('gui')) {
                 var starMatrices = camera.getMatrices();
                 this._shaderManager.setMat4('uProjection', starMatrices.projection);
 
-                // Zero out view translation for stars
+                // Zero out view translation for stars (keep sky fixed at world center).
                 for (var i = 0; i < 16; i++) this._skyViewTemp[i] = starMatrices.view.getData()[i];
                 this._skyViewTemp[12] = 0;
                 this._skyViewTemp[13] = 0;
@@ -500,6 +506,8 @@
                 this._shaderManager.setInt('uHasTexture', 0);
 
                 this._renderStars();
+            } else {
+                Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — stars not rendered');
             }
         }
     };

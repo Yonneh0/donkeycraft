@@ -31,6 +31,7 @@ void main() {
 }
 `;
 
+
 // Fog Fragment Shader
 var FOG_FRAGMENT_SHADER = `
 precision mediump float;
@@ -107,5 +108,16 @@ void main() {
     vec4 texColor = texture2D(uTexture, vUV);
     if (vColor.a * texColor.a < 0.1) discard;
     gl_FragColor = vec4(vColor.rgb, vColor.a * texColor.a);
+}
+`;
+
+// Wireframe Fragment Shader — renders solid colored lines for debug wireframes.
+var WIREFRAME_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec4 vColor;
+
+void main() {
+    gl_FragColor = vColor;
 }
 `;

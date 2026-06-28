@@ -86,16 +86,68 @@
 
     /**
      * Get the particle color for a block ID.
+     * Delegates to Donkeycraft.BlockRegistry.getBlock() when available for accurate colors.
      * @private
+     * @param {number} blockId - The block ID that was broken.
+     * @returns {{r: number, g: number, b: number}} RGB color object.
      */
     Donkeycraft.BreakParticles.prototype._getBlockParticleColor = function(blockId) {
-        switch (blockId) {
-            case 1: return { r: 0.5, g: 0.5, b: 0.5 };   // stone
-            case 2: return { r: 0.3, g: 0.6, b: 0.2 };   // grass
-            case 3: return { r: 0.6, g: 0.4, b: 0.2 };   // dirt
-            case 4: return { r: 0.8, g: 0.7, b: 0.3 };   // sand
-            default: return { r: 0.5, g: 0.5, b: 0.5 };  // fallback gray
+        // Use BlockRegistry for accurate block colors when available.
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlock === 'function') {
+            var blockInfo = Donkeycraft.BlockRegistry.getBlock(blockId);
+            if (blockInfo && blockInfo.hardness !== undefined) {
+                return this._colorFromBlockInfo(blockInfo);
+            }
         }
+        // Fallback: known block colors + generic gray.
+        switch (blockId) {
+            case 1: return { r: 0.50, g: 0.50, b: 0.50 };  // stone
+            case 2: return { r: 0.30, g: 0.60, b: 0.20 };  // grass
+            case 3: return { r: 0.60, g: 0.40, b: 0.20 };  // dirt
+            case 4: return { r: 0.80, g: 0.78, b: 0.35 };  // sand
+            case 5: return { r: 0.80, g: 0.75, b: 0.20 };  // gold block
+            case 6: return { r: 0.40, g: 0.70, b: 0.85 };  // diamond
+            case 7: return { r: 0.45, g: 0.30, b: 0.18 };  // oak log
+            case 8: return { r: 0.62, g: 0.45, b: 0.25 };  // oak plank
+            case 9: return { r: 0.45, g: 0.25, b: 0.15 };  // cobblestone
+            case 10: return { r: 0.70, g: 0.15, b: 0.15 }; // redstone ore
+            default: return { r: 0.50, g: 0.50, b: 0.50 }; // fallback gray
+        }
+    };
+
+    /**
+     * Compute an RGB color from a block info object.
+     * @private
+     * @param {Object} blockInfo - Block info from BlockRegistry.
+     * @returns {{r: number, g: number, b: number}}
+     */
+    Donkeycraft.BreakParticles.prototype._colorFromBlockInfo = function(blockInfo) {
+        var tex = blockInfo.texture || blockInfo.textures || '';
+        if (typeof tex === 'string') {
+            var t = tex.toLowerCase();
+            if (t.indexOf('stone') !== -1) return { r: 0.50, g: 0.50, b: 0.50 };
+            if (t.indexOf('grass') !== -1) return { r: 0.30, g: 0.60, b: 0.20 };
+            if (t.indexOf('dirt') !== -1) return { r: 0.60, g: 0.40, b: 0.20 };
+            if (t.indexOf('sand') !== -1) return { r: 0.80, g: 0.78, b: 0.35 };
+            if (t.indexOf('iron') !== -1 || t.indexOf('iron_block') !== -1) return { r: 0.75, g: 0.70, b: 0.65 };
+            if (t.indexOf('gold') !== -1) return { r: 0.80, g: 0.75, b: 0.20 };
+            if (t.indexOf('diamond') !== -1) return { r: 0.40, g: 0.70, b: 0.85 };
+            if (t.indexOf('emerald') !== -1) return { r: 0.15, g: 0.70, b: 0.30 };
+            if (t.indexOf('lapis') !== -1) return { r: 0.15, g: 0.30, b: 0.70 };
+            if (t.indexOf('coal') !== -1) return { r: 0.20, g: 0.20, b: 0.20 };
+            if (t.indexOf('wood') !== -1 || t.indexOf('log') !== -1) return { r: 0.45, g: 0.30, b: 0.18 };
+            if (t.indexOf('plank') !== -1) return { r: 0.62, g: 0.45, b: 0.25 };
+            if (t.indexOf('water') !== -1) return { r: 0.20, g: 0.40, b: 0.80 };
+            if (t.indexOf('lava') !== -1) return { r: 0.80, g: 0.30, b: 0.05 };
+            if (t.indexOf('glass') !== -1) return { r: 0.75, g: 0.85, b: 0.90 };
+            if (t.indexOf('brick') !== -1) return { r: 0.55, g: 0.25, b: 0.18 };
+            if (t.indexOf('snow') !== -1) return { r: 0.95, g: 0.95, b: 0.97 };
+            if (t.indexOf('leaf') !== -1 || t.indexOf('leaves') !== -1) return { r: 0.20, g: 0.55, b: 0.15 };
+            if (t.indexOf('wool') !== -1) return { r: 0.70, g: 0.70, b: 0.70 };
+            if (t.indexOf('bedrock') !== -1) return { r: 0.20, g: 0.20, b: 0.20 };
+            if (t.indexOf('obsidian') !== -1) return { r: 0.12, g: 0.10, b: 0.18 };
+        }
+        return { r: 0.50, g: 0.50, b: 0.50 };
     };
 
     /**
@@ -163,11 +215,10 @@
 
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
-            var trx = cx + rx + ux, trY = cy + ry + uy, trz = cz + rz + uz;
+            var trx = cx + rx + ux, tr_y = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
 
-            // Note: trY is intentionally used as the Y coordinate for top-right corner
-            // (variable name matches the local `trY` declaration above).
+            // Note: tr_y is the Y coordinate for top-right corner (snake_case for local temp variable).
 
             var r = p.color.r, g = p.color.g, b = p.color.b;
             var base = i * vertPerParticle * floatsPerVertex;
@@ -179,13 +230,13 @@
             vertices[base + 9]  = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
             vertices[base + 12] = 1; vertices[base + 13] = 0;
             vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
-            vertices[base + 18] = trx; vertices[base + 19] = trY; vertices[base + 20] = trz;
+            vertices[base + 18] = trx; vertices[base + 19] = tr_y; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
             vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
             vertices[base + 30] = 0; vertices[base + 31] = 0;
             vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
-            vertices[base + 36] = trx; vertices[base + 37] = trY; vertices[base + 38] = trz;
+            vertices[base + 36] = trx; vertices[base + 37] = tr_y; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
             vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;

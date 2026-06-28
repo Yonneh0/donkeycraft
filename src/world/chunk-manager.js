@@ -62,6 +62,12 @@
          * @type {boolean}
          */
         this.useStructureGenerator = false;
+
+        /**
+         * Whether terrain generation is enabled. When false, chunks are created empty.
+         * @type {boolean}
+         */
+        this.terrainEnabled = true;
     };
 
     /**
@@ -320,14 +326,17 @@
      * Fills the chunk with heightmap-based terrain, ores, caves, water, and surface layers.
      * Delegates to dimension-specific generators when available.
      * If useStructureGenerator is true, delegates overworld generation to StructureGenerator.
-     * @private
+     * This method is called from onChunkLoad callbacks in dimension.js.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
+     * @returns {boolean} True if terrain was generated, false if skipped.
      */
-    Donkeycraft.ChunkManager.prototype._generateTerrain = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.generateChunkTerrain = function(chunkX, chunkZ) {
+        // Skip if terrain is disabled or chunk already generated
+        if (!this.terrainEnabled) return false;
         var key = chunkKey(chunkX, chunkZ);
         var chunk = this._chunks.get(key);
-        if (!chunk) return;
+        if (!chunk || chunk.generated) return false;
 
         var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
 
@@ -339,17 +348,17 @@
                 _generateEndChunk(this, chunk, chunkX, chunkZ);
                 break;
             default: // Overworld
-                if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
-                    Donkeycraft.StructureGenerator.generateChunkFull) {
-                    try {
-                        Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
-                    } catch (e) {
-                        Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
-                        _generateOverworldChunk(this, chunk, chunkX, chunkZ);
-                    }
-                } else {
-                    _generateOverworldChunk(this, chunk, chunkX, chunkZ);
-                }
+         if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
+             Donkeycraft.StructureGenerator.generateChunkFull) {
+             try {
+                 Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
+             } catch (e) {
+                 Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
+                 _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+             }
+         } else {
+             _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+         }
                 break;
         }
     };
@@ -361,6 +370,7 @@
     /**
      * Generate overworld terrain for a chunk.
      * Resolves block IDs from BlockRegistry by name instead of hardcoded IDs.
+     * Uses consistent noise sampling with TerrainGenerator for biome/heightmap alignment.
      * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -374,15 +384,17 @@
             return;
         }
 
-        // Get biome for this chunk using world coordinates for 2D biome lookup
+        // Get biome for this chunk using world coordinates for 2D biome lookup.
+        // Uses PerlinNoise.noise2D() (same as TerrainGenerator.fbm internally) for consistent sampling.
         var biome = null;
         if (Donkeycraft.BiomeRegistry && Donkeycraft.PerlinNoise) {
             var worldX = chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             var worldZ = chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
-            // Use proper 2D noise with both X and Z coordinates for accurate biome mapping
+            // Use PerlinNoise.noise2D() with separate X/Z offsets for temperature/rainfall
+            // This matches the noise pattern used by TerrainGenerator.fbm → noise()
             var tempNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005, worldZ * 0.005);
             var rainNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.005 + 1000, worldZ * 0.005 + 1000);
-            // Map noise to biome ID based on temperature and rainfall [0, 1]
+            // Map noise [-1, 1] → [0, 1]
             var temp = (tempNoise + 1) * 0.5;
             var rain = (rainNoise + 1) * 0.5;
             biome = Donkeycraft.BiomeRegistry.getBiomeByClimate(temp, rain);
@@ -489,6 +501,7 @@
 
         // Mark chunk as needing mesh regeneration
         chunk._dirty = true;
+        chunk.generated = true;
     }
 
     // ============================================================

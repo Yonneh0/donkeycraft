@@ -536,7 +536,7 @@
             // Four corners of the quad
             var blx = px - rx - ux, bly = py - ry - uy, blz = pz - rz - uz;
             var brx = px + rx - ux, bry = py + ry - uy, brz = pz + rz - uz;
-            var trx = px + rx + ux, trY = py + ry + uy, trz = pz + rz + uz;
+            var trx = px + rx + ux, tr_y = py + ry + uy, trz = pz + rz + uz;
             var tlx = px - rx + ux, tly = py - ry + uy, tlz = pz - rz + uz;
 
             // Color based on particle type
@@ -558,7 +558,7 @@
             vertices[base + 12] = 1; vertices[base + 13] = 0;
             vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
             // Top-right
-            vertices[base + 18] = trx; vertices[base + 19] = trY; vertices[base + 20] = trz;
+            vertices[base + 18] = trx; vertices[base + 19] = tr_y; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
             vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             // Bottom-left (duplicate for second triangle)
@@ -566,7 +566,7 @@
             vertices[base + 30] = 0; vertices[base + 31] = 0;
             vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
             // Top-right (duplicate)
-            vertices[base + 36] = trx; vertices[base + 37] = trY; vertices[base + 38] = trz;
+            vertices[base + 36] = trx; vertices[base + 37] = tr_y; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
             vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             // Top-left
