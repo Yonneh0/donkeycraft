@@ -385,46 +385,247 @@
     document.body.removeChild(furnaceContainer);
 
     // ============================================================
-    // Section 7: ChestUI — Slot Management
+    // Section 7: ChestUI — Slot Management & Full Integration
     // ============================================================
-    F.section('7. ChestUI — Slot Management');
+    F.section('7. ChestUI — Slot Management & Full Integration');
 
     var chestContainer = document.createElement('div');
     chestContainer.id = 'chest-test-container';
     document.body.appendChild(chestContainer);
 
+    // --- Constructor with boolean config ---
     var chest = new Donkeycraft.ChestUI(chestContainer, false);
-
-    // isDoubleChest / getSlotCount
     F.assert(!chest.isDoubleChest(), 'Single chest is not double');
     F.assertEq(chest.getSlotCount(), 27, 'Single chest has 27 slots');
 
-    var doubleChest = new Donkeycraft.ChestUI(document.createElement('div'), true);
-    F.assert(doubleChest.isDoubleChest(), 'Double chest is double');
-    F.assertEq(doubleChest.getSlotCount(), 54, 'Double chest has 54 slots');
+    // --- Constructor with object config ---
+    var chestObjContainer = document.createElement('div');
+    chestObjContainer.id = 'chest-obj-test-container';
+    document.body.appendChild(chestObjContainer);
+    var chestObj = new Donkeycraft.ChestUI(chestObjContainer, { doubleChest: true, chestKey: '1,128,1' });
+    F.assert(chestObj.isDoubleChest(), 'Double chest from object config');
+    F.assertEq(chestObj.getSlotCount(), 54, 'Double chest has 54 slots');
 
-    // setSlot / takeItem
+    // --- Constructor with no config ---
+    var chestNullContainer = document.createElement('div');
+    chestNullContainer.id = 'chest-null-test-container';
+    document.body.appendChild(chestNullContainer);
+    var chestNull = new Donkeycraft.ChestUI(chestNullContainer);
+    F.assert(!chestNull.isDoubleChest(), 'Default is single chest');
+    F.assertEq(chestNull.getSlotCount(), 27, 'Default has 27 slots');
+
+    // --- getSlot with validation ---
     var stack = new Donkeycraft.ItemStack(1, 64);
-    chest.setSlot(0, stack);
-    F.assertEq(chest.getSlot(0).getCount(), 64, 'setSlot/getSlot round-trip');
+    F.assert(chest.setSlot(0, stack), 'setSlot(0, stone) succeeds');
+    F.assertEq(chest.getSlot(0).getCount(), 64, 'getSlot(0) returns correct count');
+    F.assert(chest.getSlot(-1) === null, 'getSlot(-1) returns null');
+    F.assert(chest.getSlot(27) === null, 'getSlot(27) out of bounds returns null');
+    F.assert(chest.getSlot('abc') === null, 'getSlot("abc") returns null');
+    F.assert(chest.getSlot(null) === null, 'getSlot(null) returns null');
 
+    // --- setSlot validation ---
+    F.assert(!chest.setSlot(-1, null), 'setSlot(-1) fails');
+    F.assert(!chest.setSlot(27, null), 'setSlot(27) fails');
+    F.assert(!chest.setSlot('abc', null), 'setSlot("abc") fails');
+    F.assert(!chest.setSlot(0, 'invalid'), 'setSlot with string fails');
+    F.assert(!chest.setSlot(0, 123), 'setSlot with number fails');
+    F.assert(!chest.setSlot(0, {}), 'setSlot with plain object fails');
+
+    // --- takeItem ---
     var taken = chest.takeItem(0);
     F.assert(taken !== null, 'takeItem returns a stack');
     F.assertEq(taken.getCount(), 64, 'takeItem count is correct');
     F.assert(chest.getSlot(0) === null, 'takeItem clears slot');
 
-    // takeItem from empty slot
+    // --- takeItem from empty slot ---
     var taken2 = chest.takeItem(5);
     F.assert(taken2 === null, 'takeItem from empty returns null');
 
-    // destroy
+    // --- takePartialItem ---
+    chest.setSlot(0, new Donkeycraft.ItemStack(3, 64));
+    var partial = chest.takePartialItem(0, 10);
+    F.assert(partial !== null, 'takePartialItem returns a stack');
+    F.assertEq(partial.getCount(), 10, 'takePartialItem count is 10');
+    F.assertEq(chest.getSlot(0).getCount(), 54, 'remaining slot count is 54');
+
+    // take more than available
+    var partial2 = chest.takePartialItem(0, 100);
+    F.assert(partial2 !== null, 'takePartialItem takes remaining');
+    F.assertEq(partial2.getCount(), 54, 'takePartialItem returns all remaining');
+    F.assert(chest.getSlot(0) === null, 'slot is null after taking all');
+
+    // takePartialItem validation
+    F.assert(chest.takePartialItem(-1, 5) === null, 'takePartialItem(-1) returns null');
+    F.assert(chest.takePartialItem(0, -5) === null, 'takePartialItem count negative returns null');
+    F.assert(chest.takePartialItem(0, 0) === null, 'takePartialItem count zero returns null');
+
+    // --- handleClick (left-click takes entire stack) ---
+    chest.setSlot(1, new Donkeycraft.ItemStack(5, 32));
+    var clicked = chest.handleClick(1, 0);
+    F.assert(clicked !== null, 'handleClick left-click returns stack');
+    F.assertEq(clicked.getCount(), 32, 'handleClick takes entire stack');
+    F.assert(chest.getSlot(1) === null, 'slot empty after handleClick');
+
+    // --- handleClick (right-click takes half) ---
+    chest.setSlot(2, new Donkeycraft.ItemStack(6, 10));
+    var rightClicked = chest.handleClick(2, 2);
+    F.assert(rightClicked !== null, 'handleClick right-click returns stack');
+    F.assertEq(rightClicked.getCount(), 5, 'handleClick right-click takes half (ceil)');
+    F.assertEq(chest.getSlot(2).getCount(), 5, 'remaining is 5');
+
+    // handleClick on empty slot (use a fresh slot that was never used)
+    var emptyClick = chest.handleClick(26, 0);
+    F.assert(emptyClick === null, 'handleClick on empty returns null');
+
+    // handleClick with invalid index
+    F.assert(chest.handleClick(-1, 0) === null, 'handleClick(-1) returns null');
+    F.assert(chest.handleClick(999, 0) === null, 'handleClick(999) returns null');
+
+    // --- handleDrop to empty slot ---
+    var dropStack = new Donkeycraft.ItemStack(7, 16);
+    F.assert(chest.handleDrop(dropStack, 3), 'handleDrop to slot 3 succeeds');
+    F.assertEq(chest.getSlot(3).getCount(), 16, 'handleDrop places item in slot');
+
+    // --- handleDrop to stack with matching item ---
+    chest.setSlot(4, new Donkeycraft.ItemStack(8, 32));
+    var dropStack2 = new Donkeycraft.ItemStack(8, 20);
+    F.assert(chest.handleDrop(dropStack2, 4), 'handleDrop stacks with matching item');
+    F.assertEq(chest.getSlot(4).getCount(), 52, 'handleDrop stacks to 52 (32+20)');
+
+    // --- handleDrop to full stack (overflow) ---
+    chest.setSlot(5, new Donkeycraft.ItemStack(9, 64));
+    var dropStack3 = new Donkeycraft.ItemStack(9, 10);
+    F.assert(chest.handleDrop(dropStack3, 5), 'handleDrop on full stack returns true');
+    F.assertEq(chest.getSlot(5).getCount(), 64, 'full stack stays at 64 (overflow not stored)');
+
+    // --- handleDrop to -1 (first empty slot) ---
+    chest.setSlot(6, new Donkeycraft.ItemStack(10, 8));
+    var dropStack4 = new Donkeycraft.ItemStack(11, 4);
+    F.assert(chest.handleDrop(dropStack4, -1), 'handleDrop(-1) finds first empty');
+    // Should go to slot 0 (first empty after clearing)
+    F.assert(chest.getSlot(0) !== null, 'handleDrop(-1) places item in first empty slot');
+
+    // --- handleDrop with invalid stack ---
+    F.assert(!chest.handleDrop(null, 7), 'handleDrop(null) fails');
+    F.assert(!chest.handleDrop(new Donkeycraft.ItemStack(0, 0), 7), 'handleDrop(empty) fails');
+    F.assert(!chest.handleDrop('string', 7), 'handleDrop(string) fails');
+
+    // --- handleKeyPress: Escape passes through ---
+    F.assert(!chest.handleKeyPress('Escape'), 'handleKeyPress(Escape) returns false');
+
+    // --- handleKeyPress: Digit keys consumed ---
+    F.assert(chest.handleKeyPress('Digit1'), 'handleKeyPress(Digit1) consumed');
+    F.assert(chest.handleKeyPress('Digit9'), 'handleKeyPress(Digit9) consumed');
+    F.assert(chest.handleKeyPress('Digit0'), 'handleKeyPress(Digit0) consumed');
+
+    // --- handleKeyPress: KeyQ drops first non-empty slot ---
+    // Clear all slots before 20 so KeyQ drops from slot 20 (the first non-empty)
+    for (var kq = 0; kq < 20; kq++) {
+        chest.setSlot(kq, null);
+    }
+    chest.setSlot(20, new Donkeycraft.ItemStack(12, 5));
+    var dropped = chest.handleKeyPress('KeyQ');
+    F.assert(dropped, 'handleKeyPress(KeyQ) returns true');
+    F.assert(chest.getSlot(20) === null, 'KeyQ clears the first non-empty slot (slot 20)');
+
+    // --- handleKeyPress: KeyQ on empty chest ---
+    var noDrop = chest.handleKeyPress('KeyQ');
+    F.assert(noDrop, 'handleKeyPress(KeyQ) returns true even when empty (consumes key)');
+
+    // --- handleKeyPress: other keys pass through ---
+    F.assert(!chest.handleKeyPress('Space'), 'handleKeyPress(Space) returns false');
+    F.assert(!chest.handleKeyPress('Enter'), 'handleKeyPress(Enter) returns false');
+
+    // --- onSlotChange event subscription ---
+    var slotChangeEvent = null;
+    var unsubscribe = chest.onSlotChange(function(index, newStack, oldStack) {
+        slotChangeEvent = { index: index, new: newStack, old: oldStack };
+    });
+    chest.setSlot(11, new Donkeycraft.ItemStack(13, 1));
+    F.assert(slotChangeEvent !== null, 'onSlotChange callback fired');
+    F.assertEq(slotChangeEvent.index, 11, 'onSlotChange index is correct');
+
+    // Unsubscribe
+    unsubscribe();
+    var eventFiredAfterUnsub = null;
+    chest.onSlotChange(function(s) { eventFiredAfterUnsub = s; });
+    chest.setSlot(12, new Donkeycraft.ItemStack(14, 1));
+    F.assert(eventFiredAfterUnsub !== null, 're-subscribed listener fires');
+
+    // --- onDrop event subscription ---
+    var dropEvent = null;
+    chest.onDrop(function(stack, slotIndex) {
+        dropEvent = { stack: stack, slotIndex: slotIndex };
+    });
+    // Clear all slots before 21 so KeyQ drops from slot 21 (the first non-empty)
+    for (var dq = 0; dq < 21; dq++) {
+        chest.setSlot(dq, null);
+    }
+    chest.setSlot(21, new Donkeycraft.ItemStack(15, 3));
+    chest.handleKeyPress('KeyQ');
+    F.assert(dropEvent !== null, 'onDrop callback fired for KeyQ drop');
+    F.assertEq(dropEvent.slotIndex, 21, 'onDrop slotIndex is correct (21)');
+
+    // --- loadData / serializeData round-trip ---
+    chest.setSlot(0, new Donkeycraft.ItemStack(16, 10));
+    chest.setSlot(5, new Donkeycraft.ItemStack(17, 5));
+    // Set data key manually for serialization test
+    chest._dataKey = 'test-chest-key';
+    var serialized = chest.serializeData();
+    F.assert(serialized.key !== null && serialized.key === 'test-chest-key', 'serializeData includes key');
+    F.assert(Array.isArray(serialized.slots), 'serializeData slots is array');
+
+    // Create a new chest and load data
+    var loadContainer = document.createElement('div');
+    loadContainer.id = 'chest-load-test-container';
+    document.body.appendChild(loadContainer);
+    var loadChest = new Donkeycraft.ChestUI(loadContainer, false);
+    loadChest.loadData(serialized);
+    F.assertEq(loadChest.getSlot(0).getCount(), 10, 'loadData restores slot 0');
+    F.assertEq(loadChest.getSlot(5).getCount(), 5, 'loadData restores slot 5');
+
+    // --- _loadPreloadedSlots via constructor ---
+    var preloadContainer = document.createElement('div');
+    preloadContainer.id = 'chest-preload-test-container';
+    document.body.appendChild(preloadContainer);
+    var preloadedStacks = [null, new Donkeycraft.ItemStack(18, 7), null];
+    var preloadChest = new Donkeycraft.ChestUI(preloadContainer, {
+        doubleChest: false,
+        chestKey: 'test-key',
+        preloadedSlots: preloadedStacks
+    });
+    F.assert(preloadChest.getSlot(1) !== null, 'preloaded slot 1 is set');
+    F.assertEq(preloadChest.getSlot(1).getCount(), 7, 'preloaded count is 7');
+    F.assertEq(preloadChest._dataKey, 'test-key', 'chestKey stored in _dataKey');
+
+    // --- _getItemDisplayChar coverage ---
+    // Verify display map returns characters for known IDs
+    var displayChar = chest._getItemDisplayChar(1);
+    F.assert(typeof displayChar === 'string' && displayChar.length > 0, '_getItemDisplayChar returns char for stone');
+    var defaultChar = chest._getItemDisplayChar(9999);
+    F.assertEq(defaultChar, '▪', '_getItemDisplayChar returns ▪ for unknown ID');
+
+    // --- destroy ---
     chest.destroy();
-    doubleChest.destroy();
+    F.assert(chest._container === null, 'destroy clears _container');
+    F.assert(chest._slots.length === 0, 'destroy clears _slots');
+    F.assert(chest._slotEls.length === 0, 'destroy clears _slotEls');
+    F.assert(chest._gridEl === null, 'destroy clears _gridEl');
+
+    chestObj.destroy();
+    chestNull.destroy();
+    loadChest.destroy();
+    preloadChest.destroy();
+    document.body.removeChild(chestContainer);
+    document.body.removeChild(chestObjContainer);
+    document.body.removeChild(chestNullContainer);
+    document.body.removeChild(loadContainer);
+    document.body.removeChild(preloadContainer);
 
     // ============================================================
-    // Section 8: AnvilUI — Rename & Repair
+    // Section 8: AnvilUI — Rename, Repair & Enchantment Merging
     // ============================================================
-    F.section('8. AnvilUI — Rename & Repair');
+    F.section('8. AnvilUI — Rename, Repair & Enchantment Merging');
 
     var anvilContainer = document.createElement('div');
     anvilContainer.id = 'anvil-test-container';
@@ -432,39 +633,272 @@
 
     var anvil = new Donkeycraft.AnvilUI(anvilContainer);
 
-    // getSlots
+    // --- Basic initialization ---
     F.assert(anvil.getLeftSlot() === null, 'Left slot starts null');
     F.assert(anvil.getRightSlot() === null, 'Right slot starts null');
     F.assert(anvil.getResultSlot() === null, 'Result slot starts null');
     F.assertEq(anvil.getPrice(), 0, 'Price starts at 0');
     F.assertEq(anvil.getRenameText(), '', 'Rename text starts empty');
+    F.assertEq(anvil._price, 0, '_price internal field starts at 0');
 
-    // setLeftSlot / setRightSlot with validation
+    // --- setLeftSlot / setRightSlot with validation ---
     var iron = new Donkeycraft.ItemStack(221, 1);
     var iron2 = new Donkeycraft.ItemStack(221, 1);
     F.assert(anvil.setLeftSlot(iron), 'setLeftSlot succeeds');
     F.assert(anvil.setRightSlot(iron2), 'setRightSlot succeeds');
     F.assert(!anvil.setLeftSlot('invalid'), 'setLeftSlot("invalid") fails validation');
+    // null is allowed — it clears the slot and returns true
+    F.assert(anvil.setLeftSlot(null), 'setLeftSlot(null) returns true (null is valid)');
+    F.assert(anvil.getLeftSlot() === null, 'setLeftSlot(null) clears the slot');
 
-    // setRenameText with validation
+    // --- setRenameText with validation ---
     F.assert(anvil.setRenameText('Test Name'), 'setRenameText succeeds');
     F.assertEq(anvil.getRenameText(), 'Test Name', 'getRenameText returns "Test Name"');
     F.assert(!anvil.setRenameText(123), 'setRenameText(123) fails validation');
+    F.assert(!anvil.setRenameText(null), 'setRenameText(null) fails validation');
 
-    // calculateResult (rename case)
+    // --- Rename case: single item with rename text ---
+    anvil.setLeftSlot(new Donkeycraft.ItemStack(207, 1)); // diamond_sword
+    anvil.setRightSlot(null);
+    anvil.setRenameText('Sharp Blade');
     var result = anvil.calculateResult();
     F.assert(result !== null, 'calculateResult produces result with rename');
-    F.assertEq(result.getTag().customName, 'Test Name', 'result has custom name');
+    F.assertEq(result.getTag().customName, 'Sharp Blade', 'result has custom name');
     F.assertEq(anvil.getPrice(), 1, 'Rename price is 1');
 
-    // takeResult
+    // --- Empty right slot with rename: no repair, just rename ---
+    F.assert(anvil.getResultSlot() !== null, 'Result slot populated after calculateResult');
+
+    // --- takeResult ---
     var taken = anvil.takeResult();
     F.assert(taken !== null, 'takeResult returns result');
-    F.assertEq(taken.getTag().customName, 'Test Name', 'taken item has custom name');
+    F.assertEq(taken.getTag().customName, 'Sharp Blade', 'taken item has custom name');
     F.assert(anvil.getResultSlot() === null, 'takeResult clears output');
+    F.assertEq(anvil.getPrice(), 0, 'Price resets to 0 after takeResult');
 
-    // destroy
+    // --- Repair case: two identical items ---
+    var damagedItem = new Donkeycraft.ItemStack(207, 1);
+    damagedItem.setTag({ durability: 500 }); // 500 remaining out of 1531
+    var alsoDamaged = new Donkeycraft.ItemStack(207, 1);
+    alsoDamaged.setTag({ durability: 800 }); // 800 remaining out of 1531
+
+    anvil.setLeftSlot(damagedItem);
+    anvil.setRightSlot(alsoDamaged);
+    anvil.setRenameText(''); // no rename for repair
+
+    var repairResult = anvil.calculateResult();
+    F.assert(repairResult !== null, 'Repair produces result');
+    F.assertEq(repairResult.getItemId(), 207, 'Repair result is same item type');
+
+    // Price should be based on enchantment levels (0 here) → min 1
+    F.assertEq(anvil.getPrice() >= 1, true, 'Repair price is at least 1');
+
+    // --- No result when only left item set (no rename) ---
+    anvil.setLeftSlot(new Donkeycraft.ItemStack(1, 1));
+    anvil.setRightSlot(null);
+    anvil.setRenameText('');
+    F.assert(anvil.calculateResult() === null, 'No result with only left item and no rename');
+    F.assertEq(anvil.getPrice(), 0, 'Price is 0 when no result possible');
+
+    // --- No result when only right item set ---
+    anvil.setLeftSlot(null);
+    anvil.setRightSlot(new Donkeycraft.ItemStack(3, 1));
+    F.assert(anvil.calculateResult() === null, 'No result with only right item');
+
+    // --- handleKeyPress: Enter to accept result ---
+    anvil.setLeftSlot(new Donkeycraft.ItemStack(5, 1));
+    anvil.setRightSlot(null);
+    anvil.setRenameText('Test');
+    anvil.calculateResult();
+    F.assert(anvil.getResultSlot() !== null, 'Result exists for Enter test');
+
+    var consumed = anvil.handleKeyPress('Enter');
+    F.assert(consumed, 'handleKeyPress(Enter) returns true');
+
+    // --- handleKeyPress: Escape passes through ---
+    consumed = anvil.handleKeyPress('Escape');
+    F.assert(!consumed, 'handleKeyPress(Escape) returns false (GuiManager handles it)');
+
+    // --- handleKeyPress: other keys pass through ---
+    consumed = anvil.handleKeyPress('Space');
+    F.assert(!consumed, 'handleKeyPress(Space) returns false');
+
+    // --- onResultChange event subscription (MUST be before destroy) ---
+    var resultChangeMarker = 'not_fired';
+    var unsubscribe2 = anvil.onResultChange(function(stack) {
+        resultChangeMarker = stack;
+    });
+    // Clear left slot and set no rename text so result is null
+    anvil.setLeftSlot(null);
+    anvil.setRenameText('');
+    anvil.calculateResult();
+    F.assert(resultChangeMarker !== 'not_fired', 'onResultChange callback fired');
+    F.assert(resultChangeMarker === null, 'Result change event fired with null when no result');
+
+    // Unsubscribe
+    unsubscribe();
+    var eventFiredAfterUnsub = null;
+    anvil.onResultChange(function(stack) { eventFiredAfterUnsub = stack; });
+    // Re-subscribe and trigger — the previous unsubscribe should have stopped the first listener
+
+    // --- onSlotChange event subscription (MUST be before destroy) ---
+    var slotChangeEvent = null;
+    anvil.onSlotChange(function(slotIndex, newStack, oldStack) {
+        slotChangeEvent = { index: slotIndex, new: newStack, old: oldStack };
+    });
+    anvil.setLeftSlot(new Donkeycraft.ItemStack(3, 1));
+    F.assert(slotChangeEvent !== null, 'onSlotChange callback fired');
+    F.assertEq(slotChangeEvent.index, 0, 'onSlotChange slot index is 0');
+
+    // --- setPlayer / getPlayer / canAffordPrice (MUST be before destroy) ---
+    F.assert(anvil.getPlayer() === null, 'getPlayer returns null when no player set');
+
+    // Mock player for testing
+    var mockPlayer = {
+        _levels: 5,
+        getLevel: function() { return this._levels; },
+        addLevel: function(delta) { this._levels += delta; }
+    };
+    anvil.setPlayer(mockPlayer);
+    F.assertEq(anvil.getPlayer(), mockPlayer, 'getPlayer returns player after set');
+
+    // --- canAffordPrice ---
+    anvil.setLeftSlot(new Donkeycraft.ItemStack(207, 1));
+    anvil.setRightSlot(null);
+    anvil.setRenameText('Named Sword');
+    anvil.calculateResult();
+    F.assertEq(anvil.getPrice(), 1, 'Rename price is 1');
+    F.assert(anvil.canAffordPrice(), 'Player can afford price 1 with 5 levels');
+
+    // --- XP cost validation in takeResult ---
+    // Player has 5 levels, price is 1 → should succeed
+    var affordable = anvil.takeResult();
+    F.assert(affordable !== null, 'takeResult succeeds when player can afford');
+    F.assertEq(mockPlayer.getLevel(), 4, 'Player level decreased after takeResult');
+
+    // --- handleDrop ---
+    anvil.setLeftSlot(null);
+    anvil.setRightSlot(null);
+    var dropStack = new Donkeycraft.ItemStack(199, 1); // iron_pickaxe
+    var dropResult = anvil.handleDrop(dropStack, -1); // auto-detect → left slot
+    F.assert(dropResult, 'handleDrop returns true');
+    F.assertEq(anvil.getLeftSlot().getItemId(), 199, 'handleDrop places item in left slot');
+
+    // Drop to specific slot
+    anvil.setLeftSlot(null);
+    dropResult = anvil.handleDrop(new Donkeycraft.ItemStack(201, 1), 1);
+    F.assert(dropResult, 'handleDrop to slot 1 succeeds');
+    F.assertEq(anvil.getRightSlot().getItemId(), 201, 'handleDrop places item in right slot');
+
+    // Invalid drop slot
+    var badDrop = anvil.handleDrop(new Donkeycraft.ItemStack(1, 1), 2); // output slot is invalid
+    F.assert(!badDrop, 'handleDrop to output slot fails validation');
+
+    // --- Enchantment merging test ---
+    var enchSword1 = new Donkeycraft.ItemStack(207, 1);
+    enchSword1.addEnchantment(16, 3); // Sharpness III
+    var enchSword2 = new Donkeycraft.ItemStack(207, 1);
+    enchSword2.addEnchantment(16, 2); // Sharpness II (will upgrade to III)
+    enchSword2.addEnchantment(17, 1); // Fire Aspect I
+
+    anvil.setLeftSlot(enchSword1);
+    anvil.setRightSlot(enchSword2);
+    anvil.setRenameText('');
+
+    var enchResult = anvil.calculateResult();
+    F.assert(enchResult !== null, 'Enchantment merge produces result');
+
+    var resultEnchants = enchResult.getEnchantments();
+    F.assert(resultEnchants.length >= 1, 'Result has at least one enchantment');
+
+    // Sharpness should be level 3 (max of both)
+    var sharpnessFound = false;
+    for (var ec = 0; ec < resultEnchants.length; ec++) {
+        if (resultEnchants[ec].id === 16) {
+            F.assertEq(resultEnchants[ec].level, 3, 'Sharpness upgraded to level 3');
+            sharpnessFound = true;
+            break;
+        }
+    }
+    F.assert(sharpnessFound, 'Sharpness enchantment found in result');
+
+    // Fire Aspect should also be present
+    var fireAspectFound = false;
+    for (var ec2 = 0; ec2 < resultEnchants.length; ec2++) {
+        if (resultEnchants[ec2].id === 17) {
+            fireAspectFound = true;
+            break;
+        }
+    }
+    F.assert(fireAspectFound, 'Fire Aspect enchantment merged into result');
+
+    // --- Enchantment incompatibility test: Silk Touch + Fortune ---
+    var pickaxe1 = new Donkeycraft.ItemStack(205, 1); // diamond_pickaxe
+    pickaxe1.addEnchantment(33, 1); // Silk Touch I
+    var pickaxe2 = new Donkeycraft.ItemStack(205, 1);
+    pickaxe2.addEnchantment(35, 1); // Fortune I
+
+    anvil.setLeftSlot(pickaxe1);
+    anvil.setRightSlot(pickaxe2);
+    anvil.setRenameText('');
+
+    var incompatResult = anvil.calculateResult();
+    F.assert(incompatResult !== null, 'Incompatible enchantment merge produces result');
+
+    // Silk Touch should be kept, Fortune should be dropped (or vice versa based on priority)
+    var resultEnchants2 = incompatResult.getEnchantments();
+    var hasSilk = false;
+    var hasFortune = false;
+    for (var ec3 = 0; ec3 < resultEnchants2.length; ec3++) {
+        if (resultEnchants2[ec3].id === 33) hasSilk = true;
+        if (resultEnchants2[ec3].id === 35) hasFortune = true;
+    }
+    // At most one of Silk Touch or Fortune should be present
+    F.assert(hasSilk || hasFortune, 'At least one of Silk/Fortune present');
+    F.assert(!(hasSilk && hasFortune), 'Silk Touch and Fortune are mutually exclusive');
+
+    // --- Price cap test: high enchantment levels ---
+    var maxEnchItem = new Donkeycraft.ItemStack(207, 1);
+    maxEnchItem.addEnchantment(16, 255); // Very high level
+    var maxEnchItem2 = new Donkeycraft.ItemStack(207, 1);
+    maxEnchItem2.addEnchantment(16, 255); // Very high level (will merge to 255)
+    anvil.setLeftSlot(maxEnchItem);
+    anvil.setRightSlot(maxEnchItem2);
+    anvil.setRenameText('');
+
+    var capResult = anvil.calculateResult();
+    F.assert(capResult !== null, 'High enchantment merge produces result');
+    // Price is capped at 39 (max(1, min(39, totalEnchantLevel)))
+    F.assert(anvil.getPrice() <= 39, 'Price is capped at or below 39');
+
+    // --- _getMaxDurability with tag.maxDurability ---
+    var customItem = new Donkeycraft.ItemStack(1, 1);
+    customItem.setTag({ maxDurability: 500 });
+    F.assertEq(anvil._getMaxDurability(customItem), 500, '_getMaxDurability uses tag.maxDurability');
+
+    // --- _getMaxDurability with empty stack ---
+    F.assertEq(anvil._getMaxDurability(new Donkeycraft.ItemStack(0, 0)), 0, '_getMaxDurability returns 0 for empty stack');
+    F.assertEq(anvil._getMaxDurability(null), 0, '_getMaxDurability returns 0 for null');
+
+    // --- _calculateRepairDurability edge cases ---
+    var newSword1 = new Donkeycraft.ItemStack(207, 1);
+    var newSword2 = new Donkeycraft.ItemStack(207, 1);
+    // Both have durability 0 → should produce 25% of max
+    var repairVal = anvil._calculateRepairDurability(newSword1, newSword2);
+    F.assert(repairVal > 0, '_calculateRepairDurability produces value for two new items');
+
+    // --- _isValidStack ---
+    F.assert(anvil._isValidStack(null), '_isValidStack(null) returns true');
+    F.assert(anvil._isValidStack(new Donkeycraft.ItemStack(1, 1)), '_isValidStack(valid stack) returns true');
+    F.assert(!anvil._isValidStack('string'), '_isValidStack(string) returns false');
+    F.assert(!anvil._isValidStack(123), '_isValidStack(number) returns false');
+    F.assert(!anvil._isValidStack({}), '_isValidStack(object) returns false');
+
+    // --- destroy (AFTER all event tests) ---
     anvil.destroy();
+    F.assert(anvil._container === null, 'destroy clears _container reference');
+    F.assertEq(anvil._slots.length, 0, 'destroy clears _slots array');
+    F.assert(anvil._resultStack === null, 'destroy clears _resultStack');
     document.body.removeChild(anvilContainer);
 
     // ============================================================

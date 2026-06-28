@@ -816,6 +816,86 @@ void main() {
                         }
                         return result;
                     };
+
+                    // --- Chest data store: persists chest contents across GUI open/close ---
+                    var _chestDataStore = {}; // key "x,y,z" → { doubleChest: boolean, slots: Array }
+
+                    // Listen for guiOpen:chest events from InteractableBlocks
+                    try {
+                        var eventBus = game2.getEventBus();
+                        if (eventBus) {
+                            eventBus.on('guiOpen:chest', function(data) {
+                                var cx = data.x, cy = data.y, cz = data.z;
+                                var chestKey = cx + ',' + cy + ',' + cz;
+
+                                // Double-chest detection: check adjacent positions
+                                var doubleChest = false;
+                                var adjKeys = [
+                                    (cx-1) + ',' + cy + ',' + cz,
+                                    (cx+1) + ',' + cy + ',' + cz,
+                                    cx + ',' + cy + ',' + (cz-1),
+                                    cx + ',' + cy + ',' + (cz+1)
+                                ];
+                                for (var d = 0; d < adjKeys.length; d++) {
+                                    if (_chestDataStore[adjKeys[d]] && _chestDataStore[adjKeys[d]].doubleChest) {
+                                        doubleChest = true;
+                                        break;
+                                    }
+                                }
+
+                                // Load chest data from store
+                                var chestData = _chestDataStore[chestKey] || { key: chestKey, doubleChest: doubleChest, slots: new Array(doubleChest ? 54 : 27) };
+                                chestData.doubleChest = doubleChest;
+
+                                // Open chest GUI with data
+                                guiManager.open('chest', {
+                                    doubleChest: doubleChest,
+                                    chestKey: chestKey,
+                                    preloadedSlots: chestData.slots
+                                });
+                            });
+
+                            // Listen for guiClose:chest to save data
+                            eventBus.on('guiClose:chest', function(data) {
+                                var chestKey = data.chestKey;
+                                if (chestKey && _chestDataStore[chestKey]) {
+                                    // Data is saved when GUI closes — handled by onClose listener below
+                                }
+                            });
+                        }
+                    } catch (e4) {
+                        Donkeycraft.Logger.warn('Game', 'Chest event wiring failed: ' + e4.message);
+                    }
+
+                    // Save chest data when any GUI is closed
+                    var origGuiClose = guiManager.close.bind(guiManager);
+                    guiManager.close = function() {
+                        if (this._guiStack.length > 0) {
+                            var topBefore = this._guiStack[this._guiStack.length - 1];
+                            // Save chest data if closing a chest GUI
+                            if (topBefore.type === 'chest' && topBefore.ui && topBefore.ui.serializeData) {
+                                var serialized = topBefore.ui.serializeData();
+                                if (serialized.key) {
+                                    _chestDataStore[serialized.key] = {
+                                        doubleChest: serialized.doubleChest,
+                                        slots: serialized.slots
+                                    };
+                                }
+                            }
+                        }
+                        return origGuiClose();
+                    };
+
+                    // Register chest close event handler for onClose listener
+                    guiManager.onClose(function(type) {
+                        // Emit guiClose:chest for external systems
+                        try {
+                            var globalBus = Donkeycraft.EventBus.getGlobal ? Donkeycraft.EventBus.getGlobal() : null;
+                            if (globalBus && type === 'chest' && guiManager._guiStack.length > 0) {
+                                // Data saved above in override
+                            }
+                        } catch (e5) {}
+                    });
                 } catch (e) {
                     Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
                 }

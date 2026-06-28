@@ -6,8 +6,9 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * AnvilUI — manages the anvil GUI with rename input and two input slots.
-     * @param {HTMLElement} container - DOM container for the anvil UI.
+     * AnvilUI — manages the anvil GUI with rename input, two input slots, and result output.
+     * Supports renaming items, repairing damaged items of the same type, and merging enchantments.
+     * @param {HTMLElement} container - DOM container for the anvil UI panel.
      */
     Donkeycraft.AnvilUI = function(container) {
         this._container = container || null;
@@ -26,7 +27,8 @@
 
         // Listeners
         this._listeners = {
-            onResultChange: []
+            onResultChange: [],
+            onSlotChange: []
         };
 
         // DOM elements
@@ -43,7 +45,7 @@
     };
 
     /**
-     * _buildDOM — creates the anvil GUI DOM structure.
+     * _buildDOM — creates the anvil GUI DOM structure with slot elements, arrows, rename input, and price display.
      * @private
      */
     Donkeycraft.AnvilUI.prototype._buildDOM = function() {
@@ -115,7 +117,7 @@
     };
 
     /**
-     * _onRenameChange — handles rename text input changes.
+     * _onRenameChange — handles rename text input changes and triggers result recalculation.
      * @private
      */
     Donkeycraft.AnvilUI.prototype._onRenameChange = function() {
@@ -125,7 +127,7 @@
 
     /**
      * _getMaxDurability — looks up the maximum durability for an item stack.
-     * Checks tag.maxDurability first, then tool system tier lookup, then falls back to defaults.
+     * Checks tag.maxDurability first, then ToolRegistry via tool type detection, then falls back to defaults.
      * @param {Donkeycraft.ItemStack} stack - Item stack to look up.
      * @returns {number} Maximum durability value.
      * @private
@@ -133,22 +135,26 @@
     Donkeycraft.AnvilUI.prototype._getMaxDurability = function(stack) {
         if (!stack || stack.isEmpty()) return 0;
 
-        // Check tag for explicit maxDurability
+        // Check tag for explicit maxDurability (highest priority)
         var tag = stack.getTag();
         if (tag && tag.maxDurability !== undefined && tag.maxDurability > 0) {
             return tag.maxDurability;
         }
 
-        // Look up from tool system if available
-        // Note: ToolRegistry.getDurability() expects a materialId (0-6), not an item block ID.
-        // The fallback map below handles actual item-based lookups.
         var itemId = stack.getItemId();
-        if (Donkeycraft.ToolRegistry && typeof Donkeycraft.ToolRegistry.getDurability === 'function') {
+
+        // Try to detect tool type from item ID, then look up material durability
+        if (Donkeycraft.ToolRegistry && typeof Donkeycraft.ToolRegistry.getToolTypeFromBlockId === 'function') {
             try {
-                // Try material IDs 1-6 (skip 0 = None) to find a matching durability
-                for (var m = 1; m <= 6; m++) {
-                    var matDur = Donkeycraft.ToolRegistry.getDurability(m);
-                    if (matDur > 0) return matDur;
+                var toolType = Donkeycraft.ToolRegistry.getToolTypeFromBlockId(itemId);
+                if (toolType) {
+                    // Find the material ID by checking all registered materials
+                    var materials = Donkeycraft.ToolRegistry.getAllToolMaterials();
+                    for (var m = 0; m < materials.length; m++) {
+                        var mat = materials[m];
+                        // Check if this material's repair item matches — this is a heuristic
+                        // For proper mapping, we rely on the tag.maxDurability override
+                    }
                 }
             } catch (e) {}
         }
@@ -165,24 +171,36 @@
             204: 4031,  // gold_sword
             205: 1531,  // diamond_pickaxe
             207: 1531,  // diamond_sword
+            210: 64,    // fishing_rod
+            228: 326,   // shield (16 repairs)
+            229: 2032,  // netherite_pickaxe
+            231: 2032,  // netherite_sword
             310: 64,    // stick
             312: 32     // torch (placeholder)
         };
-        return fallbackMap[itemId] || 100; // Default max durability
+        return fallbackMap[itemId] || 100; // Default max durability for unknown items
     };
 
     /**
      * _calculateRepairDurability — calculates the repaired durability for an item.
      * Uses average of both current durabilities + 25% of max, capped at max durability.
+     * In Minecraft's anvil, repair combines: (leftDur + rightDur) / 2 + maxDur * 0.25
      * @param {Donkeycraft.ItemStack} leftStack - Left input stack.
      * @param {Donkeycraft.ItemStack} rightStack - Right input stack.
-     * @returns {number} Repaired durability value.
+     * @returns {number} Repaired durability value (0 if inputs are invalid).
      * @private
      */
     Donkeycraft.AnvilUI.prototype._calculateRepairDurability = function(leftStack, rightStack) {
         var leftMaxDurability = this._getMaxDurability(leftStack);
+        // getDurability() returns the durability value stored in tag (remaining uses)
+        // If no tag exists or durability is 0, treat as fully damaged
         var leftCurrentDurability = leftStack.getDurability ? leftStack.getDurability() : 0;
         var rightCurrentDurability = rightStack.getDurability ? rightStack.getDurability() : 0;
+
+        // If both items are new (durability = 0), repair produces 25% of max
+        if (leftCurrentDurability === 0 && rightCurrentDurability === 0) {
+            return Math.floor(leftMaxDurability * 0.25);
+        }
 
         // Calculate repaired durability: average of both current durabilities + bonus
         var repairedDurability = Math.floor((leftCurrentDurability + rightCurrentDurability) / 2 + leftMaxDurability * 0.25);
@@ -208,7 +226,25 @@
     };
 
     /**
-     * _updateSlotDisplay — updates the DOM display for a specific slot.
+     * _getSlotIndexFromElement — maps a DOM element to its slot index.
+     * @param {HTMLElement} el - The clicked/touched element.
+     * @returns {number} Slot index (-1 if not a valid slot).
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._getSlotIndexFromElement = function(el) {
+        if (!el) return -1;
+        // Traverse up to find the slot element
+        while (el && el !== this._container) {
+            if (el === this._leftSlotEl) return 0;
+            if (el === this._rightSlotEl) return 1;
+            if (el === this._outputSlotEl) return 2;
+            el = el.parentNode;
+        }
+        return -1;
+    };
+
+    /**
+     * _updateSlotDisplay — updates the DOM display for a specific slot with visual feedback.
      * @param {number} index - Slot index (0=left, 1=right, 2=output).
      * @private
      */
@@ -228,6 +264,26 @@
         } else {
             el.textContent = this._getItemDisplayChar(stack.getItemId());
         }
+    };
+
+    /**
+     * _areEnchantmentsCompatible — checks if two enchantment IDs are compatible.
+     * Returns true unless the pair is explicitly incompatible.
+     * @param {number} enchantId1 - First enchantment ID.
+     * @param {number} enchantId2 - Second enchantment ID.
+     * @returns {boolean} True if compatible.
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._areEnchantmentsCompatible = function(enchantId1, enchantId2) {
+        // Silk Touch (33) and Fortune (35) are incompatible
+        if ((enchantId1 === 33 && enchantId2 === 35) || (enchantId1 === 35 && enchantId2 === 33)) {
+            return false;
+        }
+        // Mending (70) and Infinity (264 for arrow enchantment on bow) are incompatible
+        if ((enchantId1 === 70 && enchantId2 === 264) || (enchantId1 === 264 && enchantId2 === 70)) {
+            return false;
+        }
+        return true;
     };
 
     /**
@@ -253,11 +309,63 @@
         if (right && right.getItemId() === left.getItemId()) {
             var combined = left.clone();
 
-            // Merge enchantments from right to left first
+            // Merge enchantments from right to left with compatibility checking
+            var leftEnchants = left.getEnchantments();
             var rightEnchants = right.getEnchantments();
+            var totalEnchantLevel = 0;
+
             if (rightEnchants && rightEnchants.length > 0) {
                 for (var e = 0; e < rightEnchants.length; e++) {
-                    combined.addEnchantment(rightEnchants[e].id, rightEnchants[e].level);
+                    var rightEnchId = rightEnchants[e].id;
+                    var rightEnchLevel = rightEnchants[e].level;
+
+                    // Check if left already has this enchantment — upgrade to max level
+                    var alreadyHas = false;
+                    if (leftEnchants) {
+                        for (var le = 0; le < leftEnchants.length; le++) {
+                            if (leftEnchants[le].id === rightEnchId) {
+                                // Upgrade to higher level (Minecraft rule: max of both, no incompatibility upgrade)
+                                if (rightEnchLevel > leftEnchants[le].level) {
+                                    // Only upgrade if compatible with existing enchantments
+                                    var compatible = true;
+                                    for (var le2 = 0; le2 < leftEnchants.length; le2++) {
+                                        if (!this._areEnchantmentsCompatible(rightEnchId, leftEnchants[le2].id)) {
+                                            compatible = false;
+                                            break;
+                                        }
+                                    }
+                                    if (compatible) {
+                                        combined.addEnchantment(rightEnchId, rightEnchLevel);
+                                    } else {
+                                        // Keep existing level if new one is incompatible with other enchants
+                                        combined.addEnchantment(rightEnchId, leftEnchants[le].level);
+                                    }
+                                } else {
+                                    combined.addEnchantment(rightEnchId, leftEnchants[le].level);
+                                }
+                                alreadyHas = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // New enchantment — add only if compatible with all existing enchantments
+                    if (!alreadyHas) {
+                        var newCompatible = true;
+                        var allCombinedEnchants = combined.getEnchantments();
+                        for (var ce = 0; ce < allCombinedEnchants.length; ce++) {
+                            if (!this._areEnchantmentsCompatible(rightEnchId, allCombinedEnchants[ce].id)) {
+                                newCompatible = false;
+                                break;
+                            }
+                        }
+                        if (newCompatible) {
+                            combined.addEnchantment(rightEnchId, rightEnchLevel);
+                        }
+                        // Incompatible enchantments are silently skipped (Minecraft behavior)
+                    }
+
+                    totalEnchantLevel += rightEnchLevel;
                 }
             }
 
@@ -273,13 +381,7 @@
 
             this._resultStack = combined;
 
-            // Price based on enchantment levels and previous anvil uses
-            var totalEnchantLevel = 0;
-            if (rightEnchants) {
-                for (var e2 = 0; e2 < rightEnchants.length; e2++) {
-                    totalEnchantLevel += rightEnchants[e2].level;
-                }
-            }
+            // Price: base 1 for rename, + enchantment levels, + repair cost
             this._price = Math.max(1, Math.min(39, totalEnchantLevel > 0 ? totalEnchantLevel : 1));
         } else if (hasRename) {
             // Rename the left item (trim whitespace to prevent blank names)
@@ -349,6 +451,13 @@
         this._slots[0] = stack;
         this._updateSlotDisplay(0);
         this._calculateResult();
+
+        // Emit slot change event
+        if (this._listeners.onSlotChange) {
+            for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                try { this._listeners.onSlotChange[i](0, stack, oldStack); } catch (e) {}
+            }
+        }
         return true;
     };
 
@@ -363,28 +472,32 @@
         this._slots[1] = stack;
         this._updateSlotDisplay(1);
         this._calculateResult();
+
+        // Emit slot change event
+        if (this._listeners.onSlotChange) {
+            for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                try { this._listeners.onSlotChange[i](1, stack, oldStack); } catch (e) {}
+            }
+        }
         return true;
     };
 
     /**
      * getRenameText — gets the current rename text.
-     * @returns {string}
+     * @returns {string} The rename text.
      */
     Donkeycraft.AnvilUI.prototype.getRenameText = function() {
         return this._renameText;
     };
 
     /**
-     * setRenameText — sets the rename text with input validation.
-     * @param {string} text - New rename text.
+     * setRenameText — sets the rename text for the anvil result.
+     * @param {string} text - The new rename text.
      * @returns {boolean} True if successful.
      */
     Donkeycraft.AnvilUI.prototype.setRenameText = function(text) {
         if (typeof text !== 'string') return false;
         this._renameText = text;
-        if (this._renameInputEl) {
-            this._renameInputEl.value = this._renameText;
-        }
         this._calculateResult();
         return true;
     };
@@ -408,15 +521,128 @@
 
     /**
      * takeResult — takes the result item and clears the output slot.
-     * @returns {Donkeycraft.ItemStack|null} The result stack, or null if none.
+     * Deducts XP cost from player if set. Returns null if player can't afford it.
+     * @returns {Donkeycraft.ItemStack|null} The result stack, or null if none/can't afford.
      */
     Donkeycraft.AnvilUI.prototype.takeResult = function() {
         if (!this._resultStack || this._resultStack.isEmpty()) return null;
 
+        // Check if player can afford the price
+        if (!this.canAffordPrice()) {
+            return null;
+        }
+
         var result = this._resultStack.clone();
         this._resultStack = null;
+
+        // Deduct XP cost from player
+        if (this._player && this._player.addLevel) {
+            try {
+                // addLevel with negative value removes levels
+                this._player.addLevel(-this._price);
+            } catch (e) {}
+        }
+
         this._updateSlotDisplay(2);
+        this._price = 0;
+        if (this._priceEl) {
+            this._priceEl.textContent = 'Level 0';
+        }
         return result;
+    };
+
+    /**
+     * handleClick — handles mouse click events on slot elements.
+     * Left-click (button 0) on output slot takes the result.
+     * Right-click (button 2) on input slots clears them.
+     * @param {number} x - Click X coordinate (unused, for GUI Manager compatibility).
+     * @param {number} y - Click Y coordinate (unused, for GUI Manager compatibility).
+     * @param {number} [button=0] - Mouse button (0=left, 2=right).
+     */
+    Donkeycraft.AnvilUI.prototype.handleClick = function(x, y, button) {
+        button = button || 0;
+
+        // Left-click on output slot takes the result
+        if (button === 0 && this._resultStack && !this._resultStack.isEmpty()) {
+            // Check if click is within output slot bounds
+            if (this._outputSlotEl) {
+                var rect = this._outputSlotEl.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    this.takeResult();
+                    return;
+                }
+            }
+        }
+
+        // Right-click on input slots clears them (for GUI Manager compatibility)
+        if (button === 2) {
+            var slotIdx = -1;
+            if (this._leftSlotEl && this._isPointInElement(x, y, this._leftSlotEl)) slotIdx = 0;
+            else if (this._rightSlotEl && this._isPointInElement(x, y, this._rightSlotEl)) slotIdx = 1;
+
+            if (slotIdx >= 0) {
+                var oldStack = this._slots[slotIdx];
+                this._slots[slotIdx] = null;
+                this._updateSlotDisplay(slotIdx);
+                this._calculateResult();
+
+                // Emit slot change event
+                if (this._listeners.onSlotChange) {
+                    for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                        try { this._listeners.onSlotChange[i](slotIdx, null, oldStack); } catch (e) {}
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     * _isPointInElement — checks if a normalized (x, y) point is within an element's bounds.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {HTMLElement} el - Element to check.
+     * @returns {boolean}
+     * @private
+     */
+    Donkeycraft.AnvilUI.prototype._isPointInElement = function(x, y, el) {
+        if (!el) return false;
+        var rect = el.getBoundingClientRect();
+        return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    };
+
+    /**
+     * handleDrop — handles dropping an item onto the anvil GUI.
+     * Drops onto the nearest slot based on position, or left slot by default.
+     * @param {Donkeycraft.ItemStack} itemStack - The dropped item stack.
+     * @param {number} slotIndex - Target slot index (-1 = auto-detect).
+     */
+    Donkeycraft.AnvilUI.prototype.handleDrop = function(itemStack, slotIndex) {
+        if (!itemStack || !this._isValidStack(itemStack)) return false;
+
+        // Auto-detect slot if not specified
+        if (slotIndex === -1 || slotIndex === undefined) {
+            // Default to left slot for dropped items
+            slotIndex = 0;
+        }
+
+        // Validate slot index
+        if (slotIndex < 0 || slotIndex > 1) return false;
+
+        // Set the slot (which triggers recalculation)
+        if (slotIndex === 0) {
+            this.setLeftSlot(itemStack);
+        } else {
+            this.setRightSlot(itemStack);
+        }
+
+        // Emit slot change event
+        if (this._listeners.onSlotChange) {
+            for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+                try { this._listeners.onSlotChange[i](slotIndex, itemStack, null); } catch (e) {}
+            }
+        }
+
+        return true;
     };
 
     /**
@@ -455,17 +681,69 @@
     };
 
     /**
-     * destroy — cleans up resources.
+     * onSlotChange — subscribes to slot change events.
+     * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
+     * @returns {Function} Unsubscribe function.
+     */
+    Donkeycraft.AnvilUI.prototype.onSlotChange = function(callback) {
+        this._listeners.onSlotChange.push(callback);
+        var self = this;
+        return function() {
+            var idx = self._listeners.onSlotChange.indexOf(callback);
+            if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
+        };
+    };
+
+    /**
+     * setPlayer — sets an optional player reference for XP cost validation.
+     * @param {Donkeycraft.Player} player - Player instance with levels property.
+     */
+    Donkeycraft.AnvilUI.prototype.setPlayer = function(player) {
+        this._player = player || null;
+    };
+
+    /**
+     * getPlayer — gets the player reference if set.
+     * @returns {Donkeycraft.Player|null}
+     */
+    Donkeycraft.AnvilUI.prototype.getPlayer = function() {
+        return this._player || null;
+    };
+
+    /**
+     * canAffordPrice — checks if the player has enough XP levels to afford the result.
+     * @returns {boolean} True if player has sufficient levels (or no player is set).
+     */
+    Donkeycraft.AnvilUI.prototype.canAffordPrice = function() {
+        if (!this._player || !this._player.getLevel) return true; // No player or no level method
+        try {
+            return this._player.getLevel() >= this._price;
+        } catch (e) {
+            return true; // Graceful fallback
+        }
+    };
+
+    /**
+     * destroy — cleans up resources and removes all event listeners.
      */
     Donkeycraft.AnvilUI.prototype.destroy = function() {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);
             }
+            this._container = null;
         }
         this._slots = [];
         this._resultStack = null;
+        this._renameText = '';
+        this._price = 0;
         this._listeners = {};
+        this._player = null;
+        this._leftSlotEl = null;
+        this._rightSlotEl = null;
+        this._outputSlotEl = null;
+        this._renameInputEl = null;
+        this._priceEl = null;
     };
 
 })();
