@@ -611,38 +611,223 @@
 
     var creative = new Donkeycraft.CreativeInventory(creativeContainer);
 
+    // --- Basic initialization ---
+    F.assertEq(creative.getCurrentTab(), 'building', 'Default tab is building');
+    F.assertEq(creative.getSelectedItem(), null, 'No item selected initially');
+
     // getTabs
     var tabs = creative.getTabs();
+    F.assert(Array.isArray(tabs), 'getTabs returns an array');
     F.assertEq(tabs.length, 6, 'CreativeInventory has 6 tabs');
     F.assertEq(tabs[0], 'building', 'First tab is "building"');
+    F.assertEq(tabs[1], 'decoration', 'Second tab is "decoration"');
+    F.assertEq(tabs[2], 'redstone', 'Third tab is "redstone"');
+    F.assertEq(tabs[3], 'food', 'Fourth tab is "food"');
+    F.assertEq(tabs[4], 'materials', 'Fifth tab is "materials"');
+    F.assertEq(tabs[5], 'tools', 'Sixth tab is "tools"');
 
-    // getCurrentTab / selectTab
-    F.assertEq(creative.getCurrentTab(), 'building', 'Default tab is building');
+    // getTabs returns a copy (mutation safety)
+    tabs.push('fake');
+    F.assertEq(creative.getTabs().length, 6, 'getTabs returns a copy — original unchanged');
+
+    // selectTab — valid transitions
+    creative.selectTab('decoration');
+    F.assertEq(creative.getCurrentTab(), 'decoration', 'selectTab switches to decoration');
+    creative.selectTab('redstone');
+    F.assertEq(creative.getCurrentTab(), 'redstone', 'selectTab switches to redstone');
+    creative.selectTab('food');
+    F.assertEq(creative.getCurrentTab(), 'food', 'selectTab switches to food');
+    creative.selectTab('materials');
+    F.assertEq(creative.getCurrentTab(), 'materials', 'selectTab switches to materials');
     creative.selectTab('tools');
     F.assertEq(creative.getCurrentTab(), 'tools', 'selectTab switches to tools');
     creative.selectTab('building'); // switch back
 
-    // getItemByIndex
-    var item = creative.getItemByIndex(0);
-    F.assert(item > 0, 'getItemByIndex(0) returns a valid item ID');
-    var outOfBounds = creative.getItemByIndex(9999);
-    F.assertEq(outOfBounds, 0, 'getItemByIndex(9999) returns 0');
+    // selectTab — invalid tab name (no-op)
+    var oldTab = creative.getCurrentTab();
+    creative.selectTab('nonexistent');
+    F.assertEq(creative.getCurrentTab(), oldTab, 'selectTab(invalid) is no-op');
 
-    // getGridSize
+    // selectTab — same tab (no-op)
+    creative.selectTab('building'); // should be no-op
+    F.assertEq(creative.getCurrentTab(), 'building', 'selectTab(same) is no-op');
+
+    // selectTab clears selection
+    creative.setSelectedItem(1);
+    F.assertEq(creative.getSelectedItem(), 1, 'SelectedItem set to 1');
+    creative.selectTab('decoration');
+    F.assertEq(creative.getSelectedItem(), null, 'selectTab clears selection');
+
+    // getItemByIndex — valid index
+    var firstBuildingItem = creative.getItemByIndex(0);
+    F.assert(typeof firstBuildingItem === 'number' && firstBuildingItem > 0, 'getItemByIndex(0) returns a valid item ID');
+
+    // getItemByIndex — out of bounds
+    var buildingCount = (creative._tabItems['building'] || []).length;
+    var oob1 = creative.getItemByIndex(buildingCount);
+    F.assertEq(oob1, 0, 'getItemByIndex(length) returns 0');
+    var oob2 = creative.getItemByIndex(9999);
+    F.assertEq(oob2, 0, 'getItemByIndex(9999) returns 0');
+
+    // getItemByIndex — negative index
+    var negIdx = creative.getItemByIndex(-1);
+    F.assertEq(negIdx, 0, 'getItemByIndex(-1) returns 0');
+
+    // getItemByIndex — non-number index
+    var strIdx = creative.getItemByIndex('abc');
+    F.assertEq(strIdx, 0, 'getItemByIndex("abc") returns 0');
+    var nanIdx = creative.getItemByIndex(NaN);
+    F.assertEq(nanIdx, 0, 'getItemByIndex(NaN) returns 0');
+
+    // getItemByIndex — different tabs return different items
+    var buildingItem = creative.getItemByIndex(0);
+    creative.selectTab('tools');
+    var toolsItem = creative.getItemByIndex(0);
+    F.assertEq(buildingItem !== toolsItem, true, 'Different tabs return different first items');
+
+    // getGridSize — basic checks
     var size = creative.getGridSize();
+    F.assert(typeof size === 'object', 'getGridSize returns an object');
+    F.assert(typeof size.rows === 'number', 'getGridSize rows is a number');
+    F.assert(typeof size.cols === 'number', 'getGridSize cols is a number');
     F.assert(size.rows > 0, 'getGridSize rows > 0');
-    F.assert(size.cols > 0, 'getGridSize cols > 0');
+    F.assert(size.cols >= 3, 'getGridSize cols >= 3 (minimum)');
 
-    // searchItems
-    var results = creative.searchItems('stone');
-    F.assert(Array.isArray(results), 'searchItems returns an array');
+    // getItemCount — returns count of items in current tab
+    creative.selectTab('building');
+    var buildingCount2 = creative.getItemCount();
+    F.assertEq(buildingCount2, (creative._tabItems['building'] || []).length, 'getItemCount matches tab item count');
 
-    var idResults = creative.searchItems('1');
-    F.assert(idResults.length > 0, 'searchItems("1") finds items with ID containing "1"');
+    // setSearchQuery via searchItems with empty query
+    var emptySearchResults = creative.searchItems('');
+    F.assertEq(emptySearchResults.length, buildingCount2, 'Empty search returns all items from current tab');
 
-    // destroy
+    // searchItems — null/undefined input
+    var nullResults = creative.searchItems(null);
+    F.assert(Array.isArray(nullResults), 'searchItems(null) returns array');
+    var undefResults = creative.searchItems(undefined);
+    F.assert(Array.isArray(undefResults), 'searchItems(undefined) returns array');
+
+    // searchItems — numeric query (exact ID match)
+    var exactIdResults = creative.searchItems(1);
+    F.assert(exactIdResults.indexOf(1) !== -1, 'searchItems(1) finds item ID 1');
+
+    // searchItems — string numeric query (exact match, no partial)
+    var strExactResults = creative.searchItems('1');
+    F.assert(strExactResults.indexOf(1) !== -1, 'searchItems("1") finds item ID 1');
+    // "1" should NOT partially match ID 10, 11, etc. — only exact ID 1 should match
+    for (var si = 0; si < strExactResults.length; si++) {
+        var foundId = strExactResults[si];
+        // Either the ID is exactly 1, or its string form should not contain "1" at all
+        if (foundId !== 1) {
+            F.assertEq(String(foundId).indexOf('1'), -1, 'searchItems("1") does not partially match ID ' + foundId);
+        }
+    }
+
+    // searchItems — cross-tab matching (search across all tabs)
+    var stoneResults = creative.searchItems('stone');
+    F.assert(Array.isArray(stoneResults), 'searchItems("stone") returns array');
+
+    // searchItems — no matches
+    var noMatchResults = creative.searchItems('zzzzz_not_a_real_item');
+    F.assertEq(noMatchResults.length, 0, 'searchItems with no matches returns empty array');
+
+    // setSelectedItem / getSelectedItem
+    creative.selectTab('building');
+    F.assertEq(creative.getSelectedItem(), null, 'No item selected after tab change');
+    creative.setSelectedItem(1);
+    F.assertEq(creative.getSelectedItem(), 1, 'setSelectedItem(1) works');
+    creative.setSelectedItem(1); // no-op (same value)
+    F.assertEq(creative.getSelectedItem(), 1, 'setSelectedItem(same) is no-op');
+
+    // setSelectedItem with invalid value
+    creative.setSelectedItem(0);
+    F.assertEq(creative.getSelectedItem(), 0, 'setSelectedItem(0) allows 0');
+    creative.setSelectedItem(-1);
+    F.assertEq(creative.getSelectedItem(), -1, 'setSelectedItem(-1) allows negative');
+
+    // onItemSelected event subscription
+    var selectedItemEvent = null;
+    var unsubItem = creative.onItemSelected(function(itemId) {
+        selectedItemEvent = itemId;
+    });
+    creative.selectTab('building');
+    creative.setSelectedItem(4);
+    // Manually trigger item click by calling _onItemClick
+    creative._onItemClick(5);
+    F.assertEq(selectedItemEvent, 5, 'onItemSelected callback receives itemId');
+
+    // Unsubscribe from item selection
+    unsubItem();
+    var firedAfterUnsub = false;
+    creative.onItemSelected(function() { firedAfterUnsub = true; });
+    creative._onItemClick(10);
+    F.assert(firedAfterUnsub, 're-subscribed listener fires');
+
+    // onTabChange event subscription
+    var tabChangeEvent = null;
+    var oldTabEvent = null;
+    var unsubTab = creative.onTabChange(function(newTab, oldTab) {
+        tabChangeEvent = newTab;
+        oldTabEvent = oldTab;
+    });
+    creative.selectTab('decoration');
+    F.assertEq(tabChangeEvent, 'decoration', 'onTabChange receives new tab');
+    F.assertEq(oldTabEvent, 'building', 'onTabChange receives old tab');
+
+    // Unsubscribe from tab change
+    unsubTab();
+    var tabFiredAfterUnsub = null;
+    creative.onTabChange(function(newTab) { tabFiredAfterUnsub = newTab; });
+    creative.selectTab('redstone');
+    F.assertEq(tabFiredAfterUnsub, 'redstone', 're-subscribed listener fires');
+
+    // _getItemDisplayChar coverage
+    var charStone = creative._getItemDisplayChar(1);
+    F.assert(typeof charStone === 'string' && charStone.length > 0, '_getItemDisplayChar returns char for stone');
+    var charDefault = creative._getItemDisplayChar(9999);
+    F.assert(typeof charDefault === 'string', '_getItemDisplayChar returns char for unknown ID');
+    var charInvalid = creative._getItemDisplayChar(null);
+    F.assertEq(charInvalid, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for null');
+    var charNaN = creative._getItemDisplayChar(NaN);
+    F.assertEq(charNaN, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for NaN');
+    var charZero = creative._getItemDisplayChar(0);
+    F.assertEq(charZero, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for 0');
+    var charNeg = creative._getItemDisplayChar(-5);
+    F.assertEq(charNeg, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for negative');
+
+    // _getItemName coverage
+    var itemName = creative._getItemName(1);
+    F.assert(typeof itemName === 'string', '_getItemName returns string');
+    var itemNameInvalid = creative._getItemName(null);
+    F.assertEq(itemNameInvalid, 'item_null', '_getItemName(null) returns "item_null"');
+    var itemNameNaN = creative._getItemName(NaN);
+    F.assertEq(typeof itemNameNaN, 'string', '_getItemName(NaN) returns string');
+
+    // destroy — clears container and references
     creative.destroy();
-    document.body.removeChild(creativeContainer);
+    F.assert(creative._container === null, 'destroy clears _container');
+    F.assert(creative._tabBarEl === null, 'destroy clears _tabBarEl');
+    F.assert(creative._gridEl === null, 'destroy clears _gridEl');
+    F.assert(creative._searchEl === null, 'destroy clears _searchEl');
+
+    // Note: creativeContainer is a detached DOM element — it was removed from document.body by destroy()
+    // No need to manually remove it
+
+    // --- Test CreativeInventory without container (null container) ---
+    var creativeNoContainer = new Donkeycraft.CreativeInventory(null);
+    F.assertEq(creativeNoContainer.getCurrentTab(), 'building', 'Null container still initializes');
+    F.assertEq(creativeNoContainer.getTabs().length, 6, 'Null container has tabs');
+    F.assertEq(creativeNoContainer.getSelectedItem(), null, 'Null container has no selection');
+    creativeNoContainer.selectTab('tools');
+    F.assertEq(creativeNoContainer.getCurrentTab(), 'tools', 'Null container can switch tabs');
+    F.assertEq(creativeNoContainer.getItemByIndex(0), creative._tabItems['tools'][0], 'Null container getItemByIndex works');
+    // getItemCount returns tab item count regardless of whether grid is rendered
+    F.assertEq(creativeNoContainer.getItemCount(), (creativeNoContainer._tabItems['tools'] || []).length, 'Null container getItemCount returns tab item count');
+
+    // destroy null container (should be no-op)
+    creativeNoContainer.destroy();
+    F.assert(creativeNoContainer._container === null, 'destroy(null container) is safe');
 
     // ============================================================
     // Section 6: FurnaceUI — Slots & Progress
