@@ -181,7 +181,7 @@
             // Damage taken — shake the health bar
             this._triggerShake();
 
-            // Flash damaged heart red
+            // Flash damaged hearts red
             this._flashDamagedHearts(Math.abs(delta), delta);
 
             // Screen shake if health drops below 3 hearts (6 HP)
@@ -189,7 +189,7 @@
                 this._triggerScreenShake();
             }
         } else if (delta > 0) {
-            // Healing — flash healed heart white
+            // Healing — flash healed hearts white
             this._flashHealedHearts(delta, delta);
         }
 
@@ -249,7 +249,7 @@
     };
 
     /**
-     * _flashDamagedHearts — flash the heart that took damage.
+     * _flashDamagedHearts — flash the hearts that took damage.
      * @private
      * @param {number} damageAmount - Amount of damage taken.
      * @param {number} delta - Health change (negative).
@@ -260,23 +260,32 @@
         var newHealth = this._prevHealth;
         var oldHealth = newHealth + damageAmount;
 
-        // On damage, highlight the heart that was just lost: floor(oldHealth / 2).
-        var heartIndex = Math.floor(oldHealth / 2);
-        if (heartIndex < 0 || heartIndex >= this._heartContainers.length) return;
-        var container = this._heartContainers[heartIndex];
-        if (!container) return;
+        // Hearts change from oldHealth down to newHealth.
+        // Heart index i covers HP range [i*2, i*2+1].
+        // A heart changes state if its state at oldHealth differs from its state at newHealth.
+        // The damaged hearts are: floor(oldHealth/2) down to floor(newHealth/2).
+        var startIdx = Math.floor(oldHealth / 2);       // e.g. oldHealth=20 → 10, cap at 9
+        var endIdx = Math.floor(newHealth / 2);          // e.g. newHealth=19 → 9
+        startIdx = Math.min(startIdx, 9);               // cap to valid range
 
-        container.classList.add('dk-heart-flash');
-        setTimeout((function(el) {
-            if (el) el.classList.remove('dk-heart-flash');
-        }).bind(this, container), 200);
+        // Flash each damaged heart
+        for (var i = startIdx; i >= endIdx && i >= 0; i--) {
+            var container = this._heartContainers[i];
+            if (!container) continue;
+            container.classList.add('dk-heart-flash');
+            var self = this;
+            setTimeout((function(el) {
+                el.classList.remove('dk-heart-flash');
+            }).bind(this, container), 200);
+        }
 
-        // Position text above the changed heart
-        this._spawnHealthTextAt(delta, heartIndex);
+        // Position text above the center of the damaged range
+        var centerIdx = Math.round((startIdx + endIdx) / 2);
+        this._spawnHealthTextAt(delta, centerIdx);
     };
 
     /**
-     * _flashHealedHearts — flash the heart that was healed.
+     * _flashHealedHearts — flash the hearts that were healed.
      * @private
      * @param {number} healAmount - Amount of healing.
      * @param {number} delta - Health change (positive).
@@ -285,20 +294,27 @@
         if (!this._row) return;
 
         var newHealth = this._prevHealth;
+        var oldHealth = newHealth - healAmount;
 
-        // On healing, highlight the heart that was just restored: floor(newHealth / 2).
-        var heartIndex = Math.floor(newHealth / 2);
-        if (heartIndex < 0 || heartIndex >= this._heartContainers.length) return;
-        var container = this._heartContainers[heartIndex];
-        if (!container) return;
+        // Hearts change from oldHealth up to newHealth.
+        // The healed hearts are: floor(oldHealth/2) up to floor(newHealth/2).
+        var startIdx = Math.floor(oldHealth / 2);       // e.g. oldHealth=5 → 2
+        var endIdx = Math.floor(newHealth / 2);         // e.g. newHealth=12 → 6
 
-        container.classList.add('dk-heart-heal-flash');
-        setTimeout((function(el) {
-            if (el) el.classList.remove('dk-heart-heal-flash');
-        }).bind(this, container), 300);
+        // Flash each healed heart
+        for (var i = startIdx; i <= endIdx && i < 10; i++) {
+            var container = this._heartContainers[i];
+            if (!container) continue;
+            container.classList.add('dk-heart-heal-flash');
+            var self = this;
+            setTimeout((function(el) {
+                el.classList.remove('dk-heart-heal-flash');
+            }).bind(this, container), 300);
+        }
 
-        // Position text above the changed heart
-        this._spawnHealthTextAt(delta, heartIndex);
+        // Position text above the center of the healed range
+        var centerIdx = Math.round((startIdx + endIdx) / 2);
+        this._spawnHealthTextAt(delta, centerIdx);
     };
 
     /**

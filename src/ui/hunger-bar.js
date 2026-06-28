@@ -178,21 +178,18 @@
      */
     Donkeycraft.HungerBar.prototype._animateOnFoodChange = function(delta) {
         if (delta > 0) {
-            // Eating — pulse the drumstick that was filled
+            // Eating — pulse the drumsticks that were filled
             this._pulseEatenDrumsticks(delta);
         } else if (delta < 0) {
-            // Starving — dim the drumstick that was depleted
+            // Starving — dim the drumsticks that were depleted
             this._dimDepletedDrumsticks(Math.abs(delta));
         }
 
-        // Spawn +/- text effect
-        if (delta !== 0) {
-            this._spawnHungerText(delta);
-        }
+        // Note: +/- text is spawned inside _pulseEatenDrumsticks/_dimDepletedDrumsticks via _spawnHungerTextAt
     };
 
     /**
-     * _pulseEatenDrumsticks — pulse on the drumstick that was just eaten.
+     * _pulseEatenDrumsticks — pulse on the drumsticks that were just eaten.
      * @private
      * @param {number} foodGain - Amount of food restored.
      */
@@ -200,25 +197,32 @@
         if (!this._row) return;
 
         var newFood = this._prevFood;
+        var oldFood = newFood - foodGain;
 
-        // Hunger fills left-to-right (0→9). Eating restores the rightmost empty drumstick.
-        // Mirrored from health: on heal, highlight floor(newHealth/2); on eat, highlight 9 - floor(newFood/2).
-        var drumIndex = 9 - Math.floor(newFood / 2);
-        if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) return;
-        var container = this._drumstickContainers[drumIndex];
-        if (!container) return;
+        // Hunger fills right-to-left (9→0). Eating restores from the rightmost empty drumstick first.
+        // Drumstick index for food value f is floor(f / 2).
+        // The eaten drumsticks are: floor(newFood/2) up to floor(oldFood/2).
+        var startIdx = Math.floor(newFood / 2);     // e.g. newFood=5 → 2
+        var endIdx = Math.floor(oldFood / 2);       // e.g. oldFood=12 → 6
 
-        container.classList.add('dk-drumstick-eat-pulse');
-        setTimeout((function(el) {
-            if (el) el.classList.remove('dk-drumstick-eat-pulse');
-        }).bind(this, container), 400);
+        // Pulse each eaten drumstick
+        for (var i = startIdx; i <= endIdx && i < 10; i++) {
+            var container = this._drumstickContainers[i];
+            if (!container) continue;
+            container.classList.add('dk-drumstick-eat-pulse');
+            var self = this;
+            setTimeout((function(el) {
+                el.classList.remove('dk-drumstick-eat-pulse');
+            }).bind(this, container), 400);
+        }
 
-        // Position text above the changed drumstick
-        this._spawnHungerTextAt(foodGain, drumIndex);
+        // Position text above the center of the eaten range
+        var centerIdx = Math.round((startIdx + endIdx) / 2);
+        this._spawnHungerTextAt(foodGain, centerIdx);
     };
 
     /**
-     * _dimDepletedDrumsticks — dim the drumstick that was just depleted.
+     * _dimDepletedDrumsticks — dim the drumsticks that were depleted.
      * @private
      * @param {number} foodLoss - Amount of food lost.
      */
@@ -228,24 +232,30 @@
         var newFood = this._prevFood;
         var oldFood = newFood + foodLoss;
 
-        // Hunger depletes left-to-right (0→9). Starving removes the leftmost full drumstick.
-        // Mirrored from health: on damage, highlight floor(oldHealth/2); on starve, highlight 9 - floor(oldFood/2).
-        var drumIndex = 9 - Math.floor(oldFood / 2);
-        if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) return;
-        var container = this._drumstickContainers[drumIndex];
-        if (!container) return;
+        // Hunger depletes right-to-left (9→0). Starving removes from the rightmost full drumstick first.
+        // The depleted drumsticks are: floor(oldFood/2) down to floor(newFood/2).
+        var startIdx = Math.floor(oldFood / 2);       // e.g. oldFood=20 → 10, cap at 9
+        var endIdx = Math.floor(newFood / 2);          // e.g. newFood=15 → 7
+        startIdx = Math.min(startIdx, 9);             // cap to valid range
 
-        container.classList.add('dk-drumstick-dim');
-        setTimeout((function(el) {
-            if (el) el.classList.remove('dk-drumstick-dim');
-        }).bind(this, container), 300);
+        // Dim each depleted drumstick
+        for (var i = startIdx; i >= endIdx && i >= 0; i--) {
+            var container = this._drumstickContainers[i];
+            if (!container) continue;
+            container.classList.add('dk-drumstick-dim');
+            var self = this;
+            setTimeout((function(el) {
+                el.classList.remove('dk-drumstick-dim');
+            }).bind(this, container), 300);
+        }
 
-        // Position text above the changed drumstick
-        this._spawnHungerTextAt(-foodLoss, drumIndex);
+        // Position text above the center of the depleted range
+        var centerIdx = Math.round((startIdx + endIdx) / 2);
+        this._spawnHungerTextAt(-foodLoss, centerIdx);
     };
 
     /**
-     * _spawnHungerText — spawn floating +/- text at a specific drumstick index.
+     * _spawnHungerTextAt — spawn floating +/- text at a specific drumstick index.
      * @private
      * @param {number} delta - Food change (positive = eat, negative = starve).
      * @param {number} drumIndex - Index of the changed drumstick (0-9).
