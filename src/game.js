@@ -330,14 +330,14 @@
     };
 
     /**
-     * toggleDebugOverlay — toggles the F3 debug overlay visibility.
+     * toggleDebugOverlay — toggles the F3 debug overlay visibility using CSS class.
      * @returns {boolean} True if debug is now visible.
      */
     Donkeycraft.Game.prototype.toggleDebugOverlay = function() {
         this._debugVisible = !this._debugVisible;
         var overlay = document.getElementById('dk-debug-overlay');
         if (overlay) {
-            overlay.style.display = this._debugVisible ? 'block' : 'none';
+            overlay.classList.toggle('visible', this._debugVisible);
         }
         return this._debugVisible;
     };
@@ -1670,9 +1670,7 @@
      * @param {number} dt - Delta time in seconds.
      */
     Donkeycraft.Game.prototype._render = function(dt) {
-        // DEBUG: Log every frame to trace rendering pipeline
         if (!this._running || !this._gl || this._paused) {
-            console.log('[Donkeycraft] _render skipped — running:', this._running, 'gl:', !!this._gl, 'paused:', this._paused);
             return;
         }
         // Resize canvas if needed

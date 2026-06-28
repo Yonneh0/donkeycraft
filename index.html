@@ -107,12 +107,25 @@
 <script src="src/player/jumping.js"></script>
 <script src="src/player/flying.js"></script>
 <script src="src/player/hurt-box.js"></script>
+<script src="src/player/game-mode.js"></script>
+<script src="src/player/stats.js"></script>
+<script src="src/player/hunger.js"></script>
+<script src="src/player/experience.js"></script>
 
 <!-- Interaction -->
 <script src="src/interaction/raycast.js"></script>
 <script src="src/interaction/block-action.js"></script>
 <script src="src/interaction/block-placement.js"></script>
 <script src="src/interaction/interactable-blocks.js"></script>
+
+<!-- Asset Generation (refactored into src/gen/) -->
+<script src="src/gen/noise.js"></script>
+<script src="src/gen/texture-core.js"></script>
+<script src="src/gen/texture-terrain.js"></script>
+<script src="src/gen/texture-blocks.js"></script>
+<script src="src/gen/texture-special.js"></script>
+<script src="src/gen/texture-decorative.js"></script>
+<script src="src/gen/sound-manager.js"></script>
 
 <!-- Loading Screen & Init -->
 <script src="src/core/init-sequence.js"></script>
@@ -165,29 +178,12 @@
 <script src="src/storage/level-data.js"></script>
 <script src="src/storage/cache.js"></script>
 
-<!-- Game Modes -->
-<script src="src/player/game-mode.js"></script>
-<script src="src/player/stats.js"></script>
-
 <!-- Enchanting & Potions -->
 <script src="src/game/enchantment.js"></script>
 <script src="src/game/potion.js"></script>
 
 <!-- Tools -->
 <script src="src/game/tool.js"></script>
-
-<!-- Hunger & XP -->
-<script src="src/player/hunger.js"></script>
-<script src="src/player/experience.js"></script>
-
-<!-- Asset Generation (refactored into src/gen/) -->
-<script src="src/gen/noise.js"></script>
-<script src="src/gen/texture-core.js"></script>
-<script src="src/gen/texture-terrain.js"></script>
-<script src="src/gen/texture-blocks.js"></script>
-<script src="src/gen/texture-special.js"></script>
-<script src="src/gen/texture-decorative.js"></script>
-<script src="src/gen/sound-manager.js"></script>
 
 <!-- UI Elements -->
 <script src="src/ui/gui-elements.js"></script>
@@ -513,9 +509,19 @@ void main() {
         // Set overlay reference for pointer lock
         game.setOverlay(document.getElementById('dk-overlay'));
 
-        // --- Input: Pointer Lock ---
+        // --- Input: Pointer Lock & AudioContext Resume ---
         var overlay = document.getElementById('dk-overlay');
         overlay.addEventListener('click', function() {
+            // Resume AudioContext if suspended — required on mobile browsers
+            // and some desktop browsers that defer audio until user gesture.
+            if (window._dkGame && window._dkGame._audioContext) {
+                try {
+                    var ac = window._dkGame._audioContext;
+                    if (ac.state === 'suspended') {
+                        ac.resume().catch(function() {});
+                    }
+                } catch (e) {}
+            }
             if (!document.pointerLockElement) {
                 game.requestPointerLock();
             }

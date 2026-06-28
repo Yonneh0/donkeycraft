@@ -72,7 +72,7 @@
                 SNEAK: 'ControlLeft',
                 INVENTORY: 'KeyE',
                 DEBUG_SCREEN: 'F3',
-                FLY_TOGGLE: 'F5',
+                FLY_TOGGLE: 'KeyF',
                 PICK_ITEM_1: 'Digit1',
                 PICK_ITEM_2: 'Digit2',
                 PICK_ITEM_3: 'Digit3',

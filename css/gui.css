@@ -710,3 +710,24 @@
     width: 16px;
     text-align: center;
 }
+
+/* ============================================================
+   LOADING SCREEN (style.css)
+   ============================================================ */
+
+#dk-loading-screen .dk-progress-bar-container {
+    width: 300px;
+    height: 20px;
+    background: #1a1a1a;
+    border: 2px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+#dk-loading-screen .dk-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    transition: width 0.3s ease;
+}

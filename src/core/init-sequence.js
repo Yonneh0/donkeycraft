@@ -182,19 +182,21 @@
     /**
      * _initAudio — initialize the audio system with decoded buffers.
      * Attempts to create AudioContext and pre-load procedural sounds.
+     * Handles browsers that require a user gesture by deferring context creation
+     * and attempting resume() on first interaction.
      * @private
      * @returns {Promise<Object>} Resolves with { audioSystem } when ready.
      */
     Donkeycraft.InitSequence.prototype._initAudio = function() {
         var self = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function(resolve) {
             try {
-                // Initialize PerlinNoise for terrain generation before audio
-                if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init && !Donkeycraft.PerlinNoise._initialized) {
+                // Seed the shared permutation table and PRNG for terrain generation.
+                // The noise module exposes _gen._seedRng() for this purpose.
+                if (Donkeycraft._gen && Donkeycraft._gen._seedRng) {
                     var seed = self._config ? self._config.SEED : 42;
-                    Donkeycraft.PerlinNoise.init(seed);
-                    Donkeycraft.PerlinNoise._initialized = true;
-                    Donkeycraft.Logger.info('InitSequence', 'PerlinNoise initialized with seed: ' + seed);
+                    Donkeycraft._gen._seedRng(seed);
+                    Donkeycraft.Logger.info('InitSequence', 'Noise PRNG seeded with: ' + seed);
                 }
 
                 if (typeof window.AudioContext === 'undefined' && typeof window.webkitAudioContext === 'undefined') {
@@ -203,9 +205,20 @@
                     return;
                 }
 
-                // Create audio system
+                // Create audio system — AudioContext may start suspended on some browsers.
+                // The game.js click handler will call resume() when the user clicks.
                 var audioSys = new Donkeycraft.AudioSystem();
                 audioSys.init().then(function() {
+                    // Attempt to resume if the context is in 'suspended' state.
+                    // This is required on mobile browsers and some desktop browsers
+                    // that defer audio context creation until a user gesture.
+                    if (audioSys._context && audioSys._context.state === 'suspended') {
+                        audioSys._context.resume().catch(function(e) {
+                            Donkeycraft.Logger.warn('InitSequence',
+                                'AudioContext could not be auto-resumed: ' + e.message +
+                                '. Audio will start after first user interaction.');
+                        });
+                    }
                     Donkeycraft.Logger.info('InitSequence', 'AudioSystem initialized successfully');
                     resolve({ audioSystem: audioSys, perlinNoiseReady: true });
                 }).catch(function(err) {
