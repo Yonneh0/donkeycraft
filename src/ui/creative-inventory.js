@@ -173,7 +173,13 @@
 
         // Filter by search query if present — delegate to searchItems for cross-tab matching
         if (this._searchQuery && this._searchQuery.length > 0) {
-            return this.searchItems(this._searchQuery);
+            try {
+                var results = this.searchItems(this._searchQuery);
+                return results;
+            } catch (e) {
+                if (Donkeycraft.Logger) Donkeycraft.Logger.warn('CreativeInventory: searchItems failed: ' + e.message);
+                return items; // Fallback to unfiltered tab items
+            }
         }
 
         return items;
@@ -281,7 +287,12 @@
      * @returns {number[]} Array of matching item IDs.
      */
     Donkeycraft.CreativeInventory.prototype.searchItems = function(query) {
-        var queryLower = (query || '').toLowerCase().trim();
+        // Validate input
+        if (query === null || query === undefined) {
+            return this._tabItems[this._currentTab] ? this._tabItems[this._currentTab].slice() : [];
+        }
+
+        var queryLower = String(query).toLowerCase().trim();
         if (!queryLower) {
             // Empty query returns all items from current tab
             return this._tabItems[this._currentTab] ? this._tabItems[this._currentTab].slice() : [];
@@ -292,22 +303,29 @@
 
         // Build a name->ID lookup from block.js if available
         var nameLookup = null;
-        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getAllBlocks === 'function') {
-            nameLookup = {};
-            try {
+        try {
+            if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getAllBlocks === 'function') {
                 var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
-                for (var bi = 0; bi < allBlocks.length; bi++) {
-                    var block = allBlocks[bi];
-                    if (block && block.id !== undefined && block.name) {
-                        nameLookup[block.id] = block.name;
+                if (allBlocks && Array.isArray(allBlocks)) {
+                    nameLookup = {};
+                    for (var bi = 0; bi < allBlocks.length; bi++) {
+                        var block = allBlocks[bi];
+                        if (block && block.id !== undefined && block.name) {
+                            nameLookup[block.id] = block.name;
+                        }
                     }
                 }
-            } catch (e) {}
+            }
+        } catch (e) {
+            // BlockRegistry unavailable — will only match by ID
         }
 
+        // Search across ALL tabs for cross-tab matching
         for (var tab in this._tabItems) {
             if (this._tabItems.hasOwnProperty(tab)) {
                 var items = this._tabItems[tab];
+                if (!Array.isArray(items)) continue;
+
                 for (var i = 0; i < items.length; i++) {
                     var id = items[i];
                     if (seen[id]) continue;

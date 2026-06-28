@@ -664,6 +664,26 @@
     justify-content: center;
 }
 
+/* Progress bar base styles — used by LoadingScreen */
+.dk-loading-progress {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4CAF50, #66BB6A);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.dk-loading-progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
+    border-radius: 10px;
+}
+
 .dk-loading-steps {
     margin-top: 20px;
     width: 300px;

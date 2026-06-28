@@ -172,6 +172,7 @@
     /**
      * handleKeyPress — routes a key press to the top GUI.
      * Escape always closes the top GUI regardless of component handling.
+     * Returns false when no GUI is open so Escape can exit pointer lock.
      * @param {string} key - Key identifier (e.g., 'Escape', 'Digit1').
      * @returns {boolean} True if the key was consumed.
      */
@@ -180,7 +181,7 @@
 
         var top = this._guiStack[this._guiStack.length - 1];
 
-        // Escape always closes the top GUI
+        // Escape always closes the top GUI (only when one is open)
         if (key === 'Escape') {
             this.close();
             return true;

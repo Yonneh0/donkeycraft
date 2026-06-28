@@ -127,7 +127,7 @@
             }
         }
 
-        // Re-apply selection highlight after updating all slots
+        // Update selection highlight AFTER all DOM updates to ensure correct visual state
         this._updateSelectionHighlight();
     };
 

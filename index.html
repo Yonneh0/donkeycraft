@@ -764,7 +764,29 @@ void main() {
                         // Store reference for toggleDebugOverlay to use
                         game2._debugOverlay = debugOverlay;
 
-                        // Auto-start listening when debug is toggled on
+                        // Wire EventBus listener for debug:update events to render on overlay FIRST
+                        // so data is available when debug is toggled on.
+                        try {
+                            var debugOverlayEl = document.getElementById('dk-debug-overlay');
+                            if (debugOverlayEl) {
+                                game2.getEventBus().on('debug:update', function(data) {
+                                    if (game2.isDebugVisible()) {
+                                        debugOverlayEl.textContent =
+                                            'FPS: ' + data.fps +
+                                            ' | X:' + data.coordinates.x +
+                                            ' Y:' + data.coordinates.y +
+                                            ' Z:' + data.coordinates.z +
+                                            ' | Chunk: [' + data.chunkInfo.loaded + '/' + data.chunkInfo.renderDistance + ']' +
+                                            ' | Biome: ' + data.biome +
+                                            ' | Mode: ' + data.gameMode;
+                                    }
+                                });
+                            }
+                        } catch (e2) {
+                            Donkeycraft.Logger.warn('Game', 'Debug EventBus listener failed: ' + e2.message);
+                        }
+
+                        // Override toggleDebugOverlay to start/stop auto-listening
                         var origToggle = game2.toggleDebugOverlay.bind(game2);
                         game2.toggleDebugOverlay = function() {
                             var visible = origToggle();
@@ -775,23 +797,6 @@ void main() {
                             }
                             return visible;
                         };
-
-                        // Also wire EventBus listener for debug:update events to render on overlay
-                        try {
-                            game2.getEventBus().on('debug:update', function(data) {
-                                var overlayEl = document.getElementById('dk-debug-overlay');
-                                if (overlayEl && game2.isDebugVisible()) {
-                                    overlayEl.textContent =
-                                        'FPS: ' + data.fps +
-                                        ' | X:' + data.coordinates.x +
-                                        ' Y:' + data.coordinates.y +
-                                        ' Z:' + data.coordinates.z +
-                                        ' | Chunk: [' + data.chunkInfo.loaded + '/' + data.chunkInfo.renderDistance + ']' +
-                                        ' | Biome: ' + data.biome +
-                                        ' | Mode: ' + data.gameMode;
-                                }
-                            });
-                        } catch (e2) {}
                     } catch (e) {
                         Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
                     }

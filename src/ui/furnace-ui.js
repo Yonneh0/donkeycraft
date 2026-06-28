@@ -313,21 +313,24 @@
 
     /**
      * _consumeFuel — consumes one unit of fuel from the fuel slot.
-     * Decrement the stack count by 1 and clear the slot if depleted.
+     * Decrements the stack count by 1 and clears the slot if depleted.
+     * Emits a slot change event for the fuel slot (index 0).
      * @private
      */
     Donkeycraft.FurnaceUI.prototype._consumeFuel = function() {
         if (!this._slots[0] || this._slots[0].isEmpty()) return;
 
+        var oldFuelStack = this._slots[0].clone();
         this._slots[0].decrement(1);
+
         if (this._slots[0].isEmpty()) {
             this._slots[0] = null;
         }
 
-        // Emit slot change event for fuel slot
+        // Emit slot change event for fuel slot (index 0)
         if (this._listeners.onSlotChange) {
             for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                try { this._listeners.onSlotChange[i](0, this._slots[0], null); } catch (e) {}
+                try { this._listeners.onSlotChange[i](0, this._slots[0], oldFuelStack); } catch (e) {}
             }
         }
     };
@@ -409,6 +412,8 @@
      */
     Donkeycraft.FurnaceUI.prototype.setTimer = function(timer) {
         if (timer === null || timer === undefined) return false;
+        // Validate that timer has the required onRender method
+        if (typeof timer.onRender !== 'function') return false;
         this._timer = timer;
         return true;
     };
@@ -420,7 +425,7 @@
         if (this._unsubscribeRender) return;
 
         var self = this;
-        if (this._timer) {
+        if (this._timer && typeof this._timer.onRender === 'function') {
             try {
                 this._unsubscribeRender = this._timer.onRender(function(timestamp) {
                     if (self._isBurning) {

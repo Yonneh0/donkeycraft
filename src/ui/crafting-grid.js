@@ -235,8 +235,11 @@
      * @private
      */
     Donkeycraft.CraftingGrid.prototype._tryMatchRecipe = function(gridChanged) {
-        // If no recipe registry, no matching possible — clear result
-        if (!this._recipeRegistry) {
+        // Guard: ensure recipe registry exists and has required methods
+        if (!this._recipeRegistry ||
+            typeof this._recipeRegistry.matchShapedRecipe !== 'function' ||
+            typeof this._recipeRegistry.matchShapelessRecipe !== 'function') {
+            // No valid registry — clear result
             this._resultStack = null;
             this._updateResultDisplay();
             return;

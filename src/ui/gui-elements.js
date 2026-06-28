@@ -53,8 +53,9 @@
             var slotIndex = parseInt(slotEl.dataset.slotIndex, 10);
             if (isNaN(slotIndex)) return;
 
-            // Check if dragging with middle button or shift+left
-            if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+            // Check if dragging with left button (click-and-drag), middle button, or shift+left
+            // Left-click drag is the primary interaction mode for inventory management.
+            if (e.button === 0 || e.button === 1 || (e.button === 0 && e.shiftKey)) {
                 e.preventDefault();
                 self._startDrag(slotIndex, e);
             }

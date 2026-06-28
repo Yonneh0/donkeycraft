@@ -379,6 +379,28 @@
     };
 
     /**
+     * getHotbarStacks — gets the first 9 slots as a hotbar-compatible array.
+     * Returns an array of 9 ItemStack|null values suitable for Hotbar.setSlots().
+     * @returns {Array} Array of 9 ItemStack|null values.
+     */
+    Donkeycraft.Inventory.prototype.getHotbarStacks = function() {
+        var hotbar = [];
+        for (var i = 0; i < 9 && i < this._slotCount; i++) {
+            var slot = this._slots[i];
+            if (slot) {
+                hotbar[i] = slot.clone();
+            } else {
+                hotbar[i] = null;
+            }
+        }
+        // Fill remaining slots as null if inventory has fewer than 9 slots
+        while (hotbar.length < 9) {
+            hotbar.push(null);
+        }
+        return hotbar;
+    };
+
+    /**
      * isDragActive — checks if a drag operation is in progress.
      * @returns {boolean}
      */
