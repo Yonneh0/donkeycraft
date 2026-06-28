@@ -100,15 +100,11 @@
             var chunk = new Donkeycraft.Chunk(chunkX, chunkZ);
             this._chunks.set(key, chunk);
 
-            // Generate terrain for new chunk if generation systems are available
+            // Trigger onChunkLoad callback (dimension.js wires up terrain generation + lighting).
+            // The callback sets chunk.generated = true after terrain is placed,
+            // so we do NOT call _generateTerrain here to avoid double generation.
             if (this.onChunkLoad) {
                 this.onChunkLoad(chunk);
-            }
-
-            // Only generate terrain once per chunk
-            if (!chunk.generated && this._generateTerrain) {
-                this._generateTerrain(chunkX, chunkZ);
-                chunk.generated = true;
             }
 
             return chunk;

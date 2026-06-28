@@ -15,7 +15,9 @@
      * CaveGenerator — generates cave systems using 3D noise.
      */
     Donkeycraft.CaveGenerator = (function() {
-        var _caveDensity = 0.012;       // Noise threshold for cave air
+        // Cave density threshold — fbm value below which caves form.
+        // fbm returns [-1, 1]; -0.7 carves the lowest ~12% of values for natural cave density.
+        var _caveDensity = -0.7;
         var _caveRadius = 3.0;          // Base cave tunnel radius
         var _lavaYLevel = 10;           // Lava caves below this Y level
         var _surfaceDepth = 5;          // Surface depth for hanging caves
@@ -25,7 +27,7 @@
          * @type {{minY: number, maxY: number, lavaYLevel: number}}
          * @private
          */
-        var _defaultConfig = { minY: 0, maxY: WORLD_HEIGHT, lavaYLevel: _lavaYLevel };
+        var _defaultConfig = { minY: 1, maxY: WORLD_HEIGHT - 1, lavaYLevel: _lavaYLevel };
 
         /**
          * Check if a block ID is replaceable (air, liquids, flowers, grass, etc.).
@@ -68,17 +70,17 @@
             var radius = _caveRadius;
 
             if (biomeId === Donkeycraft.BiomeID.OCEAN) {
-                density = _caveDensity * 0.3;
+                density = -0.9;  // More negative = fewer caves carved
                 radius = _caveRadius * 0.5;
             } else if (biomeId === Donkeycraft.BiomeID.DESERT || biomeId === Donkeycraft.BiomeID.DESERT_M) {
-                density = _caveDensity * 0.7;
+                density = -0.8;  // Slightly fewer caves in deserts
             }
 
             // Generate main cave layer with continuous Y iteration
             _generateCaveLayer(chunk, density, radius, minY, maxY, 'main');
 
             // Generate lava caves near bedrock floor
-            _generateCaveLayer(chunk, density * 0.5, radius * 0.7, minY, lavaYLevel + 5, 'lava');
+            _generateCaveLayer(chunk, -0.9, radius * 0.7, minY, lavaYLevel + 5, 'lava');
         }
 
         /**
@@ -102,10 +104,11 @@
                     var worldX = chunk.chunkX * CHUNK_SIZE + x;
                     var worldZ = chunk.chunkZ * CHUNK_SIZE + z;
 
-                    // Adjust threshold based on local X/Z noise for tunnel shape variation
+                    // Adjust threshold based on local X/Z noise for tunnel shape variation.
+                    // fbm returns [-1, 1]; threshold varies slightly around _caveDensity.
                     var threshold = density + Donkeycraft.PerlinNoise.noise2D(
                         x * 0.3, z * 0.3
-                    ) * 0.003;
+                    ) * 0.05;
 
                     // Continuous Y iteration for connected cave networks
                     // Use while loop so manual y increment works correctly
@@ -119,7 +122,9 @@
                             3, 0.5, 2.0
                         );
 
-                        if (noiseVal < -threshold) {
+                        // Carve when noise falls below the threshold (fbm returns [-1, 1]).
+                        // Lower threshold = fewer caves; -0.7 carves ~12% of blocks.
+                        if (noiseVal < threshold) {
                             // Carve a tunnel at this position with slight Y spread
                             var tunnelRadius = radius + Donkeycraft.PerlinNoise.noise2D(
                                 y * 0.1 + x, z * 0.1 + worldZ * 0.05

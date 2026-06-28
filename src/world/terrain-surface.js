@@ -156,7 +156,8 @@
         }
 
         /**
-         * Apply snow surface: snow block on top, dirt layer below stone, optional second snow layer.
+         * Apply snow surface: snow block on top of grass, dirt layer below stone, snow layer on top.
+         * The snow layer sits ABOVE the grass_block (like vanilla Minecraft's snow layer).
          * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
          * @private
@@ -165,6 +166,7 @@
             var snowBlockId = _getBlockId('snow_block');
             var dirtId = _getBlockId('dirt');
             var stoneId = _getBlockId('stone');
+            var grassBlockId = _getBlockId('grass_block');
 
             if (!snowBlockId) return;
 
@@ -173,8 +175,12 @@
                     var surfaceY = heightmap[x + z * CHUNK_SIZE];
                     if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
-                    // Snow block on top
-                    chunk.setBlock(x, surfaceY, z, snowBlockId);
+                    // Place grass block as the base surface layer
+                    if (grassBlockId) {
+                        chunk.setBlock(x, surfaceY, z, grassBlockId);
+                    } else if (dirtId) {
+                        chunk.setBlock(x, surfaceY, z, dirtId);
+                    }
 
                     // Dirt layer below
                     for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
@@ -185,8 +191,8 @@
                         }
                     }
 
-                    // Snow layer on top (if grass block was placed)
-                    if (surfaceY + 1 < WORLD_HEIGHT && chunk.getBlock(x, surfaceY + 1, z) === 0) {
+                    // Snow layer on top of the surface block (if space is empty)
+                    if (snowBlockId && surfaceY + 1 < WORLD_HEIGHT && chunk.getBlock(x, surfaceY + 1, z) === 0) {
                         chunk.setBlock(x, surfaceY + 1, z, snowBlockId);
                     }
                 }

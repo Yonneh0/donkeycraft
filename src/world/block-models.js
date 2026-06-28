@@ -357,8 +357,9 @@
 
         /**
          * Get the texture UV for a specific block and face.
-         * Returns UV coordinates assuming a standard 16×16 texture atlas where each
-         * texture occupies a 1/16 × 1/16 cell (UV range 0-1).
+         * Returns UV coordinates matching the atlas grid layout:
+         *   col = id % ATLAS_COLS, row = Math.floor(id / ATLAS_COLS).
+         * Block IDs >= 256 (beyond the 16×16 atlas) fall back to ID 0 (air/placeholder).
          * @param {number} blockId - Block ID.
          * @param {string} faceName — Face name: "up", "down", "north", "south", "east", "west".
          * @returns {{blockId: number, faceName: string, textureName: string, u: number, v: number, uSize: number, vSize: number}|null}
@@ -372,24 +373,27 @@
             var textureBlock = Donkeycraft.BlockRegistry.getBlockByName(textureName);
             var lookupId = textureBlock ? textureBlock.id : blockId;
 
-            // Calculate UV coordinates assuming a 16×16 atlas grid (each cell = 1/16)
-            // Texture ID maps to a position in the grid: col = id % 16, row = Math.floor(id / 16)
-            var textureId = lookupId >= 0 ? lookupId : 0;
-            var col = textureId % 16;
-            var row = Math.floor(textureId / 16);
+            // Atlas is 16×16 grid (256 slots, IDs 0-255)
+            var ATLAS_COLS = 16;
+            var ATLAS_ROWS = 16;
+            var MAX_BLOCK_ID = ATLAS_COLS * ATLAS_ROWS; // 256
 
-            // Clamp to atlas bounds (atlas has 16 columns, rows wrap as needed)
-            col = Math.max(0, Math.min(col, 15));
-            row = Math.max(0, row);
+            // Block IDs >= 256 overflow the atlas — fall back to ID 0
+            if (lookupId < 0 || lookupId >= MAX_BLOCK_ID) {
+                lookupId = 0;
+            }
+
+            var col = lookupId % ATLAS_COLS;
+            var row = Math.floor(lookupId / ATLAS_COLS);
 
             return {
                 blockId: lookupId,
                 faceName: faceName,
                 textureName: textureName,
-                u: col / 16,
-                v: row / 16,
-                uSize: 1 / 16,
-                vSize: 1 / 16
+                u: col / ATLAS_COLS,
+                v: row / ATLAS_ROWS,
+                uSize: 1 / ATLAS_COLS,
+                vSize: 1 / ATLAS_ROWS
             };
         }
 

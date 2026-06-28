@@ -327,27 +327,38 @@
          * @private
          */
         function _wireGenerationToChunkManager(chunkManager, dimensionType) {
-            // Wire chunk load callback (generates terrain for new chunks)
+            // Wire chunk load callback (generates terrain for new chunks).
+            // Sets chunk.generated = true after terrain + lighting are applied.
             chunkManager.onChunkLoad = function(chunk) {
+                var terrainGenerated = false;
+
                 // Generate terrain based on dimension
                 switch (dimensionType) {
                     case Donkeycraft.DimensionType.NETHER:
                         if (Donkeycraft.NetherGenerator && Donkeycraft.NetherGenerator.generateNetherTerrain) {
-                            try { Donkeycraft.NetherGenerator.generateNetherTerrain(chunk, chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                            try { Donkeycraft.NetherGenerator.generateNetherTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
                     case Donkeycraft.DimensionType.END:
                         if (Donkeycraft.EndGenerator && Donkeycraft.EndGenerator.generateEndTerrain) {
-                            try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                            try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
                     default: // Overworld — delegate to ChunkManager's built-in generation
-                        // ChunkManager handles generated flag internally via _generateTerrain
                         if (chunkManager._generateTerrain) {
                             chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ);
+                            terrainGenerated = true;
                         }
                         break;
                 }
+
+                // Fallback: if terrain generation callback didn't run, try direct generation
+                if (!terrainGenerated && chunkManager._generateTerrain) {
+                    try { chunkManager._generateTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                }
+
+                // Mark as generated so getChunk won't attempt regeneration on future lookups
+                chunk.generated = true;
 
                 // Apply lighting after terrain generation
                 if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.updateChunkLighting) {

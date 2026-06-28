@@ -96,20 +96,20 @@
         registerBlock(5, 'deepslate', 3.0, 6.0, 5, 1, false, false, 0, 15);
         registerBlock(6, 'cobbled_deepslate', 3.0, 6.0, 6, 1, false, false, 0, 15);
         registerBlock(7, 'dirt', 0.5, 0.5, 7, 1, false, false, 0, 15);
-        registerBlock(8, 'grass_block', 0.6, 0.6, 7, 1, false, false, 0, 15);
+        registerBlock(8, 'grass_block', 0.6, 0.6, 8, 1, false, false, 0, 15);
         registerBlock(9, 'gravel', 0.6, 0.5, 9, 1, false, false, 0, 15);
 
         // Bedrock (ID 1000) — world boundary block, unbreakable
         registerBlock(1000, 'bedrock', -1, 3600000.0, -1, 0, false, false, 0, 15);
 
         // Ores (IDs 10-18)
-        registerBlock(10, 'coal_ore', 3.0, 6.0, 20, 1, false, false, 0, 15);
-        registerBlock(11, 'iron_ore', 3.0, 6.0, 21, 1, false, false, 0, 15);
-        registerBlock(12, 'gold_ore', 3.0, 6.0, 22, 1, false, false, 0, 15);
-        registerBlock(13, 'diamond_ore', 3.0, 6.0, 23, 1, false, false, 0, 15);
-        registerBlock(14, 'emerald_ore', 3.0, 6.0, 24, 1, false, false, 0, 15);
-        registerBlock(15, 'redstone_ore', 3.0, 6.0, -1, 0, false, false, 0, 15);
-        registerBlock(16, 'lapis_ore', 3.0, 6.0, 25, 1, false, false, 0, 15);
+        registerBlock(10, 'coal_ore', 3.0, 6.0, 10, 1, false, false, 0, 15);
+        registerBlock(11, 'iron_ore', 3.0, 6.0, 11, 1, false, false, 0, 15);
+        registerBlock(12, 'gold_ore', 3.0, 6.0, 12, 1, false, false, 0, 15);
+        registerBlock(13, 'diamond_ore', 3.0, 6.0, 13, 1, false, false, 0, 15);
+        registerBlock(14, 'emerald_ore', 3.0, 6.0, 14, 1, false, false, 0, 15);
+        registerBlock(15, 'redstone_ore', 3.0, 6.0, 15, 1, false, false, 0, 15);
+        registerBlock(16, 'lapis_ore', 3.0, 6.0, 16, 1, false, false, 0, 15);
         registerBlock(17, 'obsidian', 50.0, 1200.0, 26, 1, false, false, 0, 15);
         registerBlock(18, 'crying_obsidian', 50.0, 1200.0, 26, 1, false, true, 10, 15);
 
@@ -128,23 +128,23 @@
         registerBlock(27, 'jungle_log', 2.0, 2.0, 33, 1, false, false, 0, 15);
         registerBlock(28, 'acacia_log', 2.0, 2.0, 34, 1, false, false, 0, 15);
         registerBlock(29, 'dark_oak_log', 2.0, 2.0, 35, 1, false, false, 0, 15);
-        registerBlock(30, 'oak_planks', 2.0, 2.0, 31, 1, false, false, 0, 15);
-        registerBlock(31, 'spruce_planks', 2.0, 2.0, 32, 1, false, false, 0, 15);
-        registerBlock(32, 'birch_planks', 2.0, 2.0, 33, 1, false, false, 0, 15);
-        registerBlock(33, 'jungle_planks', 2.0, 2.0, 34, 1, false, false, 0, 15);
-        registerBlock(34, 'acacia_planks', 2.0, 2.0, 35, 1, false, false, 0, 15);
-        registerBlock(35, 'dark_oak_planks', 2.0, 2.0, 36, 1, false, false, 0, 15);
-        registerBlock(36, 'oak_wood', 2.0, 2.0, 31, 1, false, false, 0, 15);
-        registerBlock(37, 'spruce_wood', 2.0, 2.0, 32, 1, false, false, 0, 15);
-        registerBlock(38, 'birch_wood', 2.0, 2.0, 33, 1, false, false, 0, 15);
-        registerBlock(39, 'jungle_wood', 2.0, 2.0, 34, 1, false, false, 0, 15);
+        registerBlock(30, 'oak_planks', 2.0, 2.0, 30, 1, false, false, 0, 15);
+        registerBlock(31, 'spruce_planks', 2.0, 2.0, 31, 1, false, false, 0, 15);
+        registerBlock(32, 'birch_planks', 2.0, 2.0, 32, 1, false, false, 0, 15);
+        registerBlock(33, 'jungle_planks', 2.0, 2.0, 33, 1, false, false, 0, 15);
+        registerBlock(34, 'acacia_planks', 2.0, 2.0, 34, 1, false, false, 0, 15);
+        registerBlock(35, 'dark_oak_planks', 2.0, 2.0, 35, 1, false, false, 0, 15);
+        registerBlock(36, 'oak_wood', 2.0, 2.0, 36, 1, false, false, 0, 15);
+        registerBlock(37, 'spruce_wood', 2.0, 2.0, 37, 1, false, false, 0, 15);
+        registerBlock(38, 'birch_wood', 2.0, 2.0, 38, 1, false, false, 0, 15);
+        registerBlock(39, 'jungle_wood', 2.0, 2.0, 39, 1, false, false, 0, 15);
 
         // Stone bricks and related (IDs 40-44)
         registerBlock(40, 'stone_bricks', 1.5, 6.0, 40, 1, false, false, 0, 15);
         registerBlock(41, 'cracked_stone_bricks', 1.5, 6.0, 40, 1, false, false, 0, 15);
         registerBlock(42, 'mossy_stone_bricks', 1.5, 6.0, 40, 1, false, false, 0, 15);
         registerBlock(43, 'chiseled_stone_bricks', 1.5, 6.0, 40, 1, false, false, 0, 15);
-        registerBlock(44, 'end_stone_bricks', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(44, 'end_stone_bricks', 3.0, 9.0, 44, 1, false, false, 0, 15);
 
         // Glass and transparent blocks (IDs 45-52)
         registerBlock(45, 'glass', 0.3, 0.3, -1, 0, true, false, 0, 0);
@@ -228,10 +228,10 @@
 
         // Smooth stone and related (IDs 113-117)
         registerBlock(113, 'smooth_stone', 2.0, 6.0, 113, 1, false, false, 0, 15);
-        registerBlock(114, 'smooth_stone_slab', 2.0, 6.0, 113, 1, false, false, 0, 15);
-        registerBlock(115, 'polished_diorite', 1.5, 6.0, 3, 1, false, false, 0, 15);
-        registerBlock(116, 'polished_andesite', 1.5, 6.0, 4, 1, false, false, 0, 15);
-        registerBlock(117, 'polished_granite', 1.5, 6.0, 2, 1, false, false, 0, 15);
+        registerBlock(114, 'smooth_stone_slab', 2.0, 6.0, 114, 1, false, false, 0, 15);
+        registerBlock(115, 'polished_diorite', 1.5, 6.0, 115, 1, false, false, 0, 15);
+        registerBlock(116, 'polished_andesite', 1.5, 6.0, 116, 1, false, false, 0, 15);
+        registerBlock(117, 'polished_granite', 1.5, 6.0, 117, 1, false, false, 0, 15);
 
         // Leaves (IDs 118-123)
         registerBlock(118, 'oak_leaves', 0.2, 0.2, -1, 0, true, false, 0, 15);
@@ -250,23 +250,23 @@
 
         // Slabs (IDs 127-134) — half-height blocks
         registerBlock(127, 'stone_slab', 2.0, 6.0, 127, 1, false, false, 0, 15);
-        registerBlock(128, 'smooth_stone_slab', 2.0, 6.0, 113, 1, false, false, 0, 15);
-        registerBlock(129, 'oak_slab', 2.0, 2.0, 130, 1, false, false, 0, 15);
+        registerBlock(128, 'smooth_stone_slab', 2.0, 6.0, 128, 1, false, false, 0, 15);
+        registerBlock(129, 'oak_slab', 2.0, 2.0, 129, 1, false, false, 0, 15);
         registerBlock(130, 'oak_planks', 2.0, 2.0, 130, 1, false, false, 0, 15);
-        registerBlock(131, 'spruce_slab', 2.0, 2.0, 132, 1, false, false, 0, 15);
-        registerBlock(132, 'birch_slab', 2.0, 2.0, 133, 1, false, false, 0, 15);
-        registerBlock(133, 'cobblestone_slab', 2.0, 6.0, 134, 1, false, false, 0, 15);
-        registerBlock(134, 'brick_slab', 2.0, 6.0, 104, 1, false, false, 0, 15);
+        registerBlock(131, 'spruce_slab', 2.0, 2.0, 131, 1, false, false, 0, 15);
+        registerBlock(132, 'birch_slab', 2.0, 2.0, 132, 1, false, false, 0, 15);
+        registerBlock(133, 'cobblestone_slab', 2.0, 6.0, 133, 1, false, false, 0, 15);
+        registerBlock(134, 'brick_slab', 2.0, 6.0, 134, 1, false, false, 0, 15);
 
         // Stairs (IDs 135-142)
-        registerBlock(135, 'stone_bricks_stairs', 1.5, 6.0, 40, 1, false, false, 0, 15);
+        registerBlock(135, 'stone_bricks_stairs', 1.5, 6.0, 135, 1, false, false, 0, 15);
         registerBlock(136, 'oak_stairs', 2.0, 2.0, 136, 1, false, false, 0, 15);
-        registerBlock(137, 'cobblestone_stairs', 2.0, 6.0, 138, 1, false, false, 0, 15);
+        registerBlock(137, 'cobblestone_stairs', 2.0, 6.0, 137, 1, false, false, 0, 15);
         registerBlock(138, 'cobblestone', 2.0, 6.0, 138, 1, false, false, 0, 15);
-        registerBlock(139, 'brick_stairs', 2.0, 6.0, 104, 1, false, false, 0, 15);
-        // ID 140 reserved — was duplicate stone_bricks registration (removed)
-        registerBlock(141, 'smooth_stone_stairs', 2.0, 6.0, 113, 1, false, false, 0, 15);
-        registerBlock(142, 'sandstone_stairs', 0.8, 0.8, 21, 1, false, false, 0, 15);
+        registerBlock(139, 'brick_stairs', 2.0, 6.0, 139, 1, false, false, 0, 15);
+        // ID 140 reserved — was stone_bricks_stairs (kept at 135)
+        registerBlock(141, 'smooth_stone_stairs', 2.0, 6.0, 141, 1, false, false, 0, 15);
+        registerBlock(142, 'sandstone_stairs', 0.8, 0.8, 142, 1, false, false, 0, 15);
 
         // Buttons and levers (IDs 143-147)
         registerBlock(143, 'stone_button', 0.5, 0.5, -1, 0, true, false, 0, 0);
@@ -282,10 +282,10 @@
 
         // Fences and walls (IDs 151-157)
         registerBlock(151, 'oak_fence', 2.0, 6.0, 151, 1, false, false, 0, 15);
-        registerBlock(152, 'cobblestone_wall', 2.0, 6.0, 138, 1, false, false, 0, 15);
-        registerBlock(153, 'brick_wall', 2.0, 6.0, 104, 1, false, false, 0, 15);
-        registerBlock(154, 'nether_brick_wall', 2.0, 6.0, 106, 1, false, false, 0, 15);
-        registerBlock(155, 'sandstone_wall', 0.8, 0.8, 21, 1, false, false, 0, 15);
+        registerBlock(152, 'cobblestone_wall', 2.0, 6.0, 152, 1, false, false, 0, 15);
+        registerBlock(153, 'brick_wall', 2.0, 6.0, 153, 1, false, false, 0, 15);
+        registerBlock(154, 'nether_brick_wall', 2.0, 6.0, 154, 1, false, false, 0, 15);
+        registerBlock(155, 'sandstone_wall', 0.8, 0.8, 155, 1, false, false, 0, 15);
         registerBlock(156, 'end_rod', 0.0, 0.0, 156, 1, false, true, 1, 0);
         registerBlock(157, 'chain', 2.0, 3.0, 157, 1, false, false, 0, 0);
 
@@ -299,7 +299,7 @@
         registerBlock(164, 'rose_bush', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(165, 'sunflower', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(166, 'lily_pad', 0.0, 0.0, 166, 1, true, false, 0, 0);
-        // ID 167 removed — was duplicate of fern (ID 160)
+        registerBlock(167, 'glow_lichen', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(168, 'dead_bush', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(169, 'vine', 0.0, 0.0, -1, 0, true, false, 0, 0);
         registerBlock(170, 'cave_vines', 0.0, 0.0, -1, 0, true, false, 0, 0);
@@ -326,7 +326,7 @@
         registerBlock(183, 'tnt', 0.0, 6.0, -1, 0, false, false, 0, 15);
 
         // Books and writing (IDs 184-186)
-        registerBlock(184, 'bookshelf', 2.0, 6.0, 31, 1, false, false, 0, 15);
+        registerBlock(184, 'bookshelf', 2.0, 6.0, 184, 1, false, false, 0, 15);
         registerBlock(185, 'chiseled_bookshelf', 2.0, 6.0, 185, 1, false, false, 0, 15);
         registerBlock(186, 'lectern', 2.0, 6.0, -1, 0, false, false, 0, 0);
 
@@ -378,29 +378,29 @@
         registerBlock(213, 'lava', 0.0, 100.0, -1, 0, true, true, 15, 1);
 
         // Coal, iron, gold, diamond, emerald, lapis (IDs 214-219) — item drops
-        registerBlock(214, 'coal', 1.0, 2.0, 20, 1, false, false, 0, 15);
-        registerBlock(215, 'raw_iron', 1.0, 2.0, 21, 1, false, false, 0, 15);
-        registerBlock(216, 'raw_gold', 1.0, 2.0, 22, 1, false, false, 0, 15);
-        registerBlock(217, 'raw_diamond', 1.0, 2.0, 23, 1, false, false, 0, 15);
-        registerBlock(218, 'diamond', 3.0, 2.0, 23, 1, false, false, 0, 15);
-        registerBlock(219, 'emerald', 3.0, 2.0, 24, 1, false, false, 0, 15);
+        registerBlock(214, 'coal', 1.0, 2.0, 214, 1, false, false, 0, 15);
+        registerBlock(215, 'raw_iron', 1.0, 2.0, 215, 1, false, false, 0, 15);
+        registerBlock(216, 'raw_gold', 1.0, 2.0, 216, 1, false, false, 0, 15);
+        registerBlock(217, 'raw_diamond', 1.0, 2.0, 217, 1, false, false, 0, 15);
+        registerBlock(218, 'diamond', 3.0, 2.0, 218, 1, false, false, 0, 15);
+        registerBlock(219, 'emerald', 3.0, 2.0, 219, 1, false, false, 0, 15);
 
         // More ores and blocks (IDs 220-228)
-        registerBlock(220, 'lapis_lazuli', 1.0, 2.0, 25, 1, false, false, 0, 15);
-        registerBlock(221, 'iron_ingot', 1.0, 2.0, 21, 1, false, false, 0, 15);
-        registerBlock(222, 'gold_ingot', 1.0, 2.0, 22, 1, false, false, 0, 15);
+        registerBlock(220, 'lapis_lazuli', 1.0, 2.0, 220, 1, false, false, 0, 15);
+        registerBlock(221, 'iron_ingot', 1.0, 2.0, 221, 1, false, false, 0, 15);
+        registerBlock(222, 'gold_ingot', 1.0, 2.0, 222, 1, false, false, 0, 15);
         registerBlock(223, 'netherite_ingot', 1.0, 2.0, -1, 0, false, false, 0, 15);
         registerBlock(224, 'netherite_block', 1200.0, 1200.0, 223, 1, false, false, 0, 15);
-        registerBlock(225, 'gold_block', 3.0, 6.0, 22, 1, false, true, 0, 15);
-        registerBlock(226, 'iron_block', 3.0, 6.0, 21, 1, false, false, 0, 15);
-        registerBlock(227, 'diamond_block', 3.0, 6.0, 23, 1, false, false, 0, 15);
-        registerBlock(228, 'emerald_block', 3.0, 6.0, 24, 1, false, false, 0, 15);
+        registerBlock(225, 'gold_block', 3.0, 6.0, 225, 1, false, true, 0, 15);
+        registerBlock(226, 'iron_block', 3.0, 6.0, 226, 1, false, false, 0, 15);
+        registerBlock(227, 'diamond_block', 3.0, 6.0, 227, 1, false, false, 0, 15);
+        registerBlock(228, 'emerald_block', 3.0, 6.0, 228, 1, false, false, 0, 15);
 
         // Redstone dust and blocks (IDs 229-233)
         registerBlock(229, 'redstone_dust', 0.0, 0.0, -1, 0, true, true, 9, 0);
-        registerBlock(230, 'redstone_block', 3.0, 6.0, 229, 1, false, false, 0, 15);
-        registerBlock(231, 'lapis_block', 3.0, 6.0, 25, 1, false, false, 0, 15);
-        registerBlock(232, 'coal_block', 3.0, 6.0, 20, 1, false, false, 0, 15);
+        registerBlock(230, 'redstone_block', 3.0, 6.0, 230, 1, false, false, 0, 15);
+        registerBlock(231, 'lapis_block', 3.0, 6.0, 231, 1, false, false, 0, 15);
+        registerBlock(232, 'coal_block', 3.0, 6.0, 232, 1, false, false, 0, 15);
         registerBlock(233, 'quartz_block', 1.0, 6.0, 234, 1, false, false, 0, 15);
 
         // Quartz variants (IDs 234-237)
@@ -410,7 +410,7 @@
         registerBlock(237, 'quartz_bricks', 1.0, 6.0, 234, 1, false, false, 0, 15);
 
         // Nether quartz (ID 238)
-        registerBlock(238, 'nether_quartz_ore', 3.0, 6.0, 239, 1, false, false, 0, 15);
+        registerBlock(238, 'nether_quartz_ore', 3.0, 6.0, 238, 1, false, false, 0, 15);
 
         // Hay bale (ID 239)
         registerBlock(239, 'hay_block', 0.9, 0.5, -1, 0, false, false, 0, 15);
@@ -442,7 +442,7 @@
         registerBlock(259, 'soul_soil', 0.8, 0.8, 259, 1, false, false, 0, 15);
         registerBlock(260, 'gilded_blackstone', 1.5, 6.0, 260, 1, false, false, 0, 15);
         registerBlock(261, 'polished_blackstone', 2.0, 6.0, 261, 1, false, false, 0, 15);
-        registerBlock(262, 'polished_blackstone_bricks', 2.0, 6.0, 263, 1, false, false, 0, 15);
+        registerBlock(262, 'polished_blackstone_bricks', 2.0, 6.0, 262, 1, false, false, 0, 15);
         registerBlock(263, 'nether_wart_block', 1.0, 0.0, 263, 1, false, false, 0, 15);
         registerBlock(264, 'warped_stem', 1.0, 0.0, 265, 1, false, false, 0, 15);
         registerBlock(265, 'warped_hyphae', 1.0, 0.0, 265, 1, false, false, 0, 15);
@@ -469,8 +469,8 @@
         registerBlock(288, 'chorus_flower', 0.4, 0.4, -1, 0, false, false, 0, 15);
         registerBlock(289, 'purpur_block', 1.5, 3.0, 289, 1, false, false, 0, 15);
         registerBlock(290, 'purpur_pillar', 1.5, 3.0, 289, 1, false, false, 0, 15);
-        registerBlock(291, 'end_stone_brick_wall', 3.0, 9.0, 45, 1, false, false, 0, 15);
-        registerBlock(292, 'end_stone_bricks_stairs', 3.0, 9.0, 45, 1, false, false, 0, 15);
+        registerBlock(291, 'end_stone_brick_wall', 3.0, 9.0, 291, 1, false, false, 0, 15);
+        registerBlock(292, 'end_stone_bricks_stairs', 3.0, 9.0, 292, 1, false, false, 0, 15);
         registerBlock(293, 'shroomlight', 1.0, 0.0, 293, 1, false, true, 15, 15);
         registerBlock(294, 'pitcher_pod', 0.0, 0.0, -1, 0, true, false, 0, 0);
 

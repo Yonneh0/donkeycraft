@@ -234,8 +234,11 @@
                 gameMode: this._gameMode
             });
 
-            // Create chunk manager
-            this._chunkManager = new Donkeycraft.ChunkManager({
+            // Create chunk manager via the dimension system so terrain generation
+            // callbacks (onChunkLoad) are wired up automatically.  This ensures
+            // overworld chunks get heightmap/ore/cave/water/surface terrain and
+            // nether/end chunks get their own generators.
+            this._chunkManager = Donkeycraft.Dimensions.getCurrentChunkManager({
                 renderDistance: this._renderDistance
             });
 
@@ -245,14 +248,23 @@
                 return self._getBlockAt(wx, wy, wz);
             });
 
-            // Set up chunk manager callbacks
+            // Wire chunk unload callback (terrain renderer needs dirty marks).
+            // Do NOT overwrite onChunkLoad — dimension.js already wires terrain generation there.
             var cm = this._chunkManager;
-            cm.onChunkLoad = function(chunk) {
-                // Donkeycraft.Logger.info('Game', 'Chunk loaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
-            };
+            var existingUnload = cm.onChunkUnload;
             cm.onChunkUnload = function(chunk) {
-                // Donkeycraft.Logger.info('Game', 'Chunk unloaded: [' + chunk.chunkX + ', ' + chunk.chunkZ + ']');
+                if (existingUnload) existingUnload(chunk);
                 self._terrainRenderer.markChunkDirty(chunk.chunkX, chunk.chunkZ);
+            };
+
+            // Wire dirty-chunk callback to notify the terrain renderer
+            var existingChanged = cm.onChunksChanged;
+            cm.onChunksChanged = function() {
+                if (existingChanged) existingChanged();
+                var dirty = cm.getDirtyChunks();
+                for (var _i = 0; _i < dirty.length; _i++) {
+                    self._terrainRenderer.markChunkDirty(dirty[_i].chunk.chunkX, dirty[_i].chunk.chunkZ);
+                }
             };
 
             // Set initial player position to spawn point
