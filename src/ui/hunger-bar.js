@@ -95,13 +95,12 @@
         var boneCircle = '<circle cx="14" cy="4.5" r="1.8" fill="#f5deb3" stroke="#8b6914" stroke-width="0.5"/>';
 
         if (state === 'half') {
-            // Store unique ID once and reuse it for both clipPath and clip-path reference
-            var id = this._uniqueId();
+            // Horizontal half: bottom half filled only
             return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-half">' +
                 '<defs>' +
-                '<clipPath id="dk-drum-clip-right-' + id + '"><rect x="8" y="0" width="8" height="18"/></clipPath>' +
+                '<clipPath id="dk-drum-clip-bottom"><rect x="0" y="9" width="16" height="9"/></clipPath>' +
                 '</defs>' +
-                '<g clip-path="url(#dk-drum-clip-right-' + id + ')">' +
+                '<g clip-path="url(#dk-drum-clip-bottom)">' +
                 '<path d="' + drumstickPath + '" fill="#d4a574" stroke="#8b6914" stroke-width="0.6"/>' +
                 boneCircle +
                 '</g>' +
@@ -117,16 +116,6 @@
         return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-empty-svg">' +
             '<path d="' + drumstickPath + '" fill="rgba(50,40,30,0.2)" stroke="#5a4a2a" stroke-width="0.6"/>' +
             '</svg>';
-    };
-
-    /**
-     * _uniqueId — generate a unique ID for SVG clip-path uniqueness.
-     * @private
-     * @returns {string} Unique ID string.
-     */
-    Donkeycraft.HungerBar.prototype._uniqueId = function() {
-        if (!this._uniqueCounter) this._uniqueCounter = 0;
-        return 'h' + (this._uniqueCounter++);
     };
 
     /**
@@ -204,6 +193,16 @@
     };
 
     /**
+     * _getDrumstickIndex — convert food level to drumstick container index.
+     * @private
+     * @param {number} food - Food level (0-20).
+     * @returns {number} Drumstick container index (0-9).
+     */
+    Donkeycraft.HungerBar.prototype._getDrumstickIndex = function(food) {
+        return Math.floor(Math.max(0, food) / 2);
+    };
+
+    /**
      * _pulseEatenDrumsticks — pulse on drumsticks that were just eaten.
      * @private
      * @param {number} foodGain - Amount of food restored.
@@ -211,10 +210,15 @@
     Donkeycraft.HungerBar.prototype._pulseEatenDrumsticks = function(foodGain) {
         if (!this._row) return;
 
-        // Eaten drumsticks are the rightmost (first filled, indices 9→0)
+        var currentFood = this._prevFood;
+        var oldFood = currentFood - foodGain;
+
+        // Pulse each drumstick that changed state due to eating
         var pulseCount = Math.min(Math.ceil(foodGain / 2), 5);
         for (var i = 0; i < pulseCount && i < this._drumstickContainers.length; i++) {
-            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i]; // 9,8,7,...
+            var drumIndex = this._getDrumstickIndex(oldFood + (i * 2));
+            if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) continue;
+            var container = this._drumstickContainers[drumIndex];
             if (!container) continue;
 
             container.classList.add('dk-drumstick-eat-pulse');
@@ -234,10 +238,15 @@
     Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function(foodLoss) {
         if (!this._row) return;
 
-        // Depleted drumsticks are the leftmost (first depleted, indices 0→9)
+        var currentFood = this._prevFood;
+        var oldFood = currentFood + foodLoss;
+
+        // Dim each drumstick that changed state due to starving
         var dimCount = Math.min(Math.ceil(foodLoss / 2), 5);
         for (var i = 0; i < dimCount && i < this._drumstickContainers.length; i++) {
-            var container = this._drumstickContainers[i]; // 0,1,2,...
+            var drumIndex = this._getDrumstickIndex(oldFood - (i * 2));
+            if (drumIndex < 0 || drumIndex >= this._drumstickContainers.length) continue;
+            var container = this._drumstickContainers[drumIndex];
             if (!container) continue;
 
             container.classList.add('dk-drumstick-dim');
@@ -285,10 +294,13 @@
     Donkeycraft.HungerBar.prototype._updateBrownOverlay = function(foodLevel) {
         if (!this._overlay) return;
 
-        var ratio = foodLevel / 20;
-        // Opacity: 0% at full food → 20% at 0 food
-        var opacity = Math.max(0, (1 - ratio) * 0.2);
-        this._overlay.style.opacity = opacity;
+        var f = Math.max(0, Math.min(20, foodLevel));
+        // 66% opacity at 0 food → 0% opacity at 6 food → stays 0% above 6 food
+        var opacity = 0;
+        if (f < 6) {
+            opacity = 0.66 - ((f / 6) * 0.66); // 0.66 at f=0, 0 at f=6
+        }
+        this._overlay.style.opacity = Math.max(0, opacity);
     };
 
     /**

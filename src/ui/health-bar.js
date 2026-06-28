@@ -92,11 +92,12 @@
      */
     Donkeycraft.HealthBar.prototype._getHeartSVG = function(state) {
         if (state === 'half') {
+            // Horizontal half: bottom half filled only
             return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-half">' +
                 '<defs>' +
-                '<clipPath id="dk-heart-clip-left"><rect x="0" y="0" width="8" height="18"/></clipPath>' +
+                '<clipPath id="dk-heart-clip-bottom"><rect x="0" y="9" width="16" height="9"/></clipPath>' +
                 '</defs>' +
-                '<g clip-path="url(#dk-heart-clip-left)">' +
+                '<g clip-path="url(#dk-heart-clip-bottom)">' +
                 '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="#5a1a1a" stroke-width="0.8"/>' +
                 '</g>' +
                 '</svg>';
@@ -237,6 +238,16 @@
     };
 
     /**
+     * _getHeartIndex — convert HP value to heart container index.
+     * @private
+     * @param {number} hp - Health points (0-20).
+     * @returns {number} Heart container index (0-9).
+     */
+    Donkeycraft.HealthBar.prototype._getHeartIndex = function(hp) {
+        return Math.floor(Math.max(0, hp) / 2);
+    };
+
+    /**
      * _flashDamagedHearts — flash the hearts that took damage.
      * @private
      * @param {number} damageAmount - Amount of damage taken.
@@ -244,14 +255,15 @@
     Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(damageAmount) {
         if (!this._row) return;
 
-        var maxHealth = this._hurtBox.getMaxHealth() || 20;
         var currentHealth = this._prevHealth;
-        var hpPerHeart = maxHealth / 10;
+        var oldHealth = currentHealth + damageAmount;
 
-        // Flash the hearts that are now at or below current health
-        var flashCount = Math.min(Math.ceil(damageAmount / 2), 5); // flash up to 5 hearts
+        // Flash each heart that changed state due to damage
+        var flashCount = Math.min(Math.ceil(damageAmount / 2), 5);
         for (var i = 0; i < flashCount && i < this._heartContainers.length; i++) {
-            var container = this._heartContainers[i];
+            var heartIndex = this._getHeartIndex(oldHealth - (i * 2));
+            if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
+            var container = this._heartContainers[heartIndex];
             if (!container) continue;
 
             // Apply red flash class
@@ -272,14 +284,15 @@
     Donkeycraft.HealthBar.prototype._flashHealedHearts = function(healAmount) {
         if (!this._row) return;
 
-        var maxHealth = this._hurtBox.getMaxHealth() || 20;
         var currentHealth = this._prevHealth;
-        var hpPerHeart = maxHealth / 10;
+        var oldHealth = currentHealth - healAmount;
 
-        // Flash the hearts that were just healed (rightmost damaged hearts)
+        // Flash each heart that changed state due to healing
         var flashCount = Math.min(Math.ceil(healAmount / 2), 5);
         for (var i = 0; i < flashCount && i < this._heartContainers.length; i++) {
-            var container = this._heartContainers[this._heartContainers.length - 1 - i];
+            var heartIndex = this._getHeartIndex(oldHealth + (i * 2));
+            if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
+            var container = this._heartContainers[heartIndex];
             if (!container) continue;
 
             container.classList.add('dk-heart-heal-flash');
@@ -328,10 +341,13 @@
     Donkeycraft.HealthBar.prototype._updateRedOverlay = function(health, maxHealth) {
         if (!this._overlay) return;
 
-        var ratio = health / (maxHealth || 20);
-        // Opacity: 0% at full health → 30% at 0 health
-        var opacity = Math.max(0, (1 - ratio) * 0.3);
-        this._overlay.style.opacity = opacity;
+        var h = Math.max(0, Math.min(maxHealth || 20, health));
+        // 66% opacity at 0 HP → 0% opacity at 6 HP → stays 0% above 6 HP
+        var opacity = 0;
+        if (h < 6) {
+            opacity = 0.66 - ((h / 6) * 0.66); // 0.66 at h=0, 0 at h=6
+        }
+        this._overlay.style.opacity = Math.max(0, opacity);
     };
 
     /**
