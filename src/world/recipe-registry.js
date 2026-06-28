@@ -835,6 +835,20 @@
         // Charcoal from logs (not implemented in block.js but useful)
         // registerSmelt(charcoal_log, coal_block_or_coal_item);
 
+        /**
+         * Get all registered smelting recipes as an array.
+         * @returns {Donkeycraft.Recipe[]}
+         */
+        function getSmeltRecipes() {
+            var result = [];
+            for (var key in _smeltRecipes) {
+                if (_smeltRecipes.hasOwnProperty(key)) {
+                    result.push(_smeltRecipes[key]);
+                }
+            }
+            return result;
+        }
+
         // ============================================================
         // Public API
         // ============================================================
@@ -860,6 +874,7 @@
             getSmeltRecipe: getSmeltRecipe,
             getSmeltOutput: getSmeltOutput,
             getSmeltTime: getSmeltTime,
+            getSmeltRecipes: getSmeltRecipes,
 
             // Utility
             getAllRecipes: getAllRecipes,
