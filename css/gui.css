@@ -948,15 +948,14 @@
     pointer-events: none;
 }
 
-/* Row container for heart slots — no border, slight blur to blend with background */
+/* Row container for heart slots — no border, soft shadow to blend with background */
 .dk-health-bar-row {
     display: flex;
     gap: 2px;
     align-items: center;
     padding: 2px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
-    filter: blur(0.3px);
+    background: transparent;
+    border-radius: 0;
 }
 
 /* Individual heart container — no border, subtle glow */
@@ -1028,16 +1027,15 @@
     pointer-events: none;
 }
 
-/* Row container for drumstick slots (right-aligned) — no border, slight blur */
+/* Row container for drumstick slots (right-aligned) — no border, soft shadow to blend with background */
 .dk-hunger-bar-row {
     display: flex;
     gap: 2px;
     align-items: center;
     justify-content: flex-end;
     padding: 2px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
-    filter: blur(0.3px);
+    background: transparent;
+    border-radius: 0;
 }
 
 /* Individual drumstick container — no border, subtle glow */

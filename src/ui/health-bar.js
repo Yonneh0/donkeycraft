@@ -181,22 +181,19 @@
             // Damage taken — shake the health bar
             this._triggerShake();
 
-            // Flash damaged hearts red
-            this._flashDamagedHearts(Math.abs(delta));
+            // Flash damaged heart red
+            this._flashDamagedHearts(Math.abs(delta), delta);
 
             // Screen shake if health drops below 3 hearts (6 HP)
             if (this._prevHealth < 6) {
                 this._triggerScreenShake();
             }
         } else if (delta > 0) {
-            // Healing — flash healed hearts white
-            this._flashHealedHearts(delta);
+            // Healing — flash healed heart white
+            this._flashHealedHearts(delta, delta);
         }
 
-        // Spawn +/- text effect
-        if (delta !== 0) {
-            this._spawnHealthText(delta);
-        }
+        // Note: +/- text is spawned inside _flashDamagedHearts/_flashHealedHearts via _spawnHealthTextAt
     };
 
     /**
@@ -252,90 +249,80 @@
     };
 
     /**
-     * _flashDamagedHearts — flash the hearts that took damage.
+     * _flashDamagedHearts — flash the heart that took damage.
      * @private
      * @param {number} damageAmount - Amount of damage taken.
+     * @param {number} delta - Health change (negative).
      */
-    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(damageAmount) {
+    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(damageAmount, delta) {
         if (!this._row) return;
 
         var newHealth = this._prevHealth;
         var oldHealth = newHealth + damageAmount;
 
-        // Flash each heart that changed state due to damage.
-        // Hearts are filled left-to-right (0→9). Damage removes from the rightmost filled hearts first.
-        // Heart index i covers HP range [i*2, i*2+1]. It was damaged if oldHealth > i*2.
-        var flashCount = Math.min(Math.ceil(damageAmount / 2), 5);
-        for (var i = 0; i < flashCount; i++) {
-            // The rightmost damaged heart index: floor((oldHealth - 1) / 2) - i
-            var heartIndex = Math.floor((oldHealth - 1) / 2) - i;
-            if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
-            // Only flash if this heart is still within the damaged range
-            if (heartIndex * 2 >= oldHealth) continue;
-            var container = this._heartContainers[heartIndex];
-            if (!container) continue;
+        // On damage, highlight the heart that was just lost: floor(oldHealth / 2).
+        var heartIndex = Math.floor(oldHealth / 2);
+        if (heartIndex < 0 || heartIndex >= this._heartContainers.length) return;
+        var container = this._heartContainers[heartIndex];
+        if (!container) return;
 
-            container.classList.add('dk-heart-flash');
+        container.classList.add('dk-heart-flash');
+        setTimeout((function(el) {
+            if (el) el.classList.remove('dk-heart-flash');
+        }).bind(this, container), 200);
 
-            var self = this;
-            setTimeout(function(el) {
-                if (el) el.classList.remove('dk-heart-flash');
-            }.bind(this, container), 200);
-        }
+        // Position text above the changed heart
+        this._spawnHealthTextAt(delta, heartIndex);
     };
 
     /**
-     * _flashHealedHearts — flash the hearts that were healed.
+     * _flashHealedHearts — flash the heart that was healed.
      * @private
      * @param {number} healAmount - Amount of healing.
+     * @param {number} delta - Health change (positive).
      */
-    Donkeycraft.HealthBar.prototype._flashHealedHearts = function(healAmount) {
+    Donkeycraft.HealthBar.prototype._flashHealedHearts = function(healAmount, delta) {
         if (!this._row) return;
 
         var newHealth = this._prevHealth;
-        var oldHealth = newHealth - healAmount;
 
-        // Flash each heart that changed state due to healing.
-        // Hearts are filled left-to-right (0→9). Healing fills from the rightmost damaged heart first.
-        // Heart index i covers HP range [i*2, i*2+1]. It was healed if newHealth > i*2 and oldHealth <= i*2+1.
-        var flashCount = Math.min(Math.ceil(healAmount / 2), 5);
-        for (var i = 0; i < flashCount; i++) {
-            // The rightmost healed heart index: floor((newHealth - 1) / 2) - i
-            var heartIndex = Math.floor((newHealth - 1) / 2) - i;
-            if (heartIndex < 0 || heartIndex >= this._heartContainers.length) continue;
-            // Only flash if this heart was actually below new health
-            if (heartIndex * 2 + 1 >= newHealth) continue;
-            var container = this._heartContainers[heartIndex];
-            if (!container) continue;
+        // On healing, highlight the heart that was just restored: floor(newHealth / 2).
+        var heartIndex = Math.floor(newHealth / 2);
+        if (heartIndex < 0 || heartIndex >= this._heartContainers.length) return;
+        var container = this._heartContainers[heartIndex];
+        if (!container) return;
 
-            container.classList.add('dk-heart-heal-flash');
+        container.classList.add('dk-heart-heal-flash');
+        setTimeout((function(el) {
+            if (el) el.classList.remove('dk-heart-heal-flash');
+        }).bind(this, container), 300);
 
-            var self = this;
-            setTimeout(function(el) {
-                if (el) el.classList.remove('dk-heart-heal-flash');
-            }.bind(this, container), 300);
-        }
+        // Position text above the changed heart
+        this._spawnHealthTextAt(delta, heartIndex);
     };
 
     /**
-     * _spawnHealthText — spawn floating +X or -X text.
+     * _spawnHealthTextAt — spawn floating +/- text at a specific heart index.
      * @private
      * @param {number} delta - Health change (positive = heal, negative = damage).
+     * @param {number} heartIndex - Index of the changed heart (0-9).
      */
-    Donkeycraft.HealthBar.prototype._spawnHealthText = function(delta) {
-        if (!this._container) return;
+    Donkeycraft.HealthBar.prototype._spawnHealthTextAt = function(delta, heartIndex) {
+        if (!this._row || !this._heartContainers[heartIndex]) return;
 
         var textEl = document.createElement('div');
         textEl.className = 'dk-health-text';
         textEl.textContent = (delta > 0 ? '+' : '') + delta;
         textEl.style.color = delta > 0 ? '#2ecc71' : '#e74c3c';
 
-        // Position above center of health bar
+        // Position above the changed heart container using relative positioning
+        var heartContainer = this._heartContainers[heartIndex];
+        heartContainer.style.position = 'relative';
         textEl.style.left = '50%';
-        textEl.style.top = '-10px';
+        textEl.style.top = '-14px';
         textEl.style.transform = 'translateX(-50%)';
 
-        this._container.appendChild(textEl);
+        heartContainer.appendChild(textEl);
 
         // Remove after animation completes
         setTimeout((function(el) {
