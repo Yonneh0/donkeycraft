@@ -39,11 +39,15 @@
     /**
      * open — opens a GUI screen on top of the stack.
      * Creates a panel element, instantiates the UI component, and appends to DOM.
-     * @param {string} type - GUI type ('inventory', 'crafting_table', 'furnace', etc.).
+     * @param {string} type - GUI type identifier ('inventory', 'crafting_table', 'furnace', etc.).
      * @param {Object} [data=null] - Optional data to pass to the UI component.
+     * @returns {Object|null} The GUI entry object { type, data, ui, panelEl }, or null on failure.
      */
     Donkeycraft.GuiManager.prototype.open = function(type, data) {
         data = data || {};
+
+        // Guard: reject empty/invalid type
+        if (!type || typeof type !== 'string') return null;
 
         // Create panel element for this GUI
         var panelEl = document.createElement('div');
@@ -57,7 +61,7 @@
                 ui = new this._uiComponents[type](panelEl, data);
             } catch (e) {
                 if (Donkeycraft.Logger) Donkeycraft.Logger.error('GuiManager: Failed to create UI for type "' + type + '": ' + e.message);
-                return;
+                return null;
             }
         }
 
@@ -94,24 +98,27 @@
                 try { this._listeners._onOpen[i](type); } catch (e) {}
             }
         }
+
+        return guiEntry;
     };
 
     /**
      * close — closes the top GUI screen.
      * Removes panel from DOM, destroys UI component, hides backdrop if empty.
+     * @returns {Object|null} The removed GUI entry object, or null if stack was empty.
      */
     Donkeycraft.GuiManager.prototype.close = function() {
-        if (this._guiStack.length === 0) return;
+        if (this._guiStack.length === 0) return null;
 
         var removed = this._guiStack.pop();
 
-        // Remove panel from DOM
+        // Remove panel from DOM with null safety
         if (removed && removed.panelEl && removed.panelEl.parentNode) {
             removed.panelEl.parentNode.removeChild(removed.panelEl);
         }
 
-        // Clean up UI component
-        if (removed && removed.ui && removed.ui.destroy) {
+        // Clean up UI component with null safety
+        if (removed && removed.ui && typeof removed.ui.destroy === 'function') {
             try { removed.ui.destroy(); } catch (e) {}
         }
 
@@ -134,6 +141,8 @@
                 try { this._listeners._onClose[i](removed.type); } catch (e) {}
             }
         }
+
+        return removed;
     };
 
     /**
@@ -177,6 +186,9 @@
      * @returns {boolean} True if the key was consumed.
      */
     Donkeycraft.GuiManager.prototype.handleKeyPress = function(key) {
+        // Guard: reject empty/invalid keys
+        if (!key || typeof key !== 'string') return false;
+
         if (this._guiStack.length === 0) return false;
 
         var top = this._guiStack[this._guiStack.length - 1];
@@ -188,7 +200,7 @@
         }
 
         // Route to UI component if it has handleKeyPress
-        if (top.ui && typeof top.ui.handleKeyPress === 'function') {
+        if (top && top.ui && typeof top.ui.handleKeyPress === 'function') {
             try {
                 var consumed = top.ui.handleKeyPress(key);
                 if (consumed) return true;
@@ -202,30 +214,40 @@
 
     /**
      * handleMouseClick — routes a mouse click to the top GUI.
-     * @param {number} x - Click X coordinate (0-1 normalized).
-     * @param {number} y - Click Y coordinate (0-1 normalized).
+     * Coordinates are passed as-is to the UI component; components built with
+     * DOM-based gui-elements.js use pixel coordinates from MouseEvent objects,
+     * while this method accepts normalized (0-1) values for direct API calls.
+     * @param {number} x - Click X coordinate (normalized 0-1 or pixel value).
+     * @param {number} y - Click Y coordinate (normalized 0-1 or pixel value).
      * @param {number} [button=0] - Mouse button (0=left, 1=right, 2=middle).
      */
     Donkeycraft.GuiManager.prototype.handleMouseClick = function(x, y, button) {
         button = button || 0;
+
+        // Guard: validate coordinates are numbers
+        if (typeof x !== 'number' || typeof y !== 'number') return;
+
         if (this._guiStack.length === 0) return;
 
         var top = this._guiStack[this._guiStack.length - 1];
-        if (top.ui && typeof top.ui.handleClick === 'function') {
+        if (top && top.ui && typeof top.ui.handleClick === 'function') {
             try { top.ui.handleClick(x, y, button); } catch (e) {}
         }
     };
 
     /**
      * handleDrop — handles dropping an item onto the current GUI.
-     * @param {Donkeycraft.ItemStack} itemStack - The dropped item stack.
+     * @param {Donkeycraft.ItemStack|null} itemStack - The dropped item stack (null to clear).
      * @param {number} slotIndex - Target slot index.
      */
     Donkeycraft.GuiManager.prototype.handleDrop = function(itemStack, slotIndex) {
+        // Guard: validate slotIndex is a number
+        if (typeof slotIndex !== 'number') return;
+
         if (this._guiStack.length === 0) return;
 
         var top = this._guiStack[this._guiStack.length - 1];
-        if (top.ui && typeof top.ui.handleDrop === 'function') {
+        if (top && top.ui && typeof top.ui.handleDrop === 'function') {
             try { top.ui.handleDrop(itemStack, slotIndex); } catch (e) {}
         }
     };
@@ -270,8 +292,9 @@
     };
 
     /**
-     * getPlayer — gets the player entity reference if available.
-     * GuiManager does not own a player reference; returns null when no player is set.
+     * getPlayer — gets the optional player reference if set.
+     * GuiManager does not own a player by default; returns null when not set.
+     * This is used by GUI wrapper classes that need direct player access.
      * @returns {Donkeycraft.Player|null}
      */
     Donkeycraft.GuiManager.prototype.getPlayer = function() {
@@ -280,7 +303,7 @@
 
     /**
      * setPlayer — sets an optional player reference for GUI interaction.
-     * @param {Donkeycraft.Player} player - Player instance.
+     * @param {Donkeycraft.Player|null} player - Player instance or null to clear.
      */
     Donkeycraft.GuiManager.prototype.setPlayer = function(player) {
         this._player = player || null;
@@ -296,15 +319,23 @@
     };
 
     /**
-     * destroy — cleans up all resources and listeners.
+     * destroy — cleans up all resources, DOM elements, and listeners.
      */
     Donkeycraft.GuiManager.prototype.destroy = function() {
         this.clearAll();
+
+        // Remove container content from DOM
+        if (this._container) {
+            while (this._container.firstChild) {
+                this._container.removeChild(this._container.firstChild);
+            }
+            this._container = null;
+        }
+
+        this._backdrop = null;
         this._listeners = {};
         this._uiComponents = {};
         this._player = null;
-        this._container = null;
-        this._backdrop = null;
     };
 
 })();

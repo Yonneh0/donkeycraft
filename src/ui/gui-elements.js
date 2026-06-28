@@ -92,6 +92,10 @@
         this._dragState.active = true;
         this._dragState.sourceSlot = slotIndex;
 
+        // Capture the source stack data before any operations
+        var slotData = this._getSlotData(slotIndex);
+        this._dragState.sourceStack = slotData ? slotData.itemText : '';
+
         // Create drag visual element
         var sourceEl = this._container.querySelector('[data-slot-index="' + slotIndex + '"]');
         if (sourceEl) {
@@ -142,11 +146,12 @@
 
     /**
      * _highlightDropTarget — highlights the slot under the cursor.
+     * Only removes highlights from this._container to avoid affecting other GUI panels.
      * @param {MouseEvent} e - Mouse move event.
      * @private
      */
     Donkeycraft.GuiDragDrop.prototype._highlightDropTarget = function(e) {
-        // Remove previous highlights from container
+        // Remove previous highlights only from this container
         if (this._container) {
             var prev = this._container.querySelectorAll('.dk-slot.drag-over, .dk-hotbar-slot.drag-over, .dk-item-slot.drag-over');
             for (var i = 0; i < prev.length; i++) {
@@ -158,7 +163,8 @@
         if (!targetEl) return;
 
         var slotEl = targetEl.closest('.dk-slot, .dk-hotbar-slot, .dk-item-slot');
-        if (slotEl && slotEl !== this._dragState.dragElement) {
+        // Only highlight slots within this container
+        if (slotEl && (!this._container || this._container.contains(slotEl))) {
             slotEl.classList.add('drag-over');
         }
     };
@@ -173,22 +179,24 @@
 
         var targetSlot = null;
 
-        // Clean up drag visual — remove before hit-testing so elementFromPoint works correctly
+        // Clean up drag visual first — remove before hit-testing so elementFromPoint works correctly
         if (this._dragState.dragElement && this._dragState.dragElement.parentNode) {
             this._dragState.dragElement.parentNode.removeChild(this._dragState.dragElement);
+            this._dragState.dragElement = null;
         }
 
-        // Remove all drag-over highlights from document body
+        // Remove all drag-over highlights from document body (global cleanup)
         var highlights = document.querySelectorAll('.drag-over');
         for (var i = 0; i < highlights.length; i++) {
             highlights[i].classList.remove('drag-over');
         }
 
-        // Find drop target after cleanup
+        // Find drop target after all cleanup is complete
         var targetEl = document.elementFromPoint(e.clientX, e.clientY);
         if (targetEl) {
             var slotEl = targetEl.closest('.dk-slot, .dk-hotbar-slot, .dk-item-slot');
-            if (slotEl) {
+            // Only accept drops within this container
+            if (slotEl && (!this._container || this._container.contains(slotEl))) {
                 targetSlot = parseInt(slotEl.dataset.slotIndex, 10);
             }
         }
@@ -272,6 +280,7 @@
 
     /**
      * cancelDrag — forcibly cancels the current drag operation.
+     * Cleans up the drag ghost element and all drag-over highlights from the document.
      */
     Donkeycraft.GuiDragDrop.prototype.cancelDrag = function() {
         if (!this._dragState.active) return;
@@ -525,11 +534,17 @@
      * GuiTabNavigator — manages tabbed UI navigation.
      * @param {HTMLElement|null} container - Parent container element.
      * @param {Array<string>} tabs - Array of tab label strings.
+     * @param {Object} [options={}] - Configuration options.
+     * @param {string} [options.title='Creative Inventory'] - Panel title text.
+     * @param {boolean} [options.showCloseButton=true] - Whether to show the close button.
      */
-    Donkeycraft.GuiTabNavigator = function(container, tabs) {
+    Donkeycraft.GuiTabNavigator = function(container, tabs, options) {
+        options = options || {};
         this._container = container || null;
         this._tabs = tabs || [];
         this._activeTabIndex = 0;
+        this._title = options.title || 'Creative Inventory';
+        this._showCloseButton = options.showCloseButton !== false;
 
         this._tabBarEl = null;
         this._tabContentEl = null;
@@ -557,17 +572,19 @@
         // Title
         var titleEl = document.createElement('div');
         titleEl.className = 'dk-panel-title';
-        titleEl.textContent = 'Creative Inventory';
+        titleEl.textContent = this._title;
         this._container.appendChild(titleEl);
 
-        // Close button
-        var closeBtn = document.createElement('button');
-        closeBtn.className = 'dk-panel-close dk-interactive';
-        closeBtn.textContent = '\u00D7';
-        closeBtn.addEventListener('click', (function() {
-            this._emit('close');
-        }).bind(this));
-        this._container.appendChild(closeBtn);
+        // Close button (only if configured) — stored for cleanup
+        if (this._showCloseButton) {
+            this._closeBtn = document.createElement('button');
+            this._closeBtn.className = 'dk-panel-close dk-interactive';
+            this._closeBtn.textContent = '\u00D7';
+            this._closeBtn.addEventListener('click', (function() {
+                this._emit('close');
+            }).bind(this));
+            this._container.appendChild(this._closeBtn);
+        }
 
         // Tab bar
         this._tabBarEl = document.createElement('div');
@@ -579,7 +596,7 @@
         this._tabContentEl.className = 'dk-tab-content';
         this._container.appendChild(this._tabContentEl);
 
-        // Create tab elements
+        // Create tab elements and initialize per-tab content storage
         for (var i = 0; i < this._tabs.length; i++) {
             var tabEl = document.createElement('button');
             tabEl.className = 'dk-tab' + (i === 0 ? ' active' : '');
@@ -589,6 +606,12 @@
             })(i));
             this._tabBarEl.appendChild(tabEl);
             this._tabElements.push(tabEl);
+        }
+
+        // Initialize per-tab content storage for persistence across tab switches
+        this._tabContents = {};
+        for (var j = 0; j < this._tabs.length; j++) {
+            this._tabContents[j] = '';
         }
     };
 
@@ -601,6 +624,11 @@
         if (index < 0 || index >= this._tabs.length) return;
         if (index === this._activeTabIndex) return;
 
+        // Save current tab content before switching
+        if (this._tabContentEl && this._tabContentEl.innerHTML) {
+            this._tabContents[this._activeTabIndex] = this._tabContentEl.innerHTML;
+        }
+
         // Update tab styles
         for (var i = 0; i < this._tabElements.length; i++) {
             this._tabElements[i].classList.toggle('active', i === index);
@@ -609,9 +637,9 @@
         var oldTab = this._activeTabIndex;
         this._activeTabIndex = index;
 
-        // Clear and rebuild content
+        // Restore content for the new active tab
         if (this._tabContentEl) {
-            this._tabContentEl.innerHTML = '';
+            this._tabContentEl.innerHTML = this._tabContents[index] || '';
         }
         this._emit('tab:change', { tabIndex: index, oldTab: oldTab });
     };
@@ -648,8 +676,34 @@
      */
     Donkeycraft.GuiTabNavigator.prototype.setContent = function(html) {
         if (this._tabContentEl) {
-            this._tabContentEl.innerHTML = html;
+            this._tabContentEl.innerHTML = html || '';
+            // Also persist in the per-tab storage for the current active tab
+            this._tabContents[this._activeTabIndex] = html || '';
         }
+    };
+
+    /**
+     * setContentForTab — sets the content HTML for a specific tab by index.
+     * @param {number} index - Tab index to set content for.
+     * @param {string} html - HTML content string.
+     */
+    Donkeycraft.GuiTabNavigator.prototype.setContentForTab = function(index, html) {
+        if (index < 0 || index >= this._tabs.length) return;
+        this._tabContents[index] = html || '';
+        // If this is the currently active tab, update the DOM immediately
+        if (index === this._activeTabIndex && this._tabContentEl) {
+            this._tabContentEl.innerHTML = html || '';
+        }
+    };
+
+    /**
+     * getContentForTab — gets the content HTML for a specific tab by index.
+     * @param {number} index - Tab index.
+     * @returns {string|null} Tab content HTML or null if out of bounds.
+     */
+    Donkeycraft.GuiTabNavigator.prototype.getContentForTab = function(index) {
+        if (index < 0 || index >= this._tabs.length) return null;
+        return this._tabContents[index] || '';
     };
 
     /**
@@ -692,10 +746,25 @@
     };
 
     /**
-     * destroy — cleans up resources and event listeners.
+     * destroy — cleans up resources, DOM elements, and event listeners.
      */
     Donkeycraft.GuiTabNavigator.prototype.destroy = function() {
+        // Remove close button from DOM
+        if (this._closeBtn && this._closeBtn.parentNode) {
+            this._closeBtn.parentNode.removeChild(this._closeBtn);
+        }
+        this._closeBtn = null;
+
+        // Clear container content
+        if (this._container) {
+            while (this._container.firstChild) {
+                this._container.removeChild(this._container.firstChild);
+            }
+        }
+
         this._listeners = {};
+        this._tabContents = {};
+        this._tabElements = [];
     };
 
     // ============================================================
