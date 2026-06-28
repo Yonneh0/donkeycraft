@@ -63,7 +63,18 @@
      * @param {number} level - Food level to set (0-20).
      */
     Donkeycraft.Hunger.prototype.setFoodLevel = function(level) {
+        var oldLevel = this._foodLevel;
         this._foodLevel = Math.max(0, Math.min(20, level));
+
+        // Emit hunger change event if food level actually changed
+        if (oldLevel !== this._foodLevel && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    delta: this._foodLevel - oldLevel
+                });
+            } catch (e) {}
+        }
     };
 
     /**
@@ -112,8 +123,24 @@
         var maxSaturation = this._foodLevel * 2;
         this._saturation = Math.min(maxSaturation, this._saturation + saturationGain);
 
+        // Emit hunger change event if food level actually changed
+        if (foodRestored > 0 && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    delta: foodRestored
+                });
+            } catch (e) {}
+        }
+
         return foodRestored;
     };
+
+    /**
+     * Track previous food level for change detection.
+     * @private
+     */
+    Donkeycraft.Hunger.prototype._prevFoodLevel = 20;
 
     /**
      * Tick the hunger system — handle starvation damage and auto-regeneration.
@@ -129,8 +156,20 @@
 
         // Creative mode: no hunger mechanics, full food and saturation
         if (gameMode === 'creative') {
-            this._foodLevel = 20;
-            this._saturation = 20.0;
+            if (this._foodLevel !== 20 || this._saturation !== 20.0) {
+                this._foodLevel = 20;
+                this._saturation = 20.0;
+                // Emit event for restoration in creative mode
+                if (Donkeycraft.EventBus) {
+                    try {
+                        Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                            foodLevel: 20,
+                            delta: 20 - this._prevFoodLevel
+                        });
+                    } catch (e) {}
+                }
+            }
+            this._prevFoodLevel = 20;
             return;
         }
 
@@ -180,6 +219,17 @@
             // Reset starvation timer when food is available
             this._starvationTimer = 0;
         }
+
+        // Emit hunger change event if food level decreased during tick
+        if (this._foodLevel < this._prevFoodLevel && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    delta: this._foodLevel - this._prevFoodLevel
+                });
+            } catch (e) {}
+        }
+        this._prevFoodLevel = this._foodLevel;
 
         // Natural regeneration: when food > 18 and health < max
         if (this._foodLevel > 18 && this._hurtBox) {
@@ -231,12 +281,24 @@
      * @private
      */
     Donkeycraft.Hunger.prototype._drainSaturationAndFood = function(amount) {
+        var oldFoodLevel = this._foodLevel;
+
         // Drain saturation first (saturation counts as half a food point per unit for drain purposes)
         var satDrain = Math.min(this._saturation, amount * 2);
         this._saturation -= satDrain;
         var remainingDeg = amount - (satDrain / 2);
         if (remainingDeg > 0) {
             this._foodLevel = Math.max(0, this._foodLevel - Math.ceil(remainingDeg));
+        }
+
+        // Emit hunger change event if food level decreased
+        if (this._foodLevel < oldFoodLevel && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    delta: this._foodLevel - oldFoodLevel
+                });
+            } catch (e) {}
         }
     };
 
@@ -264,9 +326,20 @@
      * Reset the hunger system to full state.
      */
     Donkeycraft.Hunger.prototype.reset = function() {
+        var oldLevel = this._foodLevel;
         this._foodLevel = 20;
         this._saturation = 20.0;
         this._starvationTimer = 0;
+
+        // Emit event for reset
+        if (oldLevel !== 20 && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('hunger:changed', {
+                    foodLevel: 20,
+                    delta: 20 - oldLevel
+                });
+            } catch (e) {}
+        }
     };
 
     /**

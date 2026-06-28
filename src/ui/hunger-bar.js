@@ -1,0 +1,365 @@
+// Donkeycraft — Hunger Bar UI
+// Drumstick-based hunger display: 10 drumstick icons with half-icon granularity.
+// Right-aligned (rightmost = first to deplete).
+// Listens to hunger:changed events and updates DOM with animations.
+(function() {
+    'use strict';
+
+    var Donkeycraft = window.Donkeycraft;
+    var EventBus = Donkeycraft.EventBus;
+
+    /**
+     * HungerBar — manages the hunger bar DOM, animations, and overlay effects.
+     * @param {HTMLElement} container - Parent container for hunger bar DOM.
+     * @param {Donkeycraft.Hunger} hunger - Hunger instance to observe.
+     */
+    Donkeycraft.HungerBar = function(container, hunger) {
+        this._hunger = hunger;
+        this._container = container;
+
+        // DOM element references
+        this._row = null;              // .dk-hunger-bar-row
+        this._drumstickContainers = []; // Array of drumstick container elements
+        this._overlay = null;          // .dk-hunger-overlay (full-screen brown overlay)
+
+        // State tracking
+        this._prevFood = 0;
+        this._shakeTimeout = null;
+        this._flashTimeouts = [];
+
+        // Bind + build
+        var self = this;
+        this._onHungerChanged = function(data) { self.updateFromFood(data); };
+
+        this._buildDOM();
+        this._createOverlay();
+        this._subscribeToEvents();
+        this.updateFromFood({
+            foodLevel: hunger.getFoodLevel()
+        });
+    };
+
+    /**
+     * _subscribeToEvents — listen for hunger:changed events.
+     * @private
+     */
+    Donkeycraft.HungerBar.prototype._subscribeToEvents = function() {
+        var globalBus = Donkeycraft.EventBus && Donkeycraft.EventBus._global;
+        if (globalBus) {
+            try {
+                globalBus.on('hunger:changed', this._onHungerChanged);
+            } catch (e) {
+                Donkeycraft.Logger.warn('HungerBar', 'Failed to subscribe to hunger:changed: ' + e.message);
+            }
+        } else {
+            Donkeycraft.Logger.warn('HungerBar', 'No global EventBus instance available — hunger bar will not receive updates');
+        }
+    };
+
+    /**
+     * _buildDOM — create all hunger bar elements inside the container.
+     * @private
+     */
+    Donkeycraft.HungerBar.prototype._buildDOM = function() {
+        var container = this._container;
+        if (!container) return;
+
+        container.innerHTML = '';
+        container.classList.add('dk-hunger-bar-wrapper');
+
+        // Row container for 10 drumstick slots (right-aligned via flex-end)
+        var row = document.createElement('div');
+        row.className = 'dk-hunger-bar-row';
+
+        // Create 10 drumstick containers
+        for (var i = 0; i < 10; i++) {
+            var drumContainer = document.createElement('div');
+            drumContainer.className = 'dk-drumstick-container dk-drumstick-empty';
+            drumContainer.innerHTML = this._getDrumstickSVG('empty');
+            row.appendChild(drumContainer);
+            this._drumstickContainers.push(drumContainer);
+        }
+
+        container.appendChild(row);
+        this._row = row;
+    };
+
+    /**
+     * _getDrumstickSVG — return SVG markup for a drumstick in the given state.
+     * @private
+     * @param {string} state - 'full', 'half', or 'empty'.
+     * @returns {string} SVG markup string.
+     */
+    Donkeycraft.HungerBar.prototype._getDrumstickSVG = function(state) {
+        var drumstickPath = 'M4 14 L12 4 C13 3 15 3 15 4 C15 6 13 7 12 8 L4 16 Z';
+        var boneCircle = '<circle cx="14" cy="4.5" r="1.8" fill="#f5deb3" stroke="#8b6914" stroke-width="0.5"/>';
+
+        if (state === 'half') {
+            return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-half">' +
+                '<defs>' +
+                '<clipPath id="dk-drum-clip-right-' + this._uniqueId() + '"><rect x="8" y="0" width="8" height="18"/></clipPath>' +
+                '</defs>' +
+                '<g clip-path="url(#dk-drum-clip-right-' + this._uniqueId() + ')">' +
+                '<path d="' + drumstickPath + '" fill="#d4a574" stroke="#8b6914" stroke-width="0.6"/>' +
+                boneCircle +
+                '</g>' +
+                '</svg>';
+        }
+        if (state === 'full') {
+            return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-full">' +
+                '<path d="' + drumstickPath + '" fill="#d4a574" stroke="#8b6914" stroke-width="0.6"/>' +
+                boneCircle +
+                '</svg>';
+        }
+        // Empty — dark outline only
+        return '<svg viewBox="0 0 16 18" class="dk-drumstick dk-drumstick-empty-svg">' +
+            '<path d="' + drumstickPath + '" fill="rgba(50,40,30,0.2)" stroke="#5a4a2a" stroke-width="0.6"/>' +
+            '</svg>';
+    };
+
+    /**
+     * _uniqueId — generate a unique ID for SVG clip-path uniqueness.
+     * @private
+     * @returns {string} Unique ID string.
+     */
+    Donkeycraft.HungerBar.prototype._uniqueId = function() {
+        if (!this._uniqueCounter) this._uniqueCounter = 0;
+        return 'h' + (this._uniqueCounter++);
+    };
+
+    /**
+     * updateFromFood — main entry point called on hunger:changed events.
+     * @param {Object} data - { foodLevel, delta }.
+     */
+    Donkeycraft.HungerBar.prototype.updateFromFood = function(data) {
+        var newFood = Math.max(0, Math.min(20, data.foodLevel || 0));
+        var delta = data.delta || 0;
+
+        // Update each drumstick icon
+        this._renderDrumsticks(newFood);
+
+        // Animate on change
+        if (delta !== 0) {
+            this._animateOnFoodChange(delta);
+        }
+
+        // Update brown overlay based on food percentage
+        this._updateBrownOverlay(newFood);
+
+        // Update state tracking
+        this._prevFood = newFood;
+    };
+
+    /**
+     * _renderDrumsticks — update all 10 drumstick containers to reflect current food level.
+     * @private
+     * @param {number} foodLevel - Current food level (0-20).
+     */
+    Donkeycraft.HungerBar.prototype._renderDrumsticks = function(foodLevel) {
+        // Each drumstick = 2 food points (full), 1 point (half), 0 (empty)
+        var totalDrumsticks = 10;
+        var foodPerDrumstick = 2;
+
+        for (var i = 0; i < totalDrumsticks; i++) {
+            var container = this._drumstickContainers[i];
+            if (!container) continue;
+
+            // Right-aligned: rightmost drumstick depletes first
+            // Index 9 = rightmost, index 0 = leftmost
+            var drumIndex = totalDrumsticks - 1 - i; // flip: 0→rightmost, 9→leftmost
+            var drumMinFood = drumIndex * foodPerDrumstick;
+            var drumMaxFood = (drumIndex + 1) * foodPerDrumstick;
+
+            var state = 'empty';
+            if (foodLevel >= drumMaxFood) {
+                state = 'full';
+            } else if (foodLevel >= drumMinFood + foodPerDrumstick / 2) {
+                state = 'half';
+            }
+
+            // Update class and SVG
+            container.className = 'dk-drumstick-container dk-drumstick-' + state;
+            container.innerHTML = this._getDrumstickSVG(state);
+        }
+    };
+
+    /**
+     * _animateOnFoodChange — trigger animations based on food delta.
+     * @private
+     * @param {number} delta - Food change (positive = eating, negative = starving).
+     */
+    Donkeycraft.HungerBar.prototype._animateOnFoodChange = function(delta) {
+        if (delta > 0) {
+            // Eating — pulse the drumsticks that were filled
+            this._pulseEatenDrumsticks(delta);
+        } else if (delta < 0) {
+            // Starving — dim the drumsticks that were depleted
+            this._dimDepletedDrumsticks(Math.abs(delta));
+        }
+
+        // Spawn +/- text effect
+        if (delta !== 0) {
+            this._spawnHungerText(delta);
+        }
+    };
+
+    /**
+     * _pulseEatenDrumsticks — pulse green on drumsticks that were just eaten.
+     * @private
+     * @param {number} foodGain - Amount of food restored.
+     */
+    Donkeycraft.HungerBar.prototype._pulseEatenDrumsticks = function(foodGain) {
+        if (!this._row) return;
+
+        var pulseCount = Math.min(Math.ceil(foodGain / 2), 5); // pulse up to 5 drumsticks
+        for (var i = 0; i < pulseCount && i < this._drumstickContainers.length; i++) {
+            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i];
+            if (!container) continue;
+
+            container.classList.add('dk-drumstick-eat-pulse');
+
+            var self = this;
+            setTimeout(function(el) {
+                if (el) el.classList.remove('dk-drumstick-eat-pulse');
+            }.bind(this, container), 400);
+        }
+    };
+
+    /**
+     * _dimDepletedDrumsticks — dim drumsticks that were depleted.
+     * @private
+     * @param {number} foodLoss - Amount of food lost.
+     */
+    Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function(foodLoss) {
+        if (!this._row) return;
+
+        var dimCount = Math.min(Math.ceil(foodLoss / 2), 5); // dim up to 5 drumsticks
+        for (var i = 0; i < dimCount && i < this._drumstickContainers.length; i++) {
+            var container = this._drumstickContainers[this._drumstickContainers.length - 1 - i];
+            if (!container) continue;
+
+            container.classList.add('dk-drumstick-dim');
+
+            var self = this;
+            setTimeout(function(el) {
+                if (el) el.classList.remove('dk-drumstick-dim');
+            }.bind(this, container), 300);
+        }
+    };
+
+    /**
+     * _spawnHungerText — spawn floating +X or -X text.
+     * @private
+     * @param {number} delta - Food change (positive = eat, negative = starve).
+     */
+    Donkeycraft.HungerBar.prototype._spawnHungerText = function(delta) {
+        if (!this._container) return;
+
+        var textEl = document.createElement('div');
+        textEl.className = 'dk-hunger-text';
+        textEl.textContent = (delta > 0 ? '+' : '') + delta;
+        textEl.style.color = delta > 0 ? '#d4a574' : '#8b6914';
+
+        // Position above center of hunger bar
+        textEl.style.left = '50%';
+        textEl.style.top = '-10px';
+        textEl.style.transform = 'translateX(-50%)';
+
+        this._container.appendChild(textEl);
+
+        // Remove after animation completes
+        setTimeout((function(el) {
+            if (el && el.parentNode) {
+                el.parentNode.removeChild(el);
+            }
+        }).bind(this, textEl), 800);
+    };
+
+    /**
+     * _updateBrownOverlay — update the full-screen brown overlay opacity based on food level.
+     * @private
+     * @param {number} foodLevel - Current food level (0-20).
+     */
+    Donkeycraft.HungerBar.prototype._updateBrownOverlay = function(foodLevel) {
+        if (!this._overlay) return;
+
+        var ratio = foodLevel / 20;
+        // Opacity: 0% at full food → 20% at 0 food
+        var opacity = Math.max(0, (1 - ratio) * 0.2);
+        this._overlay.style.opacity = opacity;
+    };
+
+    /**
+     * _createOverlay — create the full-screen brown overlay element.
+     * @private
+     */
+    Donkeycraft.HungerBar.prototype._createOverlay = function() {
+        var overlay = document.createElement('div');
+        overlay.className = 'dk-hunger-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
+            'pointer-events:none;z-index:5;opacity:0;' +
+            'transition:opacity 400ms ease;';
+        document.body.appendChild(overlay);
+        this._overlay = overlay;
+    };
+
+    /**
+     * resetUI — clear all animations and effects.
+     */
+    Donkeycraft.HungerBar.prototype.resetUI = function() {
+        // Clear shake timeout
+        if (this._shakeTimeout) clearTimeout(this._shakeTimeout);
+
+        // Clear flash timeouts
+        for (var i = 0; i < this._flashTimeouts.length; i++) {
+            clearTimeout(this._flashTimeouts[i]);
+        }
+        this._flashTimeouts = [];
+
+        // Remove flash classes from all drumsticks
+        for (var j = 0; j < this._drumstickContainers.length; j++) {
+            if (this._drumstickContainers[j]) {
+                this._drumstickContainers[j].classList.remove('dk-drumstick-eat-pulse', 'dk-drumstick-dim');
+            }
+        }
+
+        // Reset overlay
+        if (this._overlay) {
+            this._overlay.style.opacity = '0';
+        }
+    };
+
+    /**
+     * destroy — clean up all DOM and event listeners.
+     */
+    Donkeycraft.HungerBar.prototype.destroy = function() {
+        this.resetUI();
+
+        // Unsubscribe from events
+        var globalBus = Donkeycraft.EventBus && Donkeycraft.EventBus._global;
+        if (globalBus && this._onHungerChanged) {
+            try {
+                globalBus.off('hunger:changed', this._onHungerChanged);
+            } catch (e) {}
+        }
+
+        // Remove overlay from DOM
+        if (this._overlay && this._overlay.parentNode) {
+            this._overlay.parentNode.removeChild(this._overlay);
+        }
+
+        // Clean up container
+        if (this._container) {
+            this._container.innerHTML = '';
+        }
+
+        // Null out references
+        this._hunger = null;
+        this._container = null;
+        this._row = null;
+        this._drumstickContainers = [];
+        this._overlay = null;
+        this._onHungerChanged = null;
+    };
+
+})();

@@ -40,7 +40,32 @@
     <!-- Hotbar Container -->
     <div id="dk-hotbar-container"></div>
 
+    <!-- XP Bar — independent container above hotbar -->
+    <div id="dk-xp-bar-wrapper" class="dk-xp-bar-wrapper">
+        <div class="dk-xp-bar-container">
+            <div class="dk-xp-segmented-bg"></div>
+            <div class="dk-xp-fill"></div>
+            <div class="dk-xp-watermark"></div>
+            <div class="dk-xp-badge-container">
+                <div class="dk-xp-badge-bg">
+                    <span class="dk-xp-badge-text">1</span>
+                </div>
+                <div class="dk-xp-badge-glow"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Health Bar — positioned above hotbar, left-aligned -->
+    <div id="dk-health-bar-wrapper" class="dk-health-bar-wrapper dk-interactive"></div>
+
+    <!-- Hunger Bar — positioned above hotbar, right-aligned -->
+    <div id="dk-hunger-bar-wrapper" class="dk-hunger-bar-wrapper dk-interactive"></div>
+
 </div>
+
+<!-- Health & Hunger bars (outside overlay to avoid CSS conflicts) -->
+<div id="dk-health-bar-wrapper-external" class="dk-health-bar-wrapper dk-interactive" style="display:none;"></div>
+<div id="dk-hunger-bar-wrapper-external" class="dk-hunger-bar-wrapper dk-interactive" style="display:none;"></div>
 
 <!-- Error Screen (shown on fatal errors) -->
 <div id="dk-error-screen">
@@ -173,6 +198,13 @@
 
 <!-- UI Elements -->
 <script src="src/ui/gui-elements.js"></script>
+
+<!-- XP Bar UI -->
+<script src="src/ui/xp-bar.js"></script>
+
+<!-- Health Bar & Hunger Bar UI -->
+<script src="src/ui/health-bar.js"></script>
+<script src="src/ui/hunger-bar.js"></script>
 
 <!-- Shader Sources (embedded for file:/// compatibility) -->
 <script type="text/plain" id="dk-vertex-shaders">
@@ -778,6 +810,62 @@ void main() {
                 }
             }
 
+            // --- Wire up HurtBox & Hunger systems (deferred from setSystems — player created in init()) ---
+            try {
+                var hurtBox = new Donkeycraft.HurtBox(game2._player);
+                game2._hurtBox = hurtBox;
+                Donkeycraft._hurtBox = hurtBox;
+
+                var hunger = new Donkeycraft.Hunger(game2._player, hurtBox);
+                game2._hungerSystem = hunger;
+                Donkeycraft._hungerSystem = hunger;
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
+            }
+
+            // --- Wire up Health Bar UI ---
+            try {
+                var healthBarContainer = document.getElementById('dk-health-bar-wrapper');
+                if (healthBarContainer && Donkeycraft.HealthBar && game2._hurtBox) {
+                    var healthBar = new Donkeycraft.HealthBar(healthBarContainer, game2._hurtBox);
+                    Donkeycraft._healthBar = healthBar;
+                } else {
+                    Donkeycraft.Logger.warn('Game', 'HealthBar skipped - container:', !!healthBarContainer, 'class:', typeof Donkeycraft.HealthBar, 'hurtBox:', !!game2._hurtBox);
+                }
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'HealthBar error: ' + e.message);
+            }
+
+            // --- Wire up Hunger Bar UI ---
+            try {
+                var hungerBarContainer = document.getElementById('dk-hunger-bar-wrapper');
+                if (hungerBarContainer && Donkeycraft.HungerBar && game2._hungerSystem) {
+                    var hungerBar = new Donkeycraft.HungerBar(hungerBarContainer, game2._hungerSystem);
+                    Donkeycraft._hungerBar = hungerBar;
+                } else {
+                    Donkeycraft.Logger.warn('Game', 'HungerBar skipped - container:', !!hungerBarContainer, 'class:', typeof Donkeycraft.HungerBar, 'hunger:', !!game2._hungerSystem);
+                }
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'HungerBar error: ' + e.message);
+            }
+
+            // --- Wire up XP Bar UI ---
+            try {
+                var experience = new Donkeycraft.Experience(game2._player);
+                // Make experience instance accessible for test buttons
+                Donkeycraft._xpInstance = experience;
+
+                // Wire XP bar UI (DOM container already exists in HTML)
+                var xpBarContainer = document.getElementById('dk-xp-bar-wrapper');
+                if (xpBarContainer && Donkeycraft.XPBar) {
+                    var xpBar = new Donkeycraft.XPBar(xpBarContainer, experience);
+                    // Store XPBar reference globally for test button access
+                    Donkeycraft._xpBar = xpBar;
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'XP Bar initialization failed: ' + e.message);
+            }
+
             // --- Wire up GuiManager ---
             if (Donkeycraft.GuiManager) {
                 var guiContainer = document.getElementById('dk-gui-container');
@@ -980,6 +1068,60 @@ void main() {
             loadingScreen.showError(err.message || 'Initialization failed');
         }
     });
+
+    // ============================================================
+    // Health Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
+    // ============================================================
+    var healthTestButtons = document.createElement('div');
+    healthTestButtons.id = 'dk-health-test-buttons';
+    healthTestButtons.className = 'dk-xp-test-buttons';
+    healthTestButtons.style.right = '100px';
+    healthTestButtons.style.top = '50%';
+    healthTestButtons.innerHTML =
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">DEATH</button>' +
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=Math.max(0,Donkeycraft._hurtBox._health-10);if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">-10 HP</button>' +
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=Math.max(0,Donkeycraft._hurtBox._health-1);if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">-1 HP</button>' +
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=Math.min(20,Donkeycraft._hurtBox._health+1);if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">+1 HP</button>' +
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=Math.min(20,Donkeycraft._hurtBox._health+10);if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">+10 HP</button>' +
+        '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;if(Donkeycraft._healthBar)Donkeycraft._healthBar.resetUI()}">FULL</button>';
+    document.body.appendChild(healthTestButtons);
+
+    // ============================================================
+    // Hunger Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
+    // ============================================================
+    var hungerTestButtons = document.createElement('div');
+    hungerTestButtons.id = 'dk-hunger-test-buttons';
+    hungerTestButtons.className = 'dk-xp-test-buttons';
+    hungerTestButtons.style.right = '200px';
+    hungerTestButtons.style.top = '50%';
+    hungerTestButtons.innerHTML =
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(0);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">EMPTY</button>' +
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(Math.max(0, Donkeycraft._hungerSystem.getFoodLevel()-10));if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">-10 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(Math.max(0, Donkeycraft._hungerSystem.getFoodLevel()-1));if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">-1 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(Math.min(20, Donkeycraft._hungerSystem.getFoodLevel()+1));if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">+1 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(Math.min(20, Donkeycraft._hungerSystem.getFoodLevel()+10));if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">+10 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(20);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.resetUI()}">FULL</button>';
+    document.body.appendChild(hungerTestButtons);
+
+    // ============================================================
+    // XP Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
+    // ============================================================
+    var testButtons = document.createElement('div');
+    testButtons.id = 'dk-xp-test-buttons';
+    testButtons.className = 'dk-xp-test-buttons';
+    testButtons.style.right = '10px';
+    testButtons.style.top = '50%';
+    testButtons.innerHTML =
+        '<button onclick="if(Donkeycraft._xpInstance){Donkeycraft._xpInstance.reset();if(Donkeycraft._xpBar)Donkeycraft._xpBar.resetUI()}">Reset</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1)">+1 XP</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(10)">+10 XP</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(100)">+100 XP</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1000)">+1000 XP</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+1)}">+1 Lvl</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+10)}">+10 Lvl</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.setLevelToZero(99)">Lvl 99</button>' +
+        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.setLevelToZero(100)">Lvl 100</button>';
+    document.body.appendChild(testButtons);
 
 })();
 </script>

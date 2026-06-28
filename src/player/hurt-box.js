@@ -156,6 +156,9 @@
             return 0;
         }
 
+        // Track health before damage for delta calculation
+        var healthBeforeDamage = this._health;
+
         // Apply damage to absorption first, then health
         var remainingDamage = amount;
 
@@ -175,6 +178,18 @@
             this.onDeath(source);
         }
 
+        // Emit health change event via EventBus (positive delta = damage taken)
+        var actualDelta = healthBeforeDamage - this._health;
+        if (actualDelta > 0 && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: -actualDelta  // negative = damage taken
+                });
+            } catch (e) {}
+        }
+
         return amount;
     };
 
@@ -192,7 +207,20 @@
         this._health += amount;
         this._health = Math.min(this._health, this.maxHealth);
 
-        return this._health - oldHealth;
+        var delta = this._health - oldHealth;
+
+        // Emit health change event via EventBus (positive = healing)
+        if (delta > 0 && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: delta
+                });
+            } catch (e) {}
+        }
+
+        return delta;
     };
 
     /**
