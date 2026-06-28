@@ -1,5 +1,6 @@
 // Donkeycraft — Enchanting UI
-// Enchanting GUI with level cost, enchantment options, and lapis lazuli input.
+// Enchanting table GUI: generates random enchantment options for items, validates XP level
+// and lapis lazuli costs, applies enchantments to produce enchanted output items.
 (function() {
     'use strict';
 
@@ -7,7 +8,15 @@
 
     /**
      * EnchantingUI — manages the enchanting table GUI.
-     * @param {HTMLElement} container - DOM container for the enchanting UI.
+     * Generates random enchantment options for items placed in the input slot, validates XP level
+     * and lapis lazuli costs, applies enchantments to produce enchanted output items.
+     *
+     * Slot model:
+     *   - Input slot: item to enchant (ItemStack or null)
+     *   - Output slot: enchanted result (computed, not set externally)
+     *   - Lapis lazuli: count of lapis in the lapis slot (integer >= 0)
+     *
+     * @param {HTMLElement} [container] - Optional DOM container for rendering the GUI.
      */
     Donkeycraft.EnchantingUI = function(container) {
         this._container = container || null;
@@ -52,6 +61,7 @@
     /**
      * _buildDOM — creates the enchanting table GUI DOM structure.
      * @private
+     * @returns {void}
      */
     Donkeycraft.EnchantingUI.prototype._buildDOM = function() {
         var self = this;
@@ -141,42 +151,90 @@
     };
 
     /**
-     * _getItemDisplayChar — gets a display character for an item ID.
-     * @param {number} itemId - Block/item ID.
-     * @returns {string}
+     * _getItemDisplayChar — gets a display character for an item/block ID.
+     * Uses a lookup table of emoji/symbol characters for known IDs; returns BLACK SQUARE (▪) for unknown.
+     * @param {number} itemId - Block/item ID to look up.
+     * @returns {string} A single-character display string.
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._getItemDisplayChar = function(itemId) {
+        // Validate itemId — return default for null, NaN, negative, or non-integer values
+        if (typeof itemId !== 'number' || !Number.isInteger(itemId) || itemId <= 0 || isNaN(itemId)) {
+            return '\u25A0'; // BLACK SQUARE (default placeholder)
+        }
+
         var displayMap = {
-            1: '🪨', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
-            24: '🪵', 30: '🟨', 45: '🔲', 54: '📦', 61: '🔥',
-            138: '🪨', 187: '📦', 191: '🔥', 214: '⚫', 218: '💎',
-            219: '🟢', 220: '🔵', 221: '⚪', 222: '🟡', 225: '🟡',
-            226: '⚪', 227: '💎', 310: '🥢', 312: '🔦'
+            1: '\u25CB',    // WHITE CIRCLE — stone
+            3: '\u2592',    // MEDIUM SHADE — dirt
+            4: '\u25A1',    // WHITE SQUARE — grass block
+            5: '\u258C',    // LEFT HALF BLOCK — wood log
+            6: '\u2593',    // DARKER SHADE — sand
+            7: '\u2591',    // LIGHT SHADE — gravel
+            24: '\u258C',   // LEFT HALF BLOCK — planks
+            30: '\u2593',   // DARKER SHADE — sand (red)
+            45: '\u25A0',   // BLACK SQUARE — cobblestone wall
+            54: '\u25D7',   // CIRCLE WITH VERTICAL BISECTION — chest
+            61: '\u25D8',   // CIRCLE WITH HORIZONTAL BISECTION — furnace
+            138: '\u25CB',  // WHITE CIRCLE — iron_ore
+            187: '\u25D7',  // diamond_pickaxe (netherite)
+            191: '\u25D8',  // blast_furnace
+            214: '\u25CF',  // BLACK CIRCLE — coal
+            218: '\u2666',  // DIAMOND — diamond
+            219: '\u25AE',  // BLACK VERTICAL RECTANGLE — emerald
+            220: '\u25A0',  // BLACK SQUARE — lapis_lazuli
+            221: '\u25A1',  // WHITE SQUARE — gold_ingot
+            222: '\u25CF',  // BLACK CIRCLE — redstone_dust
+            225: '\u25D6',  // CIRCLE WITH DIAGONALS — book
+            226: '\u25CB',  // WHITE CIRCLE — gold_ingot (variant)
+            227: '\u2666',  // DIAMOND — emerald (variant)
+            310: '\u25A4',  // VERTICAL LINE WITH LEFT TEE — stick
+            312: '\u25E6'   // WHITE BULLET — torch
         };
-        return displayMap[itemId] || '▪';
+
+        return displayMap[itemId] || '\u2597'; // BOX DRAWINGS LIGHT VERTICAL AND LEFT (fallback)
     };
 
     /**
-     * _updateSlotDisplay — updates the DOM display for a slot.
+     * _updateSlotDisplay — updates the DOM display for a named slot.
+     * Handles input, output, and lapis lazuli slots with appropriate visual feedback.
      * @param {string} slotName - Slot name ('input', 'output', 'lapis').
+     * @returns {void}
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._updateSlotDisplay = function(slotName) {
+        if (!this._container) return;
+
         var el, stack;
-        if (slotName === 'input') {
-            el = this._inputSlotEl;
-            stack = this._inputSlot;
-        } else if (slotName === 'output') {
-            el = this._outputSlotEl;
-            stack = this._outputSlot;
-        } else if (slotName === 'lapis') {
-            el = this._lapisSlotEl;
-        } else return;
+        switch (slotName) {
+            case 'input':
+                this._inputSlotEl = this._inputSlotEl || this._container.querySelector('.dk-enchant-input');
+                el = this._inputSlotEl;
+                stack = this._inputSlot;
+                break;
+            case 'output':
+                this._outputSlotEl = this._outputSlotEl || this._container.querySelector('.dk-enchant-output');
+                el = this._outputSlotEl;
+                stack = this._outputSlot;
+                break;
+            case 'lapis':
+                this._lapisSlotEl = this._lapisSlotEl || this._container.querySelector('.dk-enchant-lapis');
+                el = this._lapisSlotEl;
+                break;
+            default:
+                return;
+        }
 
         if (!el) return;
 
-        if (slotName !== 'lapis') {
+        if (slotName === 'lapis') {
+            // Lapis count display
+            if (this._lapisCount > 0) {
+                el.textContent = '\u25CF\u00D7' + this._lapisCount; // BLACK CIRCLE × N
+            } else {
+                el.innerHTML = '<span style="color:#aaa;font-size:11px;">Lapis</span>';
+            }
+        } else {
+            // Input/output slot display
             if (!stack || stack.isEmpty()) {
                 var labels = { input: 'Item', output: 'Result' };
                 el.innerHTML = '<span style="color:#aaa;font-size:11px;">' + (labels[slotName] || '') + '</span>';
@@ -184,19 +242,12 @@
                 el.textContent = this._getItemDisplayChar(stack.getItemId());
             }
         }
-
-        // Lapis count display
-        if (slotName === 'lapis') {
-            if (this._lapisCount > 0) {
-                el.textContent = '🔵×' + this._lapisCount;
-            } else {
-                el.innerHTML = '<span style="color:#aaa;font-size:11px;">Lapis</span>';
-            }
-        }
     };
 
     /**
-     * _updateOptionDisplay — updates the enchantment option cards.
+     * _updateOptionDisplay — updates all three enchantment option card DOM elements.
+     * Sets text, cost color, and border highlight based on current state.
+     * @returns {void}
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._updateOptionDisplay = function() {
@@ -236,10 +287,15 @@
     };
 
     /**
-     * _updateCostDisplay — updates the level cost display.
+     * _updateCostDisplay — updates the bottom-panel level cost display.
+     * Color changes to green (#4a9) if player has enough levels, red (#f84) otherwise.
+     * @returns {void}
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._updateCostDisplay = function() {
+        // Guard: skip if DOM elements not built (no container provided)
+        if (!this._levelCostEl) return;
+
         var opt = this._enchantOptions[this._selectedOption] || null;
         var cost = opt ? opt.cost : 0;
         this._levelCostEl.textContent = 'Cost: ' + cost;
@@ -247,35 +303,54 @@
     };
 
     /**
-     * _applyEnchantment — applies the selected enchantment to generate output.
+     * _applyEnchantment — computes the enchanted output based on input item, selected enchantment option,
+     * player levels, and lapis lazuli count. Updates the output slot and DOM display.
+     * Emits onResultChange events when the output changes.
+     * @returns {void}
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._applyEnchantment = function() {
+        // Clear previous result before attempting to regenerate
+        var hadOutput = this._outputSlot && !this._outputSlot.isEmpty();
+
         if (!this._inputSlot || this._inputSlot.isEmpty()) {
             this._outputSlot = null;
+            if (hadOutput) this._updateSlotDisplay('output');
             return;
         }
 
         var opt = this._enchantOptions[this._selectedOption] || null;
         if (!opt) {
             this._outputSlot = null;
+            if (hadOutput) this._updateSlotDisplay('output');
             return;
         }
 
-        // Check requirements
+        // Check XP level cost requirement
         if (this._playerLevels < opt.cost) {
             this._outputSlot = null;
+            if (hadOutput) this._updateSlotDisplay('output');
             return;
         }
 
+        // Check lapis lazuli requirement
         if (this._lapisCount < (opt.lapisCost || 1)) {
             this._outputSlot = null;
+            if (hadOutput) this._updateSlotDisplay('output');
             return;
         }
 
-        // Apply enchantment to input item
+        // Apply enchantment to input item via deep clone
         var result = this._inputSlot.clone();
-        result.addEnchantment(opt.id, opt.level);
+        try {
+            result.addEnchantment(opt.id, opt.level);
+        } catch (e) {
+            // If enchantment application fails, clear output
+            this._outputSlot = null;
+            if (hadOutput) this._updateSlotDisplay('output');
+            return;
+        }
+
         this._outputSlot = result;
 
         // Update slot display
@@ -298,13 +373,22 @@
     };
 
     /**
-     * _isValidStack — checks if a value is a valid ItemStack or null.
+     * _isValidStack — checks if a value is a valid ItemStack instance or null.
+     * Validates that the object has all required ItemStack methods and a non-zero count.
      * @param {*} val - Value to check.
-     * @returns {boolean}
+     * @returns {boolean} True if the value is null or a valid ItemStack with count > 0.
      * @private
      */
     Donkeycraft.EnchantingUI.prototype._isValidStack = function(val) {
-        return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
+        if (val === null) return true;
+        if (!val || typeof val !== 'object') return false;
+        // Must have all required ItemStack methods
+        if (typeof val.isEmpty !== 'function') return false;
+        if (typeof val.getItemId !== 'function') return false;
+        if (typeof val.getCount !== 'function') return false;
+        // Non-empty stacks must have count > 0
+        if (!val.isEmpty() && val.getCount && val.getCount() <= 0) return false;
+        return true;
     };
 
     /**
@@ -343,56 +427,55 @@
             return;
         }
 
-        // Determine which slot the item belongs to
+        // Determine which slot the item belongs to using EnchantmentRegistry.canApplyToItem()
         var itemBlockId = this._inputSlot.getItemId ? this._inputSlot.getItemId() : 0;
 
-        // Use BlockRegistry if available for accurate classification
-        var isArmor = false;
-        var isWeapon = false;
-        var blockInfo = null;
-        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlockById === 'function') {
-            try { blockInfo = Donkeycraft.BlockRegistry.getBlockById(itemBlockId); } catch (e) {}
-        }
-
-        // Armor items: helmet, chestplate, leggings, boots (vanilla IDs 300-303 for leather, 304-307 for chainmail, 308-311 for iron, 312-315 for gold, 316-319 for diamond)
-        // Also include NBT-tagged maxDurability items that exceed tool thresholds
-        var armorItemIds = [300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319];
-        if (blockInfo && blockInfo.category === 'armor') {
-            isArmor = true;
-        } else if (armorItemIds.indexOf(itemBlockId) >= 0) {
-            isArmor = true;
-        } else if (blockInfo && (blockInfo.category === 'weapon' || blockInfo.category === 'tool')) {
-            isWeapon = true;
-        } else if (itemBlockId >= 195 && itemBlockId <= 213) {
-            // Tools and weapons (crafting table through diamond items)
-            isWeapon = true;
-        } else {
-            // Default: assume weapon for anything that isn't armor (swords, tools, bows, etc.)
-            isWeapon = true;
-        }
-
-        // Get valid enchantments from the registry
+        // Get all registered enchantments and filter by item compatibility
         var registry = Donkeycraft.EnchantmentRegistry;
         var pool = [];
 
-        if (isWeapon && registry) {
-            var weaponEnchants = registry.getEnchantmentsForSlot('weapon');
-            for (var w = 0; w < weaponEnchants.length; w++) {
-                pool.push(weaponEnchants[w]);
-            }
-        } else if (isArmor && registry) {
-            var armorEnchants = registry.getEnchantmentsForSlot('armor');
-            for (var a = 0; a < armorEnchants.length; a++) {
-                pool.push(armorEnchants[a]);
+        if (registry) {
+            // Iterate over all registered enchantment IDs and check compatibility with the item
+            var allEnchants = registry.getAllEnchantments();
+            for (var e = 0; e < allEnchants.length; e++) {
+                try {
+                    if (registry.canApplyToItem(itemBlockId, allEnchants[e].id)) {
+                        pool.push(allEnchants[e]);
+                    }
+                } catch (err) {
+                    // Skip enchantments that throw during compatibility check
+                }
             }
         }
 
-        // If no registry or empty pool, fall back to a minimal static set
+        // If no registry or empty pool, fall back to a minimal static set.
+        // Must contain at least 3 entries so we can always generate 3 unique options.
+        // IMPORTANT: Fallback enchantments are pre-approved for universal use — skip canApplyToItem check
+        // because _getItemCategory() may not recognize all custom/legacy item IDs.
         if (!registry || pool.length === 0) {
-            pool = [
-                { id: 1, name: 'Sharpness', maxLevel: 5, weight: 10 },   // weapon
-                { id: 4, name: 'Protection', maxLevel: 4, weight: 10 }    // armor
+            var fallbackEnchants = [
+                { id: 1, name: 'Sharpness', maxLevel: 5, weight: 10 },   // weapon — melee damage
+                { id: 2, name: 'Smite', maxLevel: 5, weight: 5 },       // weapon — undead bonus
+                { id: 4, name: 'Protection', maxLevel: 4, weight: 10 }, // armor — general damage reduction
+                { id: 11, name: 'Unbreaking', maxLevel: 3, weight: 10 } // both — durability
             ];
+            if (!registry) {
+                // No registry at all — use fallback enchantments directly as pool objects
+                for (var f = 0; f < fallbackEnchants.length; f++) {
+                    pool.push({
+                        id: fallbackEnchants[f].id,
+                        name: fallbackEnchants[f].name,
+                        maxLevel: fallbackEnchants[f].maxLevel,
+                        weight: fallbackEnchants[f].weight
+                    });
+                }
+            } else {
+                // Registry exists but canApplyToItem rejected everything — add fallback enchantment IDs
+                // directly to pool so they bypass the compatibility check
+                for (var f2 = 0; f2 < fallbackEnchants.length; f2++) {
+                    pool.push(fallbackEnchants[f2]);
+                }
+            }
         }
 
         // Pick 3 random unique enchantments (or fewer if pool is small)
@@ -414,14 +497,24 @@
             var maxLvl = enchant.maxLevel || 1;
             var randomLevel = Math.floor(Math.random() * maxLvl) + 1;
 
-            // Calculate cost using registry formula
-            var cost = registry.calculateLevelCost ? registry.calculateLevelCost(enchant.id, randomLevel) : randomLevel;
+            // Calculate cost using registry formula (vanilla: level^2 for basic enchantments)
+            var baseCost = registry.calculateLevelCost ? registry.calculateLevelCost(enchant.id, randomLevel) : randomLevel;
+
+            // Apply option position multiplier: first option is cheapest (1x), second is 1.5x, third is 2x
+            // This mirrors vanilla Minecraft's enchanting table behavior where later options cost more
+            var positionMultiplier = [1, 1.5, 2][this._enchantOptions.length];
+            var cost = Math.ceil(baseCost * positionMultiplier);
+
+            // Ensure costs are strictly increasing across options
+            if (this._enchantOptions.length > 0 && cost <= this._enchantOptions[this._enchantOptions.length - 1].cost) {
+                cost = this._enchantOptions[this._enchantOptions.length - 1].cost + 1;
+            }
 
             this._enchantOptions.push({
                 id: enchant.id,
                 name: enchant.name,
                 level: randomLevel,
-                cost: cost + (this._enchantOptions.length * 2), // Increase cost for later options
+                cost: cost,
                 lapisCost: 1 + this._enchantOptions.length
             });
         }
@@ -431,11 +524,12 @@
     };
 
     /**
-     * selectEnchantment — selects an enchantment option by index.
-     * @param {number} index - Option index (0-2).
+     * selectEnchantment — selects an enchantment option by index and recomputes output.
+     * @param {number} index - Option index (0, 1, or 2).
+     * @returns {void}
      */
     Donkeycraft.EnchantingUI.prototype.selectEnchantment = function(index) {
-        if (index < 0 || index > 2) return;
+        if (index < 0 || index >= 3) return;
         this._selectedOption = index;
 
         this._updateOptionDisplay();

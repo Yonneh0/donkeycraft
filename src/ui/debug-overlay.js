@@ -41,7 +41,8 @@
 
     /**
      * setTimer — sets a reference to the Timer instance for delta time access.
-     * @param {Object} timer - Donkeycraft.Timer instance.
+     * Accepts any object with a getDeltaTime() method (duck typing).
+     * @param {Object} [timer=null] - Donkeycraft.Timer instance or compatible duck-typed object.
      */
     Donkeycraft.DebugOverlay.prototype.setTimer = function(timer) {
         this._timer = timer;
@@ -65,7 +66,7 @@
 
     /**
      * setBiome — sets a reference to the biome definitions.
-     * @param {Object} biome - Biome module with getBiomeAt method.
+     * @param {Object} biome - Biome module with getBiomeAt(chunkX, chunkZ) method.
      */
     Donkeycraft.DebugOverlay.prototype.setBiome = function(biome) {
         this._biome = biome;
@@ -101,12 +102,14 @@
      */
     Donkeycraft.DebugOverlay.prototype.getChunkInfo = function() {
         if (!this._chunkManager) {
-            return { loaded: 0, renderDistance: 0 };
+            return { loaded: 0, renderDistance: 8 };
         }
 
-        var renderDist = 0;
+        var renderDist = 8; // Default fallback
         try {
-            renderDist = this._config.RENDER_DISTANCE || 8;
+            if (this._config && typeof this._config.RENDER_DISTANCE === 'number') {
+                renderDist = this._config.RENDER_DISTANCE;
+            }
         } catch (e) {}
 
         // Count loaded chunks
@@ -124,6 +127,8 @@
 
     /**
      * getPlayerCoords — gets player position and rotation data.
+     * Each getter is independently try/catched so one failure does not
+     * suppress the others.
      * @returns {Object} Position, rotation, and mode data.
      */
     Donkeycraft.DebugOverlay.prototype.getPlayerCoords = function() {
@@ -132,13 +137,12 @@
         var mode = this._gameMode;
 
         if (this._player) {
-            try {
-                x = this._player.getX ? this._player.getX() : 0;
-                y = this._player.getY ? this._player.getY() : 0;
-                z = this._player.getZ ? this._player.getZ() : 0;
-                pitch = this._player.getPitch ? this._player.getPitch() : 0;
-                yaw = this._player.getYaw ? this._player.getYaw() : 0;
-            } catch (e) {}
+            // Each getter is isolated so a throwing method does not suppress others.
+            try { x = this._player.getX ? this._player.getX() : 0; } catch (e) {}
+            try { y = this._player.getY ? this._player.getY() : 0; } catch (e) {}
+            try { z = this._player.getZ ? this._player.getZ() : 0; } catch (e) {}
+            try { pitch = this._player.getPitch ? this._player.getPitch() : 0; } catch (e) {}
+            try { yaw = this._player.getYaw ? this._player.getYaw() : 0; } catch (e) {}
 
             try {
                 mode = this._player.getGameMode ? this._player.getGameMode() : 'survival';
@@ -156,17 +160,34 @@
     };
 
     /**
-     * getBiomeName — gets the current biome name.
-     * @returns {string}
+     * getBiomeName — gets the current biome name at the player's position.
+     * @returns {string} Biome name or 'Unknown' if unavailable.
      */
     Donkeycraft.DebugOverlay.prototype.getBiomeName = function() {
         if (!this._biome || !this._player) return 'Unknown';
 
+        var playerName = this._player.getName ? this._player.getName() : null;
+        if (!playerName) {
+            // Player may not have getName — continue with position lookup
+        }
+
         try {
             var x = this._player.getX ? this._player.getX() : 0;
+        } catch (e) {
+            return 'Unknown';
+        }
+
+        try {
             var z = this._player.getZ ? this._player.getZ() : 0;
-            var biome = this._biome.getBiomeAt ? this._biome.getBiomeAt(x, z) : null;
-            return biome ? biome.name : 'Unknown';
+        } catch (e) {
+            return 'Unknown';
+        }
+
+        if (!this._biome.getBiomeAt) return 'Unknown';
+
+        try {
+            var biome = this._biome.getBiomeAt(x, z);
+            return biome && biome.name ? biome.name : 'Unknown';
         } catch (e) {
             return 'Unknown';
         }
@@ -272,12 +293,18 @@
 
     /**
      * _getDeltaTime — gets delta time from the timer reference.
-     * @returns {number}
+     * Uses duck typing: any object with a getDeltaTime() method is accepted.
+     * @returns {number} Delta time in seconds, or 0 if unavailable.
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getDeltaTime = function() {
         if (this._timer) {
-            try { return this._timer.getDeltaTime ? this._timer.getDeltaTime() : 0; } catch (e) {}
+            try {
+                if (typeof this._timer.getDeltaTime === 'function') {
+                    var dt = this._timer.getDeltaTime();
+                    return (typeof dt === 'number' && dt >= 0) ? dt : 0;
+                }
+            } catch (e) {}
         }
         return 0;
     };
@@ -300,6 +327,11 @@
 
     /**
      * startListening — starts auto-updating on each render frame.
+     * FPS counter increments each frame and updates every 1000ms.
+     * The first FPS sample waits a full second from the first frame so early
+     * frames do not produce a misleading spike.
+     * Note: The FPS value emitted in collectData() may be 1 frame behind
+     * because the FPS calculation happens before data collection in the render loop.
      */
     Donkeycraft.DebugOverlay.prototype.startListening = function() {
         if (this._unsubscribeRender) return;
@@ -310,7 +342,14 @@
                 this._unsubscribeRender = this._timer.onRender(function(timestamp) {
                     // Update FPS counter
                     self._frameCount++;
-                    if (!self._lastFpsUpdate) self._lastFpsUpdate = timestamp;
+
+                    // Initialize the baseline timestamp on first frame only.
+                    // Using a flag ensures we do not accidentally reset on the first
+                    // 1000 ms boundary when _lastFpsUpdate happens to be 0.
+                    if (!self._fpsBaselineSet) {
+                        self._lastFpsUpdate = timestamp;
+                        self._fpsBaselineSet = true;
+                    }
 
                     if (timestamp - self._lastFpsUpdate >= 1000) {
                         self._fps = self._frameCount;

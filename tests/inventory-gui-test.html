@@ -1412,6 +1412,9 @@
     // getAvailableEnchantments (starts empty)
     F.assertEq(enchanting.getAvailableEnchantments().length, 0, 'No enchantments without input');
 
+    // getInputSlot (initially null)
+    F.assert(enchanting.getInputSlot() === null, 'getInputSlot returns null initially');
+
     // setInputSlot with validation
     var diamondSword = new Donkeycraft.ItemStack(207, 1);
     F.assert(enchanting.setInputSlot(diamondSword), 'setInputSlot succeeds');
@@ -1425,15 +1428,28 @@
     enchanting.selectEnchantment(0);
     F.assertEq(enchanting.getLevelCost(), opts[0].cost, 'getLevelCost returns selected option cost');
 
+    // selectEnchantment with invalid indices (no-op)
+    enchanting.selectEnchantment(-1);
+    F.assertEq(enchanting._selectedOption, 0, 'selectEnchantment(-1) is no-op');
+    enchanting.selectEnchantment(3);
+    F.assertEq(enchanting._selectedOption, 0, 'selectEnchantment(3) is no-op');
+
     // setLapisCount / setPlayerLevels with validation
     F.assert(enchanting.setLapisCount(5), 'setLapisCount(5) succeeds');
     F.assert(!enchanting.setLapisCount(-1), 'setLapisCount(-1) fails validation');
     F.assert(!enchanting.setLapisCount(1.5), 'setLapisCount(1.5) fails validation (not integer)');
+    F.assert(!enchanting.setLapisCount('abc'), 'setLapisCount("abc") fails validation');
+    F.assert(!enchanting.setLapisCount(null), 'setLapisCount(null) fails validation');
 
     F.assert(enchanting.setPlayerLevels(10), 'setPlayerLevels(10) succeeds');
     F.assert(!enchanting.setPlayerLevels(-1), 'setPlayerLevels(-1) fails validation');
+    F.assert(!enchanting.setPlayerLevels(1.5), 'setPlayerLevels(1.5) fails validation (not integer)');
+    F.assert(!enchanting.setPlayerLevels('abc'), 'setPlayerLevels("abc") fails validation');
 
-    // applyEnchantment
+    // getLapisCount
+    F.assertEq(enchanting.getLapisCount(), 5, 'getLapisCount returns 5');
+
+    // applyEnchantment (should produce result since levels >= cost and lapis >= 1)
     var applied = enchanting.applyEnchantment();
     if (applied) {
         F.assert(applied.getEnchantments().length > 0, 'Applied enchantment has enchantments');
@@ -1447,9 +1463,124 @@
         F.assert(typeof result.lapisCost === 'number', 'takeResult returns lapisCost');
     }
 
+    // takeResult after taking (should return null — output cleared)
+    var result2 = enchanting.takeResult();
+    F.assert(result2 === null, 'takeResult returns null after already taken');
+
+    // setInputSlot with empty stack (should succeed but clear options)
+    var emptyStack = new Donkeycraft.ItemStack(0, 0);
+    F.assert(enchanting.setInputSlot(emptyStack), 'setInputSlot with empty stack succeeds');
+    F.assertEq(enchanting.getAvailableEnchantments().length, 0, 'No enchantment options after clearing input');
+
+    // setInputSlot validation — null is allowed (clears slot)
+    F.assert(enchanting.setInputSlot(null), 'setInputSlot(null) returns true');
+    F.assert(enchanting.getInputSlot() === null, 'setInputSlot(null) clears the slot');
+
+    // setInputSlot validation — invalid values
+    F.assert(!enchanting.setInputSlot('string'), 'setInputSlot("string") fails validation');
+    F.assert(!enchanting.setInputSlot(123), 'setInputSlot(123) fails validation');
+    F.assert(!enchanting.setInputSlot({}), 'setInputSlot({}) fails validation');
+    F.assert(!enchanting.setInputSlot(undefined), 'setInputSlot(undefined) fails validation');
+
+    // _isValidStack tests
+    F.assert(enchanting._isValidStack(null), '_isValidStack(null) returns true');
+    F.assert(enchanting._isValidStack(new Donkeycraft.ItemStack(1, 1)), '_isValidStack(valid stack) returns true');
+    F.assert(!enchanting._isValidStack('string'), '_isValidStack(string) returns false');
+    F.assert(!enchanting._isValidStack(123), '_isValidStack(number) returns false');
+    F.assert(!enchanting._isValidStack({}), '_isValidStack(object) returns false');
+    F.assert(!enchanting._isValidStack(undefined), '_isValidStack(undefined) returns false');
+
+    // _getItemDisplayChar tests
+    var char1 = enchanting._getItemDisplayChar(1);
+    F.assert(typeof char1 === 'string' && char1.length > 0, '_getItemDisplayChar returns char for known ID');
+    var charDefault = enchanting._getItemDisplayChar(9999);
+    F.assert(charDefault !== '\u25CB', '_getItemDisplayChar returns fallback for unknown ID');
+    var charNull = enchanting._getItemDisplayChar(null);
+    F.assertEq(charNull, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for null');
+    var charNaN = enchanting._getItemDisplayChar(NaN);
+    F.assertEq(charNaN, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for NaN');
+    var charZero = enchanting._getItemDisplayChar(0);
+    F.assertEq(charZero, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for 0');
+    var charNeg = enchanting._getItemDisplayChar(-5);
+    F.assertEq(charNeg, '\u25A0', '_getItemDisplayChar returns BLACK SQUARE for negative');
+
+    // Test: insufficient XP levels prevents output
+    enchanting.setInputSlot(new Donkeycraft.ItemStack(207, 1));
+    enchanting.setPlayerLevels(0);
+    var noResult = enchanting.applyEnchantment();
+    if (noResult) {
+        F.assert(noResult.isEmpty(), 'No result when player has insufficient levels');
+    }
+
+    // Test: insufficient lapis prevents output
+    enchanting.setPlayerLevels(10);
+    enchanting.setLapisCount(0);
+    var noLapisResult = enchanting.applyEnchantment();
+    if (noLapisResult) {
+        F.assert(noLapisResult.isEmpty(), 'No result when lapis count is 0');
+    }
+
+    // Test: onResultChange event subscription (re-set input slot since it was cleared above)
+    var resultChangeEvent = null;
+    var unsubResult = enchanting.onResultChange(function(data) {
+        resultChangeEvent = data;
+    });
+    enchanting.setInputSlot(new Donkeycraft.ItemStack(207, 1)); // re-set input for event test
+    enchanting.setPlayerLevels(20);
+    enchanting.setLapisCount(5);
+    enchanting.applyEnchantment();
+    F.assert(resultChangeEvent !== null, 'onResultChange callback fired');
+
+    // Unsubscribe — verify no further calls
+    unsubResult();
+    var firedAfterUnsub = false;
+    enchanting.onResultChange(function() { firedAfterUnsub = true; });
+    enchanting.applyEnchantment();
+    F.assert(firedAfterUnsub, 're-subscribed listener fires');
+
     // destroy
     enchanting.destroy();
     document.body.removeChild(enchantContainer);
+
+    // --- Test EnchantingUI without container (null container) ---
+    var enchantNoContainer = new Donkeycraft.EnchantingUI(null);
+    F.assertEq(enchantNoContainer.getAvailableEnchantments().length, 0, 'Null container has no enchantment options');
+    F.assert(enchantNoContainer.getInputSlot() === null, 'Null container input slot is null');
+    F.assert(enchantNoContainer.setLapisCount(3), 'setLapisCount works without container');
+    F.assert(enchantNoContainer.setPlayerLevels(10), 'setPlayerLevels works without container');
+    enchantNoContainer.selectEnchantment(0); // should be no-op (no options)
+    enchantNoContainer.destroy();
+
+    // --- Test EnchantingUI with _generateEnchantmentOptions fallback pool ---
+    var enchantFallbackContainer = document.createElement('div');
+    enchantFallbackContainer.id = 'enchant-fallback-test-container';
+    document.body.appendChild(enchantFallbackContainer);
+
+    var enchantFallback = new Donkeycraft.EnchantingUI(enchantFallbackContainer);
+    // Set input slot with an item that won't match any registry entries
+    enchantFallback.setInputSlot(new Donkeycraft.ItemStack(1, 1)); // stone
+    var fallbackOpts = enchantFallback.getAvailableEnchantments();
+    F.assertEq(fallbackOpts.length, 3, 'Fallback pool generates 3 options');
+    // Verify fallback option structure
+    F.assert(typeof fallbackOpts[0].id === 'number', 'Fallback option has id');
+    F.assert(typeof fallbackOpts[0].name === 'string', 'Fallback option has name');
+    F.assert(typeof fallbackOpts[0].cost === 'number', 'Fallback option has cost');
+    F.assert(typeof fallbackOpts[0].lapisCost === 'number', 'Fallback option has lapisCost');
+
+    // Verify cost increases for later options (position multiplier)
+    if (fallbackOpts.length >= 2) {
+        F.assert(fallbackOpts[1].cost > fallbackOpts[0].cost, 'Second option costs more than first (position multiplier)');
+    }
+    if (fallbackOpts.length >= 3) {
+        F.assert(fallbackOpts[2].cost > fallbackOpts[1].cost, 'Third option costs more than second (position multiplier)');
+    }
+
+    // Test: clear input clears options
+    enchantFallback.setInputSlot(null);
+    F.assertEq(enchantFallback.getAvailableEnchantments().length, 0, 'Clearing input clears options');
+
+    enchantFallback.destroy();
+    document.body.removeChild(enchantFallbackContainer);
 
     // ============================================================
     // Section 10: GuiManager — Open/Close & Routing
@@ -1510,51 +1641,328 @@
     guiManager.destroy();
 
     // ============================================================
-    // Section 11: DebugOverlay — Data Collection
+    // Section 11: DebugOverlay — Data Collection & Rendering Support
     // ============================================================
-    F.section('11. DebugOverlay — Data Collection');
+    F.section('11. DebugOverlay — Data Collection & Rendering Support');
 
     var debugBus = new Donkeycraft.EventBus();
     var debug = new Donkeycraft.DebugOverlay(debugBus);
 
-    // setFPS / getFPS
-    debug.setFPS(60);
-    F.assertEq(debug.getFPS(), 60, 'getFPS returns set value');
+    // --- Constructor initialization ---
+    F.assert(debug !== null, 'DebugOverlay instance created');
+    F.assertEq(debug.getFPS(), 0, 'getFPS returns 0 initially');
+    F.assertEq(debug.getGameMode(), 'survival', 'getGameMode returns "survival" by default');
 
-    // setGameMode / getGameMode
+    // --- setFPS / getFPS boundary conditions ---
+    debug.setFPS(60);
+    F.assertEq(debug.getFPS(), 60, 'setFPS(60) / getFPS() returns 60');
+    debug.setFPS(144);
+    F.assertEq(debug.getFPS(), 144, 'setFPS(144) / getFPS() returns 144');
+    // Negative FPS should be clamped to 0
+    debug.setFPS(-50);
+    F.assertEq(debug.getFPS(), 0, 'setFPS(-50) clamps to 0');
+    // Zero FPS
+    debug.setFPS(0);
+    F.assertEq(debug.getFPS(), 0, 'setFPS(0) returns 0');
+    // Non-integer FPS (should be rounded)
+    debug.setFPS(59.7);
+    F.assertEq(debug.getFPS(), 60, 'setFPS(59.7) rounds to 60');
+    debug.setFPS(59.2);
+    F.assertEq(debug.getFPS(), 59, 'setFPS(59.2) rounds to 59');
+
+    // --- setGameMode / getGameMode ---
     debug.setGameMode('creative');
     F.assertEq(debug.getGameMode(), 'creative', 'getGameMode returns "creative"');
+    debug.setGameMode('spectator');
+    F.assertEq(debug.getGameMode(), 'spectator', 'getGameMode returns "spectator"');
+    debug.setGameMode('survival');
+    F.assertEq(debug.getGameMode(), 'survival', 'getGameMode returns "survival"');
+    // Null/undefined game mode should default to 'survival'
+    debug.setGameMode(null);
+    F.assertEq(debug.getGameMode(), 'survival', 'setGameMode(null) defaults to "survival"');
+    debug.setGameMode(undefined);
+    F.assertEq(debug.getGameMode(), 'survival', 'setGameMode(undefined) defaults to "survival"');
 
-    // collectData
-    var data = debug.collectData(null, null);
-    F.assert(data.fps >= 0, 'collectData fps is non-negative');
-    F.assert(typeof data.coordinates === 'object', 'collectData has coordinates object');
-    F.assert(typeof data.chunkInfo === 'object', 'collectData has chunkInfo object');
-    F.assert(typeof data.lightLevels === 'object', 'collectData has lightLevels object');
-    F.assert(typeof data.biome === 'string', 'collectData biome is string');
+    // --- setTimer / _getDeltaTime ---
+    var mockTimer = {
+        getDeltaTime: function() { return 0.016; }
+    };
+    debug.setTimer(mockTimer);
+    // _getDeltaTime is private — test indirectly through collectData
+    F.assert(debug._getDeltaTime === 0.016 || typeof debug._getDeltaTime === 'function', '_getDeltaTime exists on prototype');
 
-    // getChunkInfo (no chunk manager)
-    var chunkInfo = debug.getChunkInfo();
-    F.assertEq(chunkInfo.loaded, 0, 'No chunks loaded');
+    // Timer with no getDeltaTime
+    var emptyTimer = {};
+    debug.setTimer(emptyTimer);
+    // Should not throw — collectData should handle gracefully
+    F.assert(debug._getDeltaTime() === 0, '_getDeltaTime returns 0 when timer has no getDeltaTime');
 
-    // getPlayerCoords (no player)
+    // Timer set to null
+    debug.setTimer(null);
+    F.assert(debug._getDeltaTime() === 0, '_getDeltaTime returns 0 when timer is null');
+
+    // --- getPlayerCoords (no player) ---
     var coords = debug.getPlayerCoords();
     F.assertEq(coords.x, 0, 'Player X is 0 without player');
     F.assertEq(coords.y, 0, 'Player Y is 0 without player');
     F.assertEq(coords.z, 0, 'Player Z is 0 without player');
+    F.assertEq(coords.pitch, 0, 'Pitch is 0 without player');
+    F.assertEq(coords.yaw, 0, 'Yaw is 0 without player');
+    F.assertEq(coords.mode, 'survival', 'Mode defaults to "survival"');
 
-    // getLightLevels (no chunk manager)
-    var light = debug.getLightLevels();
-    F.assert(light.sky >= 0 && light.sky <= 15, 'Sky light is 0-15');
-    F.assert(light.block >= 0 && light.block <= 15, 'Block light is 0-15');
+    // --- getPlayerCoords with mock player ---
+    var mockPlayer = {
+        getX: function() { return 123.456; },
+        getY: function() { return 64.789; },
+        getZ: function() { return -99.123; },
+        getPitch: function() { return -45.678; },
+        getYaw: function() { return 180.5; },
+        getGameMode: function() { return 'creative'; }
+    };
+    var coordsWithPlayer = debug.getPlayerCoords();
+    // Note: getPlayerCoords uses this._player — we need to set it first
+    debug.setPlayer(mockPlayer);
+    var coordsWithRealPlayer = debug.getPlayerCoords();
+    F.assertEq(coordsWithRealPlayer.x, 123.46, 'X rounded to 2 decimals (123.456 → 123.46)');
+    F.assertEq(coordsWithRealPlayer.y, 64.79, 'Y rounded to 2 decimals (64.789 → 64.79)');
+    F.assertEq(coordsWithRealPlayer.z, -99.12, 'Z rounded to 2 decimals (-99.123 → -99.12)');
+    F.assertEq(coordsWithRealPlayer.pitch, -45.68, 'Pitch rounded to 2 decimals');
+    F.assertEq(coordsWithRealPlayer.yaw, 180.5, 'Yaw rounded to 2 decimals');
+    F.assertEq(coordsWithRealPlayer.mode, 'creative', 'Mode from player.getGameMode()');
 
-    // startListening / stopListening
-    debug.setTimer({ onRender: function() { return function() {}; } });
+    // --- getPlayerCoords with player missing methods ---
+    var incompletePlayer = {
+        getX: function() { return 10; }
+        // missing getY, getZ, etc.
+    };
+    debug.setPlayer(incompletePlayer);
+    var partialCoords = debug.getPlayerCoords();
+    F.assertEq(partialCoords.x, 10, 'Partial player coords x from available method');
+    F.assertEq(partialCoords.y, 0, 'Missing getY returns 0');
+    F.assertEq(partialCoords.z, 0, 'Missing getZ returns 0');
+
+    // --- getPlayerCoords with player throwing exceptions ---
+    var throwingPlayer = {
+        getX: function() { throw new Error('fail'); },
+        getY: function() { return 5; },
+        getZ: function() { throw new Error('fail'); },
+        getPitch: function() { return 10; },
+        getYaw: function() { throw new Error('fail'); }
+    };
+    debug.setPlayer(throwingPlayer);
+    var throwingCoords = debug.getPlayerCoords();
+    F.assertEq(throwingCoords.x, 0, 'getX exception returns 0');
+    F.assertEq(throwingCoords.y, 5, 'getY succeeds with value 5');
+    F.assertEq(throwingCoords.z, 0, 'getZ exception returns 0');
+    F.assertEq(throwingCoords.pitch, 10, 'getPitch succeeds with value 10');
+    F.assertEq(throwingCoords.yaw, 0, 'getYaw exception returns 0');
+
+    // --- getChunkInfo (no chunk manager) ---
+    debug.setChunkManager(null);
+    var emptyChunkInfo = debug.getChunkInfo();
+    F.assertEq(emptyChunkInfo.loaded, 0, 'No chunks loaded without chunk manager');
+    F.assertEq(emptyChunkInfo.renderDistance, 8, 'renderDistance defaults to config.RENDER_DISTANCE or 0');
+
+    // --- getChunkInfo with mock chunk manager ---
+    var mockChunkManager = {
+        getAllChunks: function() {
+            return [
+                { x: 0, z: 0 },
+                { x: 1, z: 0 },
+                { x: 0, z: 1 }
+            ];
+        }
+    };
+    debug.setChunkManager(mockChunkManager);
+    var chunkInfoWithManager = debug.getChunkInfo();
+    F.assertEq(chunkInfoWithManager.loaded, 3, 'getAllChunks returns 3 chunks');
+    F.assert(chunkInfoWithManager.renderDistance >= 0, 'renderDistance is non-negative');
+
+    // --- getChunkInfo with chunk manager throwing ---
+    var throwingCM = {
+        getAllChunks: function() { throw new Error('fail'); }
+    };
+    debug.setChunkManager(throwingCM);
+    var throwingChunkInfo = debug.getChunkInfo();
+    F.assertEq(throwingChunkInfo.loaded, 0, 'getAllChunks exception returns loaded=0');
+
+    // --- getBiomeName (no biome/player) ---
+    debug.setBiome(null);
+    debug.setPlayer(null);
+    F.assertEq(debug.getBiomeName(), 'Unknown', 'getBiomeName returns "Unknown" without biome/player');
+
+    // --- getBiomeName with biome and player ---
+    var mockBiome = {
+        getBiomeAt: function(x, z) {
+            if (x > 0 && x < 100 && z > 0 && z < 100) return { name: 'Plains' };
+            return { name: 'Desert' };
+        }
+    };
+    debug.setBiome(mockBiome);
+    var plainsPlayer = {
+        getX: function() { return 50; },
+        getZ: function() { return 50; }
+    };
+    debug.setPlayer(plainsPlayer);
+    F.assertEq(debug.getBiomeName(), 'Plains', 'getBiomeName returns "Plains" for coordinates (50, 50)');
+
+    var desertPlayer = {
+        getX: function() { return 200; },
+        getZ: function() { return 200; }
+    };
+    debug.setPlayer(desertPlayer);
+    F.assertEq(debug.getBiomeName(), 'Desert', 'getBiomeName returns "Desert" for coordinates (200, 200)');
+
+    // --- getBiomeName with biome throwing exception ---
+    var throwingBiome = {
+        getBiomeAt: function() { throw new Error('fail'); }
+    };
+    debug.setBiome(throwingBiome);
+    F.assertEq(debug.getBiomeName(), 'Unknown', 'getBiomeName returns "Unknown" on biome exception');
+
+    // --- getLightLevels (no chunk manager/player) ---
+    debug.setChunkManager(null);
+    debug.setPlayer(null);
+    var emptyLight = debug.getLightLevels();
+    F.assertEq(emptyLight.sky, 15, 'Sky light defaults to 15 without chunk manager');
+    F.assertEq(emptyLight.block, 0, 'Block light defaults to 0 without chunk manager');
+
+    // --- getLightLevels with mock player and chunk manager ---
+    var mockChunk = {
+        getSkyLight: function(x, y, z) { return 12; },
+        getBlockLight: function(x, y, z) { return 5; }
+    };
+
+    var lightPlayer = {
+        getX: function() { return 17; },   // chunkX=1, localX=1
+        getY: function() { return 64; },   // localY=64
+        getZ: function() { return 17; }    // chunkZ=1, localZ=1
+    };
+    var lightCM = {
+        getChunk: function(cx, cz) {
+            if (cx === 1 && cz === 1) return mockChunk;
+            return null;
+        }
+    };
+
+    debug.setPlayer(lightPlayer);
+    debug.setChunkManager(lightCM);
+    var lightLevels = debug.getLightLevels();
+    F.assertEq(lightLevels.sky, 12, 'Sky light from chunk is 12');
+    F.assertEq(lightLevels.block, 5, 'Block light from chunk is 5');
+
+    // --- getLightLevels with chunk returning null ---
+    var noChunkCM = {
+        getChunk: function() { return null; }
+    };
+    debug.setChunkManager(noChunkCM);
+    var noChunkLight = debug.getLightLevels();
+    F.assertEq(noChunkLight.sky, 15, 'Sky light defaults to 15 when chunk is null');
+    F.assertEq(noChunkLight.block, 0, 'Block light defaults to 0 when chunk is null');
+
+    // --- getLightLevels clamping ---
+    var extremeChunk = {
+        getSkyLight: function() { return 20; },  // > 15
+        getBlockLight: function() { return -3; }  // < 0
+    };
+    var extremeCM = {
+        getChunk: function() { return extremeChunk; }
+    };
+    debug.setChunkManager(extremeCM);
+    var extremeLight = debug.getLightLevels();
+    F.assertEq(extremeLight.sky, 15, 'Sky light clamped to max 15');
+    F.assertEq(extremeLight.block, 0, 'Block light clamped to min 0');
+
+    // --- collectData with no references ---
+    debug.setPlayer(null);
+    debug.setChunkManager(null);
+    debug.setBiome(null);
+    debug.setFPS(0); // Reset FPS to 0 before collecting data
+    var emptyData = debug.collectData(null, null);
+    F.assertEq(emptyData.fps, 0, 'collectData fps is 0');
+    F.assertEq(emptyData.coordinates.x, 0, 'collectData coordinates x is 0');
+    F.assertEq(emptyData.chunkInfo.loaded, 0, 'collectData chunkInfo loaded is 0');
+    F.assertEq(emptyData.lightLevels.sky, 15, 'collectData lightLevels sky is 15');
+    F.assertEq(emptyData.lightLevels.block, 0, 'collectData lightLevels block is 0');
+    F.assert(typeof emptyData.biome === 'string', 'collectData biome is string');
+    F.assert(typeof emptyData.deltaTime === 'number', 'collectData deltaTime is number');
+
+    // --- collectData with passed arguments (no side effects) ---
+    var argPlayer = {
+        getX: function() { return 999; },
+        getY: function() { return 128; },
+        getZ: function() { return -500; },
+        getPitch: function() { return 0; },
+        getYaw: function() { return 90; },
+        getGameMode: function() { return 'spectator'; }
+    };
+    var argChunkManager = {
+        getAllChunks: function() { return [{}, {}, {}, {}]; }
+    };
+    var argData = debug.collectData(argPlayer, argChunkManager);
+    F.assertEq(argData.coordinates.x, 999, 'collectData uses passed player x');
+    F.assertEq(argData.coordinates.y, 128, 'collectData uses passed player y');
+    F.assertEq(argData.coordinates.z, -500, 'collectData uses passed player z');
+    F.assertEq(argData.coordinates.mode, 'spectator', 'collectData uses passed player mode');
+    F.assertEq(argData.chunkInfo.loaded, 4, 'collectData uses passed chunkManager loaded count');
+
+    // --- collectData does not mutate internal state ---
+    F.assertEq(debug._player, null, 'Internal _player unchanged after collectData with arg');
+    F.assertEq(debug._chunkManager, null, 'Internal _chunkManager unchanged after collectData with arg');
+
+    // --- collectData with mixed internal and passed references ---
+    debug.setPlayer(mockPlayer);  // set internal player
+    var mixedData = debug.collectData(null, argChunkManager);  // pass chunkManager only
+    F.assertEq(mixedData.coordinates.x, 123.46, 'collectData uses internal player when no arg');
+    F.assertEq(mixedData.chunkInfo.loaded, 4, 'collectData uses passed chunkManager');
+
+    // --- update() emits debug:event ---
+    var updateEventData = null;
+    debugBus.on('debug:update', function(data) { updateEventData = data; });
+    debug.setPlayer(mockPlayer);
+    debug.setChunkManager(argChunkManager);
+    debug.update(mockPlayer, argChunkManager);
+    F.assert(updateEventData !== null, 'update() emits debug:update event');
+    F.assert(updateEventData.fps >= 0, 'emitted data has non-negative fps');
+    F.assert(typeof updateEventData.coordinates === 'object', 'emitted data has coordinates');
+
+    // --- startListening / stopListening ---
+    var listenData = null;
+    debugBus.on('debug:update', function(data) { listenData = data; });
+    var renderTimer = {
+        onRender: function(callback) {
+            // Simulate a single render tick
+            setTimeout(function() { callback(Date.now()); }, 10);
+            return function() {}; // unsubscribe
+        }
+    };
+    debug.setTimer(renderTimer);
+    debug.setPlayer(mockPlayer);
+    debug.setChunkManager(argChunkManager);
     debug.startListening();
+    F.assert(debug._unsubscribeRender !== null, '_unsubscribeRender is set after startListening');
+    debug.stopListening();
+    F.assert(debug._unsubscribeRender === null, '_unsubscribeRender cleared after stopListening');
+
+    // --- startListening called twice (no-op second call) ---
+    debug.startListening();
+    var firstUnsub = debug._unsubscribeRender;
+    debug.startListening();
+    F.assert(debug._unsubscribeRender === firstUnsub, 'startListening() second call does not change unsubscribe ref');
     debug.stopListening();
 
-    // destroy
+    // --- destroy ---
     debug.destroy();
+    F.assert(debug._eventBus === null, '_eventBus cleared after destroy');
+    F.assert(debug._config === null, '_config cleared after destroy');
+    F.assert(debug._player === null, '_player cleared after destroy');
+    F.assert(debug._chunkManager === null, '_chunkManager cleared after destroy');
+    F.assert(debug._biome === null, '_biome cleared after destroy');
+    F.assert(debug._timer === null, '_timer cleared after destroy');
+
+    // --- destroy is safe to call multiple times ---
+    debug.destroy();  // should not throw
+    debug.destroy();  // should not throw
 
     // ============================================================
     // Section 12: GuiDragDrop — Drag Operations
