@@ -353,10 +353,9 @@
 
         // Render wireframes ON TOP of terrain:
         // - Disable depth write so wireframes don't modify the depth buffer
-        // - DISABLE depth test entirely — terrain has already written to the depth buffer,
-        //   and wireframe fragments at block positions would be depth-failed behind terrain faces.
+        // - Keep depth test enabled — polygon offset pushes wireframes slightly forward
+        //   of terrain faces, so they pass the depth test at block boundaries.
         gl.depthMask(false);
-        gl.disable(gl.DEPTH_TEST);
 
         // Draw all line segments
         gl.drawArrays(gl.LINES, 0, geometry.vertexCount);
@@ -370,7 +369,6 @@
 
         // Restore WebGL state
         gl.depthMask(true);
-        gl.enable(gl.DEPTH_TEST);
         if (gl.polygonOffset) {
             gl.disable(gl.POLYGON_OFFSET_FILL);
         }

@@ -1,5 +1,7 @@
 // Donkeycraft — Break Particles
 // Block breaking particle system: spawn, update, render.
+// Particles are billboard quads rendered via the GUI shader program.
+// Vertex buffer is pre-allocated to max capacity to eliminate per-frame GC pressure.
 (function() {
     'use strict';
 
@@ -7,6 +9,14 @@
 
     /**
      * BreakParticle — Individual particle state for the physics simulation.
+     * @param {number} x - Initial X position.
+     * @param {number} y - Initial Y position.
+     * @param {number} z - Initial Z position.
+     * @param {number} vx - X velocity (blocks/s).
+     * @param {number} vy - Y velocity (blocks/s).
+     * @param {number} vz - Z velocity (blocks/s).
+     * @param {{r:number,g:number,b:number}} color - RGB color.
+     * @param {number} lifetime - Lifetime in seconds.
      */
     function BreakParticle(x, y, z, vx, vy, vz, color, lifetime) {
         this.x = x;
@@ -23,6 +33,9 @@
 
     /**
      * BreakParticles — Manages block breaking particle effects.
+     * Pre-allocates vertex buffer at max capacity to avoid per-frame GC.
+     * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
+     * @param {ShaderManager} shaderManager - The shader manager instance.
      */
     Donkeycraft.BreakParticles = function(gl, shaderManager) {
         this._gl = gl;
@@ -34,7 +47,10 @@
 
         this._vertexBuffer = null;
         this._contextLost = false;
-        this._vertexArray = null;
+
+        // Pre-allocated vertex buffer: 8 particles × 6 verts/particle × 9 floats/vert = 432 floats.
+        // Grows dynamically if particle count exceeds initial capacity, but never shrinks.
+        this._vertexArray = new Float32Array(this._maxParticles * 6 * 9);
 
         if (gl) {
             var self = this;
@@ -219,10 +235,8 @@
 
             var blx = cx - rx - ux, bly = cy - ry - uy, blz = cz - rz - uz;
             var brx = cx + rx - ux, bry = cy + ry - uy, brz = cz + rz - uz;
-            var trx = cx + rx + ux, tr_y = cy + ry + uy, trz = cz + rz + uz;
+            var trx = cx + rx + ux, topRightY = cy + ry + uy, trz = cz + rz + uz;
             var tlx = cx - rx + ux, tly = cy - ry + uy, tlz = cz - rz + uz;
-
-            // Note: tr_y is the Y coordinate for top-right corner (snake_case for local temp variable).
 
             var r = p.color.r, g = p.color.g, b = p.color.b;
             var base = i * vertPerParticle * floatsPerVertex;
@@ -234,13 +248,13 @@
             vertices[base + 9]  = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
             vertices[base + 12] = 1; vertices[base + 13] = 0;
             vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
-            vertices[base + 18] = trx; vertices[base + 19] = tr_y; vertices[base + 20] = trz;
+            vertices[base + 18] = trx; vertices[base + 19] = topRightY; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
             vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
             vertices[base + 30] = 0; vertices[base + 31] = 0;
             vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
-            vertices[base + 36] = trx; vertices[base + 37] = tr_y; vertices[base + 38] = trz;
+            vertices[base + 36] = trx; vertices[base + 37] = topRightY; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
             vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
@@ -293,7 +307,7 @@
 
     /**
      * Get the number of active particles.
-     * @returns {number}
+     * @returns {number} Active particle count.
      */
     Donkeycraft.BreakParticles.prototype.getCount = function() {
         return this._particles.length;
@@ -312,6 +326,23 @@
 
         this._particles = [];
         this._contextLost = false;
+    };
+
+    /**
+     * Rebuild GPU buffers after a WebGL context restore event.
+     * @private
+     */
+    Donkeycraft.BreakParticles.prototype._rebuildBuffers = function() {
+        // Buffers will be lazily recreated on next render() call via the vertex buffer
+        // null check — no explicit rebuild needed since geometry is per-frame dynamic data.
+    };
+
+    /**
+     * Get the maximum number of particles this system can manage.
+     * @returns {number} Maximum particle count.
+     */
+    Donkeycraft.BreakParticles.prototype.getMaxCount = function() {
+        return this._maxParticles;
     };
 
 })();

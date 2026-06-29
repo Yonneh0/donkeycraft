@@ -1,5 +1,6 @@
 // Donkeycraft — Weather
-// Weather: rain particles, thunder lightning, snow, wind effects.
+// Weather system: state management, particle rendering (rain/snow), thunder/lightning.
+// Weather state and duration are managed by the Weather class; rendering is handled by WeatherRenderer.
 (function() {
     'use strict';
 
@@ -14,7 +15,8 @@
     Donkeycraft.WEATHER_SNOW = 'snow';
 
     /**
-     * Weather — Manages weather state, duration, and biome-specific restrictions.
+     * Weather — Manages weather state, duration, thunder intensity, and biome-specific restrictions.
+     * Does NOT handle rendering — that is done by WeatherRenderer.
      */
     Donkeycraft.Weather = function() {
         this._weatherState = Donkeycraft.WEATHER_CLEAR;
@@ -367,7 +369,8 @@
     };
 
     /**
-     * WeatherRenderer — Renders weather particles (rain, snow) using the GUI shader.
+     * WeatherRenderer — Renders weather particles (rain, snow) using the GUI shader program.
+     * Particles are billboard quads that respawn when they fall below y=0 or move too far from the player.
      * @param {WebGLRenderingContext} gl - WebGL context.
      * @param {ShaderManager} shaderManager - Shader manager instance.
      */
@@ -407,15 +410,18 @@
     };
 
     /**
-     * Activate weather rendering with the current weather state.
+     * Activate weather rendering. Resets particle count so spawnInitialParticles() will repopulate.
+     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.activate = function() {
+        if (this._active) return; // Already active — avoid resetting
         this._active = true;
         this._particleCount = 0;
     };
 
     /**
-     * Deactivate weather rendering.
+     * Deactivate weather rendering and clear all particles.
+     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.deactivate = function() {
         this._active = false;
@@ -452,9 +458,10 @@
     };
 
     /**
-     * Update weather particles by delta time.
+     * Update weather particles by delta time. Respawn particles that fall below y=0 or move too far from player.
      * @param {number} deltaTime - Time since last frame in seconds.
-     * @param {Donkeycraft.Vector3} playerPos - Player position for particle culling.
+     * @param {{x:number,y:number,z:number}} playerPos - Player position for particle culling.
+     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.update = function(deltaTime, playerPos) {
         if (!this._active || this._particleCount === 0) return;
@@ -489,11 +496,12 @@
     };
 
     /**
-     * Render weather particles using the GUI shader program.
-     * Particles are rendered as small quads (billboarded).
+     * Render weather particles as billboard quads using the GUI shader program.
+     * Depth write is disabled so particles render as translucent overlays on terrain.
      * @param {Camera} camera - The camera instance.
-     * @param {number} particleDensity - Particle density [0, 1].
+     * @param {number} particleDensity - Particle density multiplier [0, 1].
      * @param {string} type - Particle type ('rain' or 'snow').
+     * @returns {boolean} True if particles were rendered.
      */
     Donkeycraft.WeatherRenderer.prototype.render = function(camera, particleDensity, type) {
         var gl = this._gl;
@@ -508,8 +516,8 @@
 
         try {
             var matrices = camera.getMatrices();
-        this._shaderManager.setMat4('uProjection', matrices.projection);
-        this._shaderManager.setMat4('uView', matrices.view);
+            this._shaderManager.setMat4('uProjection', matrices.projection);
+            this._shaderManager.setMat4('uView', matrices.view);
         this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
         this._shaderManager.setInt('uHasTexture', 0);
 
@@ -540,7 +548,7 @@
             // Four corners of the quad
             var blx = px - rx - ux, bly = py - ry - uy, blz = pz - rz - uz;
             var brx = px + rx - ux, bry = py + ry - uy, brz = pz + rz - uz;
-            var trx = px + rx + ux, tr_y = py + ry + uy, trz = pz + rz + uz;
+            var trx = px + rx + ux, topRightY = py + ry + uy, trz = pz + rz + uz;
             var tlx = px - rx + ux, tly = py - ry + uy, tlz = pz - rz + uz;
 
             // Color based on particle type
@@ -562,7 +570,7 @@
             vertices[base + 12] = 1; vertices[base + 13] = 0;
             vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
             // Top-right
-            vertices[base + 18] = trx; vertices[base + 19] = tr_y; vertices[base + 20] = trz;
+            vertices[base + 18] = trx; vertices[base + 19] = topRightY; vertices[base + 20] = trz;
             vertices[base + 21] = 1; vertices[base + 22] = 1;
             vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
             // Bottom-left (duplicate for second triangle)
@@ -570,7 +578,7 @@
             vertices[base + 30] = 0; vertices[base + 31] = 0;
             vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
             // Top-right (duplicate)
-            vertices[base + 36] = trx; vertices[base + 37] = tr_y; vertices[base + 38] = trz;
+            vertices[base + 36] = trx; vertices[base + 37] = topRightY; vertices[base + 38] = trz;
             vertices[base + 39] = 1; vertices[base + 40] = 1;
             vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
             // Top-left
@@ -617,8 +625,10 @@
     };
 
     /**
-     * Spawn initial particles for the current weather state.
-     * @param {number} count - Number of particles to spawn.
+     * Spawn initial particles with random positions across the render area.
+     * Actual player-relative positions are set during update() when player position is known.
+     * @param {number} [count=500] - Number of particles to spawn (capped at maxParticles).
+     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.spawnInitialParticles = function(count) {
         var self = this;
@@ -637,8 +647,8 @@
     };
 
     /**
-     * Get the current particle count.
-     * @returns {number}
+     * Get the current active particle count.
+     * @returns {number} Active particle count.
      */
     Donkeycraft.WeatherRenderer.prototype.getParticleCount = function() {
         return this._particleCount;
@@ -646,6 +656,8 @@
 
     /**
      * Destroy weather renderer resources and free GPU memory.
+     * Cleans up vertex buffer and resets all particle data arrays.
+     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.destroy = function() {
         var gl = this._gl;
@@ -667,7 +679,20 @@
     };
 
     /**
-     * Destroy the Weather instance and free resources.
+     * Rebuild GPU buffers after a WebGL context restore event.
+     * Buffers are lazily recreated on next render call via null checks — no explicit rebuild needed.
+     * @private
+     * @returns {void}
+     */
+    Donkeycraft.WeatherRenderer.prototype._rebuildBuffers = function() {
+        // Buffers are lazily recreated on next render call via null checks —
+        // no explicit rebuild needed since geometry is per-frame dynamic data.
+    };
+
+    /**
+     * Destroy the Weather instance and reset all state to defaults.
+     * Does NOT destroy WeatherRenderer — that is a separate class.
+     * @returns {void}
      */
     Donkeycraft.Weather.prototype.destroy = function() {
         this._weatherState = Donkeycraft.WEATHER_CLEAR;

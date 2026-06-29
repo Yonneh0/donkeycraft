@@ -92,10 +92,10 @@
 
     /**
      * Remove back-facing faces from a chunk mesh.
-     * Preserves the original index type (Uint16 or Uint32) from the input geometry.
+     * Always returns Uint32Array to avoid overflow when many triangles survive culling.
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
      * @param {Donkeycraft.Vector3} cameraPos - Camera position for face culling.
-     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.MeshOptimizer.prototype.cullBackFaces = function(geometry, cameraPos) {
         var vertices = geometry.vertices;
@@ -105,13 +105,9 @@
 
         if (indexCount === 0) return geometry;
 
+        // Always use Uint32 — culling rarely removes enough faces to fit in Uint16.
         var maxTriangles = Math.floor(indexCount / 3);
-        var keptIndices;
-        if (geometry.indices instanceof Uint32Array) {
-            keptIndices = new Uint32Array(maxTriangles * 3);
-        } else {
-            keptIndices = new Uint16Array(maxTriangles * 3);
-        }
+        var keptIndices = new Uint32Array(maxTriangles * 3);
         var keptCount = 0;
 
         for (var i = 0; i < indexCount; i += 3) {
@@ -150,16 +146,9 @@
             }
         }
 
-        var resultIndices;
-        if (geometry.indices instanceof Uint32Array) {
-            resultIndices = keptIndices.subarray(0, keptCount * 3);
-        } else {
-            resultIndices = keptIndices.subarray(0, keptCount * 3);
-        }
-
         return {
             vertices: vertices,
-            indices: resultIndices,
+            indices: keptIndices.subarray(0, keptCount * 3),
             vertexCount: geometry.vertexCount,
             indexCount: keptCount * 3
         };

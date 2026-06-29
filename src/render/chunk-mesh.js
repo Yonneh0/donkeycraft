@@ -16,15 +16,13 @@
         this._vertexBuffer = null;
         this._indexBuffer = null;
 
-        // Geometry data
+        // Geometry data (stored for context restore and dirty tracking)
+        this._geometry = null;
         this._vertexCount = 0;
         this._indexCount = 0;
 
         // Dirty flag — whether buffers need updating
         this._dirty = true;
-
-        // Current geometry
-        this._geometry = null;
 
         // Destroyed flag — prevents drawing after destruction
         this._destroyed = false;
@@ -77,10 +75,13 @@
 
     /**
      * Upload geometry data to WebGL buffers.
+     * Creates buffers if they don't exist, or re-uploads if they do.
+     * Sets _dirty to false after successful upload.
+     * @returns {boolean} True if buffers were uploaded successfully.
      */
     Donkeycraft.ChunkMesh.prototype.uploadBuffers = function() {
         var gl = this._gl;
-        if (!gl || !this._geometry) return;
+        if (!gl || !this._geometry) return false;
 
         // Create or recreate vertex buffer
         if (!this._vertexBuffer) {
@@ -98,7 +99,9 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._geometry.indices, gl.DYNAMIC_DRAW);
 
+        // Mark clean only after successful upload
         this._dirty = false;
+        return true;
     };
 
     /**

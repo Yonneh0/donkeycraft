@@ -1,5 +1,6 @@
 // Donkeycraft — Main Game Class
 // Main game class: initialization, main loop (update + render), pause/resume.
+// Orchestrates all subsystems including WebGL rendering, player physics, chunk management, and GUI.
 (function() {
     'use strict';
 
@@ -18,11 +19,13 @@
         this._renderDistance = options.renderDistance || Config.RENDER_DISTANCE;
         this._gameMode = options.gameMode || 'survival';
 
-        // Core systems
+        // Core WebGL systems
         this._canvas = null;
         this._gl = null;
         this._glContext = null;
         this._shaderManager = null;
+
+        // Rendering subsystems (initialized in init())
         this._camera = null;
         this._terrainRenderer = null;
         this._fog = null;
@@ -35,11 +38,17 @@
         this._weatherRenderer = null;
         this._wireframeRenderer = null;
 
-        // Survival subsystems (health, hunger) for HUD rendering
+        // Texture atlas (generated from AssetManager textures)
+        this._textureAtlas = null;
+
+        // Audio context (shared with init-sequence AudioSystem)
+        this._audioContext = null;
+
+        // Survival subsystems (health, hunger) for HUD rendering (set by setSystems())
         this._hurtBox = null;
         this._hungerSystem = null;
 
-        // Game systems
+        // Game systems (initialized in init())
         this._timer = null;
         this._input = null;
         this._player = null;
@@ -47,7 +56,7 @@
         this._eventBus = null;
         this._redstoneEngine = null;
 
-        // Movement systems (set by external code or initialized here)
+        // Movement/collision subsystems (set by setSystems())
         this._movementSystem = null;
         this._collisionSystem = null;
         this._jumpSystem = null;
@@ -73,19 +82,22 @@
         this._unsubscribeTick = null;
         this._unsubscribeRender = null;
 
-        // Overlay elements
+        // Overlay DOM element (for pointer lock)
         this._overlay = null;
 
-        // Hotbar reference for key-based slot selection
+        // Hotbar UI reference (set externally after init)
         this._hotbar = null;
 
         // Debug overlay toggle state (F3)
         this._debugVisible = false;
 
-        // GuiManager reference for GUI screen management
+        // GuiManager reference for GUI screen management (set externally after init)
         this._guiManager = null;
 
-        // Auto-save system (uses Config.AUTO_SAVE_INTERVAL, CHUNKS_PER_SAVE, SAVE_BATCH_DELAY)
+        // Level data for persistence (set via setLevelData())
+        this._levelData = null;
+
+        // Auto-save system state
         this._autoSaveTimer = 0;
         this._worldStore = null;
 
@@ -212,6 +224,9 @@
                 this._terrainRenderer.setTextureAtlas(this._textureAtlas);
             }
             this._terrainRenderer.setRenderDistance(this._renderDistance);
+
+            // Wire camera reference into terrain renderer for back-face culling optimization.
+            this._terrainRenderer.setCamera(this._camera);
 
             // Create hand renderer
             this._handRenderer = new Donkeycraft.HandRenderer(this._gl, this._shaderManager);
@@ -1779,13 +1794,16 @@
             Donkeycraft.Logger.error('Game', 'Terrain render failed: ' + e.message);
         }
 
-        // Render break particles
-        if (this._breakParticles) {
+        // Update and render break particles (physics simulation + rendering)
+        if (this._breakParticles && this._player) {
+            var playerPos = this._player.getPosition();
+            this._breakParticles.update(dt, -20.0); // gravity: -20 blocks/s²
             this._breakParticles.render(this._camera);
         }
 
-        // Render hand (first-person item)
+        // Update and render hand (first-person item) with bob animation
         if (this._handRenderer && this._camera && this._canvas) {
+            this._handRenderer.setBobAngle(this._handRenderer.getBobAngle() + dt * 3);
             this._handRenderer.render(this._camera, this._canvas.width, this._canvas.height);
         }
 

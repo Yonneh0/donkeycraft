@@ -431,7 +431,8 @@
 
         // Section 2: Position & Rotation
         lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Position</span> <span class="dk-debug-value">X: ' + coords.x + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Position</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  X:</span> <span class="dk-debug-value">' + coords.x + '</span></span>');
         lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Y:</span> <span class="dk-debug-value">' + coords.y + '</span></span>');
         lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Z:</span> <span class="dk-debug-value">' + coords.z + '</span></span>');
         lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Yaw</span> <span class="dk-debug-value">: ' + coords.yaw + '</span></span>');

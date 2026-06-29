@@ -1,12 +1,16 @@
 // Donkeycraft — Sky
-// Sky rendering: day/night gradient, sun, moon, stars, cloud layer.
+// Sky rendering: day/night gradient, sun, moon, stars.
+// Cloud layer is rendered via wireframe renderer debug overlay (future enhancement).
 (function() {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * Sky — Renders the sky dome with day/night gradient, sun, moon, and stars.
+     * Sky — Renders the sky dome with day/night gradient, sun disc, moon disc, and star field.
+     * All elements are rendered as overlays on top of terrain using depthMask(false).
+     * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
+     * @param {ShaderManager} shaderManager - The shader manager instance.
      */
     Donkeycraft.Sky = function(gl, shaderManager) {
         this._gl = gl;
@@ -24,11 +28,13 @@
         this._sunGeometry = null;
         this._sunVertBuf = null;
         this._sunIndexBuf = null;
+        this._sunColorBuffer = null; // Reusable vertex buffer for sun color data
 
         // Moon disc geometry and buffers
         this._moonGeometry = null;
         this._moonVertBuf = null;
         this._moonIndexBuf = null;
+        this._moonColorBuffer = null; // Reusable vertex buffer for moon color data
 
         // Star field geometry and buffers
         this._starCount = 500;
@@ -48,7 +54,9 @@
 
     /**
      * Build a large hemisphere geometry for the sky dome.
+     * Uses 16 segments × 8 rings for smooth curvature with minimal vertices.
      * @private
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildSkyDome = function() {
         var segments = 16;
@@ -88,7 +96,9 @@
 
     /**
      * Build a small disc geometry for the sun.
+     * Uses 12 segments for a smooth circular shape (13 vertices total).
      * @private
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildSunDisc = function() {
         var segments = 12;
@@ -115,7 +125,9 @@
 
     /**
      * Build a small disc geometry for the moon.
+     * Uses 12 segments for a smooth circular shape (13 vertices total).
      * @private
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildMoonDisc = function() {
         var segments = 12;
@@ -141,8 +153,10 @@
     };
 
     /**
-     * Build a star field as point sprites.
+     * Build a star field as point sprites using a seeded PRNG for reproducible positions.
+     * Stars are distributed only on the upper hemisphere (sky visible above horizon).
      * @private
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildStarField = function() {
         var starPositions = [];
@@ -176,6 +190,7 @@
     /**
      * Set whether stars are visible.
      * @param {boolean} visible - True to show stars.
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype.setStarsVisible = function(visible) {
         this._starsVisible = !!visible;
@@ -183,7 +198,7 @@
 
     /**
      * Check if stars are currently visible.
-     * @returns {boolean}
+     * @returns {boolean} True if stars are enabled.
      */
     Donkeycraft.Sky.prototype.getStarsVisible = function() {
         return this._starsVisible;
@@ -206,8 +221,9 @@
     };
 
     /**
-     * Set the time of day (0-1).
+     * Set the time of day (0-1). Clamps to [0, 1) range.
      * @param {number} t - Time value in [0, 1).
+     * @returns {void}
      */
     Donkeycraft.Sky.prototype.setTimeOfDay = function(t) {
         this._timeOfDay = t - Math.floor(t);
@@ -216,7 +232,7 @@
 
     /**
      * Get the current time of day.
-     * @returns {number}
+     * @returns {number} Time value in [0, 1).
      */
     Donkeycraft.Sky.prototype.getTimeOfDay = function() {
         return this._timeOfDay;
@@ -232,9 +248,12 @@
         var gl = this._gl;
         if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return false;
 
-        // Switch to 'gui' shader — sun discs use uModel which the sky shader lacks.
+        // Save current shader state so we can restore it after rendering the sun.
+        var currentProgram = this._shaderManager._getActiveProgram();
+
+        // Sun discs use uModel which the sky shader lacks — switch to 'gui' shader.
         if (!this._shaderManager.use('gui')) {
-            Donkeycraft.Logger.error('Sky', 'GUI shader unavailable — sun disc not rendered');
+            Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — sun disc not rendered');
             return false;
         }
 
@@ -250,6 +269,7 @@
         var modelMatrix = Donkeycraft.Matrix4.multiply(translateMatrix, scaleMatrix);
 
         this._shaderManager.setMat4('uModel', modelMatrix);
+        this._shaderManager.setInt('uHasTexture', 0);
 
         // Sun color: bright yellow-white, intensity-based alpha
         var r = 1.0, g = 0.95, b = 0.7, a = sunIntensity;
@@ -305,6 +325,11 @@
         } finally {
             // Always restore depth write state.
             gl.depthMask(true);
+            // Restore the previous shader program so subsequent rendering (stars, etc.)
+            // continues with the correct shader instead of the GUI shader.
+            if (currentProgram) {
+                this._shaderManager.useProgram(currentProgram);
+            }
         }
     };
 
@@ -318,9 +343,12 @@
         var gl = this._gl;
         if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return false;
 
-        // Switch to 'gui' shader — moon discs use uModel which the sky shader lacks.
+        // Save current shader state so we can restore it after rendering the moon.
+        var currentProgram = this._shaderManager._getActiveProgram();
+
+        // Moon discs use uModel which the sky shader lacks — switch to 'gui' shader.
         if (!this._shaderManager.use('gui')) {
-            Donkeycraft.Logger.error('Sky', 'GUI shader unavailable — moon disc not rendered');
+            Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — moon disc not rendered');
             return false;
         }
 
@@ -336,6 +364,7 @@
         var modelMatrix = Donkeycraft.Matrix4.multiply(translateMatrix, scaleMatrix);
 
         this._shaderManager.setMat4('uModel', modelMatrix);
+        this._shaderManager.setInt('uHasTexture', 0);
 
         // Moon color: pale silver
         var r = 0.8, g = 0.82, b = 0.9, a = 1.0;
@@ -390,6 +419,11 @@
         } finally {
             // Always restore depth write state.
             gl.depthMask(true);
+            // Restore the previous shader program so subsequent rendering (stars, etc.)
+            // continues with the correct shader instead of the GUI shader.
+            if (currentProgram) {
+                this._shaderManager.useProgram(currentProgram);
+            }
         }
     };
 
@@ -499,21 +533,25 @@
             this._renderMoonDisc(moonDir);
         }
 
-        // Restore sky shader after sun/moon rendering.
+        // Restore sky shader for stars rendering.
         if (!this._shaderManager.use('sky')) {
-            Donkeycraft.Logger.error('Sky', 'Failed to restore sky shader — sky dome and stars will not render');
+            Donkeycraft.Logger.warn('Sky', 'Failed to restore sky shader — stars will not render');
             gl.depthMask(true);
             return;
         }
 
-        // Re-enable depth writing before stars
+        // Re-enable depth writing before stars.
         gl.depthMask(true);
 
         // ---- Stars (visible at night, translucent point sprites — disable depth write) ----
         if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
             gl.depthMask(false);
             // Switch to GUI shader for star rendering (solid color points).
-            if (this._shaderManager.use('gui')) {
+            var starsCurrentProgram = this._shaderManager._getActiveProgram();
+            if (!this._shaderManager.use('gui')) {
+                Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — stars will not render');
+                gl.depthMask(true);
+            } else {
                 var starMatrices = camera.getMatrices();
                 this._shaderManager.setMat4('uProjection', starMatrices.projection);
 
@@ -528,8 +566,11 @@
                 this._shaderManager.setInt('uHasTexture', 0);
 
                 this._renderStars();
-            } else {
-                Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — stars not rendered');
+
+                // Restore the previous shader program after star rendering.
+                if (starsCurrentProgram) {
+                    this._shaderManager.useProgram(starsCurrentProgram);
+                }
             }
             gl.depthMask(true);
         }

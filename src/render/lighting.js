@@ -49,34 +49,56 @@
     };
 
     /**
-     * Compute sky color RGB based on time of day.
+     * Compute sky color RGB based on time of day with smooth interpolation.
+     * Uses continuous piecewise-linear blending to avoid boundary discontinuities.
      * @returns {{r: number, g: number, b: number}} Sky color components in [0, 1].
      */
     Donkeycraft.Lighting.prototype.getSkyColor = function() {
         var t = this._timeOfDay;
-        var sunIntensity = this.getSunIntensity();
 
-        // Color keyframes
-        if (t > 0.20 && t < 0.30) {
-            var phase = (t - 0.20) / 0.10;
-            return {
-                r: Donkeycraft.lerp(0.02, 0.95, phase),
-                g: Donkeycraft.lerp(0.02, 0.55, phase),
-                b: Donkeycraft.lerp(0.08, 0.15, phase)
-            };
+        // Smooth sky color keyframes: [time, r, g, b]
+        // t=0.0 → midnight (dark blue-black)
+        // t=0.20 → pre-dawn (very dark)
+        // t=0.30 → sunrise complete (orange-pink)
+        // t=0.50 → midday (deep blue)
+        // t=0.70 → sunset start
+        // t=0.80 → dusk complete (dark blue-black)
+        // t=1.0 → midnight again
+
+        var keyframes = [
+            { t: 0.00, r: 0.02, g: 0.02, b: 0.06 },  // midnight
+            { t: 0.20, r: 0.03, g: 0.02, b: 0.05 },  // pre-dawn (darker)
+            { t: 0.30, r: 0.85, g: 0.55, b: 0.25 },  // sunrise orange-pink
+            { t: 0.40, r: 0.40, g: 0.65, b: 0.95 },  // morning blue
+            { t: 0.55, r: 0.30, g: 0.60, b: 1.00 },  // midday deep blue
+            { t: 0.70, r: 0.80, g: 0.50, b: 0.20 },  // sunset orange
+            { t: 0.80, r: 0.03, g: 0.02, b: 0.05 },  // dusk (dark)
+            { t: 1.00, r: 0.02, g: 0.02, b: 0.06 }   // midnight again
+        ];
+
+        // Find the two keyframes surrounding current time
+        var lower = keyframes[0];
+        var upper = keyframes[keyframes.length - 1];
+
+        for (var i = 0; i < keyframes.length - 1; i++) {
+            if (t >= keyframes[i].t && t <= keyframes[i + 1].t) {
+                lower = keyframes[i];
+                upper = keyframes[i + 1];
+                break;
+            }
         }
-        if (t > 0.70 && t < 0.80) {
-            var phase = (t - 0.70) / 0.10;
-            return {
-                r: Donkeycraft.lerp(0.95, 0.02, phase),
-                g: Donkeycraft.lerp(0.55, 0.02, phase),
-                b: Donkeycraft.lerp(0.15, 0.08, phase)
-            };
-        }
-        if (t >= 0.30 && t <= 0.70) {
-            return { r: 0.3, g: 0.6, b: 1.0 }; // Day
-        }
-        return { r: 0.02, g: 0.02, b: 0.08 }; // Night
+
+        var range = upper.t - lower.t;
+        var phase = range > 0 ? (t - lower.t) / range : 0;
+
+        // Smooth easing to avoid linear interpolation artifacts
+        phase = phase * phase * (3 - 2 * phase); // smoothstep
+
+        return {
+            r: Donkeycraft.lerp(lower.r, upper.r, phase),
+            g: Donkeycraft.lerp(lower.g, upper.g, phase),
+            b: Donkeycraft.lerp(lower.b, upper.b, phase)
+        };
     };
 
     /**

@@ -1,5 +1,6 @@
 // Donkeycraft — Shader Manager
 // Shader compilation, linking, uniform/location caching.
+// Validates all compiled programs via gl.validateProgram() to catch GLSL errors early.
 (function() {
     'use strict';
 
@@ -11,6 +12,8 @@
 
     /**
      * ShaderManager — Compiles and manages WebGL shaders and programs.
+     * Validates all compiled programs via gl.validateProgram() to catch GLSL errors early.
+     * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
      */
     Donkeycraft.ShaderManager = function(gl) {
         this._gl = gl;
@@ -23,8 +26,9 @@
 
     /**
      * Compile a shader from a source string.
+     * Logs detailed error information including source line numbers on failure.
      * @param {string} source - GLSL shader source code.
-     * @param {number} type - Shader type: 'vertex' or 'fragment'.
+     * @param {string} type - Shader type: 'vertex' or 'fragment'.
      * @returns {WebGLShader|null} The compiled shader, or null on failure.
      */
     Donkeycraft.ShaderManager.prototype.compileShader = function(source, type) {
@@ -58,6 +62,7 @@
 
     /**
      * Link a program from vertex and fragment shaders.
+     * Validates the linked program via gl.validateProgram() to catch uniform/attribute mismatches.
      * @param {WebGLShader} vertShader - Compiled vertex shader.
      * @param {WebGLShader} fragShader - Compiled fragment shader.
      * @param {string[]} [attribLocations] - Optional attribute location bindings.
@@ -89,6 +94,16 @@
             gl.deleteProgram(program);
             Donkeycraft.Logger.error('ShaderManager', 'Program linking failed:\nError: ' + errorMsg);
             return null;
+        }
+
+        // Validate the program to catch uniform/attribute mismatches early.
+        if (gl.validateProgram) {
+            if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
+                var validateMsg = gl.getProgramInfoLog(program);
+                gl.deleteProgram(program);
+                Donkeycraft.Logger.error('ShaderManager', 'Program validation failed:\n' + validateMsg);
+                return null;
+            }
         }
 
         this._programCount++;

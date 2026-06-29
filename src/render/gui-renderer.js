@@ -165,6 +165,15 @@
     };
 
     /**
+     * Rebuild GPU buffers after a WebGL context restore event.
+     * @private
+     */
+    Donkeycraft.GUIRenderer.prototype._rebuildBuffers = function() {
+        // Buffers are lazily recreated on next render call via null checks —
+        // no explicit rebuild needed since geometry data is static.
+    };
+
+    /**
      * Get or create a cached orthographic projection matrix.
      * @private
      */

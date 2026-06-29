@@ -21,6 +21,18 @@
         this._heldItemId = 1; // Default: stone
         this._bobAngle = 0;
 
+        // Listen for context loss/restore on the source canvas
+        if (gl && gl.canvas) {
+            var self = this;
+            gl.canvas.addEventListener('webglcontextlost', function(e) {
+                e.preventDefault();
+                self._contextLost = true;
+            });
+            gl.canvas.addEventListener('webglcontextrestored', function() {
+                self._contextLost = false;
+            });
+        }
+
         // Cached projection matrix (avoids per-frame allocation)
         this._projMatrixCache = null;
         this._lastAspect = null;
@@ -80,6 +92,14 @@
      */
     Donkeycraft.HandRenderer.prototype.setBobAngle = function(angle) {
         this._bobAngle = angle;
+    };
+
+    /**
+     * Get the current bob animation angle.
+     * @returns {number} Bob angle in radians.
+     */
+    Donkeycraft.HandRenderer.prototype.getBobAngle = function() {
+        return this._bobAngle;
     };
 
     /**

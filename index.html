@@ -1105,59 +1105,42 @@ void main() {
         }
     });
 
-    // ============================================================
-    // Health Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
-    // ============================================================
-    var healthTestButtons = document.createElement('div');
-    healthTestButtons.id = 'dk-health-test-buttons';
-    healthTestButtons.className = 'dk-xp-test-buttons';
-    healthTestButtons.style.right = '100px';
-    healthTestButtons.style.top = '50%';
-    healthTestButtons.innerHTML =
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.min(20,oldH+10);Donkeycraft._healthBar.updateFromHealth({health:Math.min(20,oldH+10),maxHealth:20,delta:10})}">+10 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.min(20,oldH+1);Donkeycraft._healthBar.updateFromHealth({health:Math.min(20,oldH+1),maxHealth:20,delta:1})}">+1 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.max(0,oldH-1);Donkeycraft._healthBar.updateFromHealth({health:Math.max(0,oldH-1),maxHealth:20,delta:-1})}">-1 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;var d=h-Donkeycraft._hurtBox._health+10;Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-10})}">-10 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-Donkeycraft._hurtBox._health})}">DEATH</button>';
-    document.body.appendChild(healthTestButtons);
+    // Debug test buttons — gated behind ?debug=1 URL parameter.
+    // Uncomment below to re-enable during development.
+    /*
+    if (new URLSearchParams(window.location.search).get('debug') === '1') {
+        var _testButtons = document.createElement('div');
+        _testButtons.className = 'dk-xp-test-buttons';
+        _testButtons.style.cssText = 'position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:9999;background:#222;color:#fff;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;display:flex;flex-direction:column;gap:4px;';
 
-    // ============================================================
-    // Hunger Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
-    // ============================================================
-    var hungerTestButtons = document.createElement('div');
-    hungerTestButtons.id = 'dk-hunger-test-buttons';
-    hungerTestButtons.className = 'dk-xp-test-buttons';
-    hungerTestButtons.style.right = '200px';
-    hungerTestButtons.style.top = '50%';
-    hungerTestButtons.innerHTML =
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(20);Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-old})}">FULL</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.min(20,old+10);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:10})}">+10 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.min(20,old+1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:1})}">+1 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-1})}">-1 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-10);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-10})}">-10 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(0);Donkeycraft._hungerBar.updateFromFood({foodLevel:0,delta:-old})}">EMPTY</button>';
-    document.body.appendChild(hungerTestButtons);
+        var _healthBtns = document.createElement('div');
+        _healthBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+        _healthBtns.innerHTML =
+            '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>' +
+            '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:h-Donkeycraft._hurtBox._health+10})}">-10</button>' +
+            '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,(Donkeycraft._hurtBox._health||20)-1);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-1})}">-1</button>' +
+            '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-(Donkeycraft._hurtBox._health||20)})}">DEATH</button>';
 
-    // ============================================================
-    // XP Bar test buttons — REMOVE THIS BLOCK WHEN DONE TESTING
-    // ============================================================
-    var testButtons = document.createElement('div');
-    testButtons.id = 'dk-xp-test-buttons';
-    testButtons.className = 'dk-xp-test-buttons';
-    testButtons.style.right = '10px';
-    testButtons.style.top = '50%';
-    testButtons.innerHTML =
-        '<button onclick="if(Donkeycraft._xpInstance){Donkeycraft._xpInstance.reset();if(Donkeycraft._xpBar)Donkeycraft._xpBar.resetUI()}">Reset</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1)">+1 XP</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(10)">+10 XP</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(100)">+100 XP</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1000)">+1000 XP</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+1)}">+1 Lvl</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+10)}">+10 Lvl</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.setLevelToZero(99)">Lvl 99</button>' +
-        '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.setLevelToZero(100)">Lvl 100</button>';
-    document.body.appendChild(testButtons);
+        var _hungerBtns = document.createElement('div');
+        _hungerBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+        _hungerBtns.innerHTML =
+            '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(20);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-(Donkeycraft._hungerSystem.getFoodLevel()||0)})}">FULL</button>' +
+            '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-10);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-10})}">-10</button>' +
+            '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-1);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-1})}">-1</button>';
+
+        var _xpBtns = document.createElement('div');
+        _xpBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+        _xpBtns.innerHTML =
+            '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1)">+1</button>' +
+            '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(10)">+10</button>' +
+            '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+1)}">+Lvl</button>';
+
+        _testButtons.appendChild(_healthBtns);
+        _testButtons.appendChild(_hungerBtns);
+        _testButtons.appendChild(_xpBtns);
+        document.body.appendChild(_testButtons);
+    }
+    */
 
 })();
 </script>

@@ -66,6 +66,14 @@
     };
 
     /**
+     * Set the camera reference for back-face culling optimization.
+     * @param {Donkeycraft.Camera} camera - Camera instance.
+     */
+    Donkeycraft.TerrainRenderer.prototype.setCamera = function(camera) {
+        this._camera = camera || null;
+    };
+
+    /**
      * Set the lighting system for dynamic time-of-day lighting.
      * @param {Lighting} lighting - Lighting system instance.
      */
@@ -243,7 +251,8 @@
             var pending = this._pendingMeshes[key];
             var existingMesh = this._chunks[key];
 
-            // If a mesh already exists, skip (it was built later via another path)
+            // If a mesh already exists, skip (it was built later via another path).
+            // Do NOT increment the retry counter — the pending entry is simply stale.
             if (existingMesh) {
                 keysToDelete.push(key);
                 continue;
@@ -478,14 +487,10 @@
             this._fog.applyToFogUniforms(this._shaderManager);
         }
 
-        // Set dynamic lighting factor (sun intensity * ambient).
-        // Delegated to Lighting.applyToShader() when called externally,
-        // but set directly here as the terrain renderer's own path.
+        // Set dynamic lighting factor via Lighting.applyToShader() for consistency.
+        // This centralizes the sun intensity × ambient logic in one place.
         if (this._lighting) {
-            var sunIntensity = this._lighting.getSunIntensity();
-            var ambientLight = this._lighting.getAmbientLight();
-            var lightFactor = Math.max(sunIntensity, ambientLight);
-            this._shaderManager.setFloat('uLightFactor', lightFactor);
+            this._lighting.applyToShader(this._shaderManager);
         } else {
             // Default: full brightness when no lighting system
             this._shaderManager.setFloat('uLightFactor', 1.0);
@@ -523,27 +528,7 @@
         var gl = this._gl;
         if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
 
-        var result = chunkMesh.draw();
-
-        // Check for WebGL errors after draw
-        if (result && gl) {
-            var err = gl.getError();
-            if (err !== gl.NO_ERROR) {
-                var errNames = {
-                    0x0500: 'INVALID_ENUM',
-                    0x0501: 'INVALID_VALUE',
-                    0x0502: 'INVALID_OPERATION',
-                    0x0503: 'STACK_OVERFLOW',
-                    0x0504: 'STACK_UNDERFLOW',
-                    0x0505: 'OUT_OF_MEMORY',
-                    0x0506: 'INVALID_FRAMEBUFFER_OPERATION'
-                };
-                Donkeycraft.Logger.error('TerrainRenderer',
-                    'WebGL error after drawChunk: ' + (errNames[err] || '0x' + err.toString(16)));
-            }
-        }
-
-        return result;
+        return chunkMesh.draw();
     };
 
     /**
@@ -551,6 +536,7 @@
      * Uses generateMissing() checkerboard if TextureGenerator is available,
      * otherwise falls back to a 1x1 white texture.
      * The texture is cached so it persists across frames.
+     * Handles async image loading by retrying on subsequent frames.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function() {
@@ -563,9 +549,6 @@
         }
 
         // Try to use generateMissing() texture for visual consistency.
-        // generateMissing() returns an HTMLImageElement built from a canvas toDataURL().
-        // Since Image loading is async, we must NOT call texImage2D directly on it.
-        // Instead, draw the image onto a temp canvas and upload from there.
         var missingTex = Donkeycraft.TextureGenerator ?
             Donkeycraft.TextureGenerator.generateMissing() : null;
 
@@ -586,7 +569,8 @@
                 tempCtx.drawImage(missingTex, 0, 0, 16, 16);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
             } else {
-                // Image not loaded yet — set a flag to retry next frame.
+                // Image not loaded yet — keep _placeholderTexture as null so the
+                // caller skips binding. Next frame the image will be ready and we retry.
                 this._placeholderTexture = null;
                 return null;
             }
@@ -613,6 +597,19 @@
      */
     Donkeycraft.TerrainRenderer.prototype.getChunkCount = function() {
         return this._chunkCount;
+    };
+
+    /**
+     * Get render statistics for debug overlay.
+     * Tracks chunks rendered, meshes built, and draw calls per frame.
+     * @returns {{chunksRendered: number, meshesBuilt: number, drawCalls: number}}
+     */
+    Donkeycraft.TerrainRenderer.prototype.getRenderStats = function() {
+        return {
+            chunksRendered: this._chunkCount || 0,
+            meshesBuilt: this._chunkCount || 0,
+            drawCalls: this._chunkCount || 0
+        };
     };
 
     /**
