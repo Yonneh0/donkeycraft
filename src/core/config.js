@@ -36,7 +36,7 @@
             PLAYER_SPRINT_SPEED: 7.8,   // Sprinting speed (blocks/sec)
             PLAYER_FLY_SPEED: 5.0,      // Creative fly speed
             PLAYER_FLY_SPEED_BOOST: 10.0, // Creative fly speed with sprint
-            PLAYER_JUMP_FORCE: 0.42,    // Jump velocity
+            PLAYER_JUMP_FORCE: 5.0,     // Jump velocity (blocks/s) — gives ~0.6 block jump height with GRAVITY=-20
             PLAYER_REACH: 6.0,          // Block interaction reach distance
 
             // Camera settings

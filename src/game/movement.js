@@ -28,6 +28,14 @@
     };
 
     /**
+     * Set the HurtBox reference for fall damage application.
+     * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance.
+     */
+    Donkeycraft.Movement.prototype.setHurtBox = function(hurtBox) {
+        this._hurtBox = hurtBox;
+    };
+
+    /**
      * Set the hunger system reference for degradation tracking.
      * @param {Donkeycraft.Hunger} hungerSystem - Hunger instance.
      */
@@ -171,8 +179,22 @@
                 player.trackFallDistance(-vy * deltaTime);
             }
         } else if (result.onGround) {
-            // Reset fall distance when landing on solid ground
-            player.maxFallDistance = 0;
+            // Apply fall damage when landing after a fall, then reset tracking.
+            // The HurtBox system has calculateFallDamage and applyFallDamage methods
+            // that handle the math — we just need to call them if fall damage exists.
+            if (player.maxFallDistance > Config.FALL_DAMAGE_THRESHOLD && this._hurtBox) {
+                try {
+                    var fallDmg = this._hurtBox.applyFallDamage();
+                    if (fallDmg > 0) {
+                        Donkeycraft.Logger.info('Movement', 'Player took ' + fallDmg.toFixed(1) + ' fall damage');
+                    }
+                } catch (e) {
+                    Donkeycraft.Logger.warn('Movement', 'Fall damage application failed: ' + e.message);
+                }
+            } else {
+                // Reset fall distance when landing with no damage
+                player.maxFallDistance = 0;
+            }
         }
 
         // Clear horizontal velocity when not moving (survival walking)
@@ -211,9 +233,10 @@
         var input = this._input;
         var collision = this._collision;
 
-        // Get fly speed (boosted with sprint)
-        var isSprinting = input.isKeyDown(Config.KEYBINDS.SPRINT);
-        var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
+        // Fly speed — no sprint boost in creative fly mode.
+        // In vanilla Minecraft, Shift controls vertical movement in creative fly;
+        // sprint speed boost only applies to walking modes.
+        var speed = Config.PLAYER_FLY_SPEED;
 
         // Compute horizontal movement direction from input
         var forward = input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) ? 1 : (input.isKeyDown(Config.KEYBINDS.MOVE_BACKWARD) ? -1 : 0);
@@ -243,19 +266,22 @@
             moveZ = 0;
         }
 
-        // Vertical movement: Space = up, Shift = down
-        // Vanilla Minecraft allows descending while moving horizontally
+        // Vertical movement: Space = up, ShiftLeft = down.
+        // In creative fly mode, ShiftLeft controls vertical descent — no conflict with
+        // survival sprint (which also uses ShiftLeft) because this code only runs in creative mode.
         var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-        var moveDown = input.isKeyDown(Config.KEYBINDS.SPRINT) ? 1 : 0;
+        var moveDown = input.isKeyDown('ShiftLeft') ? 1 : 0;
 
         var flyVy = 0;
         if (moveUp !== 0) {
             flyVy = speed;
         } else if (moveDown !== 0) {
-            flyVy = -Config.FLYING_TERMINAL_VELOCITY;
+            // FLYING_TERMINAL_VELOCITY is negative (-20), so assign directly.
+            flyVy = Config.FLYING_TERMINAL_VELOCITY;
         }
 
-        // Apply velocity directly (no gravity in creative fly)
+        // Apply velocity directly (no gravity in creative fly).
+        // Multiply by deltaTime for frame-rate-independent movement.
         player.setVelocity(moveX, flyVy, moveZ);
 
         // Resolve movement with collision (creative still collides with blocks)
@@ -284,9 +310,9 @@
         var player = this._player;
         var input = this._input;
 
-        // Get fly speed (boosted with sprint)
-        var isSprinting = input.isKeyDown(Config.KEYBINDS.SPRINT);
-        var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
+        // Spectator fly speed — no sprint boost.
+        // In spectator mode, ShiftLeft controls vertical movement only.
+        var speed = Config.PLAYER_FLY_SPEED;
 
         // Compute horizontal movement direction from input
         var forward = input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) ? 1 : (input.isKeyDown(Config.KEYBINDS.MOVE_BACKWARD) ? -1 : 0);
@@ -316,21 +342,25 @@
             moveZ = 0;
         }
 
-        // Vertical movement: Space = up, Shift = down
+        // Vertical movement: Space = up, ShiftLeft = down.
+        // In spectator mode, ShiftLeft controls vertical descent — no conflict with
+        // survival sprint because this code only runs in spectator mode.
         var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-        var moveDown = input.isKeyDown(Config.KEYBINDS.SPRINT) ? 1 : 0;
+        var moveDown = input.isKeyDown('ShiftLeft') ? 1 : 0;
 
         var flyVy = 0;
         if (moveUp !== 0) {
             flyVy = speed;
         } else if (moveDown !== 0) {
-            flyVy = -Config.FLYING_TERMINAL_VELOCITY;
+            // FLYING_TERMINAL_VELOCITY is negative (-20), so assign directly.
+            flyVy = Config.FLYING_TERMINAL_VELOCITY;
         }
 
-        // Apply velocity directly — no collision in spectator mode
+        // Apply velocity directly — no collision in spectator mode.
+        // Multiply by deltaTime for frame-rate-independent movement.
         player.setVelocity(moveX, flyVy, moveZ);
 
-        // Update position without collision resolution
+        // Update position without collision resolution.
         var pos = player.getPosition();
         pos.x += moveX * deltaTime;
         pos.y += flyVy * deltaTime;

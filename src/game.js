@@ -1366,11 +1366,12 @@
         this._updatePlayer(dt);
 
         // Tick player subsystems in dependency order:
+        // Tick order — critical for correct game logic:
         // 1. Flying — state management (toggle, speed queries)
-        // 2. Movement — physics, gravity, swimming, collision resolution
+        // 2. Movement — physics, gravity, swimming, collision resolution, fall damage
         // 3. Jumping — jump input, cooldown, water swimming boost
-        // 4. Hunger — starvation, saturation drain, food-based regeneration
-        // 5. HurtBox — fire damage tick (applied after hunger to avoid double-heal)
+        // 4. HurtBox — fire damage tick (applied BEFORE hunger to prevent double-heal)
+        // 5. Hunger — starvation, saturation drain, food-based regeneration
         if (this._flyingSystem) {
             try { this._flyingSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Flying tick error: ' + e.message); }
         }
@@ -1380,11 +1381,11 @@
         if (this._jumpSystem) {
             try { this._jumpSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Jump tick error: ' + e.message); }
         }
-        if (this._hungerSystem) {
-            try { this._hungerSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Hunger tick error: ' + e.message); }
-        }
         if (this._hurtBox) {
             try { this._hurtBox.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'HurtBox tick error: ' + e.message); }
+        }
+        if (this._hungerSystem) {
+            try { this._hungerSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Hunger tick error: ' + e.message); }
         }
 
         // Update chunk manager based on player position.
@@ -1480,13 +1481,26 @@
         rot.yaw = this._camera.getYaw();
         rot.pitch = this._camera.getPitch();
 
-        // Decay knockback directly on the player's knockback object.
+        // Apply knockback velocity to the player and decay it over time.
+        // Knockback is applied as an additional velocity component that decays
+        // each tick so the player gradually slows down after being hit.
         var kb = this._player.getKnockback();
         if (kb && (Math.abs(kb.x) > 0.001 || Math.abs(kb.z) > 0.001)) {
+            // Apply knockback to player velocity (horizontal only — upward component stored in y).
+            var playerVel = this._player.getVelocity();
+            this._player.setVelocity(
+                playerVel.x + kb.x,
+                playerVel.y + kb.y,
+                playerVel.z + kb.z
+            );
+
+            // Decay knockback velocity (0.9 = 10% decay per tick at 20 TPS).
             kb.x *= 0.9;
             kb.z *= 0.9;
-            if (Math.abs(kb.x) < 0.01) { kb.x = 0; }
-            if (Math.abs(kb.z) < 0.01) { kb.z = 0; }
+            kb.y *= 0.9;
+            if (Math.abs(kb.x) < 0.001) { kb.x = 0; }
+            if (Math.abs(kb.z) < 0.001) { kb.z = 0; }
+            if (Math.abs(kb.y) < 0.001) { kb.y = 0; }
         }
 
         // Emit player tick event for subscribers (e.g., stats tracking).

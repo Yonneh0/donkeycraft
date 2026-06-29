@@ -824,6 +824,13 @@ void main() {
                 if (game2._movementSystem) {
                     try { game2._movementSystem.setHungerSystem(hunger); } catch (e3) {}
                 }
+
+                // Wire HurtBox into Movement for fall damage application
+                if (game2._movementSystem) {
+                    try { game2._movementSystem.setHurtBox(hurtBox); } catch (e4) {
+                        Donkeycraft.Logger.warn('Game', 'Failed to wire HurtBox into Movement: ' + e4.message);
+                    }
+                }
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
             }

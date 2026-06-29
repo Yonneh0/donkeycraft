@@ -49,22 +49,34 @@
         // Spectators always fly — no flag check needed.
         if (gameMode === 'spectator') return true;
         // Creative mode requires explicit toggle.
-        return gameMode === 'creative' && this._flyEnabled;
+        if (gameMode === 'creative') return this._flyEnabled;
+        return false;
     };
 
     /**
-     * Toggle flying mode on/off (creative only).
-     * Spectator mode always flies and cannot be toggled off.
+     * Toggle flying mode on/off.
+     * Creative mode: toggles the internal flag and player.flyEnabled.
+     * Spectator mode: always flies — sets flag to true without toggling off.
      * @returns {boolean} True if the toggle was applied.
      */
     Donkeycraft.Flying.prototype.toggleFlyMode = function() {
         var gameMode = this._player.getGameMode();
 
-        // Only creative and spectator can toggle flying
+        // Only creative and spectator can fly
         if (gameMode !== 'creative' && gameMode !== 'spectator') {
             return false;
         }
 
+        // Spectators always fly — force flag to true, never toggle off
+        if (gameMode === 'spectator') {
+            this._flyEnabled = true;
+            if (this._player) {
+                this._player.flyEnabled = true;
+            }
+            return true;
+        }
+
+        // Creative mode: normal toggle
         this._flyEnabled = !this._flyEnabled;
         if (this._player) {
             this._player.flyEnabled = this._flyEnabled;
@@ -98,6 +110,13 @@
      * @returns {boolean} True if disabled successfully.
      */
     Donkeycraft.Flying.prototype.disableFlyMode = function() {
+        var gameMode = this._player.getGameMode();
+
+        // Spectators cannot disable flying
+        if (gameMode === 'spectator') {
+            return false;
+        }
+
         this._flyEnabled = false;
         if (this._player) {
             this._player.flyEnabled = false;
@@ -167,6 +186,7 @@
             this._player = null;
         }
         this._input = null;
+        this._flyEnabled = false;
     };
 
 })();
