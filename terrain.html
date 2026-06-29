@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Donkeycraft Terrain Generator & Viewer</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { overflow: hidden; background: #1a1a2e; font-family: 'Courier New', monospace; color: #e0e0e0; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+
+    /* Controls Panel */
+    #controls {
+        position: absolute; top: 10px; left: 10px;
+        background: rgba(10, 10, 30, 0.85); border: 1px solid #4444aa;
+        border-radius: 6px; padding: 12px; min-width: 260px;
+        font-size: 12px; user-select: none; z-index: 100;
+    }
+    #controls h2 { font-size: 14px; color: #8888ff; margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; }
+    #controls h2:hover { color: #aaaaFF; }
+    .control-group { margin-bottom: 6px; }
+    .control-group label { display: inline-block; width: 100px; color: #aaaacc; }
+    .control-group input[type="range"] { width: 100px; vertical-align: middle; }
+    .control-group input[type="number"], .control-group input[type="text"] {
+        width: 80px; background: #222244; border: 1px solid #5555aa; color: #e0e0e0;
+        padding: 2px 4px; border-radius: 3px; font-family: inherit; font-size: 11px;
+    }
+    .control-group select {
+        background: #222244; border: 1px solid #5555aa; color: #e0e0e0;
+        padding: 2px 4px; border-radius: 3px; font-family: inherit; font-size: 11px;
+    }
+    .control-group button {
+        background: #333366; border: 1px solid #5555aa; color: #ccccff;
+        padding: 4px 10px; border-radius: 3px; cursor: pointer; font-family: inherit; font-size: 11px;
+    }
+    .control-group button:hover { background: #444488; }
+    .control-group button.active { background: #5566aa; color: #fff; }
+    #controls-body { transition: max-height 0.2s ease; overflow: hidden; }
+    #controls.collapsed #controls-body { max-height: 0; padding: 0; }
+    #controls.collapsed { min-width: auto; padding: 8px; }
+    .toggle-arrow { transition: transform 0.2s; }
+    #controls.collapsed .toggle-arrow { transform: rotate(-90deg); }
+
+    /* Debug Overlay */
+    #debug-overlay {
+        position: absolute; top: 10px; right: 10px;
+        background: rgba(10, 10, 30, 0.85); border: 1px solid #44aa44;
+        border-radius: 6px; padding: 10px; min-width: 300px;
+        font-size: 11px; z-index: 100; white-space: pre-line;
+    }
+    #debug-overlay .chunk-hash { color: #ffcc44; word-break: break-all; }
+    #debug-overlay .stat-label { color: #88ff88; }
+    #debug-overlay .stat-value { color: #ffffff; }
+
+    /* Block Legend */
+    #block-legend {
+        position: absolute; bottom: 10px; left: 10px;
+        background: rgba(10, 10, 30, 0.85); border: 1px solid #aa44aa;
+        border-radius: 6px; padding: 10px; font-size: 10px; z-index: 100;
+    }
+    #block-legend h3 { color: #cc88ff; margin-bottom: 6px; font-size: 12px; }
+    #block-legend-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+    .legend-item { display: flex; align-items: center; gap: 4px; padding: 1px 3px; }
+    .legend-color { width: 12px; height: 12px; border: 1px solid #555; border-radius: 1px; }
+
+    /* Crosshair */
+    #crosshair {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px; height: 20px; pointer-events: none; z-index: 50;
+    }
+    #crosshair::before, #crosshair::after {
+        content: ''; position: absolute; background: rgba(255,255,255,0.7);
+    }
+    #crosshair::before { width: 2px; height: 20px; left: 9px; top: 0; }
+    #crosshair::after { width: 20px; height: 2px; top: 9px; left: 0; }
+
+    /* Instructions */
+    #instructions {
+        position: absolute; bottom: 10px; right: 10px;
+        background: rgba(10, 10, 30, 0.85); border: 1px solid #aaaa44;
+        border-radius: 6px; padding: 10px; font-size: 10px; z-index: 100;
+    }
+    #instructions h3 { color: #ffff88; margin-bottom: 4px; }
+
+    /* Block highlight wireframe */
+    .highlight-block-info {
+        position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+        background: rgba(10, 10, 30, 0.85); border: 1px solid #ff8844;
+        border-radius: 4px; padding: 6px 12px; font-size: 11px; z-index: 100;
+        color: #ffcc88; pointer-events: none;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="terrain-canvas"></canvas>
+<div id="crosshair"></div>
+
+<div id="controls">
+    <h2>
+        <span>⚙ Terrain Controls</span>
+        <span class="toggle-arrow">▼</span>
+    </h2>
+    <div id="controls-body">
+        <div class="control-group">
+            <label>Seed:</label>
+            <input type="number" id="seed-input" value="42">
+            <button id="generate-btn">Generate</button>
+        </div>
+        <div class="control-group">
+            <label>Biome:</label>
+            <select id="biome-select">
+                <option value="0">plains</option>
+                <option value="1">desert</option>
+                <option value="2">mountains</option>
+                <option value="3">snow</option>
+                <option value="4">ocean</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Render Dist:</label>
+            <input type="range" id="render-dist-slider" min="1" max="8" value="3">
+            <span id="render-dist-val">3</span>
+        </div>
+        <div class="control-group">
+            <label>Time of Day:</label>
+            <input type="range" id="time-slider" min="0" max="1000" value="250">
+            <span id="time-val">0.25</span>
+        </div>
+        <div class="control-group">
+            <label>Gravity:</label>
+            <input type="range" id="gravity-slider" min="0" max="100" value="80">
+            <span id="gravity-val">80%</span>
+        </div>
+        <div class="control-group">
+            <button id="wireframe-btn">Wireframe: OFF</button>
+            <button id="bedrock-btn">Bedrock: ON</button>
+        </div>
+        <div class="control-group">
+            <button id="fly-btn">Fly Mode: ON</button>
+            <button id="pause-btn">Pause: OFF</button>
+        </div>
+        <div class="control-group">
+            <label>Chunk X:</label><input type="number" id="chunk-x-input" value="0" style="width:60px">
+            <label>Z:</label><input type="number" id="chunk-z-input" value="0" style="width:60px">
+            <button id="goto-chunk-btn">Go</button>
+        </div>
+    </div>
+</div>
+
+<div id="debug-overlay">
+    <div><span class="stat-label">FPS:</span> <span class="stat-value" id="dbg-fps">0</span></div>
+    <div><span class="stat-label">Chunks:</span> <span class="stat-value" id="dbg-chunks">0</span></div>
+    <div><span class="stat-label">Position:</span> <span class="stat-value" id="dbg-pos">0, 64, 0</span></div>
+    <div><span class="stat-label">Rotation:</span> <span class="stat-value" id="dbg-rot">0°, 0°</span></div>
+    <div><span class="stat-label">Chunk:</span> <span class="stat-value" id="dbg-chunk-coord">(0, 0)</span></div>
+    <hr style="border-color: #336633; margin: 4px 0;">
+    <div class="chunk-hash" id="dbg-chunk-hash">Chunk hash loading...</div>
+</div>
+
+<div id="block-legend">
+    <h3>Block Legend</h3>
+    <div id="block-legend-grid"></div>
+</div>
+
+<div id="instructions">
+    <h3>Controls</h3>
+    <div>WASD — Move | Mouse — Look</div>
+    <div>Space — Up | Shift — Down</div>
+    <div>Left Click — Break Block</div>
+    <div>Right Click — Place Block</div>
+    <div>1-5 — Select Block Type</div>
+    <div>ESC — Release Mouse</div>
+</div>
+
+<div class="highlight-block-info" id="block-info" style="display:none;"></div>
+
+<script>
+// ============================================================
+// Donkeycraft Terrain Viewer — Standalone Single-File WebGL Renderer
+// All code is self-contained; no external dependencies.
+// ============================================================
+
+(function() {
+    'use strict';
+
+    // ============================================================
+    // SECTION 1: MATH LIBRARY (adapted from src/core/math-utils.js)
+    // ============================================================
+
+    var Vector3 = function(x, y, z) {
+        this.x = (x !== undefined && !isNaN(x)) ? x : 0;
+        this.y = (y !== undefined && !isNaN(y)) ? y : 0;
+        this.z = (z !== undefined && !isNaN(z)) ? z : 0;
+    };
+
+    Vector3.zero = function() { return new Vector3(0, 0, 0); };
+
+    Vector3.prototype.set = function(x, y, z) {
+        this.x = (x !== undefined && !isNaN(x)) ? x : 0;
+        this.y = (y !== undefined && !isNaN(y)) ? y : 0;
+        this.z = (z !== undefined && !isNaN(z)) ? z : 0;
+        return this;
+    };
+
+    Vector3.prototype.add = function(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; };
+    Vector3.prototype.sub = function(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; };
+
+    Vector3.prototype.scale = function(s) { this.x *= s; this.y *= s; this.z *= s; return this; };
+
+    Vector3.prototype.dot = function(v) { return this.x * v.x + this.y * v.y + this.z * v.z; };
+
+    Vector3.prototype.cross = function(v) {
+        var x = this.x, y = this.y, z = this.z;
+        this.x = y * v.z - z * v.y;
+        this.y = z * v.x - x * v.z;
+        this.z = x * v.y - y * v.x;
+        return this;
+    };
+
+    Vector3.prototype.lengthSq = function() { return this.x*this.x + this.y*this.y + this.z*this.z; };
+
+    Vector3.prototype.length = function() { return Math.sqrt(this.lengthSq()); };
+
+    Vector3.prototype.normalize = function() {
+        var len = this.length();
+        if (len > 0.00001) { this.x /= len; this.y /= len; this.z /= len; }
+        else { this.set(0, 0, 0); }
+        return this;
+    };
+
+    Vector3.prototype.normalized = function() { return Vector3.copy(this).normalize(); };
+
+    Vector3.prototype.distanceTo = function(v) {
+        var dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z;
+        return Math.sqrt(dx*dx + dy*dy + dz*dz);
+    };
+
+    Vector3.prototype.floor = function() {
+        this.x = Math.floor(this.x); this.y = Math.floor(this.y); this.z = Math.floor(this.z);
+        return this;
+    };
+
+    Vector3.copy = function(v) { return new Vector3(v.x, v.y, v.z); };
+
+    // Lerp utility
+    var lerp = function(a, b, t) { return a + (b - a) * t; };
+    var clamp = function(v, min, max) { return Math.min(max, Math.max(min, v)); };
+    var map = function(v, inMin, inMax, outMin, outMax) {
+        if (inMin === inMax) return outMin;
+        return outMin + (outMax - outMin) * ((v - inMin) / (inMax - inMin));
+    };
+
+    // ============================================================
+    // Matrix4 — column-major 4×4 matrix for WebGL
+    // ============================================================
+
+    var Matrix4 = function(data) {
+        this._data = data || new Float32Array(16);
+    };
+
+    Matrix4.createIdentity = function() {
+        var d = new Float32Array(16);
+        d[0]=1; d[5]=1; d[10]=1; d[15]=1;
+        return new Matrix4(d);
+    };
+
+    Matrix4.createPerspective = function(fovRadians, aspect, near, far) {
+        var f = 1.0 / Math.tan(fovRadians / 2);
+        var nf = 1 / (near - far);
+        var d = new Float32Array(16);
+        d[0] = f/aspect; d[5] = f;
+        d[10] = (far+near)*nf; d[11] = -1;
+        d[14] = 2*far*near*nf;
+        return new Matrix4(d);
+    };
+
+    Matrix4.createLookAt = function(eye, target, up) {
+        var zAxis = Vector3.copy(eye).sub(target).normalize();
+        var xAxis = Vector3.copy(up).cross(zAxis).normalize();
+        var yAxis = Vector3.copy(zAxis).cross(xAxis);
+        var d = new Float32Array(16);
+        d[0]=xAxis.x; d[1]=xAxis.y; d[2]=xAxis.z; d[3]=0;
+        d[4]=yAxis.x; d[5]=yAxis.y; d[6]=yAxis.z; d[7]=0;
+        d[8]=zAxis.x; d[9]=zAxis.y; d[10]=zAxis.z; d[11]=0;
+        d[12]=-xAxis.dot(eye); d[13]=-yAxis.dot(eye); d[14]=-zAxis.dot(eye); d[15]=1;
+        return new Matrix4(d);
+    };
+
+    Matrix4.createTranslation = function(x, y, z) {
+        var m = Matrix4.createIdentity();
+        m._data[12] = x; m._data[13] = y; m._data[14] = z;
+        return m;
+    };
+
+    Matrix4.createScale = function(x, y, z) {
+        var d = new Float32Array(16);
+        d[0]=x; d[5]=y; d[10]=z; d[15]=1;
+        return new Matrix4(d);
+    };
+
+    Matrix4.multiply = function(a, b) {
+        var aa = a._data, bb = b._data, r = new Float32Array(16);
+        for (var i = 0; i < 4; i++)
+            for (var j = 0; j < 4; j++)
+                r[i*4+j] = aa[i*4]*bb[j] + aa[i*4+1]*bb[4+j] + aa[i*4+2]*bb[8+j] + aa[i*4+3]*bb[12+j];
+        return new Matrix4(r);
+    };
+
+    Matrix4.prototype.getData = function() { return this._data; };
+
+    Matrix4.prototype.clone = function() { return new Matrix4(new Float32Array(this._data)); };
+
+    // Transpose in place
+    Matrix4.prototype.transpose = function() {
+        var d = this._data, t;
+        t=d[1]; d[1]=d[4]; d[4]=t;
+        t=d[2]; d[2]=d[8]; d[8]=t;
+        t=d[3]; d[3]=d[12]; d[12]=t;
+        t=d[6]; d[6]=d[9]; d[9]=t;
+        t=d[7]; d[7]=d[13]; d[13]=t;
+        t=d[11]; d[11]=d[14]; d[14]=t;
+        return this;
+    };
+
+    // ============================================================
+    // SECTION 2: PERLIN NOISE (adapted from src/core/math-utils.js)
+    // ============================================================
+
+    var PerlinNoise = (function() {
+        var _perm = new Uint8Array(512);
+
+        function init(seed) {
+            var p = new Uint8Array(256);
+            for (var i = 0; i < 256; i++) p[i] = i;
+            var s = (seed !== undefined && !isNaN(seed)) ? Math.abs(Math.floor(seed)) : 42;
+            if (s <= 0) s = 1;
+            for (var i = 255; i > 0; i--) {
+                s = (s * 16807) % 2147483647;
+                var j = s % (i + 1);
+                var tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+            }
+            for (var i = 0; i < 512; i++) _perm[i] = p[i & 255];
+        }
+
+        function fade(t) { return t*t*t*(t*(t*6-15)+10); }
+
+        function grad(hash, x, y, z) {
+            var h = hash & 15;
+            var u = h < 8 ? x : y;
+            var v = h < 4 ? y : (h===12||h===14 ? x : z);
+            return ((h&1)===0 ? u : -u) + ((h&2)===0 ? v : -v);
+        }
+
+        function lerp(t, a, b) { return a + t * (b - a); }
+
+        function noise3D(x, y, z) {
+            var X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+            x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+            var u = fade(x), v = fade(y), w = fade(z);
+            var A = _perm[X]+Y, AA = _perm[A]+Z, AB = _perm[A+1]+Z;
+            var B = _perm[X+1]+Y, BA = _perm[B]+Z, BB = _perm[B+1]+Z;
+            return lerp(w, lerp(v, lerp(u, grad(_perm[AA],x,y,z), grad(_perm[BA],x-1,y,z)),
+                               lerp(u, grad(_perm[AB],x,y-1,z), grad(_perm[BB],x-1,y-1,z))),
+                       lerp(v, lerp(u, grad(_perm[AA+1],x,y,z-1), grad(_perm[BA+1],x-1,y,z-1)),
+                               lerp(u, grad(_perm[AB+1],x,y-1,z-1), grad(_perm[BB+1],x-1,y-1,z-1))));
+        }
+
+        function noise2D(x, y) { return noise3D(x, y, 0); }
+
+        function fbm(x, y, z, octaves, persistence, lacunarity) {
+            octaves = octaves || 4; persistence = persistence || 0.5; lacunarity = lacunarity || 2;
+            var total = 0, amplitude = 1, frequency = 1, maxValue = 0;
+            for (var i = 0; i < octaves; i++) {
+                total += noise3D(x*frequency, y*frequency, z*frequency) * amplitude;
+                maxValue += amplitude; amplitude *= persistence; frequency *= lacunarity;
+            }
+            return maxValue === 0 ? 0 : total / maxValue;
+        }
+
+        init(42); // default seed
+
+        return { init: init, noise3D: noise3D, noise2D: noise2D, fbm: fbm };
+    })();
+
+    // ============================================================
+    // SECTION 3: BLOCK COLOR REGISTRY
+    // Procedural RGB colors for block rendering (no texture atlas needed)
+    // Stub: Full implementation would include all 256+ vanilla blocks
+    // ============================================================
+
+    var BlockColors = {
+        // Core blocks
+        0:   { r:0, g:0, b:0, name:'air', transparent:true },      // Air (transparent)
+        1:   { r:0.50,g:0.50,b:0.50, name:'stone' },               // Stone
+        2:   { r:0.65,g:0.55,b:0.50, name:'granite' },             // Granite
+        3:   { r:0.70,g:0.70,b:0.70, name:'diorite' },             // Diorite
+        4:   { r:0.45,g:0.50,b:0.55, name:'andesite' },            // Andesite
+        5:   { r:0.35,g:0.35,b:0.40, name:'deepslate' },           // Deepslate
+        6:   { r:0.30,g:0.30,b:0.35, name:'cobbled_deepslate' },   // Cobbled deepslate
+        7:   { r:0.40,g:0.28,b:0.18, name:'dirt' },                // Dirt
+        8:   { r:0.30,g:0.68,b:0.18, name:'grass_block_top' },     // Grass block top
+        9:   { r:0.55,g:0.52,b:0.48, name:'gravel' },              // Gravel
+        10:  { r:0.25,g:0.25,b:0.25, name:'coal_ore' },            // Coal ore
+        11:  { r:0.70,g:0.58,b:0.50, name:'iron_ore' },            // Iron ore
+        12:  { r:0.90,g:0.78,b:0.20, name:'gold_ore' },            // Gold ore
+        13:  { r:0.20,g:0.85,b:0.75, name:'diamond_ore' },         // Diamond ore
+        14:  { r:0.15,g:0.75,b:0.20, name:'emerald_ore' },         // Emerald ore
+        15:  { r:0.85,g:0.15,b:0.10, name:'redstone_ore' },        // Redstone ore
+        16:  { r:0.15,g:0.30,b:0.75, name:'lapis_ore' },           // Lapis ore
+        17:  { r:0.12,g:0.10,b:0.15, name:'obsidian' },            // Obsidian
+        18:  { r:0.40,g:0.15,b:0.55, name:'crying_obsidian', emissive:true }, // Crying obsidian
+        19:  { r:0.80,g:0.75,b:0.50, name:'sand' },                // Sand
+        20:  { r:0.72,g:0.41,b:0.25, name:'red_sand' },            // Red sand
+        21:  { r:0.78,g:0.70,b:0.52, name:'sandstone' },           // Sandstone
+        24:  { r:0.50,g:0.35,b:0.20, name:'oak_log' },             // Oak log (side)
+        25:  { r:0.30,g:0.22,b:0.15, name:'spruce_log' },          // Spruce log
+        26:  { r:0.65,g:0.58,b:0.45, name:'birch_log' },           // Birch log
+        30:  { r:0.55,g:0.40,b:0.22, name:'oak_planks' },          // Oak planks
+        31:  { r:0.35,g:0.25,b:0.15, name:'spruce_planks' },       // Spruce planks
+        32:  { r:0.70,g:0.60,b:0.45, name:'birch_planks' },        // Birch planks
+        45:  { r:0.70,g:0.85,b:0.95, name:'glass', transparent:true }, // Glass
+        48:  { r:0.60,g:0.80,b:0.90, name:'ice', transparent:true },    // Ice
+        49:  { r:0.30,g:0.60,b:0.85, name:'blue_ice' },            // Blue ice
+        51:  { r:0.95,g:0.95,b:0.97, name:'snow_block' },          // Snow block
+        53:  { r:0.94,g:0.94,b:0.94, name:'white_wool' },          // White wool
+        69:  { r:0.82,g:0.47,b:0.14, name:'orange_concrete' },     // Orange concrete
+        85:  { r:0.94,g:0.87,b:0.25, name:'yellow_concrete' },     // Yellow concrete
+        57:  { r:0.49,g:0.89,b:0.22, name:'lime_concrete' },       // Lime concrete
+        64:  { r:0.13,g:0.23,b:0.60, name:'blue_concrete' },       // Blue concrete
+        67:  { r:0.78,g:0.13,b:0.13, name:'red_concrete' },        // Red concrete
+        68:  { r:0.15,g:0.15,b:0.15, name:'black_concrete' },      // Black concrete
+        1000:{ r:0.15,g:0.15,b:0.15, name:'bedrock' },             // Bedrock
+        212: { r:0.20,g:0.40,b:0.85, name:'water', transparent:true }, // Water (stub: full impl would handle liquid rendering)
+        213: { r:0.90,g:0.35,b:0.05, name:'lava', emissive:true }, // Lava
+
+        // Stub: Additional block colors would be defined here for full coverage
+        // All remaining blocks fall back to a checkerboard pattern
+    };
+
+    // Get color for any block ID; returns fallback if not registered
+    function getBlockColor(blockId) {
+        var c = BlockColors[blockId];
+        if (c) return c;
+        // Stub: fallback procedural color based on block ID hash
+        // Full implementation would generate colors from a hash of the block name
+        var h = ((blockId * 2654435761) >>> 0) % 360;
+        return { r: 0.5, g: 0.5, b: 0.5, name: 'unknown_' + blockId, transparent: false };
+    }
+
+    // ============================================================
+    // SECTION 4: TERRAIN GENERATION SYSTEM
+    // Stub: Simplified biome system; full impl would integrate with biome.js
+    // ============================================================
+
+    var CHUNK_SIZE = 16;
+    var WORLD_HEIGHT = 256;
+
+    // Biome configuration definitions
+    var BIOMES = [
+        { id:0, name:'plains', baseHeight:64, variation:20, ocean:false, desert:false, snow:false, surfaceBlock:8, subBlock:7, deepBlock:1 },
+        { id:1, name:'desert', baseHeight:60, variation:10, ocean:false, desert:true, snow:false, surfaceBlock:19, subBlock:19, deepBlock:1 },
+        { id:2, name:'mountains', baseHeight:100, variation:80, ocean:false, desert:false, snow:false, surfaceBlock:1, subBlock:1, deepBlock:1 },
+        { id:3, name:'snow', baseHeight:70, variation:30, ocean:false, desert:false, snow:true, surfaceBlock:51, subBlock:7, deepBlock:1 },
+        { id:4, name:'ocean', baseHeight:20, variation:5, ocean:true, desert:false, snow:false, surfaceBlock:8, subBlock:7, deepBlock:1 }
+    ];
+
+    /**
+     * TerrainGenerator — generates heightmaps and terrain for chunks.
+     */
+    var TerrainGenerator = {
+        _chunks: {}, // key "cx,cz" → ChunkData
+
+        /**
+         * Generate a heightmap for given chunk coordinates.
+         * @param {number} chunkX
+         * @param {number} chunkZ
+         * @param {number} biomeId — index into BIOMES array
+         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE
+         */
+        generateHeightmap: function(chunkX, chunkZ, biomeId) {
+            var biome = BIOMES[biomeId] || BIOMES[0];
+            var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
+            var scale = 0.015;
+            var detailScale = 0.05;
+
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                    var baseNoise = PerlinNoise.fbm(worldX * scale, 0, worldZ * scale, 4, 0.5, 2.0);
+                    var detailNoise = PerlinNoise.fbm(worldX * detailScale, 0, worldZ * detailScale, 3, 0.5, 2.0);
+
+                    var height = biome.baseHeight + baseNoise * biome.variation * 0.7 + detailNoise * biome.variation * 0.3;
+                    height = Math.floor(clamp(height, 1, WORLD_HEIGHT - 10));
+
+                    if (biome.ocean) height = clamp(height, 5, 30);
+
+                    // Extreme hills peak boost
+                    if (biome.id === 2) {
+                        var peakBoost = Math.abs(PerlinNoise.noise2D(worldX * 0.008, worldZ * 0.008)) * biome.variation;
+                        height = Math.min(height + Math.floor(peakBoost), WORLD_HEIGHT - 15);
+                    }
+
+                    heightmap[x + z * CHUNK_SIZE] = height;
+                }
+            }
+            return heightmap;
+        },
+
+        /**
+         * Build full chunk block data from a heightmap.
+         * @param {number} cx — Chunk X coordinate
+         * @param {number} cz — Chunk Z coordinate
+         * @param {number} biomeId — Biome index
+         * @returns {ChunkData}
+         */
+        buildChunk: function(cx, cz, biomeId) {
+            var biome = BIOMES[biomeId] || BIOMES[0];
+            var heightmap = this.generateHeightmap(cx, cz, biomeId);
+            var blocks = new Uint16Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE);
+
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
+                    var globalY = 0;
+
+                    // Stub: Full implementation would place ores, caves, water here
+                    // The existing engine uses ore-generator.js and cave-generator.js for this
+                    for (globalY = 0; globalY < WORLD_HEIGHT; globalY++) {
+                        var idx = x + globalY * CHUNK_SIZE + z * CHUNK_SIZE * WORLD_HEIGHT;
+
+                        // Bedrock at Y=0
+                        if (globalY === 0) {
+                            blocks[idx] = 1000;
+                            continue;
+                        }
+
+                        if (globalY < surfaceY - 3) {
+                            // Deep stone
+                            blocks[idx] = biome.id === 2 ? 1 : 1; // stone
+                        } else if (globalY < surfaceY) {
+                            // Sub-surface (dirt, sand, or stone depending on biome)
+                            if (biome.desert) {
+                                blocks[idx] = 19; // sand
+                            } else {
+                                blocks[idx] = biome.subBlock;
+                            }
+                        } else if (globalY === surfaceY) {
+                            // Surface block
+                            blocks[idx] = biome.surfaceBlock;
+                        }
+                        // Above surface = air (0, default)
+                    }
+
+                    // Stub: Water filling in ocean biomes
+                    if (biome.ocean) {
+                        var waterLevel = 63;
+                        for (globalY = surfaceY + 1; globalY <= waterLevel && globalY < WORLD_HEIGHT; globalY++) {
+                            var widx = x + globalY * CHUNK_SIZE + z * CHUNK_SIZE * WORLD_HEIGHT;
+                            blocks[widx] = 212; // water
+                        }
+                    }
+                }
+            }
+
+            return { cx: cx, cz: cz, biomeId: biomeId, blocks: blocks, heightmap: heightmap };
+        },
+
+        /**
+         * Get or create a chunk, generating it if needed.
+         */
+        getChunk: function(cx, cz, biomeId) {
+            var key = cx + ',' + cz;
+            if (!this._chunks[key]) {
+                this._chunks[key] = this.buildChunk(cx, cz, biomeId);
+            }
+            return this._chunks[key];
+        },
+
+        /**
+         * Remove a chunk by coordinate.
+         */
+        removeChunk: function(cx, cz) {
+            var key = cx + ',' + cz;
+            delete this._chunks[key];
+        },
+
+        /**
+         * Get all loaded chunks as an array.
+         */
+        getAllChunks: function() {
+            var result = [];
+            var keys = Object.keys(this._chunks);
+            for (var i = 0; i < keys.length; i++) {
+                result.push(this._chunks[keys[i]]);
+            }
+            return result;
+        },
+
+        /**
+         * Clear all chunks.
+         */
+        clearAll: function() {
+            this._chunks = {};
+        },
+
+        /**
+         * Compute a deterministic hash string for a chunk's block data.
+         * Used for debugging and verification.
+         */
+        computeChunkHash: function(chunk) {
+            var data = chunk.blocks;
+            var hash = 0;
+            // Sample every 256th block for performance (256 * 256 = 65536 blocks total)
+            var step = Math.max(1, Math.floor(data.length / 4096));
+            for (var i = 0; i < data.length; i += step) {
+                hash = ((hash << 5) - hash + data[i]) | 0;
+            }
+            var hex = (hash >>> 0).toString(16).toUpperCase();
+            while (hex.length < 8) hex = '0' + hex;
+            var biome = BIOMES[chunk.biomeId] ? BIOMES[chunk.biomeId].name : 'unknown';
+            return 'Chunk [' + chunk.cx + ',' + chunk.cz + '] hash=0x' + hex + ' seed=' + PerlinNoise.init.toString().length + ' biome=' + biome + ' blocks=' + data.length;
+        }
+    };
+
+    // ============================================================
+    // SECTION 5: WEBGL RENDERER
+    // Standalone WebGL 1 rendering pipeline
+    // ============================================================
+
+    var GL = null; // WebGL context
+    var canvas = null;
+
+    // Shader programs
+    var terrainProgram = null;
+    var wireframeProgram = null;
+    var highlightProgram = null;
+
+    // Shader locations
+    var terrainLocs = {};
+    var wireframeLocs = {};
+    var highlightLocs = {};
+
+    // ============================================================
+    // GLSL Shaders (inline, no external files)
+    // ============================================================
+
+    var TERRAIN_VS = [
+        'attribute vec3 aPosition;',
+        'attribute vec2 aUV;',
+        'attribute vec3 aNormal;',
+        'attribute vec3 aColor;',
+        'uniform mat4 uProjection;',
+        'uniform mat4 uView;',
+        'uniform mat4 uModel;',
+        'varying vec2 vUV;',
+        'varying vec3 vNormal;',
+        'varying vec3 vColor;',
+        'varying float vDepth;',
+        'void main() {',
+        '    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);',
+        '    vUV = aUV;',
+        '    vNormal = mat3(uView) * aNormal;', // Transform normal to view space
+        '    vColor = aColor;',
+        '    vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);',
+        '    vDepth = -viewPos.z;',
+        '}'
+    ].join('\n');
+
+    var TERRAIN_FS = [
+        'precision mediump float;',
+        'varying vec2 vUV;',
+        'varying vec3 vNormal;',
+        'varying vec3 vColor;',
+        'varying float vDepth;',
+        'uniform float uFogDensity;',
+        'uniform vec3 uFogColor;',
+        'uniform float uLightFactor;',
+        'void main() {',
+        '    // Normalize normal',
+        '    vec3 N = normalize(vNormal);',
+        '    // Simple directional lighting (sun from above)',
+        '    vec3 sunDir = normalize(vec3(0.5, 1.0, 0.3));',
+        '    float diff = max(dot(N, sunDir), 0.0);',
+        '    float ambient = 0.35;',
+        '    float light = ambient + (1.0 - ambient) * diff * uLightFactor;',
+        '    vec3 color = vColor * light;',
+        '    // Exponential distance fog',
+        '    float fogFactor = 1.0 - exp(-uFogDensity * vDepth * uFogDensity * vDepth);',
+        '    fogFactor = clamp(fogFactor, 0.0, 1.0);',
+        '    color = mix(color, uFogColor, fogFactor);',
+        '    gl_FragColor = vec4(color, 1.0);',
+        '}'
+    ].join('\n');
+
+    var WIREFRAME_VS = [
+        'attribute vec3 aPosition;',
+        'uniform mat4 uProjection;',
+        'uniform mat4 uView;',
+        'uniform mat4 uModel;',
+        'void main() {',
+        '    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);',
+        '}'
+    ].join('\n');
+
+    var WIREFRAME_FS = [
+        'precision mediump float;',
+        'uniform vec3 uColor;',
+        'void main() {',
+        '    gl_FragColor = vec4(uColor, 1.0);',
+        '}'
+    ].join('\n');
+
+    // Highlight block shader (for selected block)
+    var HIGHLIGHT_VS = [
+        'attribute vec3 aPosition;',
+        'uniform mat4 uProjection;',
+        'uniform mat4 uView;',
+        'uniform mat4 uModel;',
+        'void main() {',
+        '    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);',
+        '}'
+    ].join('\n');
+
+    var HIGHLIGHT_FS = [
+        'precision mediump float;',
+        'uniform vec3 uColor;',
+        'uniform float uAlpha;',
+        'void main() {',
+        '    gl_FragColor = vec4(uColor, uAlpha);',
+        '}'
+    ].join('\n');
+
+    // ============================================================
+    // Shader compilation helper
+    // ============================================================
+
+    function compileShader(source, type) {
+        var shader = GL.createShader(type);
+        GL.shaderSource(shader, source);
+        GL.compileShader(shader);
+        if (!GL.getShaderParameter(shader, GL.COMPILE_STATUS)) {
+            console.error('Shader compile error:', GL.getShaderInfoLog(shader));
+            GL.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    function linkProgram(vertShader, fragShader) {
+        var prog = GL.createProgram();
+        GL.attachShader(prog, vertShader);
+        GL.attachShader(prog, fragShader);
+        GL.linkProgram(prog);
+        if (!GL.getProgramParameter(prog, GL.LINK_STATUS)) {
+            console.error('Program link error:', GL.getProgramInfoLog(prog));
+            return null;
+        }
+        return prog;
+    }
+
+    function getUniformLocations(prog, names) {
+        var locs = {};
+        for (var i = 0; i < names.length; i++) {
+            locs[names[i]] = GL.getUniformLocation(prog, names[i]);
+        }
+        return locs;
+    }
+
+    function getAttributeLocations(prog, names) {
+        var locs = {};
+        for (var i = 0; i < names.length; i++) {
+            locs[names[i]] = GL.getAttribLocation(prog, names[i]);
+        }
+        return locs;
+    }
+
+    // ============================================================
+    // WebGL Initialization
+    // ============================================================
+
+    function initWebGL() {
+        canvas = document.getElementById('terrain-canvas');
+        GL = canvas.getContext('webgl', { antialias: true, alpha: false }) ||
+             canvas.getContext('experimental-webgl', { antialias: true, alpha: false });
+
+        if (!GL) {
+            alert('WebGL not supported!');
+            return false;
+        }
+
+        // Resize canvas to fill window
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            GL.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Compile terrain shader program
+        var terrainVert = compileShader(TERRAIN_VS, GL.VERTEX_SHADER);
+        var terrainFrag = compileShader(TERRAIN_FS, GL.FRAGMENT_SHADER);
+        terrainProgram = linkProgram(terrainVert, terrainFrag);
+
+        terrainLocs = getUniformLocations(terrainProgram, [
+            'uProjection', 'uView', 'uModel',
+            'uFogDensity', 'uFogColor', 'uLightFactor'
+        ]);
+        var tAttrs = getAttributeLocations(terrainProgram, ['aPosition', 'aUV', 'aNormal', 'aColor']);
+        terrainLocs.aPosition = tAttrs.aPosition;
+        terrainLocs.aUV = tAttrs.aUV;
+        terrainLocs.aNormal = tAttrs.aNormal;
+        terrainLocs.aColor = tAttrs.aColor;
+
+        // Compile wireframe shader program
+        var wfVert = compileShader(WIREFRAME_VS, GL.VERTEX_SHADER);
+        var wfFrag = compileShader(WIREFRAME_FS, GL.FRAGMENT_SHADER);
+        wireframeProgram = linkProgram(wfVert, wfFrag);
+
+        wireframeLocs = getUniformLocations(wireframeProgram, ['uProjection', 'uView', 'uModel', 'uColor']);
+
+        // Compile highlight shader program
+        var hlVert = compileShader(HIGHLIGHT_VS, GL.VERTEX_SHADER);
+        var hlFrag = compileShader(HIGHLIGHT_FS, GL.FRAGMENT_SHADER);
+        highlightProgram = linkProgram(hlVert, hlFrag);
+
+        highlightLocs = getUniformLocations(highlightProgram, ['uProjection', 'uView', 'uModel', 'uColor', 'uAlpha']);
+
+        // Enable depth testing
+        GL.enable(GL.DEPTH_TEST);
+        GL.clearColor(0.4, 0.6, 0.85, 1.0); // Sky blue default
+
+        return true;
+    }
+
+    // ============================================================
+    // SECTION 6: CHUNK MESH BUILDER
+    // Generates vertex data for chunk rendering with face culling
+    // Stub: Full impl would use texture UVs; this uses solid colors
+    // ============================================================
+
+    /**
+     * ChunkMesh — manages GPU buffers for a single chunk's terrain mesh.
+     */
+    var ChunkMesh = function() {
+        this.vertexBuffer = null;
+        this.indexBuffer = null;
+        this.vertexCount = 0;
+        this.indexCount = 0;
+        this.dirty = true;
+    };
+
+    /**
+     * Build mesh geometry from chunk block data.
+     * Implements face culling: only render faces adjacent to air/transparent blocks.
+     * @param {ChunkData} chunk
+     * @returns {Object} { vertices, indices }
+     */
+    function buildChunkGeometry(chunk) {
+        var blocks = chunk.blocks;
+        var cx = chunk.cx, cz = chunk.cz;
+        var vertices = [];
+        var indices = [];
+
+        // Face definitions: direction, normal, corner positions, color tint
+        var faces = [
+            { dir: 'up',    normal: [0,1,0],  corners: [[0,1,0],[1,1,0],[1,1,1],[0,1,1]], light: 1.0 },
+            { dir: 'down',  normal: [0,-1,0], corners: [[0,0,1],[1,0,1],[1,0,0],[0,0,0]], light: 0.5 },
+            { dir: 'north', normal: [0,0,-1], corners: [[0,0,1],[0,1,1],[1,1,1],[1,0,1]], light: 0.9 },
+            { dir: 'south', normal: [0,0,1],  corners: [[1,0,0],[1,1,0],[0,1,0],[0,0,0]], light: 0.6 },
+            { dir: 'east',  normal: [1,0,0],  corners: [[1,0,1],[1,1,1],[1,1,0],[1,0,0]], light: 0.8 },
+            { dir: 'west',  normal: [-1,0,0], corners: [[0,0,0],[0,1,0],[0,1,1],[0,0,1]], light: 0.7 }
+        ];
+
+        var globalX = cx * CHUNK_SIZE;
+        var globalZ = cz * CHUNK_SIZE;
+
+        // Stub: For performance, limit Y range in initial implementation
+        // Full impl would iterate all Y from 0 to WORLD_HEIGHT
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                for (var y = 0; y < WORLD_HEIGHT; y++) {
+                    var idx = x + y * CHUNK_SIZE + z * CHUNK_SIZE * WORLD_HEIGHT;
+                    var blockId = blocks[idx];
+
+                    // Skip air
+                    if (blockId === 0) continue;
+
+                    var color = getBlockColor(blockId);
+
+                    // Check each face
+                    for (var f = 0; f < faces.length; f++) {
+                        var face = faces[f];
+                        var nx = x + face.corners[0][0] * face.normal[0];
+                        var ny = y + face.corners[0][1] * face.normal[1];
+                        var nz = z + face.corners[0][2] * face.normal[2];
+
+                        // Get neighbor block
+                        var neighborId;
+                        if (nx < 0 || nx >= CHUNK_SIZE || ny < 0 || ny >= WORLD_HEIGHT || nz < 0 || nz >= CHUNK_SIZE) {
+                            // Edge of chunk — show face (stub: full impl would check adjacent chunk)
+                            neighborId = 0;
+                        } else {
+                            var nidx = nx + ny * CHUNK_SIZE + nz * CHUNK_SIZE * WORLD_HEIGHT;
+                            neighborId = blocks[nidx];
+                        }
+
+                        var neighborColor = getBlockColor(neighborId);
+                        var isTransparent = neighborColor.transparent || false;
+
+                        // Show face if neighbor is air or transparent (but not same block type)
+                        if (neighborId === 0 || (isTransparent && neighborId !== blockId)) {
+                            // Add quad vertices
+                            var baseVert = vertices.length / 9; // 9 floats per vertex (px,py,pz, nx,ny,nz, r,g,b)
+                            for (var v = 0; v < 4; v++) {
+                                var cx2 = face.corners[v][0];
+                                var cy2 = face.corners[v][1];
+                                var cz2 = face.corners[v][2];
+                                vertices.push(
+                                    globalX + cx2, y + cy2, globalZ + cz2, // position (fixed: was globalY, should be y)
+                                    face.normal[0], face.normal[1], face.normal[2], // normal
+                                    color.r * face.light, color.g * face.light, color.b * face.light // color with light tint
+                                );
+                            }
+                            indices.push(baseVert, baseVert+1, baseVert+2, baseVert, baseVert+2, baseVert+3);
+                        }
+                    }
+                }
+            }
+        }
+
+        return { vertices: new Float32Array(vertices), indices: new Uint32Array(indices) };
+    }
+
+    /**
+     * Update or create GPU buffers for a chunk mesh.
+     */
+    function updateChunkMesh(mesh, geometry) {
+        // Delete old buffers
+        if (mesh.vertexBuffer) GL.deleteBuffer(mesh.vertexBuffer);
+        if (mesh.indexBuffer) GL.deleteBuffer(mesh.indexBuffer);
+
+        // Create vertex buffer (interleaved: pos(3) + normal(3) + color(3) = 9 floats)
+        mesh.vertexBuffer = GL.createBuffer();
+        GL.bindBuffer(GL.ARRAY_BUFFER, mesh.vertexBuffer);
+        GL.bufferData(GL.ARRAY_BUFFER, geometry.vertices, GL.STATIC_DRAW);
+
+        // Create index buffer
+        mesh.indexBuffer = GL.createBuffer();
+        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+        GL.bufferData(GL.ELEMENT_ARRAY_BUFFER, geometry.indices, GL.STATIC_DRAW);
+
+        mesh.vertexCount = geometry.vertices.length / 9;
+        mesh.indexCount = geometry.indices.length;
+        mesh.dirty = false;
+    }
+
+    /**
+     * Draw a chunk mesh.
+     */
+    function drawChunkMesh(mesh) {
+        if (mesh.indexCount === 0) return;
+
+        var stride = 9 * 4; // 9 floats × 4 bytes
+
+        GL.bindBuffer(GL.ARRAY_BUFFER, mesh.vertexBuffer);
+        GL.enableVertexAttribArray(terrainLocs.aPosition);
+        GL.vertexAttribPointer(terrainLocs.aPosition, 3, GL.FLOAT, false, stride, 0);
+
+        GL.enableVertexAttribArray(terrainLocs.aNormal);
+        GL.vertexAttribPointer(terrainLocs.aNormal, 3, GL.FLOAT, false, stride, 12);
+
+        GL.enableVertexAttribArray(terrainLocs.aColor);
+        GL.vertexAttribPointer(terrainLocs.aColor, 3, GL.FLOAT, false, stride, 24);
+
+        GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, mesh.indexBuffer);
+        GL.drawElements(GL.TRIANGLES, mesh.indexCount, GL.UNSIGNED_INT, 0);
+
+        GL.disableVertexAttribArray(terrainLocs.aPosition);
+        GL.disableVertexAttribArray(terrainLocs.aNormal);
+        GL.disableVertexAttribArray(terrainLocs.aColor);
+    }
+
+    // ============================================================
+    // SECTION 7: CAMERA SYSTEM
+    // First-person camera with pointer lock controls
+    // ============================================================
+
+    var Camera = function() {
+        this.position = new Vector3(0, 100, 0);
+        this.yaw = 0;      // Horizontal rotation (radians)
+        this.pitch = 0;    // Vertical rotation (radians)
+        this.fov = 70;     // Field of view (degrees)
+        this.near = 0.1;
+        this.far = 1000;
+        this.speed = 50;   // Movement speed (blocks/sec)
+        this.sprintMultiplier = 2.0;
+    };
+
+    Camera.prototype.setRotation = function(yaw, pitch) {
+        this.yaw = yaw;
+        this.pitch = clamp(pitch, -Math.PI/2 + 0.01, Math.PI/2 - 0.01);
+    };
+
+    Camera.prototype.applyMouseDelta = function(dx, dy, sensitivity) {
+        this.yaw -= dx * sensitivity;
+        this.pitch = clamp(this.pitch - dy * sensitivity, -Math.PI/2 + 0.01, Math.PI/2 - 0.01);
+    };
+
+    Camera.prototype.getForward = function() {
+        return new Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    };
+
+    Camera.prototype.getRight = function() {
+        return new Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    };
+
+    Camera.prototype.getUp = function() { return new Vector3(0, 1, 0); };
+
+    Camera.prototype.getForward3D = function() {
+        var sinYaw = Math.sin(this.yaw), cosYaw = Math.cos(this.yaw);
+        var sinPitch = Math.sin(this.pitch), cosPitch = Math.cos(this.pitch);
+        return new Vector3(-sinYaw * cosPitch, sinPitch, -cosYaw * cosPitch);
+    };
+
+    Camera.prototype.move = function(dx, dy, dz, dt) {
+        this.position.x += dx * dt;
+        this.position.y += dy * dt;
+        this.position.z += dz * dt;
+    };
+
+    Camera.prototype.getPosition = function() { return this.position; };
+
+    Camera.prototype.getViewMatrix = function() {
+        var target = new Vector3(
+            this.position.x - Math.sin(this.yaw) * Math.cos(this.pitch),
+            this.position.y + Math.sin(this.pitch),
+            this.position.z - Math.cos(this.yaw) * Math.cos(this.pitch)
+        );
+        return Matrix4.createLookAt(this.position, target, new Vector3(0, 1, 0));
+    };
+
+    Camera.prototype.getProjectionMatrix = function(aspect) {
+        return Matrix4.createPerspective(this.fov * Math.PI / 180, aspect || 1.0, this.near, this.far);
+    };
+
+    Camera.prototype.getChunkCoords = function() {
+        var cx = Math.floor(this.position.x / CHUNK_SIZE);
+        var cz = Math.floor(this.position.z / CHUNK_SIZE);
+        return { cx: cx, cz: cz };
+    };
+
+    // ============================================================
+    // SECTION 8: INPUT HANDLER
+    // Keyboard and mouse state tracking
+    // ============================================================
+
+    var Input = function() {
+        this.keys = {};
+        this.mouseDX = 0;
+        this.mouseDY = 0;
+        this.pointerLocked = false;
+        this.leftClick = false;
+        this.rightClick = false;
+        this.flyMode = true;
+        this.sprinting = false;
+    };
+
+    var input = new Input();
+
+    function initInput() {
+        // Keyboard
+        document.addEventListener('keydown', function(e) {
+            input.keys[e.code] = true;
+            if (e.code === 'Escape' && document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+            // Number keys 1-5 for block selection
+            if (e.code >= 'Digit1' && e.code <= 'Digit5') {
+                selectedBlockType = parseInt(e.code.replace('Digit', ''));
+            }
+        });
+        document.addEventListener('keyup', function(e) {
+            input.keys[e.code] = false;
+        });
+
+        // Mouse capture on canvas click
+        canvas.addEventListener('click', function() {
+            if (!document.pointerLockElement) {
+                canvas.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('pointerlockchange', function() {
+            input.pointerLocked = !!document.pointerLockElement;
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (input.pointerLocked) {
+                input.mouseDX += e.movementX || 0;
+                input.mouseDY += e.movementY || 0;
+            }
+        });
+
+        canvas.addEventListener('mousedown', function(e) {
+            if (input.pointerLocked) {
+                if (e.button === 0) input.leftClick = true;
+                if (e.button === 2) input.rightClick = true;
+            }
+        });
+
+        canvas.addEventListener('mouseup', function(e) {
+            if (e.button === 0) input.leftClick = false;
+            if (e.button === 2) input.rightClick = false;
+        });
+
+        // Prevent context menu
+        canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    }
+
+    // ============================================================
+    // SECTION 9: LIGHTING & FOG SYSTEM
+    // Time-of-day based lighting with smooth sky color transitions
+    // ============================================================
+
+    var LightingSystem = {
+        timeOfDay: 0.25, // 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset
+
+        getSunIntensity: function() {
+            // Sun is highest at t=0.5 (noon), lowest at t=0.0/1.0 (midnight)
+            var angle = (this.timeOfDay - 0.25) * Math.PI * 2;
+            return clamp(Math.sin(angle), 0, 1);
+        },
+
+        getAmbientLight: function() {
+            var sun = this.getSunIntensity();
+            return 0.15 + sun * 0.85;
+        },
+
+        getSkyColor: function() {
+            var t = this.timeOfDay;
+            // Piecewise sky color interpolation
+            if (t < 0.2) { // Pre-dawn
+                return { r: 0.05, g: 0.05, b: 0.15 };
+            } else if (t < 0.3) { // Sunrise
+                var s = (t - 0.2) / 0.1;
+                return {
+                    r: lerp(0.05, 0.85, s),
+                    g: lerp(0.05, 0.50, s),
+                    b: lerp(0.15, 0.60, s)
+                };
+            } else if (t < 0.5) { // Morning to midday
+                var s = (t - 0.3) / 0.2;
+                return {
+                    r: lerp(0.85, 0.40, s),
+                    g: lerp(0.50, 0.65, s),
+                    b: lerp(0.60, 0.85, s)
+                };
+            } else if (t < 0.7) { // Afternoon
+                var s = (t - 0.5) / 0.2;
+                return {
+                    r: lerp(0.40, 0.80, s),
+                    g: lerp(0.65, 0.45, s),
+                    b: lerp(0.85, 0.30, s)
+                };
+            } else if (t < 0.8) { // Sunset
+                var s = (t - 0.7) / 0.1;
+                return {
+                    r: lerp(0.80, 0.10, s),
+                    g: lerp(0.45, 0.05, s),
+                    b: lerp(0.30, 0.20, s)
+                };
+            } else { // Night
+                return { r: 0.05, g: 0.05, b: 0.15 };
+            }
+        },
+
+        getLightFactor: function() {
+            return this.getSunIntensity() * 0.6 + 0.4;
+        }
+    };
+
+    // ============================================================
+    // SECTION 10: RAYCAST (DDA block targeting)
+    // Stub: Simplified raycast for block highlighting/interaction
+    // Full impl would match src/game/raycast.js DDA algorithm
+    // ============================================================
+
+    var RaycastResult = function(blockX, blockY, blockZ, faceNormal) {
+        this.blockX = blockX;
+        this.blockY = blockY;
+        this.blockZ = blockZ;
+        this.faceNormal = faceNormal || [0, 0, 0];
+    };
+
+    /**
+     * DDA raycast from camera position in camera direction.
+     * Returns the first solid block hit, or null if nothing found.
+     * Stub: Simplified version — full impl would check all block types including transparent.
+     */
+    function raycast(maxSteps) {
+        maxSteps = maxSteps || 64; // ~reach distance of 6-8 blocks
+        var camPos = camera.getPosition();
+        var forward = camera.getForward3D();
+
+        var x = camPos.x, y = camPos.y, z = camPos.z;
+        var stepX, stepY, stepZ;
+        var tDeltaX, tDeltaY, tDeltaZ;
+
+        if (forward.x > 0.001) { stepX = 1; tDeltaX = 0.001 / Math.abs(forward.x); }
+        else if (forward.x < -0.001) { stepX = -1; tDeltaX = 0.001 / Math.abs(forward.x); }
+        else { stepX = 0; tDeltaX = Infinity; }
+
+        if (forward.y > 0.001) { stepY = 1; tDeltaY = 0.001 / Math.abs(forward.y); }
+        else if (forward.y < -0.001) { stepY = -1; tDeltaY = 0.001 / Math.abs(forward.y); }
+        else { stepY = 0; tDeltaY = Infinity; }
+
+        if (forward.z > 0.001) { stepZ = 1; tDeltaZ = 0.001 / Math.abs(forward.z); }
+        else if (forward.z < -0.001) { stepZ = -1; tDeltaZ = 0.001 / Math.abs(forward.z); }
+        else { stepZ = 0; tDeltaZ = Infinity; }
+
+        var tMaxX = stepX > 0 ? (Math.floor(x) + 1 - x) * tDeltaX : (x - Math.floor(x)) * tDeltaX;
+        var tMaxY = stepY > 0 ? (Math.floor(y) + 1 - y) * tDeltaY : (y - Math.floor(y)) * tDeltaY;
+        var tMaxZ = stepZ > 0 ? (Math.floor(z) + 1 - z) * tDeltaZ : (z - Math.floor(z)) * tDeltaZ;
+
+        var cx = Math.floor(x), cy = Math.floor(y), cz = Math.floor(z);
+        var prevX = cx, prevY = cy, prevZ = cz;
+
+        for (var i = 0; i < maxSteps; i++) {
+            // Check if this block is solid
+            var chunkCoordX = Math.floor(cx / CHUNK_SIZE);
+            var chunkCoordZ = Math.floor(cz / CHUNK_SIZE);
+            var chunk = TerrainGenerator.getChunk(chunkCoordX, chunkCoordZ, currentBiomeId);
+            if (chunk) {
+                var lx = ((cx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                var lz = ((cz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                if (cy >= 0 && cy < WORLD_HEIGHT) {
+                    var idx = lx + cy * CHUNK_SIZE + lz * CHUNK_SIZE * WORLD_HEIGHT;
+                    var blockId = chunk.blocks[idx];
+                    if (blockId !== 0) {
+                        // Determine face normal
+                        var faceX = cx - prevX, faceY = cy - prevY, faceZ = cz - prevZ;
+                        return new RaycastResult(cx, cy, cz, [faceX, faceY, faceZ]);
+                    }
+                }
+            }
+
+            // Advance along the axis we're closest to
+            if (tMaxX < tMaxY) {
+                if (tMaxX < tMaxZ) { prevX = cx; cx += stepX; tMaxX += tDeltaX; }
+                else { prevZ = cz; cz += stepZ; tMaxZ += tDeltaZ; }
+            } else {
+                if (tMaxY < tMaxZ) { prevY = cy; cy += stepY; tMaxY += tDeltaY; }
+                else { prevZ = cz; cz += stepZ; tMaxZ += tDeltaZ; }
+            }
+        }
+
+        return null;
+    }
+
+    // ============================================================
+    // SECTION 11: WIREFRAME RENDERER
+    // Debug wireframe overlays for blocks
+    // ============================================================
+
+    var WireframeRenderer = {
+        enabled: false,
+        showBedrock: true,
+        highlightBlock: null, // {x, y, z}
+
+        /**
+         * Render wireframe outlines around specific blocks.
+         */
+        render: function() {
+            if (!this.enabled && !this.highlightBlock) return;
+
+            GL.useProgram(wireframeProgram);
+
+            var proj = camera.getProjectionMatrix(canvas.width / canvas.height);
+            var view = camera.getViewMatrix();
+            var blocksToWire = [];
+
+            // Add bedrock layer
+            if (this.showBedrock) {
+                for (var x = 0; x < CHUNK_SIZE; x++) {
+                    for (var z = 0; z < CHUNK_SIZE; z++) {
+                        blocksToWire.push({ x: x, y: 0, z: z, color: [1.0, 0.2, 0.2] }); // Red
+                    }
+                }
+            }
+
+            // Add highlighted block
+            if (this.highlightBlock) {
+                blocksToWire.push({
+                    x: this.highlightBlock.x, y: this.highlightBlock.y, z: this.highlightBlock.z,
+                    color: [1.0, 1.0, 0.3] // Yellow
+                });
+            }
+
+            // Draw wireframe boxes for each block
+            // Stub: Full implementation would buffer all vertices and draw in a single call
+            // For now, draw individual boxes (inefficient but simple)
+            GL.uniformMatrix4fv(wireframeLocs.uProjection, false, proj.getData());
+            GL.uniformMatrix4fv(wireframeLocs.uView, false, view.getData());
+
+            var boxVerts = [
+                // Box: 12 edges, 24 vertices (position only)
+                0,0,0, 1,0,0,  1,0,0, 1,0,1,  1,0,1, 0,0,1,  0,0,1, 0,0,0, // bottom
+                0,1,0, 1,1,0,  1,1,0, 1,1,1,  1,1,1, 0,1,1,  0,1,1, 0,1,0, // top
+                0,0,0, 0,1,0,  1,0,0, 1,1,0,  1,0,1, 1,1,1,  0,0,1, 0,1,1  // verticals
+            ];
+
+            var boxBuffer = GL.createBuffer();
+            GL.bindBuffer(GL.ARRAY_BUFFER, boxBuffer);
+            GL.bufferData(GL.ARRAY_BUFFER, new Float32Array(boxVerts), GL.DYNAMIC_DRAW);
+
+            GL.enableVertexAttribArray(wireframeLocs.aPosition);
+            GL.vertexAttribPointer(wireframeLocs.aPosition, 3, GL.FLOAT, false, 0, 0);
+
+            for (var i = 0; i < blocksToWire.length; i++) {
+                var b = blocksToWire[i];
+                var model = Matrix4.createTranslation(b.x + 0.5, b.y + 0.5, b.z + 0.5);
+                GL.uniformMatrix4fv(wireframeLocs.uModel, false, model.getData());
+                GL.uniform3f(wireframeLocs.uColor, b.color[0], b.color[1], b.color[2]);
+                GL.drawArrays(GL.LINES, 0, 24);
+            }
+
+            GL.disableVertexAttribArray(wireframeLocs.aPosition);
+            GL.deleteBuffer(boxBuffer);
+        }
+    };
+
+    // ============================================================
+    // SECTION 12: GAME STATE & MAIN LOOP
+    // ============================================================
+
+    var camera = new Camera();
+    var meshes = {}; // key "cx,cz" → ChunkMesh
+    var geometries = {}; // key "cx,cz" → geometry
+    var currentBiomeId = 0;
+    var selectedBlockType = 1; // Default: stone
+    var paused = false;
+    var lastTime = 0;
+    var frameCount = 0;
+    var fps = 0;
+    var fpsTimer = 0;
+
+    // Debug info elements
+    var dbgFps = document.getElementById('dbg-fps');
+    var dbgChunks = document.getElementById('dbg-chunks');
+    var dbgPos = document.getElementById('dbg-pos');
+    var dbgRot = document.getElementById('dbg-rot');
+    var dbgChunkCoord = document.getElementById('dbg-chunk-coord');
+    var dbgChunkHash = document.getElementById('dbg-chunk-hash');
+    var blockInfoEl = document.getElementById('block-info');
+
+    // UI elements
+    var seedInput = document.getElementById('seed-input');
+    var biomeSelect = document.getElementById('biome-select');
+    var renderDistSlider = document.getElementById('render-dist-slider');
+    var renderDistVal = document.getElementById('render-dist-val');
+    var timeSlider = document.getElementById('time-slider');
+    var timeVal = document.getElementById('time-val');
+    var gravitySlider = document.getElementById('gravity-slider');
+    var gravityVal = document.getElementById('gravity-val');
+    var wireframeBtn = document.getElementById('wireframe-btn');
+    var bedrockBtn = document.getElementById('bedrock-btn');
+    var flyBtn = document.getElementById('fly-btn');
+    var pauseBtn = document.getElementById('pause-btn');
+    var chunkXInput = document.getElementById('chunk-x-input');
+    var chunkZInput = document.getElementById('chunk-z-input');
+    var gotoChunkBtn = document.getElementById('goto-chunk-btn');
+    var generateBtn = document.getElementById('generate-btn');
+
+    // ============================================================
+    // UI Event Wiring
+    // ============================================================
+
+    function initUI() {
+        generateBtn.addEventListener('click', regenerateWorld);
+
+        renderDistSlider.addEventListener('input', function() {
+            currentRenderDistance = parseInt(this.value);
+            renderDistVal.textContent = this.value;
+            updateChunks();
+        });
+
+        timeSlider.addEventListener('input', function() {
+            LightingSystem.timeOfDay = parseInt(this.value) / 1000;
+            timeVal.textContent = LightingSystem.timeOfDay.toFixed(2);
+        });
+
+        gravitySlider.addEventListener('input', function() {
+            var val = parseInt(this.value);
+            gravityVal.textContent = val + '%';
+            // Stub: Gravity slider would affect visual gravity feel in future
+        });
+
+        wireframeBtn.addEventListener('click', function() {
+            WireframeRenderer.enabled = !WireframeRenderer.enabled;
+            this.textContent = 'Wireframe: ' + (WireframeRenderer.enabled ? 'ON' : 'OFF');
+            this.classList.toggle('active', WireframeRenderer.enabled);
+        });
+
+        bedrockBtn.addEventListener('click', function() {
+            WireframeRenderer.showBedrock = !WireframeRenderer.showBedrock;
+            this.textContent = 'Bedrock: ' + (WireframeRenderer.showBedrock ? 'ON' : 'OFF');
+            this.classList.toggle('active', WireframeRenderer.showBedrock);
+        });
+
+        flyBtn.addEventListener('click', function() {
+            input.flyMode = !input.flyMode;
+            this.textContent = 'Fly Mode: ' + (input.flyMode ? 'ON' : 'OFF');
+            this.classList.toggle('active', input.flyMode);
+        });
+
+        pauseBtn.addEventListener('click', function() {
+            paused = !paused;
+            this.textContent = 'Pause: ' + (paused ? 'ON' : 'OFF');
+            this.classList.toggle('active', paused);
+        });
+
+        gotoChunkBtn.addEventListener('click', function() {
+            var cx = parseInt(chunkXInput.value) || 0;
+            var cz = parseInt(chunkZInput.value) || 0;
+            camera.position.x = cx * CHUNK_SIZE + CHUNK_SIZE / 2;
+            camera.position.y = 100;
+            camera.position.z = cz * CHUNK_SIZE + CHUNK_SIZE / 2;
+        });
+
+        // Controls panel collapse toggle
+        document.querySelector('#controls h2').addEventListener('click', function() {
+            document.getElementById('controls').classList.toggle('collapsed');
+        });
+
+        // Build block legend
+        buildBlockLegend();
+    }
+
+    /**
+     * Build the block color legend in the UI.
+     */
+    function buildBlockLegend() {
+        var grid = document.getElementById('block-legend-grid');
+        var keyBlocks = [1, 7, 8, 19, 21, 30, 45, 48, 51, 69, 85, 1000];
+        for (var i = 0; i < keyBlocks.length; i++) {
+            var id = keyBlocks[i];
+            var c = getBlockColor(id);
+            var item = document.createElement('div');
+            item.className = 'legend-item';
+            item.innerHTML = '<div class="legend-color" style="background:rgb('+Math.floor(c.r*255)+','+Math.floor(c.g*255)+','+Math.floor(c.b*255)+')"></div>' +
+                '<span>' + id + ':' + (c.name || '?') + '</span>';
+            grid.appendChild(item);
+        }
+    }
+
+    // ============================================================
+    // World Generation & Chunk Management
+    // ============================================================
+
+    var currentRenderDistance = 3;
+
+    /**
+     * Regenerate the entire world with current settings.
+     */
+    function regenerateWorld() {
+        var seed = parseInt(seedInput.value) || 42;
+        PerlinNoise.init(seed);
+        currentBiomeId = parseInt(biomeSelect.value);
+        TerrainGenerator.clearAll();
+
+        // Clear all meshes
+        for (var key in meshes) {
+            if (meshes[key].vertexBuffer) GL.deleteBuffer(meshes[key].vertexBuffer);
+            if (meshes[key].indexBuffer) GL.deleteBuffer(meshes[key].indexBuffer);
+        }
+        meshes = {};
+        geometries = {};
+
+        updateChunks();
+    }
+
+    /**
+     * Update chunks based on camera position and render distance.
+     */
+    function updateChunks() {
+        var coords = camera.getChunkCoords();
+        var dist = currentRenderDistance;
+
+        // Generate needed chunks
+        for (var dx = -dist; dx <= dist; dx++) {
+            for (var dz = -dist; dz <= dist; dz++) {
+                var cx = coords.cx + dx;
+                var cz = coords.cz + dz;
+                var key = cx + ',' + cz;
+
+                if (!meshes[key]) {
+                    var chunk = TerrainGenerator.getChunk(cx, cz, currentBiomeId);
+                    var geometry = buildChunkGeometry(chunk);
+                    geometries[key] = geometry;
+                    var mesh = new ChunkMesh();
+                    updateChunkMesh(mesh, geometry);
+                    meshes[key] = mesh;
+                }
+            }
+        }
+
+        // Unload far chunks
+        for (var key in meshes) {
+            var parts = key.split(',');
+            var mx = parseInt(parts[0]);
+            var mz = parseInt(parts[1]);
+            if (Math.abs(mx - coords.cx) > dist + 1 || Math.abs(mz - coords.cz) > dist + 1) {
+                var m = meshes[key];
+                if (m.vertexBuffer) GL.deleteBuffer(m.vertexBuffer);
+                if (m.indexBuffer) GL.deleteBuffer(m.indexBuffer);
+                delete meshes[key];
+                delete geometries[key];
+                TerrainGenerator.removeChunk(mx, mz);
+            }
+        }
+    }
+
+    // ============================================================
+    // SECTION 13: BLOCK INTERACTION (break/place)
+    // ============================================================
+
+    /**
+     * Handle block breaking (left click).
+     * Stub: Full impl would play break sound, spawn particles, update inventory.
+     */
+    function breakBlock() {
+        var result = raycast(32);
+        if (result && result.blockY >= 1) {
+            // Find chunk and set block to air
+            var chunkCoordX = Math.floor(result.blockX / CHUNK_SIZE);
+            var chunkCoordZ = Math.floor(result.blockZ / CHUNK_SIZE);
+            var chunk = TerrainGenerator.getChunk(chunkCoordX, chunkCoordZ, currentBiomeId);
+            if (chunk) {
+                var lx = ((result.blockX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                var lz = ((result.blockZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                if (result.blockY >= 0 && result.blockY < WORLD_HEIGHT) {
+                    var idx = lx + result.blockY * CHUNK_SIZE + lz * CHUNK_SIZE * WORLD_HEIGHT;
+                    if (chunk.blocks[idx] !== 1000) { // Don't break bedrock
+                        chunk.blocks[idx] = 0;
+                        meshNeedsRebuild(chunkCoordX, chunkCoordZ);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle block placement (right click).
+     * Stub: Full impl would check inventory, place item from hotbar.
+     */
+    function placeBlock() {
+        var result = raycast(32);
+        if (result) {
+            var px = result.blockX + result.faceNormal[0];
+            var py = result.blockY + result.faceNormal[1];
+            var pz = result.blockZ + result.faceNormal[2];
+
+            // Don't place inside player
+            var camPos = camera.getPosition();
+            if (Math.abs(px - camPos.x) < 0.8 && Math.abs(py - camPos.y) < 1.8 && Math.abs(pz - camPos.z) < 0.8) return;
+
+            var chunkCoordX = Math.floor(px / CHUNK_SIZE);
+            var chunkCoordZ = Math.floor(pz / CHUNK_SIZE);
+            var chunk = TerrainGenerator.getChunk(chunkCoordX, chunkCoordZ, currentBiomeId);
+            if (chunk) {
+                var lx = ((px % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                var lz = ((pz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+                if (py >= 0 && py < WORLD_HEIGHT) {
+                    var idx = lx + py * CHUNK_SIZE + lz * CHUNK_SIZE * WORLD_HEIGHT;
+                    chunk.blocks[idx] = selectedBlockType;
+                    meshNeedsRebuild(chunkCoordX, chunkCoordZ);
+                }
+            }
+        }
+    }
+
+    /**
+     * Mark a chunk's mesh for rebuild after block modification.
+     */
+    function meshNeedsRebuild(cx, cz) {
+        var key = cx + ',' + cz;
+        if (meshes[key] && geometries[key]) {
+            var chunk = TerrainGenerator.getChunk(cx, cz, currentBiomeId);
+            var geometry = buildChunkGeometry(chunk);
+            geometries[key] = geometry;
+            updateChunkMesh(meshes[key], geometry);
+        }
+    }
+
+    // ============================================================
+    // SECTION 14: MAIN GAME LOOP
+    // ============================================================
+
+    function gameLoop(timestamp) {
+        requestAnimationFrame(gameLoop);
+
+        if (!lastTime) lastTime = timestamp;
+        var dt = Math.min((timestamp - lastTime) / 1000, 0.1); // Cap at 100ms
+        lastTime = timestamp;
+
+        // FPS counter
+        frameCount++;
+        fpsTimer += dt;
+        if (fpsTimer >= 1.0) {
+            fps = Math.round(frameCount / fpsTimer);
+            frameCount = 0;
+            fpsTimer = 0;
+        }
+
+        if (paused) return;
+
+        // ---- Update camera from input ----
+        var speed = camera.speed * (input.sprinting ? camera.sprintMultiplier : 1.0) * dt;
+
+        if (input.pointerLocked) {
+            camera.applyMouseDelta(input.mouseDX, input.mouseDY, 0.002);
+            input.mouseDX = 0;
+            input.mouseDY = 0;
+
+            var forward = camera.getForward();
+            var right = camera.getRight();
+            var moveX = 0, moveY = 0, moveZ = 0;
+
+            if (input.keys['KeyW']) { moveX += forward.x; moveZ += forward.z; }
+            if (input.keys['KeyS']) { moveX -= forward.x; moveZ -= forward.z; }
+            if (input.keys['KeyA']) { moveX -= right.x; moveZ -= right.z; }
+            if (input.keys['KeyD']) { moveX += right.x; moveZ += right.z; }
+
+            if (input.flyMode) {
+                if (input.keys['Space']) moveY += 1;
+                if (input.keys['ShiftLeft'] || input.keys['ShiftRight']) moveY -= 1;
+            } else {
+                // Stub: Full gravity + collision system would go here
+                // This is a simplified fall behavior
+                moveY -= 20 * dt; // Gravity
+            }
+
+            // Normalize movement
+            var len = Math.sqrt(moveX*moveX + moveY*moveY + moveZ*moveZ);
+            if (len > 0) {
+                moveX /= len; moveY /= len; moveZ /= len;
+                camera.move(moveX * speed, moveY * speed, moveZ * speed);
+            }
+
+            // Clamp to world bounds
+            camera.position.y = clamp(camera.position.y, 1, WORLD_HEIGHT - 1);
+        }
+
+        // ---- Block interaction ----
+        if (input.leftClick) { breakBlock(); input.leftClick = false; } // Single click
+        if (input.rightClick) { placeBlock(); input.rightClick = false; }
+
+        // ---- Update chunks ----
+        updateChunks();
+
+        // ---- Update lighting ----
+        var skyColor = LightingSystem.getSkyColor();
+        var lightFactor = LightingSystem.getLightFactor();
+        GL.clearColor(skyColor.r, skyColor.g, skyColor.b, 1.0);
+
+        // ---- Render ----
+        GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
+        GL.enable(GL.DEPTH_TEST);
+        GL.disable(GL.BLEND); // No transparency for now (stub: full impl would sort transparent blocks)
+
+        var proj = camera.getProjectionMatrix(canvas.width / canvas.height);
+        var view = camera.getViewMatrix();
+
+        // Draw terrain meshes
+        GL.useProgram(terrainProgram);
+        GL.uniformMatrix4fv(terrainLocs.uProjection, false, proj.getData());
+        GL.uniformMatrix4fv(terrainLocs.uView, false, view.getData());
+        GL.uniform1f(terrainLocs.uFogDensity, 0.008);
+        GL.uniform3f(terrainLocs.uFogColor, skyColor.r * 0.8, skyColor.g * 0.8, skyColor.b * 0.8);
+        GL.uniform1f(terrainLocs.uLightFactor, lightFactor);
+
+        for (var key in meshes) {
+            var mesh = meshes[key];
+            if (mesh.indexCount > 0) {
+                var parts = key.split(',');
+                var mcx = parseInt(parts[0]);
+                var mcz = parseInt(parts[1]);
+                var model = Matrix4.createIdentity(); // Already translated in geometry
+                GL.uniformMatrix4fv(terrainLocs.uModel, false, model.getData());
+                drawChunkMesh(mesh);
+            }
+        }
+
+        // Draw wireframes
+        WireframeRenderer.render();
+
+        // ---- Update debug overlay ----
+        var coords = camera.getChunkCoords();
+        dbgFps.textContent = fps;
+        dbgChunks.textContent = Object.keys(meshes).length;
+        dbgPos.textContent = Math.floor(camera.position.x) + ', ' + Math.floor(camera.position.y) + ', ' + Math.floor(camera.position.z);
+        var yawDeg = Math.round(camera.yaw * 180 / Math.PI);
+        var pitchDeg = Math.round(camera.pitch * 180 / Math.PI);
+        dbgRot.textContent = yawDeg + '°, ' + pitchDeg + '°';
+        dbgChunkCoord.textContent = '(' + coords.cx + ', ' + coords.cz + ')';
+
+        // Chunk hash for current chunk
+        var currentChunk = TerrainGenerator.getChunk(coords.cx, coords.cz, currentBiomeId);
+        if (currentChunk) {
+            dbgChunkHash.textContent = TerrainGenerator.computeChunkHash(currentChunk);
+        } else {
+            dbgChunkHash.textContent = 'No chunk data at (' + coords.cx + ', ' + coords.cz + ')';
+        }
+
+        // Block info from raycast
+        var rayResult = raycast(32);
+        if (rayResult) {
+            blockInfoEl.style.display = 'block';
+            var rChunk = TerrainGenerator.getChunk(Math.floor(rayResult.blockX / CHUNK_SIZE), Math.floor(rayResult.blockZ / CHUNK_SIZE), currentBiomeId);
+            var rLx = ((rayResult.blockX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            var rLz = ((rayResult.blockZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            var rIdx = rLx + rayResult.blockY * CHUNK_SIZE + rLz * CHUNK_SIZE * WORLD_HEIGHT;
+            var rBlockId = rChunk ? rChunk.blocks[rIdx] : 0;
+            var rColor = getBlockColor(rBlockId);
+            blockInfoEl.textContent = 'Target: [' + rayResult.blockX + ',' + rayResult.blockY + ',' + rayResult.blockZ + '] ID=' + rBlockId + ' (' + (rColor.name || '?') + ') | RGB(' + Math.floor((rColor.r||0)*255) + ',' + Math.floor((rColor.g||0)*255) + ',' + Math.floor((rColor.b||0)*255) + ')';
+        } else {
+            blockInfoEl.style.display = 'none';
+        }
+
+        // Wireframe highlight for targeted block
+        if (rayResult) {
+            WireframeRenderer.highlightBlock = { x: rayResult.blockX, y: rayResult.blockY, z: rayResult.blockZ };
+        } else {
+            WireframeRenderer.highlightBlock = null;
+        }
+    }
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    function init() {
+        if (!initWebGL()) return;
+        initInput();
+        initUI();
+
+        // Generate initial world
+        regenerateWorld();
+
+        // Start game loop
+        requestAnimationFrame(gameLoop);
+
+        console.log('Donkeycraft Terrain Viewer initialized.');
+        console.log('Click the canvas to capture mouse. WASD to move, mouse to look.');
+    }
+
+    // Start when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+})();
+</script>
+</body>
+</html>
