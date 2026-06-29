@@ -1,6 +1,6 @@
 // Donkeycraft — Base Entity Class
 // All entities (mobs, bosses, projectiles) inherit from this base class.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -17,7 +17,7 @@
      * @param {number} [config.height=1.8] - Entity height in blocks.
      * @param {number} [config.width=0.6] - Entity width in blocks.
      */
-    Donkeycraft.Entity = function(config) {
+    Donkeycraft.Entity = function (config) {
         config = config || {};
 
         /**
@@ -111,7 +111,7 @@
      * Get the entity's current position.
      * @returns {Donkeycraft.Vector3|null}
      */
-    Donkeycraft.Entity.prototype.getPosition = function() {
+    Donkeycraft.Entity.prototype.getPosition = function () {
         if (this._destroyed || !this._position) {
             return null;
         }
@@ -124,7 +124,7 @@
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
      */
-    Donkeycraft.Entity.prototype.setPosition = function(x, y, z) {
+    Donkeycraft.Entity.prototype.setPosition = function (x, y, z) {
         if (this._destroyed) return;
         this._position.x = x;
         this._position.y = y;
@@ -135,7 +135,7 @@
      * Get the entity's current velocity.
      * @returns {Donkeycraft.Vector3|null}
      */
-    Donkeycraft.Entity.prototype.getVelocity = function() {
+    Donkeycraft.Entity.prototype.getVelocity = function () {
         if (this._destroyed || !this._velocity) {
             return null;
         }
@@ -148,7 +148,7 @@
      * @param {number} vy - Y velocity (blocks/s).
      * @param {number} vz - Z velocity (blocks/s).
      */
-    Donkeycraft.Entity.prototype.setVelocity = function(vx, vy, vz) {
+    Donkeycraft.Entity.prototype.setVelocity = function (vx, vy, vz) {
         if (this._destroyed) return;
         this._velocity.x = vx;
         this._velocity.y = vy;
@@ -159,7 +159,7 @@
      * Get the entity's current rotation.
      * @returns {{yaw: number, pitch: number}|null} Rotation in radians.
      */
-    Donkeycraft.Entity.prototype.getRotation = function() {
+    Donkeycraft.Entity.prototype.getRotation = function () {
         if (this._destroyed || !this._rotation) {
             return null;
         }
@@ -171,7 +171,7 @@
      * @param {number} yaw - Yaw angle in radians [0, 2π).
      * @param {number} pitch - Pitch angle in radians [-π/2, π/2].
      */
-    Donkeycraft.Entity.prototype.setRotation = function(yaw, pitch) {
+    Donkeycraft.Entity.prototype.setRotation = function (yaw, pitch) {
         if (this._destroyed) return;
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
@@ -182,7 +182,7 @@
      * Get the entity's dimensions.
      * @returns {{height: number, width: number}|null}
      */
-    Donkeycraft.Entity.prototype.getDimensions = function() {
+    Donkeycraft.Entity.prototype.getDimensions = function () {
         if (this._destroyed) return null;
         return {
             height: this.height,
@@ -194,7 +194,7 @@
      * Get the entity's bounding box (AABB).
      * @returns {{minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number}|null}
      */
-    Donkeycraft.Entity.prototype.getBoundingBox = function() {
+    Donkeycraft.Entity.prototype.getBoundingBox = function () {
         if (this._destroyed || !this._position) {
             return null;
         }
@@ -213,7 +213,7 @@
      * Get the entity's eye position.
      * @returns {Donkeycraft.Vector3|null}
      */
-    Donkeycraft.Entity.prototype.getEyePosition = function() {
+    Donkeycraft.Entity.prototype.getEyePosition = function () {
         if (this._destroyed || !this._position) {
             return null;
         }
@@ -228,7 +228,7 @@
      * Get the forward direction vector based on entity rotation.
      * @returns {Donkeycraft.Vector3|null}
      */
-    Donkeycraft.Entity.prototype.getForwardDirection = function() {
+    Donkeycraft.Entity.prototype.getForwardDirection = function () {
         if (this._destroyed || !this._rotation) {
             return null;
         }
@@ -244,7 +244,7 @@
      * Check if the entity is alive.
      * @returns {boolean}
      */
-    Donkeycraft.Entity.prototype.isAlive = function() {
+    Donkeycraft.Entity.prototype.isAlive = function () {
         return this.alive && !this._despawned;
     };
 
@@ -252,7 +252,7 @@
      * Set whether the entity is alive or dead.
      * @param {boolean} alive - True if alive, false if dead.
      */
-    Donkeycraft.Entity.prototype.setAlive = function(alive) {
+    Donkeycraft.Entity.prototype.setAlive = function (alive) {
         if (this._destroyed) return;
         this.alive = !!alive;
         if (!alive) {
@@ -264,7 +264,7 @@
      * Get the entity's current health.
      * @returns {number}
      */
-    Donkeycraft.Entity.prototype.getHealth = function() {
+    Donkeycraft.Entity.prototype.getHealth = function () {
         return this.health;
     };
 
@@ -272,7 +272,7 @@
      * Set the entity's health (clamped to [0, maxHealth]).
      * @param {number} health - Health value.
      */
-    Donkeycraft.Entity.prototype.setHealth = function(health) {
+    Donkeycraft.Entity.prototype.setHealth = function (health) {
         if (this._destroyed) return;
         this.health = Math.floor(Donkeycraft.clamp(health, 0, this.maxHealth));
         if (this.health <= 0) {
@@ -286,7 +286,7 @@
      * @param {string} [source='generic'] - Damage source type.
      * @returns {number} Actual damage dealt.
      */
-    Donkeycraft.Entity.prototype.takeDamage = function(amount, source) {
+    Donkeycraft.Entity.prototype.takeDamage = function (amount, source) {
         source = source || 'generic';
         if (!this.isAlive() || this._destroyed) {
             return 0;
@@ -324,7 +324,7 @@
      * Heal the entity.
      * @param {number} amount - Healing amount.
      */
-    Donkeycraft.Entity.prototype.heal = function(amount) {
+    Donkeycraft.Entity.prototype.heal = function (amount) {
         if (!this.isAlive() || this._destroyed) {
             return;
         }
@@ -337,7 +337,7 @@
      * Called when the entity dies. Override in subclasses for custom death behavior.
      * @private
      */
-    Donkeycraft.Entity.prototype.onDeath = function() {
+    Donkeycraft.Entity.prototype.onDeath = function () {
         // Subclasses can override
     };
 
@@ -345,7 +345,7 @@
      * Tick method — called every game tick. Override for entity-specific logic.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Entity.prototype.tick = function(deltaTime) {
+    Donkeycraft.Entity.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
 
         // Apply velocity to position
@@ -368,10 +368,10 @@
      * @param {Function} callback - Function called with (deltaTime) each tick.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.Entity.prototype.onTick = function(callback) {
-        if (this._destroyed) return function() {};
+    Donkeycraft.Entity.prototype.onTick = function (callback) {
+        if (this._destroyed) return function () { };
         this._subscribers.push(callback);
-        return (function() {
+        return (function () {
             var idx = this._subscribers.indexOf(callback);
             if (idx !== -1) {
                 this._subscribers.splice(idx, 1);
@@ -382,7 +382,7 @@
     /**
      * Despawn the entity (mark as removed).
      */
-    Donkeycraft.Entity.prototype.despawn = function() {
+    Donkeycraft.Entity.prototype.despawn = function () {
         if (this._destroyed) return;
         this._despawned = true;
         this.alive = false;
@@ -392,7 +392,7 @@
      * Check if the entity is despawned.
      * @returns {boolean}
      */
-    Donkeycraft.Entity.prototype.isDespawned = function() {
+    Donkeycraft.Entity.prototype.isDespawned = function () {
         return this._despawned;
     };
 
@@ -400,7 +400,7 @@
      * Serialize entity state for save/load.
      * @returns {object|null} Serialized state, or null if destroyed.
      */
-    Donkeycraft.Entity.prototype.serialize = function() {
+    Donkeycraft.Entity.prototype.serialize = function () {
         if (this._destroyed || !this._position) {
             return null;
         }
@@ -420,7 +420,7 @@
      * Deserialize entity state from saved data.
      * @param {object} data - Serialized state.
      */
-    Donkeycraft.Entity.prototype.fromObject = function(data) {
+    Donkeycraft.Entity.prototype.fromObject = function (data) {
         if (this._destroyed) return;
         if (!data || !this._position) return;
         if (data.x !== undefined) this._position.x = data.x;
@@ -435,7 +435,7 @@
      * Destroy the entity and free resources.
      * After calling destroy(), all getter methods return null.
      */
-    Donkeycraft.Entity.prototype.destroy = function() {
+    Donkeycraft.Entity.prototype.destroy = function () {
         if (this._destroyed) return; // Guard against double-destroy
         this._destroyed = true;
         this.alive = false;

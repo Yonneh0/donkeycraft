@@ -1,7 +1,7 @@
 // Donkeycraft — Configuration
 // Game configuration: render distance, chunk size, tick rates, keybinds, physics, and persistence.
 // All values are constants — do not modify at runtime.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
      *
      * @namespace
      */
-    Donkeycraft.Config = (function() {
+    Donkeycraft.Config = (function () {
         return {
             // World settings
             CHUNK_SIZE: 16,           // Chunks are 16 blocks wide/deep

@@ -1,6 +1,6 @@
 // Donkeycraft — GUI Elements
 // DOM-based UI interaction layer: drag-drop, buttons, tabs, text input.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -17,7 +17,7 @@
      * @param {Function} [options.onDragEnd] - Callback when drag ends, called with (targetSlotIndex).
      * @param {Function} [options.onDrop] - Callback on drop, called with (sourceSlot, targetSlot, stack).
      */
-    Donkeycraft.GuiDragDrop = function(container, options) {
+    Donkeycraft.GuiDragDrop = function (container, options) {
         this._container = container || null;
         this._onDragStart = options && options.onDragStart ? options.onDragStart : null;
         this._onDragEnd = options && options.onDragEnd ? options.onDragEnd : null;
@@ -42,11 +42,11 @@
      * _bindEvents — attaches DOM event listeners for drag-and-drop.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._bindEvents = function() {
+    Donkeycraft.GuiDragDrop.prototype._bindEvents = function () {
         var self = this;
 
         // Mouse down on slots (delegated from container)
-        this._boundHandlers.mouseDown = function(e) {
+        this._boundHandlers.mouseDown = function (e) {
             var slotEl = e.target.closest('.dk-slot, .dk-hotbar-slot, .dk-item-slot');
             if (!slotEl) return;
 
@@ -62,7 +62,7 @@
         };
 
         // Mouse move on document
-        this._boundHandlers.mouseMove = function(e) {
+        this._boundHandlers.mouseMove = function (e) {
             if (!self._dragState.active) return;
             e.preventDefault();
             self._updateDragVisual(e);
@@ -70,7 +70,7 @@
         };
 
         // Mouse up on document
-        this._boundHandlers.mouseUp = function(e) {
+        this._boundHandlers.mouseUp = function (e) {
             if (!self._dragState.active) return;
             self._endDrag(e);
         };
@@ -86,7 +86,7 @@
      * @param {MouseEvent} e - Mouse event.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._startDrag = function(slotIndex, e) {
+    Donkeycraft.GuiDragDrop.prototype._startDrag = function (slotIndex, e) {
         if (this._dragState.active) return;
 
         this._dragState.active = true;
@@ -123,7 +123,7 @@
 
         // Notify callback
         if (this._onDragStart) {
-            try { this._onDragStart(slotIndex, this._getSlotData(slotIndex)); } catch (ex) {}
+            try { this._onDragStart(slotIndex, this._getSlotData(slotIndex)); } catch (ex) { }
         }
 
         // Emit event
@@ -135,7 +135,7 @@
      * @param {MouseEvent} e - Mouse move event.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._updateDragVisual = function(e) {
+    Donkeycraft.GuiDragDrop.prototype._updateDragVisual = function (e) {
         if (this._dragState.dragElement) {
             // Reveal on first movement so the ghost doesn't interfere with initial hit tests
             this._dragState.dragElement.style.display = '';
@@ -150,7 +150,7 @@
      * @param {MouseEvent} e - Mouse move event.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._highlightDropTarget = function(e) {
+    Donkeycraft.GuiDragDrop.prototype._highlightDropTarget = function (e) {
         // Remove previous highlights only from this container (scoped to avoid affecting other drag-drop instances)
         if (this._container) {
             var prev = this._container.querySelectorAll('.dk-slot.drag-over, .dk-hotbar-slot.drag-over, .dk-item-slot.drag-over');
@@ -174,7 +174,7 @@
      * @param {MouseEvent} e - Mouse up event.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._endDrag = function(e) {
+    Donkeycraft.GuiDragDrop.prototype._endDrag = function (e) {
         if (!this._dragState.active) return;
 
         var targetSlot = null;
@@ -205,12 +205,12 @@
         if (targetSlot !== null && targetSlot !== this._dragState.sourceSlot && this._onDrop) {
             try {
                 this._onDrop(this._dragState.sourceSlot, targetSlot, this._dragState.sourceStack);
-            } catch (ex) {}
+            } catch (ex) { }
         }
 
         // Notify end callback
         if (this._onDragEnd) {
-            try { this._onDragEnd(targetSlot); } catch (ex) {}
+            try { this._onDragEnd(targetSlot); } catch (ex) { }
         }
 
         this._emit('drag:end', {
@@ -231,7 +231,7 @@
      * @returns {Object|null} Slot data object with itemText and countText, or null.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._getSlotData = function(slotIndex) {
+    Donkeycraft.GuiDragDrop.prototype._getSlotData = function (slotIndex) {
         if (!this._container) return null;
 
         var slotEl = this._container.querySelector('[data-slot-index="' + slotIndex + '"]');
@@ -253,10 +253,10 @@
      * @param {Object} data - Event data object.
      * @private
      */
-    Donkeycraft.GuiDragDrop.prototype._emit = function(event, data) {
+    Donkeycraft.GuiDragDrop.prototype._emit = function (event, data) {
         if (this._listeners[event]) {
             for (var i = 0; i < this._listeners[event].length; i++) {
-                try { this._listeners[event][i](data); } catch (ex) {}
+                try { this._listeners[event][i](data); } catch (ex) { }
             }
         }
     };
@@ -267,12 +267,12 @@
      * @param {Function} callback - Callback function called with (data).
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiDragDrop.prototype.on = function(event, callback) {
+    Donkeycraft.GuiDragDrop.prototype.on = function (event, callback) {
         if (!this._listeners[event]) this._listeners[event] = [];
         this._listeners[event].push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners[event].indexOf(callback);
             if (idx >= 0) self._listeners[event].splice(idx, 1);
         };
@@ -282,7 +282,7 @@
      * cancelDrag — forcibly cancels the current drag operation.
      * Cleans up the drag ghost element and all drag-over highlights from the document.
      */
-    Donkeycraft.GuiDragDrop.prototype.cancelDrag = function() {
+    Donkeycraft.GuiDragDrop.prototype.cancelDrag = function () {
         if (!this._dragState.active) return;
 
         if (this._dragState.dragElement && this._dragState.dragElement.parentNode) {
@@ -305,14 +305,14 @@
      * isDragging — checks if a drag operation is in progress.
      * @returns {boolean}
      */
-    Donkeycraft.GuiDragDrop.prototype.isDragging = function() {
+    Donkeycraft.GuiDragDrop.prototype.isDragging = function () {
         return this._dragState.active;
     };
 
     /**
      * destroy — cleans up all DOM event listeners and internal state.
      */
-    Donkeycraft.GuiDragDrop.prototype.destroy = function() {
+    Donkeycraft.GuiDragDrop.prototype.destroy = function () {
         this.cancelDrag();
 
         if (this._container && this._boundHandlers.mouseDown) {
@@ -341,7 +341,7 @@
      * @param {boolean} [options.disabled=false] - Initial disabled state.
      * @param {HTMLElement} [options.container=null] - Optional parent container element.
      */
-    Donkeycraft.GuiButton = function(text, options) {
+    Donkeycraft.GuiButton = function (text, options) {
         options = options || {};
         this._text = text || '';
         this._className = options.className || 'dk-button';
@@ -373,32 +373,32 @@
      * _bindEvents — attaches click and hover handlers to the button element.
      * @private
      */
-    Donkeycraft.GuiButton.prototype._bindEvents = function() {
+    Donkeycraft.GuiButton.prototype._bindEvents = function () {
         var self = this;
 
-        this._boundHandlers.click = function(e) {
+        this._boundHandlers.click = function (e) {
             if (self._disabled) return;
             if (self._listeners.click) {
                 for (var i = 0; i < self._listeners.click.length; i++) {
-                    try { self._listeners.click[i](e); } catch (ex) {}
+                    try { self._listeners.click[i](e); } catch (ex) { }
                 }
             }
         };
 
-        this._boundHandlers.mouseEnter = function(e) {
+        this._boundHandlers.mouseEnter = function (e) {
             if (self._disabled) return;
             if (self._listeners.mouseenter) {
                 for (var i = 0; i < self._listeners.mouseenter.length; i++) {
-                    try { self._listeners.mouseenter[i](e); } catch (ex) {}
+                    try { self._listeners.mouseenter[i](e); } catch (ex) { }
                 }
             }
         };
 
-        this._boundHandlers.mouseLeave = function(e) {
+        this._boundHandlers.mouseLeave = function (e) {
             if (self._disabled) return;
             if (self._listeners.mouseleave) {
                 for (var i = 0; i < self._listeners.mouseleave.length; i++) {
-                    try { self._listeners.mouseleave[i](e); } catch (ex) {}
+                    try { self._listeners.mouseleave[i](e); } catch (ex) { }
                 }
             }
         };
@@ -412,7 +412,7 @@
      * getElement — gets the button DOM element.
      * @returns {HTMLButtonElement}
      */
-    Donkeycraft.GuiButton.prototype.getElement = function() {
+    Donkeycraft.GuiButton.prototype.getElement = function () {
         return this._element;
     };
 
@@ -420,7 +420,7 @@
      * setText — updates the button label.
      * @param {string} text - New label text.
      */
-    Donkeycraft.GuiButton.prototype.setText = function(text) {
+    Donkeycraft.GuiButton.prototype.setText = function (text) {
         this._text = text || '';
         this._element.textContent = this._text;
     };
@@ -429,7 +429,7 @@
      * getText — gets the current button label.
      * @returns {string}
      */
-    Donkeycraft.GuiButton.prototype.getText = function() {
+    Donkeycraft.GuiButton.prototype.getText = function () {
         return this._text;
     };
 
@@ -437,7 +437,7 @@
      * setDisabled — enables or disables the button.
      * @param {boolean} disabled - Whether to disable the button.
      */
-    Donkeycraft.GuiButton.prototype.setDisabled = function(disabled) {
+    Donkeycraft.GuiButton.prototype.setDisabled = function (disabled) {
         this._disabled = !!disabled;
         this._element.disabled = this._disabled;
         this._element.setAttribute('data-disabled', this._disabled ? 'true' : 'false');
@@ -447,7 +447,7 @@
      * isDisabled — checks if the button is disabled.
      * @returns {boolean}
      */
-    Donkeycraft.GuiButton.prototype.isDisabled = function() {
+    Donkeycraft.GuiButton.prototype.isDisabled = function () {
         return this._disabled;
     };
 
@@ -455,7 +455,7 @@
      * setVisible — shows or hides the button.
      * @param {boolean} visible - Whether to show the button.
      */
-    Donkeycraft.GuiButton.prototype.setVisible = function(visible) {
+    Donkeycraft.GuiButton.prototype.setVisible = function (visible) {
         this._element.style.display = visible ? '' : 'none';
     };
 
@@ -463,7 +463,7 @@
      * isVisible — checks if the button is visible.
      * @returns {boolean}
      */
-    Donkeycraft.GuiButton.prototype.isVisible = function() {
+    Donkeycraft.GuiButton.prototype.isVisible = function () {
         return this._element.style.display !== 'none';
     };
 
@@ -472,12 +472,12 @@
      * @param {Function} callback - Called with (event) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiButton.prototype.onClick = function(callback) {
+    Donkeycraft.GuiButton.prototype.onClick = function (callback) {
         if (!this._listeners.click) this._listeners.click = [];
         this._listeners.click.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.click.indexOf(callback);
             if (idx >= 0) self._listeners.click.splice(idx, 1);
         };
@@ -488,12 +488,12 @@
      * @param {Function} callback - Called with (event) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiButton.prototype.onMouseEnter = function(callback) {
+    Donkeycraft.GuiButton.prototype.onMouseEnter = function (callback) {
         if (!this._listeners.mouseenter) this._listeners.mouseenter = [];
         this._listeners.mouseenter.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.mouseenter.indexOf(callback);
             if (idx >= 0) self._listeners.mouseenter.splice(idx, 1);
         };
@@ -504,12 +504,12 @@
      * @param {Function} callback - Called with (event) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiButton.prototype.onMouseLeave = function(callback) {
+    Donkeycraft.GuiButton.prototype.onMouseLeave = function (callback) {
         if (!this._listeners.mouseleave) this._listeners.mouseleave = [];
         this._listeners.mouseleave.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.mouseleave.indexOf(callback);
             if (idx >= 0) self._listeners.mouseleave.splice(idx, 1);
         };
@@ -518,7 +518,7 @@
     /**
      * destroy — removes the button from DOM and cleans up event listeners.
      */
-    Donkeycraft.GuiButton.prototype.destroy = function() {
+    Donkeycraft.GuiButton.prototype.destroy = function () {
         if (this._element && this._element.parentNode) {
             this._element.parentNode.removeChild(this._element);
         }
@@ -538,7 +538,7 @@
      * @param {string} [options.title='Creative Inventory'] - Panel title text.
      * @param {boolean} [options.showCloseButton=true] - Whether to show the close button.
      */
-    Donkeycraft.GuiTabNavigator = function(container, tabs, options) {
+    Donkeycraft.GuiTabNavigator = function (container, tabs, options) {
         options = options || {};
         this._container = container || null;
         this._tabs = tabs || [];
@@ -560,7 +560,7 @@
      * _buildDOM — creates the tab bar and content area inside the container.
      * @private
      */
-    Donkeycraft.GuiTabNavigator.prototype._buildDOM = function() {
+    Donkeycraft.GuiTabNavigator.prototype._buildDOM = function () {
         if (!this._container) return;
 
         var self = this;
@@ -580,7 +580,7 @@
             this._closeBtn = document.createElement('button');
             this._closeBtn.className = 'dk-panel-close dk-interactive';
             this._closeBtn.textContent = '\u00D7';
-            this._closeBtn.addEventListener('click', (function() {
+            this._closeBtn.addEventListener('click', (function () {
                 this._emit('close');
             }).bind(this));
             this._container.appendChild(this._closeBtn);
@@ -601,8 +601,8 @@
             var tabEl = document.createElement('button');
             tabEl.className = 'dk-tab' + (i === 0 ? ' active' : '');
             tabEl.textContent = this._tabs[i];
-            tabEl.addEventListener('click', (function(idx) {
-                return function() { self._setActiveTab(idx); };
+            tabEl.addEventListener('click', (function (idx) {
+                return function () { self._setActiveTab(idx); };
             })(i));
             this._tabBarEl.appendChild(tabEl);
             this._tabElements.push(tabEl);
@@ -620,7 +620,7 @@
      * @param {number} index - Tab index.
      * @private
      */
-    Donkeycraft.GuiTabNavigator.prototype._setActiveTab = function(index) {
+    Donkeycraft.GuiTabNavigator.prototype._setActiveTab = function (index) {
         if (index < 0 || index >= this._tabs.length) return;
         if (index === this._activeTabIndex) return;
 
@@ -648,7 +648,7 @@
      * getActiveTab — gets the currently active tab index.
      * @returns {number}
      */
-    Donkeycraft.GuiTabNavigator.prototype.getActiveTab = function() {
+    Donkeycraft.GuiTabNavigator.prototype.getActiveTab = function () {
         return this._activeTabIndex;
     };
 
@@ -656,7 +656,7 @@
      * getTabCount — gets the total number of tabs.
      * @returns {number}
      */
-    Donkeycraft.GuiTabNavigator.prototype.getTabCount = function() {
+    Donkeycraft.GuiTabNavigator.prototype.getTabCount = function () {
         return this._tabs.length;
     };
 
@@ -665,7 +665,7 @@
      * @param {number} index - Tab index.
      * @returns {string|null} Tab name or null if out of bounds.
      */
-    Donkeycraft.GuiTabNavigator.prototype.getTabName = function(index) {
+    Donkeycraft.GuiTabNavigator.prototype.getTabName = function (index) {
         if (index < 0 || index >= this._tabs.length) return null;
         return this._tabs[index];
     };
@@ -674,7 +674,7 @@
      * setContent — sets the content HTML for the active tab.
      * @param {string} html - HTML content string.
      */
-    Donkeycraft.GuiTabNavigator.prototype.setContent = function(html) {
+    Donkeycraft.GuiTabNavigator.prototype.setContent = function (html) {
         if (this._tabContentEl) {
             this._tabContentEl.innerHTML = html || '';
             // Also persist in the per-tab storage for the current active tab
@@ -687,7 +687,7 @@
      * @param {number} index - Tab index to set content for.
      * @param {string} html - HTML content string.
      */
-    Donkeycraft.GuiTabNavigator.prototype.setContentForTab = function(index, html) {
+    Donkeycraft.GuiTabNavigator.prototype.setContentForTab = function (index, html) {
         if (index < 0 || index >= this._tabs.length) return;
         this._tabContents[index] = html || '';
         // If this is the currently active tab, update the DOM immediately
@@ -701,7 +701,7 @@
      * @param {number} index - Tab index.
      * @returns {string|null} Tab content HTML or null if out of bounds.
      */
-    Donkeycraft.GuiTabNavigator.prototype.getContentForTab = function(index) {
+    Donkeycraft.GuiTabNavigator.prototype.getContentForTab = function (index) {
         if (index < 0 || index >= this._tabs.length) return null;
         return this._tabContents[index] || '';
     };
@@ -710,7 +710,7 @@
      * getElement — gets the root container element.
      * @returns {HTMLElement|null}
      */
-    Donkeycraft.GuiTabNavigator.prototype.getElement = function() {
+    Donkeycraft.GuiTabNavigator.prototype.getElement = function () {
         return this._container;
     };
 
@@ -720,10 +720,10 @@
      * @param {Object} data - Event data.
      * @private
      */
-    Donkeycraft.GuiTabNavigator.prototype._emit = function(event, data) {
+    Donkeycraft.GuiTabNavigator.prototype._emit = function (event, data) {
         if (this._listeners[event]) {
             for (var i = 0; i < this._listeners[event].length; i++) {
-                try { this._listeners[event][i](data); } catch (ex) {}
+                try { this._listeners[event][i](data); } catch (ex) { }
             }
         }
     };
@@ -734,12 +734,12 @@
      * @param {Function} callback - Callback function called with (data).
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiTabNavigator.prototype.on = function(event, callback) {
+    Donkeycraft.GuiTabNavigator.prototype.on = function (event, callback) {
         if (!this._listeners[event]) this._listeners[event] = [];
         this._listeners[event].push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners[event].indexOf(callback);
             if (idx >= 0) self._listeners[event].splice(idx, 1);
         };
@@ -748,7 +748,7 @@
     /**
      * destroy — cleans up resources, DOM elements, and event listeners.
      */
-    Donkeycraft.GuiTabNavigator.prototype.destroy = function() {
+    Donkeycraft.GuiTabNavigator.prototype.destroy = function () {
         // Remove close button from DOM
         if (this._closeBtn && this._closeBtn.parentNode) {
             this._closeBtn.parentNode.removeChild(this._closeBtn);
@@ -779,7 +779,7 @@
      * @param {number} [options.maxLength=100] - Maximum input length.
      * @param {HTMLElement} [options.container=null] - Optional parent container element.
      */
-    Donkeycraft.GuiTextInput = function(options) {
+    Donkeycraft.GuiTextInput = function (options) {
         options = options || {};
         this._placeholder = options.placeholder || '';
         this._maxLength = options.maxLength !== undefined && options.maxLength !== null ? Math.max(1, options.maxLength) : 100;
@@ -807,33 +807,33 @@
      * _bindEvents — attaches input, blur, and keydown handlers to the input element.
      * @private
      */
-    Donkeycraft.GuiTextInput.prototype._bindEvents = function() {
+    Donkeycraft.GuiTextInput.prototype._bindEvents = function () {
         var self = this;
 
-        this._boundHandlers.input = function(e) {
+        this._boundHandlers.input = function (e) {
             if (self._error) {
                 self._element.classList.remove('error');
                 self._error = false;
             }
             if (self._listeners.input) {
                 for (var i = 0; i < self._listeners.input.length; i++) {
-                    try { self._listeners.input[i](self._element.value); } catch (ex) {}
+                    try { self._listeners.input[i](self._element.value); } catch (ex) { }
                 }
             }
         };
 
-        this._boundHandlers.blur = function(e) {
+        this._boundHandlers.blur = function (e) {
             if (self._listeners.blur) {
                 for (var i = 0; i < self._listeners.blur.length; i++) {
-                    try { self._listeners.blur[i](self._element.value); } catch (ex) {}
+                    try { self._listeners.blur[i](self._element.value); } catch (ex) { }
                 }
             }
         };
 
-        this._boundHandlers.keyDown = function(e) {
+        this._boundHandlers.keyDown = function (e) {
             if (self._listeners.keydown) {
                 for (var i = 0; i < self._listeners.keydown.length; i++) {
-                    try { self._listeners.keydown[i](e, self._element.value); } catch (ex) {}
+                    try { self._listeners.keydown[i](e, self._element.value); } catch (ex) { }
                 }
             }
         };
@@ -847,7 +847,7 @@
      * getElement — gets the input DOM element.
      * @returns {HTMLInputElement}
      */
-    Donkeycraft.GuiTextInput.prototype.getElement = function() {
+    Donkeycraft.GuiTextInput.prototype.getElement = function () {
         return this._element;
     };
 
@@ -855,7 +855,7 @@
      * getValue — gets the current input value.
      * @returns {string}
      */
-    Donkeycraft.GuiTextInput.prototype.getValue = function() {
+    Donkeycraft.GuiTextInput.prototype.getValue = function () {
         return this._element ? this._element.value : '';
     };
 
@@ -863,14 +863,14 @@
      * setValue — sets the input value programmatically and fires input events.
      * @param {string} value - New value.
      */
-    Donkeycraft.GuiTextInput.prototype.setValue = function(value) {
+    Donkeycraft.GuiTextInput.prototype.setValue = function (value) {
         var newValue = value || '';
         if (this._element && this._element.value !== newValue) {
             this._element.value = newValue;
             // Fire input listeners to notify the UI layer of the programmatic change
             if (this._listeners.input) {
                 for (var i = 0; i < this._listeners.input.length; i++) {
-                    try { this._listeners.input[i](newValue); } catch (ex) {}
+                    try { this._listeners.input[i](newValue); } catch (ex) { }
                 }
             }
         }
@@ -880,7 +880,7 @@
      * getMaxLength — gets the maximum allowed input length.
      * @returns {number}
      */
-    Donkeycraft.GuiTextInput.prototype.getMaxLength = function() {
+    Donkeycraft.GuiTextInput.prototype.getMaxLength = function () {
         return this._maxLength;
     };
 
@@ -888,7 +888,7 @@
      * setMaxLength — sets the maximum allowed input length.
      * @param {number} max - Maximum length (minimum 1).
      */
-    Donkeycraft.GuiTextInput.prototype.setMaxLength = function(max) {
+    Donkeycraft.GuiTextInput.prototype.setMaxLength = function (max) {
         this._maxLength = (max !== undefined && max !== null) ? Math.max(1, max) : 100;
         if (this._element) {
             this._element.maxLength = this._maxLength;
@@ -900,14 +900,14 @@
      * @param {boolean} error - Whether to show error state.
      * @param {string} [message=''] - Optional error message (not used in DOM, passed to listeners).
      */
-    Donkeycraft.GuiTextInput.prototype.setError = function(error, message) {
+    Donkeycraft.GuiTextInput.prototype.setError = function (error, message) {
         this._error = !!error;
         if (this._element) {
             this._element.classList.toggle('error', this._error);
         }
         if (this._listeners.error) {
             for (var i = 0; i < this._listeners.error.length; i++) {
-                try { this._listeners.error[i](this._error, message || ''); } catch (ex) {}
+                try { this._listeners.error[i](this._error, message || ''); } catch (ex) { }
             }
         }
     };
@@ -916,25 +916,25 @@
      * isErrored — checks if the input is in error state.
      * @returns {boolean}
      */
-    Donkeycraft.GuiTextInput.prototype.isErrored = function() {
+    Donkeycraft.GuiTextInput.prototype.isErrored = function () {
         return this._error;
     };
 
     /**
      * focus — focuses the input element.
      */
-    Donkeycraft.GuiTextInput.prototype.focus = function() {
+    Donkeycraft.GuiTextInput.prototype.focus = function () {
         if (this._element) {
-            try { this._element.focus(); } catch (ex) {}
+            try { this._element.focus(); } catch (ex) { }
         }
     };
 
     /**
      * blur — removes focus from the input element.
      */
-    Donkeycraft.GuiTextInput.prototype.blur = function() {
+    Donkeycraft.GuiTextInput.prototype.blur = function () {
         if (this._element) {
-            try { this._element.blur(); } catch (ex) {}
+            try { this._element.blur(); } catch (ex) { }
         }
     };
 
@@ -942,7 +942,7 @@
      * setVisible — shows or hides the input.
      * @param {boolean} visible - Whether to show the input.
      */
-    Donkeycraft.GuiTextInput.prototype.setVisible = function(visible) {
+    Donkeycraft.GuiTextInput.prototype.setVisible = function (visible) {
         if (this._element) {
             this._element.style.display = visible ? '' : 'none';
         }
@@ -952,7 +952,7 @@
      * isVisible — checks if the input is visible.
      * @returns {boolean}
      */
-    Donkeycraft.GuiTextInput.prototype.isVisible = function() {
+    Donkeycraft.GuiTextInput.prototype.isVisible = function () {
         return this._element && this._element.style.display !== 'none';
     };
 
@@ -961,12 +961,12 @@
      * @param {Function} callback - Called with (value) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiTextInput.prototype.onInput = function(callback) {
+    Donkeycraft.GuiTextInput.prototype.onInput = function (callback) {
         if (!this._listeners.input) this._listeners.input = [];
         this._listeners.input.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.input.indexOf(callback);
             if (idx >= 0) self._listeners.input.splice(idx, 1);
         };
@@ -977,12 +977,12 @@
      * @param {Function} callback - Called with (value) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiTextInput.prototype.onBlur = function(callback) {
+    Donkeycraft.GuiTextInput.prototype.onBlur = function (callback) {
         if (!this._listeners.blur) this._listeners.blur = [];
         this._listeners.blur.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.blur.indexOf(callback);
             if (idx >= 0) self._listeners.blur.splice(idx, 1);
         };
@@ -993,12 +993,12 @@
      * @param {Function} callback - Called with (event, value) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiTextInput.prototype.onKeyDown = function(callback) {
+    Donkeycraft.GuiTextInput.prototype.onKeyDown = function (callback) {
         if (!this._listeners.keydown) this._listeners.keydown = [];
         this._listeners.keydown.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.keydown.indexOf(callback);
             if (idx >= 0) self._listeners.keydown.splice(idx, 1);
         };
@@ -1007,7 +1007,7 @@
     /**
      * destroy — removes the input from DOM and cleans up event listeners.
      */
-    Donkeycraft.GuiTextInput.prototype.destroy = function() {
+    Donkeycraft.GuiTextInput.prototype.destroy = function () {
         if (this._element && this._element.parentNode) {
             this._element.parentNode.removeChild(this._element);
         }

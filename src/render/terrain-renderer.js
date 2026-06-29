@@ -1,6 +1,6 @@
 // Donkeycraft — Terrain Renderer
 // Main rendering: chunk iteration, frustum culling, batched draws.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -15,7 +15,7 @@
      * @param {Fog} fog - Fog system for distance fog.
      * @param {Lighting} [lighting] - Optional lighting system for dynamic time-of-day lighting.
      */
-    Donkeycraft.TerrainRenderer = function(gl, shaderManager, fog, lighting) {
+    Donkeycraft.TerrainRenderer = function (gl, shaderManager, fog, lighting) {
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._fog = fog;
@@ -61,7 +61,7 @@
      * Set the world block getter function.
      * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
      */
-    Donkeycraft.TerrainRenderer.prototype.setWorldData = function(getBlockFunc) {
+    Donkeycraft.TerrainRenderer.prototype.setWorldData = function (getBlockFunc) {
         this._getBlockFunc = getBlockFunc;
     };
 
@@ -69,7 +69,7 @@
      * Set the camera reference for back-face culling optimization.
      * @param {Donkeycraft.Camera} camera - Camera instance.
      */
-    Donkeycraft.TerrainRenderer.prototype.setCamera = function(camera) {
+    Donkeycraft.TerrainRenderer.prototype.setCamera = function (camera) {
         this._camera = camera || null;
     };
 
@@ -77,7 +77,7 @@
      * Set the lighting system for dynamic time-of-day lighting.
      * @param {Lighting} lighting - Lighting system instance.
      */
-    Donkeycraft.TerrainRenderer.prototype.setLighting = function(lighting) {
+    Donkeycraft.TerrainRenderer.prototype.setLighting = function (lighting) {
         this._lighting = lighting || null;
     };
 
@@ -86,7 +86,7 @@
      * When set, the terrain renderer binds the atlas texture instead of the placeholder.
      * @param {Donkeycraft.TextureAtlas} atlas - Texture atlas instance.
      */
-    Donkeycraft.TerrainRenderer.prototype.setTextureAtlas = function(atlas) {
+    Donkeycraft.TerrainRenderer.prototype.setTextureAtlas = function (atlas) {
         this._textureAtlas = atlas;
     };
 
@@ -94,7 +94,7 @@
      * Get the current lighting system instance.
      * @returns {Lighting|null}
      */
-    Donkeycraft.TerrainRenderer.prototype.getLighting = function() {
+    Donkeycraft.TerrainRenderer.prototype.getLighting = function () {
         return this._lighting;
     };
 
@@ -102,7 +102,7 @@
      * Set the render distance in chunks.
      * @param {number} distance - Number of chunks to render (radius).
      */
-    Donkeycraft.TerrainRenderer.prototype.setRenderDistance = function(distance) {
+    Donkeycraft.TerrainRenderer.prototype.setRenderDistance = function (distance) {
         this._renderDistance = distance;
     };
 
@@ -110,7 +110,7 @@
      * Get the current render distance.
      * @returns {number}
      */
-    Donkeycraft.TerrainRenderer.prototype.getRenderDistance = function() {
+    Donkeycraft.TerrainRenderer.prototype.getRenderDistance = function () {
         return this._renderDistance;
     };
 
@@ -119,7 +119,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
-    Donkeycraft.TerrainRenderer.prototype.markChunkDirty = function(chunkX, chunkZ) {
+    Donkeycraft.TerrainRenderer.prototype.markChunkDirty = function (chunkX, chunkZ) {
         this._dirtyChunks[chunkX + ',' + chunkZ] = true;
     };
 
@@ -129,7 +129,7 @@
      * @param {number} playerChunkX - Player's chunk X coordinate.
      * @param {number} playerChunkZ - Player's chunk Z coordinate.
      */
-    Donkeycraft.TerrainRenderer.prototype.updateChunks = function(playerChunkX, playerChunkZ) {
+    Donkeycraft.TerrainRenderer.prototype.updateChunks = function (playerChunkX, playerChunkZ) {
         var gl = this._gl;
         if (!gl || !this._getBlockFunc) {
             Donkeycraft.Logger.warn('TerrainRenderer', 'updateChunks skipped: gl=' + (gl ? 'ok' : 'null') + ', _getBlockFunc=' + (this._getBlockFunc ? 'ok' : 'null'));
@@ -179,7 +179,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
-    Donkeycraft.TerrainRenderer.prototype._createChunkMesh = function(chunkX, chunkZ) {
+    Donkeycraft.TerrainRenderer.prototype._createChunkMesh = function (chunkX, chunkZ) {
         var gl = this._gl;
         if (!gl) {
             Donkeycraft.Logger.error('TerrainRenderer', 'WebGL context is null — cannot create chunk mesh');
@@ -194,7 +194,7 @@
 
         // Wrap world-coordinate getter into local chunk coordinates.
         var self = this;
-        var localGetBlock = function(localX, y, localZ) {
+        var localGetBlock = function (localX, y, localZ) {
             var worldX = chunkX * CHUNK_SIZE + localX;
             var worldY = y;
             var worldZ = chunkZ * CHUNK_SIZE + localZ;
@@ -241,7 +241,7 @@
      * Called from updateChunks() each frame.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._processPendingMeshes = function() {
+    Donkeycraft.TerrainRenderer.prototype._processPendingMeshes = function () {
         var keysToDelete = [];
         var self = this;
 
@@ -290,7 +290,7 @@
      * Check if a block is fully opaque (no faces should be shown adjacent to it).
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._isBlockSolid = function(blockId) {
+    Donkeycraft.TerrainRenderer.prototype._isBlockSolid = function (blockId) {
         // Use BlockRegistry if available (Phase 3+), otherwise fall back to hardcoded list.
         if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isOpaque === 'function') {
             return Donkeycraft.BlockRegistry.isOpaque(blockId);
@@ -303,7 +303,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
-    Donkeycraft.TerrainRenderer.prototype.rebuildChunk = function(chunkX, chunkZ) {
+    Donkeycraft.TerrainRenderer.prototype.rebuildChunk = function (chunkX, chunkZ) {
         var key = chunkX + ',' + chunkZ;
         if (this._chunks[key]) {
             this._chunks[key].destroy();
@@ -317,7 +317,7 @@
      * Each plane: dot(point, axis) + dist <= 0 means inside.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._extractFrustumPlanes = function() {
+    Donkeycraft.TerrainRenderer.prototype._extractFrustumPlanes = function () {
         var projData = this._cachedProjData;
         var viewData = this._cachedViewData;
         if (!projData || !viewData) return;
@@ -339,7 +339,7 @@
      * Extract a single frustum plane from the view-projection matrix.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._extractPlane = function(vp, i, j, k) {
+    Donkeycraft.TerrainRenderer.prototype._extractPlane = function (vp, i, j, k) {
         var col, sign;
         if (i !== 0) { col = 0; sign = i < 0 ? 1 : -1; }
         else if (j !== 0) { col = 1; sign = j < 0 ? 1 : -1; }
@@ -365,16 +365,16 @@
      * Check if an AABB is visible in the frustum.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._isBoxInFrustum = function(
+    Donkeycraft.TerrainRenderer.prototype._isBoxInFrustum = function (
         minX, minY, minZ, maxX, maxY, maxZ
     ) {
         if (!this._frustumPlanes) return true;
 
         var corners = [
-            minX, minY, minZ,  maxX, minY, minZ,
-            minX, maxY, minZ,  maxX, maxY, minZ,
-            minX, minY, maxZ,  maxX, minY, maxZ,
-            minX, maxY, maxZ,  maxX, maxY, maxZ
+            minX, minY, minZ, maxX, minY, minZ,
+            minX, maxY, minZ, maxX, maxY, minZ,
+            minX, minY, maxZ, maxX, minY, maxZ,
+            minX, maxY, maxZ, maxX, maxY, maxZ
         ];
 
         for (var p = 0; p < this._frustumPlanes.length; p++) {
@@ -383,8 +383,8 @@
             for (var c = 0; c < 8; c++) {
                 var base = c * 3;
                 var dot = corners[base] * plane.axis.x +
-                          corners[base + 1] * plane.axis.y +
-                          corners[base + 2] * plane.axis.z + plane.dist;
+                    corners[base + 1] * plane.axis.y +
+                    corners[base + 2] * plane.axis.z + plane.dist;
                 if (dot > 0) {
                     allBehind = false;
                     break;
@@ -399,14 +399,14 @@
      * Get a cache key for current view+projection matrix data.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._getFrustumCacheKey = function() {
+    Donkeycraft.TerrainRenderer.prototype._getFrustumCacheKey = function () {
         var projData = this._cachedProjData;
         var viewData = this._cachedViewData;
         if (!projData || !viewData) return null;
 
         // Hash key from diagonal elements (most stable across rotations)
         return 'p' + projData[0] + projData[5] + projData[10] + projData[15] +
-               'v' + viewData[0] + viewData[5] + viewData[10] + viewData[15];
+            'v' + viewData[0] + viewData[5] + viewData[10] + viewData[15];
     };
 
     /**
@@ -414,14 +414,14 @@
      * Result: r = a × b where both inputs and output are column-major arrays.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function(a, b, target) {
+    Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function (a, b, target) {
         var r = target || new Float32Array(16);
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
-                r[i + j * 4] = a[i]      * b[j * 4]    +
-                               a[4 + i]  * b[j * 4 + 1] +
-                               a[8 + i]  * b[j * 4 + 2] +
-                               a[12 + i] * b[j * 4 + 3];
+                r[i + j * 4] = a[i] * b[j * 4] +
+                    a[4 + i] * b[j * 4 + 1] +
+                    a[8 + i] * b[j * 4 + 2] +
+                    a[12 + i] * b[j * 4 + 3];
             }
         }
         return r;
@@ -431,7 +431,7 @@
      * Render all visible chunks.
      * @param {Camera} camera - The camera instance.
      */
-    Donkeycraft.TerrainRenderer.prototype.render = function(camera) {
+    Donkeycraft.TerrainRenderer.prototype.render = function (camera) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !this._getBlockFunc || !camera) {
             Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: gl=' + (gl ? 'ok' : 'null') + ', shaderMgr=' + (this._shaderManager ? 'ok' : 'null') + ', blockFunc=' + (this._getBlockFunc ? 'ok' : 'null') + ', camera=' + (camera ? 'ok' : 'null'));
@@ -524,7 +524,7 @@
      * Draw a single chunk mesh.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._drawChunk = function(chunkMesh) {
+    Donkeycraft.TerrainRenderer.prototype._drawChunk = function (chunkMesh) {
         var gl = this._gl;
         if (!chunkMesh || chunkMesh.getIndexCount() === 0) return false;
 
@@ -539,7 +539,7 @@
      * Handles async image loading by retrying on subsequent frames.
      * @private
      */
-    Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function() {
+    Donkeycraft.TerrainRenderer.prototype._getPlaceholderTexture = function () {
         var gl = this._gl;
         if (!gl) return null;
 
@@ -595,7 +595,7 @@
      * Get the number of rendered chunks.
      * @returns {number}
      */
-    Donkeycraft.TerrainRenderer.prototype.getChunkCount = function() {
+    Donkeycraft.TerrainRenderer.prototype.getChunkCount = function () {
         return this._chunkCount;
     };
 
@@ -604,7 +604,7 @@
      * Tracks chunks rendered, meshes built, and draw calls per frame.
      * @returns {{chunksRendered: number, meshesBuilt: number, drawCalls: number}}
      */
-    Donkeycraft.TerrainRenderer.prototype.getRenderStats = function() {
+    Donkeycraft.TerrainRenderer.prototype.getRenderStats = function () {
         return {
             chunksRendered: this._chunkCount || 0,
             meshesBuilt: this._chunkCount || 0,
@@ -615,7 +615,7 @@
     /**
      * Destroy all chunk meshes and free resources.
      */
-    Donkeycraft.TerrainRenderer.prototype.destroy = function() {
+    Donkeycraft.TerrainRenderer.prototype.destroy = function () {
         for (var key in this._chunks) {
             if (this._chunks.hasOwnProperty(key)) {
                 this._chunks[key].destroy();

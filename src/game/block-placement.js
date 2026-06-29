@@ -1,6 +1,6 @@
 // Donkeycraft — Block Placement
 // Block placement: face normal handling, snap to grid, placement rules.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -20,7 +20,7 @@
      *
      * @namespace
      */
-    Donkeycraft.BlockPlacement = (function() {
+    Donkeycraft.BlockPlacement = (function () {
 
         /**
          * Get the opposite face normal (for placing adjacent to a face).
@@ -66,8 +66,8 @@
 
             // AABB overlap test: no overlap = !(blockMax < hurtMin || blockMin > hurtMax)
             var overlaps = !(blockMaxX < hurtBox.minX || blockMinX > hurtBox.maxX ||
-                             blockMaxY < hurtBox.minY || blockMinY > hurtBox.maxY ||
-                             blockMaxZ < hurtBox.minZ || blockMinZ > hurtBox.maxZ);
+                blockMaxY < hurtBox.minY || blockMinY > hurtBox.maxY ||
+                blockMaxZ < hurtBox.minZ || blockMinZ > hurtBox.maxZ);
 
             return !overlaps;
         }

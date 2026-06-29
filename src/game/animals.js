@@ -1,6 +1,6 @@
 // Donkeycraft — Animal-Specific Behavior
 // Breeding, lead, name tags, baby speed for passive mobs.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -18,7 +18,7 @@
      * @param {number} [config.z=0] - Initial Z position.
      * @param {boolean} [config.isBaby=false] - Whether this is a baby animal.
      */
-    Donkeycraft.Animal = function(config) {
+    Donkeycraft.Animal = function (config) {
         config = config || {};
 
         // Call PassiveMob constructor
@@ -91,7 +91,7 @@
      * @returns {string}
      * @private
      */
-    Donkeycraft.Animal.prototype._getFoodItem = function() {
+    Donkeycraft.Animal.prototype._getFoodItem = function () {
         var foodMap = {
             cow: 'wheat',
             pig: 'carrot',
@@ -106,7 +106,7 @@
      * @param {string} foodItem - Item name fed to the animal.
      * @returns {boolean} True if food was accepted.
      */
-    Donkeycraft.Animal.prototype.feed = function(foodItem) {
+    Donkeycraft.Animal.prototype.feed = function (foodItem) {
         if (foodItem !== this.foodItem) {
             return false; // Wrong food
         }
@@ -136,14 +136,14 @@
      * Check if this animal can breed.
      * @returns {boolean}
      */
-    Donkeycraft.Animal.prototype.canBreed = function() {
+    Donkeycraft.Animal.prototype.canBreed = function () {
         return this._inLove && !this.isBaby && this._loveCooldown <= 0;
     };
 
     /**
      * Enter love mode.
      */
-    Donkeycraft.Animal.prototype.enterLoveMode = function() {
+    Donkeycraft.Animal.prototype.enterLoveMode = function () {
         if (this.isBaby || this._inLove) {
             return;
         }
@@ -155,7 +155,7 @@
     /**
      * Exit love mode.
      */
-    Donkeycraft.Animal.prototype.exitLoveMode = function() {
+    Donkeycraft.Animal.prototype.exitLoveMode = function () {
         this._inLove = false;
     };
 
@@ -165,7 +165,7 @@
      * @param {Donkeycraft.Animal} other - Other animal.
      * @returns {boolean} True if both can breed.
      */
-    Donkeycraft.Animal.prototype.canBreedWith = function(other) {
+    Donkeycraft.Animal.prototype.canBreedWith = function (other) {
         if (!other || other.type !== this.type) {
             return false; // Must be same type
         }
@@ -178,7 +178,7 @@
      * @param {Donkeycraft.Animal} partner - Breeding partner.
      * @returns {Donkeycraft.Animal|null} Baby animal or null if breeding failed.
      */
-    Donkeycraft.Animal.prototype.breedWith = function(partner) {
+    Donkeycraft.Animal.prototype.breedWith = function (partner) {
         if (!this.canBreedWith(partner)) {
             return null;
         }
@@ -229,7 +229,7 @@
      * @param {boolean} led - True if on lead.
      * @param {Donkeycraft.Entity} [owner] - Lead owner entity.
      */
-    Donkeycraft.Animal.prototype.setOnLead = function(led, owner) {
+    Donkeycraft.Animal.prototype.setOnLead = function (led, owner) {
         this._onLead = !!led;
         if (this._onLead) {
             this.leadOwner = owner || null;
@@ -242,7 +242,7 @@
      * Check if this animal is on a lead.
      * @returns {boolean}
      */
-    Donkeycraft.Animal.prototype.isOnLead = function() {
+    Donkeycraft.Animal.prototype.isOnLead = function () {
         return this._onLead;
     };
 
@@ -251,7 +251,7 @@
      * Babies get 1.5x, led animals get 0.8x, both stack multiplicatively.
      * @returns {number}
      */
-    Donkeycraft.Animal.prototype.getSpeedMultiplier = function() {
+    Donkeycraft.Animal.prototype.getSpeedMultiplier = function () {
         var mult = this.isBaby ? this.babySpeedMultiplier : 1.0;
         if (this._onLead && this.leadOwner) {
             mult *= 0.8; // Slower when led
@@ -263,7 +263,7 @@
      * Tick method — handle love mode cooldown, lead following, age progression.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Animal.prototype.tick = function(deltaTime) {
+    Donkeycraft.Animal.prototype.tick = function (deltaTime) {
         // Call parent tick (wander + flee)
         Donkeycraft.PassiveMob.prototype.tick.call(this, deltaTime);
 
@@ -315,7 +315,7 @@
      * @param {boolean} [isBaby=false] - Whether this is a baby.
      * @returns {Donkeycraft.Animal|null}
      */
-    Donkeycraft.Animal.create = function(type, x, y, z, isBaby) {
+    Donkeycraft.Animal.create = function (type, x, y, z, isBaby) {
         if (!Donkeycraft.MobStats || !Donkeycraft.MobStats[type]) {
             return null; // Unknown type
         }

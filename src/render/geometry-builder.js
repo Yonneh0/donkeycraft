@@ -1,6 +1,6 @@
 // Donkeycraft — Geometry Builder
 // Builds vertex buffers: position, UV, normal, light data for chunk meshes.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -9,18 +9,18 @@
 
     // Face definitions: direction, corner order (CCW for front-facing), light intensity
     var FACES = [
-        { dir: [1, 0, 0],  name: 'right',  light: 0.8, corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },   // +X
-        { dir: [-1, 0, 0], name: 'left',   light: 0.7, corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]] },  // -X
-        { dir: [0, 1, 0],  name: 'top',    light: 1.0, corners: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]] },   // +Y
-        { dir: [0, -1, 0], name: 'bottom', light: 0.5, corners: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]] },  // -Y
-        { dir: [0, 0, 1],  name: 'front',  light: 0.9, corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },   // +Z
-        { dir: [0, 0, -1], name: 'back',   light: 0.6, corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] }   // -Z
+        { dir: [1, 0, 0], name: 'right', light: 0.8, corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]] },   // +X
+        { dir: [-1, 0, 0], name: 'left', light: 0.7, corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]] },  // -X
+        { dir: [0, 1, 0], name: 'top', light: 1.0, corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]] },   // +Y
+        { dir: [0, -1, 0], name: 'bottom', light: 0.5, corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]] },  // -Y
+        { dir: [0, 0, 1], name: 'front', light: 0.9, corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },   // +Z
+        { dir: [0, 0, -1], name: 'back', light: 0.6, corners: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] }   // -Z
     ];
 
     /**
      * GeometryBuilder — Builds vertex data arrays for chunk mesh rendering.
      */
-    Donkeycraft.GeometryBuilder = function() {
+    Donkeycraft.GeometryBuilder = function () {
         this._vertexSize = 9; // position(3) + light(1) + UV(2) + normal(3)
     };
 
@@ -30,7 +30,7 @@
      * @param {number} blockId - The block ID to check.
      * @returns {boolean} True if the block is transparent/non-solid.
      */
-    Donkeycraft.GeometryBuilder.prototype.isTransparent = function(blockId) {
+    Donkeycraft.GeometryBuilder.prototype.isTransparent = function (blockId) {
         // Prefer BlockTypes for accurate transparency checks.
         if (Donkeycraft.BlockTypes && typeof Donkeycraft.BlockTypes.isTransparent === 'function') {
             return Donkeycraft.BlockTypes.isTransparent(blockId);
@@ -55,7 +55,7 @@
      * @param {Function} getBlockFunc - Function(x, y, z) returning block ID at world position.
      * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.GeometryBuilder.prototype.buildChunk = function(chunkX, chunkZ, getBlockFunc) {
+    Donkeycraft.GeometryBuilder.prototype.buildChunk = function (chunkX, chunkZ, getBlockFunc) {
         var vertices = [];
         var indices = [];
 
@@ -123,7 +123,7 @@
      * Get block at world coordinates, handling chunk boundaries.
      * @private
      */
-    Donkeycraft.GeometryBuilder.prototype._getBlockAt = function(nx, ny, nz, getBlockFunc, chunkX, chunkZ) {
+    Donkeycraft.GeometryBuilder.prototype._getBlockAt = function (nx, ny, nz, getBlockFunc, chunkX, chunkZ) {
         var localX = nx - chunkX * CHUNK_SIZE;
         var localZ = nz - chunkZ * CHUNK_SIZE;
 
@@ -144,7 +144,7 @@
      * @param {string} faceName - Face name (unused by atlas, kept for API compat).
      * @returns {{u0: number, v0: number, u1: number, v1: number}} UV coordinates.
      */
-    Donkeycraft.GeometryBuilder.prototype._getBlockUV = function(blockId, faceName) {
+    Donkeycraft.GeometryBuilder.prototype._getBlockUV = function (blockId, faceName) {
         // Use texture atlas UV mapping if available (proper block-to-tile lookup).
         if (Donkeycraft.TextureAtlas && typeof Donkeycraft.TextureAtlas.getBlockUV === 'function') {
             return Donkeycraft.TextureAtlas.getBlockUV(blockId);
@@ -173,7 +173,7 @@
      * @param {number} [y=0.0] - Y position.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.GeometryBuilder.prototype.buildQuad = function(size, y) {
+    Donkeycraft.GeometryBuilder.prototype.buildQuad = function (size, y) {
         size = size || 1.0;
         y = (y !== undefined) ? y : 0.0;
         var half = size / 2;
@@ -181,10 +181,10 @@
         // 4 vertices: position(3) + light(1) + UV(2) + normal(3) = 9 floats each
         return {
             vertices: new Float32Array([
-                -half, y, -half,  1.0,   0, 0,   0, 1, 0,
-                 half, y, -half,  1.0,   1, 0,   0, 1, 0,
-                 half, y,  half,  1.0,   1, 1,   0, 1, 0,
-                -half, y,  half,  1.0,   0, 1,   0, 1, 0
+                -half, y, -half, 1.0, 0, 0, 0, 1, 0,
+                half, y, -half, 1.0, 1, 0, 0, 1, 0,
+                half, y, half, 1.0, 1, 1, 0, 1, 0,
+                -half, y, half, 1.0, 0, 1, 0, 1, 0
             ]),
             indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
             vertexCount: 4,
@@ -198,7 +198,7 @@
      * @param {number} [y=0.0] - Y position of center.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.GeometryBuilder.prototype.buildCube = function(size, y) {
+    Donkeycraft.GeometryBuilder.prototype.buildCube = function (size, y) {
         size = size || 1.0;
         y = (y !== undefined) ? y : 0.0;
         var half = size / 2;
@@ -208,39 +208,39 @@
         return {
             vertices: new Float32Array([
                 // +X face
-                 half, y-half, -half,  0.8,  0.875, 0.75,  1, 0, 0,
-                 half, y+half, -half,  0.8,  0.875, 0.875, 1, 0, 0,
-                 half, y+half,  half,  0.8,  0.875, 1.0,   1, 0, 0,
-                 half, y-half,  half,  0.8,  0.875, 0.75,  1, 0, 0,
+                half, y - half, -half, 0.8, 0.875, 0.75, 1, 0, 0,
+                half, y + half, -half, 0.8, 0.875, 0.875, 1, 0, 0,
+                half, y + half, half, 0.8, 0.875, 1.0, 1, 0, 0,
+                half, y - half, half, 0.8, 0.875, 0.75, 1, 0, 0,
                 // -X face
-               -half, y-half,  half,  0.7,  0.75, 0.75, -1, 0, 0,
-               -half, y+half,  half,  0.7,  0.75, 0.875, -1, 0, 0,
-               -half, y+half, -half,  0.7,  0.75, 1.0,  -1, 0, 0,
-               -half, y-half, -half,  0.7,  0.75, 0.75, -1, 0, 0,
+                -half, y - half, half, 0.7, 0.75, 0.75, -1, 0, 0,
+                -half, y + half, half, 0.7, 0.75, 0.875, -1, 0, 0,
+                -half, y + half, -half, 0.7, 0.75, 1.0, -1, 0, 0,
+                -half, y - half, -half, 0.7, 0.75, 0.75, -1, 0, 0,
                 // +Y face (top)
-               -half, y+half, -half,  1.0,  0.0, 0.0,   0, 1, 0,
-                half, y+half, -half,  1.0,  0.125, 0.0,  0, 1, 0,
-                half, y+half,  half,  1.0,  0.125, 0.125, 0, 1, 0,
-               -half, y+half,  half,  1.0,  0.0, 0.125,  0, 1, 0,
+                -half, y + half, -half, 1.0, 0.0, 0.0, 0, 1, 0,
+                half, y + half, -half, 1.0, 0.125, 0.0, 0, 1, 0,
+                half, y + half, half, 1.0, 0.125, 0.125, 0, 1, 0,
+                -half, y + half, half, 1.0, 0.0, 0.125, 0, 1, 0,
                 // -Y face (bottom)
-               -half, y-half,  half,  0.5,  0.0, 0.0,   0, -1, 0,
-                half, y-half,  half,  0.5,  0.125, 0.0,  0, -1, 0,
-                half, y-half, -half,  0.5,  0.125, 0.125, 0, -1, 0,
-               -half, y-half, -half,  0.5,  0.0, 0.125,  0, -1, 0,
+                -half, y - half, half, 0.5, 0.0, 0.0, 0, -1, 0,
+                half, y - half, half, 0.5, 0.125, 0.0, 0, -1, 0,
+                half, y - half, -half, 0.5, 0.125, 0.125, 0, -1, 0,
+                -half, y - half, -half, 0.5, 0.0, 0.125, 0, -1, 0,
                 // +Z face (front)
-                half, y-half,  half,  0.9,  0.25, 0.75,  0, 0, 1,
-                half, y+half,  half,  0.9,  0.25, 0.875, 0, 0, 1,
-               -half, y+half,  half,  0.9,  0.375, 0.875, 0, 0, 1,
-               -half, y-half,  half,  0.9,  0.375, 0.75,  0, 0, 1,
+                half, y - half, half, 0.9, 0.25, 0.75, 0, 0, 1,
+                half, y + half, half, 0.9, 0.25, 0.875, 0, 0, 1,
+                -half, y + half, half, 0.9, 0.375, 0.875, 0, 0, 1,
+                -half, y - half, half, 0.9, 0.375, 0.75, 0, 0, 1,
                 // -Z face (back)
-               -half, y-half, -half,  0.6,  0.25, 0.75,  0, 0, -1,
-               -half, y+half, -half,  0.6,  0.25, 0.875, 0, 0, -1,
-                half, y+half, -half,  0.6,  0.375, 0.875, 0, 0, -1,
-                half, y-half, -half,  0.6,  0.375, 0.75,  0, 0, -1
+                -half, y - half, -half, 0.6, 0.25, 0.75, 0, 0, -1,
+                -half, y + half, -half, 0.6, 0.25, 0.875, 0, 0, -1,
+                half, y + half, -half, 0.6, 0.375, 0.875, 0, 0, -1,
+                half, y - half, -half, 0.6, 0.375, 0.75, 0, 0, -1
             ]),
             indices: new Uint16Array([
-                0, 1, 2,  0, 2, 3,       // +X
-                4, 5, 6,  4, 6, 7,       // -X
+                0, 1, 2, 0, 2, 3,       // +X
+                4, 5, 6, 4, 6, 7,       // -X
                 8, 9, 10, 8, 10, 11,     // +Y
                 12, 13, 14, 12, 14, 15,  // -Y
                 16, 17, 18, 16, 18, 19,  // +Z

@@ -1,6 +1,6 @@
 // Donkeycraft — Creative Inventory
 // Creative inventory GUI with tab navigation, item search, and grid display.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -9,7 +9,7 @@
      * CreativeInventory — manages the creative mode inventory GUI.
      * @param {HTMLElement} container - DOM container for the creative inventory.
      */
-    Donkeycraft.CreativeInventory = function(container) {
+    Donkeycraft.CreativeInventory = function (container) {
         this._container = container || null;
 
         // Tab definitions — ordered display order
@@ -51,7 +51,7 @@
      * _buildItemLists — populates the tab-to-item-ID mapping.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._buildItemLists = function() {
+    Donkeycraft.CreativeInventory.prototype._buildItemLists = function () {
         // Building blocks: stone family, wood, glass, concrete, etc.
         this._tabItems['building'] = [
             1, 3, 4, 5, 6, 7, 12, 24, 30, 35, 36, 43, 44, 45, 52, 53, 54, 55, 56, 57,
@@ -106,7 +106,7 @@
      * _buildDOM — creates the creative inventory DOM structure.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._buildDOM = function() {
+    Donkeycraft.CreativeInventory.prototype._buildDOM = function () {
         var self = this;
         if (!this._container) return;
 
@@ -137,8 +137,8 @@
             // Store tab name in dataset for reliable identification
             tabBtn.dataset.tabName = this._tabs[t];
 
-            tabBtn.addEventListener('click', (function(tabName) {
-                return function() { self.selectTab(tabName); };
+            tabBtn.addEventListener('click', (function (tabName) {
+                return function () { self.selectTab(tabName); };
             })(this._tabs[t]));
 
             this._tabBarEl.appendChild(tabBtn);
@@ -155,8 +155,8 @@
         this._searchEl.placeholder = 'Search items...';
         this._searchEl.style.cssText = 'width: 100%; padding: 6px 8px; background: #222; border: 1px solid #555; color: #ccc; border-radius: 3px; font-size: 12px; box-sizing: border-box; outline: none;';
 
-        this._searchEl.addEventListener('input', (function() {
-            return function() { self._onSearchChange(); };
+        this._searchEl.addEventListener('input', (function () {
+            return function () { self._onSearchChange(); };
         })());
 
         searchContainer.appendChild(this._searchEl);
@@ -181,7 +181,7 @@
      * @returns {string} Block name, or 'item_' + id if not found.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._getItemName = function(itemId) {
+    Donkeycraft.CreativeInventory.prototype._getItemName = function (itemId) {
         if (typeof itemId !== 'number' || isNaN(itemId)) {
             return 'item_' + itemId;
         }
@@ -204,7 +204,7 @@
      * _renderGrid — renders the item grid for the current tab.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._renderGrid = function() {
+    Donkeycraft.CreativeInventory.prototype._renderGrid = function () {
         if (!this._gridEl) return;
 
         var items = this._getFilteredItems();
@@ -229,13 +229,13 @@
             }
 
             var self = this;
-            itemEl.addEventListener('click', (function(id) {
-                return function() { self._onItemClick(id); };
+            itemEl.addEventListener('click', (function (id) {
+                return function () { self._onItemClick(id); };
             })(itemId));
 
             // Keyboard support: Enter/Space to select
-            itemEl.addEventListener('keydown', (function(id, el) {
-                return function(e) {
+            itemEl.addEventListener('keydown', (function (id, el) {
+                return function (e) {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         self._onItemClick(id);
@@ -244,10 +244,10 @@
             })(itemId, itemEl));
 
             // Hover effects
-            itemEl.addEventListener('mouseenter', function() {
+            itemEl.addEventListener('mouseenter', function () {
                 this.style.background = 'rgba(100,100,120,0.8)';
             });
-            itemEl.addEventListener('mouseleave', function() {
+            itemEl.addEventListener('mouseleave', function () {
                 if (this.dataset.itemId !== String(self._selectedItemId)) {
                     this.style.background = 'rgba(80,80,80,0.6)';
                 }
@@ -262,7 +262,7 @@
      * @returns {number[]} Array of block/item IDs.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._getFilteredItems = function() {
+    Donkeycraft.CreativeInventory.prototype._getFilteredItems = function () {
         var items = this._tabItems[this._currentTab] || [];
 
         // Filter by search query if present — delegate to searchItems for cross-tab matching
@@ -285,7 +285,7 @@
      * _onSearchChange — handles search input changes.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._onSearchChange = function() {
+    Donkeycraft.CreativeInventory.prototype._onSearchChange = function () {
         this._searchQuery = (this._searchEl.value || '').toLowerCase().trim();
         this._selectedItemId = null; // Clear selection on search change
         this._renderGrid();
@@ -296,13 +296,13 @@
      * @param {number} itemId - The clicked item's ID.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._onItemClick = function(itemId) {
+    Donkeycraft.CreativeInventory.prototype._onItemClick = function (itemId) {
         this._selectedItemId = itemId;
         this._renderGrid(); // Re-render to update selection highlight
 
         if (this._subscriptions.onItemSelected) {
             for (var i = 0; i < this._subscriptions.onItemSelected.length; i++) {
-                try { this._subscriptions.onItemSelected[i](itemId); } catch (e) {}
+                try { this._subscriptions.onItemSelected[i](itemId); } catch (e) { }
             }
         }
     };
@@ -314,7 +314,7 @@
      * @returns {string} Display character.
      * @private
      */
-    Donkeycraft.CreativeInventory.prototype._getItemDisplayChar = function(itemId) {
+    Donkeycraft.CreativeInventory.prototype._getItemDisplayChar = function (itemId) {
         if (typeof itemId !== 'number' || isNaN(itemId) || itemId <= 0) {
             return '\u25A0'; // BLACK SQUARE for invalid/empty
         }
@@ -375,7 +375,7 @@
      * getTabs — gets the available tab names.
      * @returns {string[]} Array of tab name strings.
      */
-    Donkeycraft.CreativeInventory.prototype.getTabs = function() {
+    Donkeycraft.CreativeInventory.prototype.getTabs = function () {
         return this._tabs.slice();
     };
 
@@ -383,7 +383,7 @@
      * selectTab — switches to a different tab.
      * @param {string} tabName - Tab name to switch to.
      */
-    Donkeycraft.CreativeInventory.prototype.selectTab = function(tabName) {
+    Donkeycraft.CreativeInventory.prototype.selectTab = function (tabName) {
         // Validate tab name
         if (this._tabs.indexOf(tabName) === -1) return;
 
@@ -416,7 +416,7 @@
         // Emit tab change event
         if (this._subscriptions.onTabChange) {
             for (var j = 0; j < this._subscriptions.onTabChange.length; j++) {
-                try { this._subscriptions.onTabChange[j](tabName, oldTab); } catch (e) {}
+                try { this._subscriptions.onTabChange[j](tabName, oldTab); } catch (e) { }
             }
         }
     };
@@ -425,7 +425,7 @@
      * getCurrentTab — gets the current tab name.
      * @returns {string}
      */
-    Donkeycraft.CreativeInventory.prototype.getCurrentTab = function() {
+    Donkeycraft.CreativeInventory.prototype.getCurrentTab = function () {
         return this._currentTab;
     };
 
@@ -436,7 +436,7 @@
      * @param {string|number} query - Search query string or numeric ID.
      * @returns {number[]} Array of matching item IDs.
      */
-    Donkeycraft.CreativeInventory.prototype.searchItems = function(query) {
+    Donkeycraft.CreativeInventory.prototype.searchItems = function (query) {
         // Validate and normalize input
         if (query === null || query === undefined) {
             return this._tabItems[this._currentTab] ? this._tabItems[this._currentTab].slice() : [];
@@ -508,7 +508,7 @@
      * @param {number} index - Grid index within the current tab.
      * @returns {number} Block/item ID, or 0 if out of bounds.
      */
-    Donkeycraft.CreativeInventory.prototype.getItemByIndex = function(index) {
+    Donkeycraft.CreativeInventory.prototype.getItemByIndex = function (index) {
         var items = this._tabItems[this._currentTab] || [];
         if (typeof index !== 'number' || isNaN(index) || index < 0 || index >= items.length) {
             return 0;
@@ -520,7 +520,7 @@
      * getGridSize — gets the dimensions of the item grid.
      * @returns {Object} { rows, cols } dimensions.
      */
-    Donkeycraft.CreativeInventory.prototype.getGridSize = function() {
+    Donkeycraft.CreativeInventory.prototype.getGridSize = function () {
         var count = (this._tabItems[this._currentTab] || []).length;
 
         // Calculate columns based on container width if available
@@ -539,7 +539,7 @@
      * getItemCount — gets the number of visible items in the current view.
      * @returns {number} Number of items displayed (after search filtering).
      */
-    Donkeycraft.CreativeInventory.prototype.getItemCount = function() {
+    Donkeycraft.CreativeInventory.prototype.getItemCount = function () {
         return this._getFilteredItems().length;
     };
 
@@ -547,7 +547,7 @@
      * getSelectedItem — gets the currently selected item ID.
      * @returns {number|null} The selected item ID, or null if none selected.
      */
-    Donkeycraft.CreativeInventory.prototype.getSelectedItem = function() {
+    Donkeycraft.CreativeInventory.prototype.getSelectedItem = function () {
         return this._selectedItemId;
     };
 
@@ -555,7 +555,7 @@
      * setSelectedItem — sets the selected item (for keyboard navigation).
      * @param {number} itemId - Item ID to select.
      */
-    Donkeycraft.CreativeInventory.prototype.setSelectedItem = function(itemId) {
+    Donkeycraft.CreativeInventory.prototype.setSelectedItem = function (itemId) {
         if (this._selectedItemId === itemId) return;
         this._selectedItemId = itemId;
 
@@ -580,14 +580,14 @@
      * @param {Function} callback - Called with (itemId) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.CreativeInventory.prototype.onItemSelected = function(callback) {
+    Donkeycraft.CreativeInventory.prototype.onItemSelected = function (callback) {
         if (!this._subscriptions.onItemSelected) {
             this._subscriptions.onItemSelected = [];
         }
         this._subscriptions.onItemSelected.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._subscriptions.onItemSelected.indexOf(callback);
             if (idx >= 0) self._subscriptions.onItemSelected.splice(idx, 1);
         };
@@ -598,14 +598,14 @@
      * @param {Function} callback - Called with (newTab, oldTab) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.CreativeInventory.prototype.onTabChange = function(callback) {
+    Donkeycraft.CreativeInventory.prototype.onTabChange = function (callback) {
         if (!this._subscriptions.onTabChange) {
             this._subscriptions.onTabChange = [];
         }
         this._subscriptions.onTabChange.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._subscriptions.onTabChange.indexOf(callback);
             if (idx >= 0) self._subscriptions.onTabChange.splice(idx, 1);
         };
@@ -614,7 +614,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.CreativeInventory.prototype.destroy = function() {
+    Donkeycraft.CreativeInventory.prototype.destroy = function () {
         // Clear container DOM
         if (this._container) {
             while (this._container.firstChild) {

@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone Pistons
 // Pistons & sticky pistons: push up to 12 blocks, pull (sticky), crush detection.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -59,7 +59,7 @@
      * RedstonePistons — manages piston extension/retraction, push limits,
      * crush detection, and sticky piston pulling.
      */
-    Donkeycraft.RedstonePistons = (function() {
+    Donkeycraft.RedstonePistons = (function () {
 
         // Piston states: Map<"x,y,z", { extended: boolean, extending: boolean, extendTick: number, facing: number, isSticky: boolean }}
         var _pistonStates = {};
@@ -411,12 +411,12 @@
          */
         function _getPushDirection(facing) {
             switch (facing) {
-                case FACING_DOWN:  return { dx: 0, dy: -1, dz: 0 };
-                case FACING_UP:    return { dx: 0, dy: 1, dz: 0 };
+                case FACING_DOWN: return { dx: 0, dy: -1, dz: 0 };
+                case FACING_UP: return { dx: 0, dy: 1, dz: 0 };
                 case FACING_SOUTH: return { dx: 0, dy: 0, dz: 1 };
                 case FACING_NORTH: return { dx: 0, dy: 0, dz: -1 };
-                case FACING_WEST:  return { dx: -1, dy: 0, dz: 0 };
-                case FACING_EAST:  return { dx: 1, dy: 0, dz: 0 };
+                case FACING_WEST: return { dx: -1, dy: 0, dz: 0 };
+                case FACING_EAST: return { dx: 1, dy: 0, dz: 0 };
             }
             return null;
         }

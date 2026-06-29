@@ -1,6 +1,6 @@
 // Donkeycraft — Event Bus
 // Publish/subscribe event system for decoupled communication between systems.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * Supports namespaced events, one-time listeners, and safe static emission.
      * @param {string} [namespace=''] - Optional namespace prefix for events (e.g., 'world', 'player').
      */
-    Donkeycraft.EventBus = function(namespace) {
+    Donkeycraft.EventBus = function (namespace) {
         this._namespace = namespace || '';
         this._listeners = {};
     };
@@ -22,7 +22,7 @@
      * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
      * @returns {Function} Unsubscribe function that removes this listener without firing it.
      */
-    Donkeycraft.EventBus.prototype.on = function(event, callback, context) {
+    Donkeycraft.EventBus.prototype.on = function (event, callback, context) {
         var key = this._namespace + event;
         if (!this._listeners[key]) {
             this._listeners[key] = [];
@@ -30,7 +30,7 @@
         this._listeners[key].push({ callback: callback, context: context || this });
 
         var self = this;
-        return function() {
+        return function () {
             self.off(event, callback);
         };
     };
@@ -44,17 +44,17 @@
      * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
      * @returns {Function} Unsubscribe function that prevents the one-time listener from ever firing.
      */
-    Donkeycraft.EventBus.prototype.once = function(event, callback, context) {
+    Donkeycraft.EventBus.prototype.once = function (event, callback, context) {
         var self = this;
         var key = this._namespace + event;
         var fired = false;
 
-        var wrapped = function() {
+        var wrapped = function () {
             if (fired) return;
             fired = true;
             // Remove the wrapped callback from listeners
             if (self._listeners[key]) {
-                self._listeners[key] = self._listeners[key].filter(function(entry) {
+                self._listeners[key] = self._listeners[key].filter(function (entry) {
                     return entry.callback !== wrapped && entry._originalCallback !== callback;
                 });
             }
@@ -69,7 +69,7 @@
             listeners[listeners.length - 1]._originalCallback = callback;
         }
 
-        return function() {
+        return function () {
             fired = true;
             self.off(event, callback);
         };
@@ -81,11 +81,11 @@
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - The exact callback function reference to remove.
      */
-    Donkeycraft.EventBus.prototype.off = function(event, callback) {
+    Donkeycraft.EventBus.prototype.off = function (event, callback) {
         var key = this._namespace + event;
         if (!this._listeners[key]) return;
 
-        this._listeners[key] = this._listeners[key].filter(function(entry) {
+        this._listeners[key] = this._listeners[key].filter(function (entry) {
             return !(entry.callback === callback || entry._originalCallback === callback);
         });
 
@@ -102,7 +102,7 @@
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {...*} args - Arguments passed to each listener callback.
      */
-    Donkeycraft.EventBus.prototype.emit = function(event) {
+    Donkeycraft.EventBus.prototype.emit = function (event) {
         var key = this._namespace + event;
         if (!this._listeners[key]) return;
 
@@ -124,7 +124,7 @@
     /**
      * Clear all listeners.
      */
-    Donkeycraft.EventBus.prototype.clear = function() {
+    Donkeycraft.EventBus.prototype.clear = function () {
         this._listeners = {};
     };
 
@@ -136,7 +136,7 @@
      * @param {string} event - Event name (no namespace prefix — uses the global instance directly).
      * @param {...*} args - Arguments passed to each listener callback.
      */
-    Donkeycraft.EventBus.emitSafe = function(event) {
+    Donkeycraft.EventBus.emitSafe = function (event) {
         var globalInstance = Donkeycraft.EventBus._global;
         if (!globalInstance || typeof globalInstance.emit !== 'function') return;
         var args = Array.prototype.slice.call(arguments, 1);
@@ -148,7 +148,7 @@
      * Call this once during game initialization with the main game's EventBus.
      * @param {Donkeycraft.EventBus} instance - The global EventBus instance.
      */
-    Donkeycraft.EventBus.setGlobal = function(instance) {
+    Donkeycraft.EventBus.setGlobal = function (instance) {
         if (instance && typeof instance.emit === 'function') {
             Donkeycraft.EventBus._global = instance;
         }

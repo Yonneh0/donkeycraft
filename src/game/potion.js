@@ -1,6 +1,6 @@
 // Donkeycraft — Potion System
 // Brewing recipe matching, effect application, duration, and amplifier management.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -20,7 +20,7 @@
      * @param {number} [maxDuration=1800] — Maximum duration in ticks (90 seconds).
      * @param {number} [maxAmplifier=4] — Maximum amplifier level (0-4, where 0 = base).
      */
-    Donkeycraft.PotionEffect = function(id, name, r, g, b, minDuration, maxDuration, maxAmplifier) {
+    Donkeycraft.PotionEffect = function (id, name, r, g, b, minDuration, maxDuration, maxAmplifier) {
         this.id = id;
         this.name = name;
         this.r = r;
@@ -45,7 +45,7 @@
      * @param {boolean} [isInstant=false] — Whether this is an instant effect potion.
      * @param {string} [bucketColor=null] — Custom bucket color hex string (or null for default).
      */
-    Donkeycraft.Potion = function(id, name, ingredientId, basePotionId, effects, isInstant, bucketColor) {
+    Donkeycraft.Potion = function (id, name, ingredientId, basePotionId, effects, isInstant, bucketColor) {
         this.id = id;
         this.name = name;
         this.ingredientId = ingredientId || 0;
@@ -62,7 +62,7 @@
     /**
      * PotionRegistry — static class managing all potion definitions, effects, and brewing recipes.
      */
-    Donkeycraft.PotionRegistry = (function() {
+    Donkeycraft.PotionRegistry = (function () {
         var _potions = {};          // id -> Potion
         var _effects = {};          // id -> PotionEffect
         var _byName = {};           // name -> Potion
@@ -425,7 +425,7 @@
      * @param {number} duration - Remaining duration in ticks.
      * @param {number} maxDuration - Original/max duration in ticks.
      */
-    Donkeycraft.ActivePotion = function(effectId, amplifier, duration, maxDuration) {
+    Donkeycraft.ActivePotion = function (effectId, amplifier, duration, maxDuration) {
         this.effectId = effectId;
         this.amplifier = amplifier;
         this.remainingTicks = duration;
@@ -439,7 +439,7 @@
     /**
      * ActivePotionManager — static class managing active potion effects on entities.
      */
-    Donkeycraft.ActivePotionManager = (function() {
+    Donkeycraft.ActivePotionManager = (function () {
         var _entityEffects = {};  // entityId -> [ActivePotion]
         var _nextEntityId = 1;
 

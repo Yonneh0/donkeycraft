@@ -1,6 +1,6 @@
 // Donkeycraft — Recipe Registry
 // Central registry for all crafting recipes, furnace recipes, shapeless recipes.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -19,7 +19,7 @@
      * @param {number} [outputCount=1] — Number of output items.
      * @param {number} [cookingTime=200] — Smelting time in ticks (200 = 10 seconds). Only for "smelt" type.
      */
-    Donkeycraft.Recipe = function(id, type, ingredients, gridSize, outputBlockId, outputCount, cookingTime) {
+    Donkeycraft.Recipe = function (id, type, ingredients, gridSize, outputBlockId, outputCount, cookingTime) {
         this.id = id;
         this.type = type;             // "shaped", "shapeless", "smelt"
         this.ingredients = ingredients;
@@ -36,7 +36,7 @@
     /**
      * RecipeRegistry — central registry for crafting and smelting recipes.
      */
-    Donkeycraft.RecipeRegistry = (function() {
+    Donkeycraft.RecipeRegistry = (function () {
         var _shapedRecipes = [];     // Array of shaped recipes (2×2 and 3×3)
         var _shapelessRecipes = [];  // Array of shapeless recipes
         var _smeltRecipes = {};      // inputBlockId -> Recipe

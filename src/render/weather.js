@@ -1,7 +1,7 @@
 // Donkeycraft — Weather
 // Weather system: state management, particle rendering (rain/snow), thunder/lightning.
 // Weather state and duration are managed by the Weather class; rendering is handled by WeatherRenderer.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -18,7 +18,7 @@
      * Weather — Manages weather state, duration, thunder intensity, and biome-specific restrictions.
      * Does NOT handle rendering — that is done by WeatherRenderer.
      */
-    Donkeycraft.Weather = function() {
+    Donkeycraft.Weather = function () {
         this._weatherState = Donkeycraft.WEATHER_CLEAR;
         this._weatherDuration = 0;
         this._weatherTimer = 0;
@@ -31,7 +31,7 @@
      * Set the current weather state.
      * @param {string} state — Weather state ('clear', 'rain', 'thunder', 'snow').
      */
-    Donkeycraft.Weather.prototype.setWeather = function(state) {
+    Donkeycraft.Weather.prototype.setWeather = function (state) {
         var validStates = [
             Donkeycraft.WEATHER_CLEAR,
             Donkeycraft.WEATHER_RAIN,
@@ -76,7 +76,7 @@
      * Get the current weather state.
      * @returns {string} Weather state.
      */
-    Donkeycraft.Weather.prototype.getWeather = function() {
+    Donkeycraft.Weather.prototype.getWeather = function () {
         return this._weatherState;
     };
 
@@ -84,16 +84,16 @@
      * Check if it is currently raining.
      * @returns {boolean} True if raining.
      */
-    Donkeycraft.Weather.prototype.isRaining = function() {
+    Donkeycraft.Weather.prototype.isRaining = function () {
         return this._weatherState === Donkeycraft.WEATHER_RAIN ||
-               this._weatherState === Donkeycraft.WEATHER_THUNDER;
+            this._weatherState === Donkeycraft.WEATHER_THUNDER;
     };
 
     /**
      * Check if it is currently thundering.
      * @returns {boolean} True if thundering.
      */
-    Donkeycraft.Weather.prototype.isThundering = function() {
+    Donkeycraft.Weather.prototype.isThundering = function () {
         return this._weatherState === Donkeycraft.WEATHER_THUNDER;
     };
 
@@ -101,7 +101,7 @@
      * Check if it is currently snowing.
      * @returns {boolean} True if snowing.
      */
-    Donkeycraft.Weather.prototype.isSnowing = function() {
+    Donkeycraft.Weather.prototype.isSnowing = function () {
         return this._weatherState === Donkeycraft.WEATHER_SNOW;
     };
 
@@ -109,7 +109,7 @@
      * Get the remaining ticks until weather changes.
      * @returns {number} Ticks remaining.
      */
-    Donkeycraft.Weather.prototype.getWeatherDuration = function() {
+    Donkeycraft.Weather.prototype.getWeatherDuration = function () {
         return Math.max(0, this._weatherDuration - this._weatherTimer);
     };
 
@@ -117,7 +117,7 @@
      * Set the weather duration in ticks.
      * @param {number} duration — Duration in ticks.
      */
-    Donkeycraft.Weather.prototype.setWeatherDuration = function(duration) {
+    Donkeycraft.Weather.prototype.setWeatherDuration = function (duration) {
         this._weatherDuration = Math.max(100, duration);
     };
 
@@ -125,7 +125,7 @@
      * Get the current thunder intensity [0, 1].
      * @returns {number} Thunder intensity.
      */
-    Donkeycraft.Weather.prototype.getThunderIntensity = function() {
+    Donkeycraft.Weather.prototype.getThunderIntensity = function () {
         return this._thunderIntensity;
     };
 
@@ -133,7 +133,7 @@
      * Set thunder intensity [0, 1].
      * @param {number} intensity — Thunder intensity.
      */
-    Donkeycraft.Weather.prototype.setThunderIntensity = function(intensity) {
+    Donkeycraft.Weather.prototype.setThunderIntensity = function (intensity) {
         this._thunderIntensity = Donkeycraft.clamp(intensity, 0, 1);
     };
 
@@ -141,7 +141,7 @@
      * Get the particle density [0, 1].
      * @returns {number} Particle density.
      */
-    Donkeycraft.Weather.prototype.getParticleDensity = function() {
+    Donkeycraft.Weather.prototype.getParticleDensity = function () {
         return this._particleDensity;
     };
 
@@ -149,7 +149,7 @@
      * Tick the weather system — advance timer and check for weather changes.
      * @param {Object} [biomeAtPlayer] — Optional biome info for restrictions.
      */
-    Donkeycraft.Weather.prototype.tick = function(biomeAtPlayer) {
+    Donkeycraft.Weather.prototype.tick = function (biomeAtPlayer) {
         this._weatherTimer++;
 
         // Thunder intensity fluctuation
@@ -174,7 +174,7 @@
      * @param {Object} [biomeAtPlayer] — Optional biome info for restrictions.
      * @returns {boolean} True if weather should change.
      */
-    Donkeycraft.Weather.prototype.shouldChangeWeather = function(biomeAtPlayer) {
+    Donkeycraft.Weather.prototype.shouldChangeWeather = function (biomeAtPlayer) {
         // If it's been at least 100 ticks, allow random change
         if (this._weatherTimer < 100) {
             return false;
@@ -197,7 +197,7 @@
      * Change to a random weather state (respecting biome restrictions).
      * @param {Object} [biomeAtPlayer] — Optional biome info for restrictions.
      */
-    Donkeycraft.Weather.prototype.changeToRandomWeather = function(biomeAtPlayer) {
+    Donkeycraft.Weather.prototype.changeToRandomWeather = function (biomeAtPlayer) {
         var possibleStates = [
             Donkeycraft.WEATHER_CLEAR,
             Donkeycraft.WEATHER_RAIN,
@@ -213,10 +213,10 @@
         // Filter out biome-incompatible weather
         var isDesert = biomeAtPlayer && biomeAtPlayer.isDesert;
         if (isDesert) {
-            possibleStates = possibleStates.filter(function(s) {
+            possibleStates = possibleStates.filter(function (s) {
                 return s !== Donkeycraft.WEATHER_RAIN &&
-                       s !== Donkeycraft.WEATHER_THUNDER &&
-                       s !== Donkeycraft.WEATHER_SNOW;
+                    s !== Donkeycraft.WEATHER_THUNDER &&
+                    s !== Donkeycraft.WEATHER_SNOW;
             });
         }
 
@@ -250,7 +250,7 @@
      * @param {number} biomeId — Biome ID.
      * @returns {{canRain: boolean, canSnow: boolean}} Weather permissions.
      */
-    Donkeycraft.Weather.prototype.getBiomeWeather = function(biomeId) {
+    Donkeycraft.Weather.prototype.getBiomeWeather = function (biomeId) {
         // Default: all weather allowed
         var result = { canRain: true, canSnow: true };
 
@@ -273,7 +273,7 @@
      * @param {number} biomeId — Biome ID.
      * @param {{canRain: boolean, canSnow: boolean}} permissions — Weather permissions.
      */
-    Donkeycraft.Weather.prototype.setBiomeWeatherRestriction = function(biomeId, permissions) {
+    Donkeycraft.Weather.prototype.setBiomeWeatherRestriction = function (biomeId, permissions) {
         this._biomeWeatherMap[biomeId] = permissions;
     };
 
@@ -282,7 +282,7 @@
      * @param {number} biomeId — Biome ID.
      * @returns {{canRain: boolean, canSnow: boolean}} Weather permissions.
      */
-    Donkeycraft.Weather.prototype.getBiomeWeatherRestrictions = function(biomeId) {
+    Donkeycraft.Weather.prototype.getBiomeWeatherRestrictions = function (biomeId) {
         if (this._biomeWeatherMap[biomeId]) {
             return this._biomeWeatherMap[biomeId];
         }
@@ -295,7 +295,7 @@
      * @returns {number} Duration in ticks [6000, 120000].
      * @private
      */
-    Donkeycraft.Weather.prototype.getRandomDuration = function(state) {
+    Donkeycraft.Weather.prototype.getRandomDuration = function (state) {
         var minDuration, maxDuration;
 
         switch (state) {
@@ -324,7 +324,7 @@
      * Force a weather change immediately.
      * @param {string} state — Target weather state.
      */
-    Donkeycraft.Weather.prototype.forceChange = function(state) {
+    Donkeycraft.Weather.prototype.forceChange = function (state) {
         this.setWeather(state);
         this._weatherTimer = 0;
     };
@@ -332,7 +332,7 @@
     /**
      * Clear current weather immediately.
      */
-    Donkeycraft.Weather.prototype.clear = function() {
+    Donkeycraft.Weather.prototype.clear = function () {
         this.setWeather(Donkeycraft.WEATHER_CLEAR);
     };
 
@@ -340,7 +340,7 @@
      * Serialize weather state to a plain object.
      * @returns {{weatherState: string, weatherDuration: number, weatherTimer: number}} Serialized state.
      */
-    Donkeycraft.Weather.prototype.serialize = function() {
+    Donkeycraft.Weather.prototype.serialize = function () {
         return {
             weatherState: this._weatherState,
             weatherDuration: this._weatherDuration,
@@ -353,7 +353,7 @@
      * @param {Object} data — Serialized state.
      * @returns {Donkeycraft.Weather} This instance for chaining.
      */
-    Donkeycraft.Weather.prototype.deserialize = function(data) {
+    Donkeycraft.Weather.prototype.deserialize = function (data) {
         if (data) {
             if (typeof data.weatherState === 'string') {
                 this._weatherState = data.weatherState;
@@ -374,7 +374,7 @@
      * @param {WebGLRenderingContext} gl - WebGL context.
      * @param {ShaderManager} shaderManager - Shader manager instance.
      */
-    Donkeycraft.WeatherRenderer = function(gl, shaderManager) {
+    Donkeycraft.WeatherRenderer = function (gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._maxParticles = 2000;
@@ -397,12 +397,12 @@
 
         if (gl && gl.canvas) {
             var self = this;
-            gl.canvas.addEventListener('webglcontextlost', function(e) {
+            gl.canvas.addEventListener('webglcontextlost', function (e) {
                 e.preventDefault();
                 self._contextLost = true;
                 self._vertexBuffer = null;
             });
-            gl.canvas.addEventListener('webglcontextrestored', function() {
+            gl.canvas.addEventListener('webglcontextrestored', function () {
                 self._contextLost = false;
                 self._vertexBuffer = null;
             });
@@ -413,7 +413,7 @@
      * Activate weather rendering. Resets particle count so spawnInitialParticles() will repopulate.
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype.activate = function() {
+    Donkeycraft.WeatherRenderer.prototype.activate = function () {
         if (this._active) return; // Already active — avoid resetting
         this._active = true;
         this._particleCount = 0;
@@ -423,7 +423,7 @@
      * Deactivate weather rendering and clear all particles.
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype.deactivate = function() {
+    Donkeycraft.WeatherRenderer.prototype.deactivate = function () {
         this._active = false;
         this._particleCount = 0;
     };
@@ -432,7 +432,7 @@
      * Spawn a single weather particle at the given position.
      * @private
      */
-    Donkeycraft.WeatherRenderer.prototype._spawnParticle = function(x, y, z, type) {
+    Donkeycraft.WeatherRenderer.prototype._spawnParticle = function (x, y, z, type) {
         if (this._particleCount >= this._maxParticles) return;
 
         var i = this._particleCount;
@@ -463,7 +463,7 @@
      * @param {{x:number,y:number,z:number}} playerPos - Player position for particle culling.
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype.update = function(deltaTime, playerPos) {
+    Donkeycraft.WeatherRenderer.prototype.update = function (deltaTime, playerPos) {
         if (!this._active || this._particleCount === 0) return;
 
         var removed = 0;
@@ -503,7 +503,7 @@
      * @param {string} type - Particle type ('rain' or 'snow').
      * @returns {boolean} True if particles were rendered.
      */
-    Donkeycraft.WeatherRenderer.prototype.render = function(camera, particleDensity, type) {
+    Donkeycraft.WeatherRenderer.prototype.render = function (camera, particleDensity, type) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !this._active || this._particleCount === 0) return;
 
@@ -518,101 +518,101 @@
             var matrices = camera.getMatrices();
             this._shaderManager.setMat4('uProjection', matrices.projection);
             this._shaderManager.setMat4('uView', matrices.view);
-        this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
-        this._shaderManager.setInt('uHasTexture', 0);
+            this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+            this._shaderManager.setInt('uHasTexture', 0);
 
-        var right = camera.getRight();
-        var up = camera.getUp();
+            var right = camera.getRight();
+            var up = camera.getUp();
 
-        // Build vertex data: each particle is a quad (6 vertices)
-        var particleSize = type === 'snow' ? 0.15 : 0.03;
-        var vertsPerParticle = 6;
-        var floatsPerVertex = 9;
-        var totalFloats = this._particleCount * vertsPerParticle * floatsPerVertex;
+            // Build vertex data: each particle is a quad (6 vertices)
+            var particleSize = type === 'snow' ? 0.15 : 0.03;
+            var vertsPerParticle = 6;
+            var floatsPerVertex = 9;
+            var totalFloats = this._particleCount * vertsPerParticle * floatsPerVertex;
 
-        if (!this._vertexArray || this._vertexArray.length < totalFloats) {
-            this._vertexArray = new Float32Array(totalFloats);
-        }
-        var vertices = this._vertexArray;
+            if (!this._vertexArray || this._vertexArray.length < totalFloats) {
+                this._vertexArray = new Float32Array(totalFloats);
+            }
+            var vertices = this._vertexArray;
 
-        for (var i = 0; i < this._particleCount; i++) {
-            var px = this._px[i];
-            var py = this._py[i];
-            var pz = this._pz[i];
-            var alpha = this._pAlpha[i] * particleDensity;
+            for (var i = 0; i < this._particleCount; i++) {
+                var px = this._px[i];
+                var py = this._py[i];
+                var pz = this._pz[i];
+                var alpha = this._pAlpha[i] * particleDensity;
 
-            // Billboard quad (always faces camera)
-            var rx = right.x * particleSize, ry = right.y * particleSize, rz = right.z * particleSize;
-            var ux = up.x * particleSize, uy = up.y * particleSize, uz = up.z * particleSize;
+                // Billboard quad (always faces camera)
+                var rx = right.x * particleSize, ry = right.y * particleSize, rz = right.z * particleSize;
+                var ux = up.x * particleSize, uy = up.y * particleSize, uz = up.z * particleSize;
 
-            // Four corners of the quad
-            var blx = px - rx - ux, bly = py - ry - uy, blz = pz - rz - uz;
-            var brx = px + rx - ux, bry = py + ry - uy, brz = pz + rz - uz;
-            var trx = px + rx + ux, topRightY = py + ry + uy, trz = pz + rz + uz;
-            var tlx = px - rx + ux, tly = py - ry + uy, tlz = pz - rz + uz;
+                // Four corners of the quad
+                var blx = px - rx - ux, bly = py - ry - uy, blz = pz - rz - uz;
+                var brx = px + rx - ux, bry = py + ry - uy, brz = pz + rz - uz;
+                var trx = px + rx + ux, topRightY = py + ry + uy, trz = pz + rz + uz;
+                var tlx = px - rx + ux, tly = py - ry + uy, tlz = pz - rz + uz;
 
-            // Color based on particle type
-            var r, g, b;
-            if (type === 'snow') {
-                r = 0.95; g = 0.95; b = 1.0;
-            } else {
-                r = 0.6; g = 0.7; b = 0.9;
+                // Color based on particle type
+                var r, g, b;
+                if (type === 'snow') {
+                    r = 0.95; g = 0.95; b = 1.0;
+                } else {
+                    r = 0.6; g = 0.7; b = 0.9;
+                }
+
+                var base = i * vertsPerParticle * floatsPerVertex;
+
+                // Bottom-left
+                vertices[base] = blx; vertices[base + 1] = bly; vertices[base + 2] = blz;
+                vertices[base + 3] = 0; vertices[base + 4] = 0;
+                vertices[base + 5] = r; vertices[base + 6] = g; vertices[base + 7] = b; vertices[base + 8] = alpha;
+                // Bottom-right
+                vertices[base + 9] = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
+                vertices[base + 12] = 1; vertices[base + 13] = 0;
+                vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
+                // Top-right
+                vertices[base + 18] = trx; vertices[base + 19] = topRightY; vertices[base + 20] = trz;
+                vertices[base + 21] = 1; vertices[base + 22] = 1;
+                vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
+                // Bottom-left (duplicate for second triangle)
+                vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
+                vertices[base + 30] = 0; vertices[base + 31] = 0;
+                vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
+                // Top-right (duplicate)
+                vertices[base + 36] = trx; vertices[base + 37] = topRightY; vertices[base + 38] = trz;
+                vertices[base + 39] = 1; vertices[base + 40] = 1;
+                vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
+                // Top-left
+                vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
+                vertices[base + 48] = 0; vertices[base + 49] = 1;
+                vertices[base + 50] = r; vertices[base + 51] = g; vertices[base + 52] = b; vertices[base + 53] = alpha;
             }
 
-            var base = i * vertsPerParticle * floatsPerVertex;
+            // Upload vertex data to GPU
+            if (!this._vertexBuffer) {
+                this._vertexBuffer = gl.createBuffer();
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
 
-            // Bottom-left
-            vertices[base] = blx; vertices[base + 1] = bly; vertices[base + 2] = blz;
-            vertices[base + 3] = 0; vertices[base + 4] = 0;
-            vertices[base + 5] = r; vertices[base + 6] = g; vertices[base + 7] = b; vertices[base + 8] = alpha;
-            // Bottom-right
-            vertices[base + 9] = brx; vertices[base + 10] = bry; vertices[base + 11] = brz;
-            vertices[base + 12] = 1; vertices[base + 13] = 0;
-            vertices[base + 14] = r; vertices[base + 15] = g; vertices[base + 16] = b; vertices[base + 17] = alpha;
-            // Top-right
-            vertices[base + 18] = trx; vertices[base + 19] = topRightY; vertices[base + 20] = trz;
-            vertices[base + 21] = 1; vertices[base + 22] = 1;
-            vertices[base + 23] = r; vertices[base + 24] = g; vertices[base + 25] = b; vertices[base + 26] = alpha;
-            // Bottom-left (duplicate for second triangle)
-            vertices[base + 27] = blx; vertices[base + 28] = bly; vertices[base + 29] = blz;
-            vertices[base + 30] = 0; vertices[base + 31] = 0;
-            vertices[base + 32] = r; vertices[base + 33] = g; vertices[base + 34] = b; vertices[base + 35] = alpha;
-            // Top-right (duplicate)
-            vertices[base + 36] = trx; vertices[base + 37] = topRightY; vertices[base + 38] = trz;
-            vertices[base + 39] = 1; vertices[base + 40] = 1;
-            vertices[base + 41] = r; vertices[base + 42] = g; vertices[base + 43] = b; vertices[base + 44] = alpha;
-            // Top-left
-            vertices[base + 45] = tlx; vertices[base + 46] = tly; vertices[base + 47] = tlz;
-            vertices[base + 48] = 0; vertices[base + 49] = 1;
-            vertices[base + 50] = r; vertices[base + 51] = g; vertices[base + 52] = b; vertices[base + 53] = alpha;
-        }
+            var posLoc = this._shaderManager.getAttribute('aPosition');
+            var uvLoc = this._shaderManager.getAttribute('aUV');
+            var colorLoc = this._shaderManager.getAttribute('aColor');
 
-        // Upload vertex data to GPU
-        if (!this._vertexBuffer) {
-            this._vertexBuffer = gl.createBuffer();
-        }
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
+            if (posLoc >= 0) {
+                gl.enableVertexAttribArray(posLoc);
+                gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
+            }
+            if (uvLoc >= 0) {
+                gl.enableVertexAttribArray(uvLoc);
+                gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
+            }
+            if (colorLoc >= 0) {
+                gl.enableVertexAttribArray(colorLoc);
+                gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
+            }
 
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-        var uvLoc = this._shaderManager.getAttribute('aUV');
-        var colorLoc = this._shaderManager.getAttribute('aColor');
-
-        if (posLoc >= 0) {
-            gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 9 * 4, 0);
-        }
-        if (uvLoc >= 0) {
-            gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 12);
-        }
-        if (colorLoc >= 0) {
-            gl.enableVertexAttribArray(colorLoc);
-            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 9 * 4, 20);
-        }
-
-        var totalVertices = this._particleCount * vertsPerParticle;
-        gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
+            var totalVertices = this._particleCount * vertsPerParticle;
+            gl.drawArrays(gl.TRIANGLES, 0, totalVertices);
         } finally {
             // Always restore depth writes, even on error.
             gl.depthMask(true);
@@ -630,7 +630,7 @@
      * @param {number} [count=500] - Number of particles to spawn (capped at maxParticles).
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype.spawnInitialParticles = function(count) {
+    Donkeycraft.WeatherRenderer.prototype.spawnInitialParticles = function (count) {
         var self = this;
         count = Math.min(count || 500, this._maxParticles);
 
@@ -650,7 +650,7 @@
      * Get the current active particle count.
      * @returns {number} Active particle count.
      */
-    Donkeycraft.WeatherRenderer.prototype.getParticleCount = function() {
+    Donkeycraft.WeatherRenderer.prototype.getParticleCount = function () {
         return this._particleCount;
     };
 
@@ -659,7 +659,7 @@
      * Cleans up vertex buffer and resets all particle data arrays.
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype.destroy = function() {
+    Donkeycraft.WeatherRenderer.prototype.destroy = function () {
         var gl = this._gl;
         if (this._vertexBuffer && gl) {
             gl.deleteBuffer(this._vertexBuffer);
@@ -684,7 +684,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.WeatherRenderer.prototype._rebuildBuffers = function() {
+    Donkeycraft.WeatherRenderer.prototype._rebuildBuffers = function () {
         // Buffers are lazily recreated on next render call via null checks —
         // no explicit rebuild needed since geometry is per-frame dynamic data.
     };
@@ -694,7 +694,7 @@
      * Does NOT destroy WeatherRenderer — that is a separate class.
      * @returns {void}
      */
-    Donkeycraft.Weather.prototype.destroy = function() {
+    Donkeycraft.Weather.prototype.destroy = function () {
         this._weatherState = Donkeycraft.WEATHER_CLEAR;
         this._weatherDuration = 0;
         this._weatherTimer = 0;

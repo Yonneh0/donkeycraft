@@ -1,6 +1,6 @@
 // Donkeycraft — Mob AI
 // Pathfinding (greedy best-first), line-of-sight, attack behavior, flee.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -50,7 +50,7 @@
      * @param {Function} isBlockSolid - Callback(x, y, z) returning truthy if block blocks vision.
      * @returns {boolean} True if line-of-sight exists.
      */
-    Donkeycraft.MobAI.hasLineOfSight = function(x1, y1, z1, x2, y2, z2, isBlockSolid) {
+    Donkeycraft.MobAI.hasLineOfSight = function (x1, y1, z1, x2, y2, z2, isBlockSolid) {
         var dx = x2 - x1;
         var dy = y2 - y1;
         var dz = z2 - z1;
@@ -91,7 +91,7 @@
      * @param {number} maxSteps - Maximum steps to prevent infinite loops.
      * @returns {Object|null} Path with 'steps' array and 'distance', or null if no path.
      */
-    Donkeycraft.MobAI.findPath = function(startX, startY, startZ, endX, endY, endZ, isWalkable, maxSteps) {
+    Donkeycraft.MobAI.findPath = function (startX, startY, startZ, endX, endY, endZ, isWalkable, maxSteps) {
         maxSteps = maxSteps || 200;
 
         var currentX = Math.floor(startX);
@@ -141,8 +141,8 @@
 
                 // Calculate distance to target
                 var dist = (nx - endFloorX) * (nx - endFloorX) +
-                           (ny - endFloorY) * (ny - endFloorY) +
-                           (nz - endFloorZ) * (nz - endFloorZ);
+                    (ny - endFloorY) * (ny - endFloorY) +
+                    (nz - endFloorZ) * (nz - endFloorZ);
 
                 if (dist < bestDist) {
                     bestDist = dist;
@@ -179,7 +179,7 @@
      * @param {number} speed - Movement speed.
      * @returns {{vx: number, vz: number}} Velocity components.
      */
-    Donkeycraft.MobAI.calculateChaseVelocity = function(mobX, mobZ, targetX, targetZ, speed) {
+    Donkeycraft.MobAI.calculateChaseVelocity = function (mobX, mobZ, targetX, targetZ, speed) {
         var dx = targetX - mobX;
         var dz = targetZ - mobZ;
         var dist = Math.sqrt(dx * dx + dz * dz);
@@ -203,7 +203,7 @@
      * @param {number} speed - Movement speed.
      * @returns {{vx: number, vz: number}} Velocity components.
      */
-    Donkeycraft.MobAI.calculateFleeVelocity = function(mobX, mobZ, sourceX, sourceZ, speed) {
+    Donkeycraft.MobAI.calculateFleeVelocity = function (mobX, mobZ, sourceX, sourceZ, speed) {
         var dx = mobX - sourceX;
         var dz = mobZ - sourceZ;
         var dist = Math.sqrt(dx * dx + dz * dz);
@@ -231,7 +231,7 @@
      * @param {Function} getBlockId - Callback(x, y, z) returning block ID (0 = air).
      * @returns {boolean} True if mob can see player.
      */
-    Donkeycraft.MobAI.canMobSeePlayer = function(mob, player, getBlockId) {
+    Donkeycraft.MobAI.canMobSeePlayer = function (mob, player, getBlockId) {
         var eyePos = mob.getEyePosition();
         var targetPos = player.getEyePosition();
 
@@ -287,7 +287,7 @@
      * @param {number} fleeDistance - Distance at which mob flees.
      * @returns {boolean} True if mob should flee.
      */
-    Donkeycraft.MobAI.shouldFlee = function(mob, player, fleeDistance) {
+    Donkeycraft.MobAI.shouldFlee = function (mob, player, fleeDistance) {
         fleeDistance = fleeDistance || 5;
 
         // Guard against destroyed entities
@@ -312,7 +312,7 @@
      * @param {number} [maxRadius=10] - Maximum wander radius.
      * @returns {{x: number, z: number}} Wander coordinates.
      */
-    Donkeycraft.MobAI.getWanderTarget = function(centerX, centerZ, maxRadius) {
+    Donkeycraft.MobAI.getWanderTarget = function (centerX, centerZ, maxRadius) {
         maxRadius = maxRadius || 10;
         var angle = Math.random() * Math.PI * 2;
         var radius = Math.random() * maxRadius;

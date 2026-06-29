@@ -1,6 +1,6 @@
 // Donkeycraft — WebGL Context
 // WebGL 1 context creation, error handling, capability queries.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * Listens for 'webglcontextlost' and 'webglcontextrestored' events on the canvas.
      * @param {HTMLCanvasElement} canvas - The canvas element to create the WebGL context from.
      */
-    Donkeycraft.GLContext = function(canvas) {
+    Donkeycraft.GLContext = function (canvas) {
         this._canvas = canvas;
         this._context = null;
         this._capabilities = {};
@@ -31,18 +31,18 @@
      * @private
      * @returns {boolean}
      */
-    Donkeycraft.GLContext.prototype._createContext = function() {
+    Donkeycraft.GLContext.prototype._createContext = function () {
         var self = this;
 
         // Bind webglcontextlost handler
-        this._onContextLost = function(event) {
+        this._onContextLost = function (event) {
             self._contextLost = true;
             event.preventDefault();
             Donkeycraft.Logger.error('GLContext', 'WebGL context lost — browser-initiated (GPU reset, tab crash, driver update)');
         };
 
         // Bind webglcontextrestored handler
-        this._onContextRestored = function() {
+        this._onContextRestored = function () {
             self._contextLost = false;
             self._queryCapabilities();
             Donkeycraft.Logger.info('GLContext', 'WebGL context restored — capabilities re-queried');
@@ -79,7 +79,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.GLContext.prototype._queryCapabilities = function() {
+    Donkeycraft.GLContext.prototype._queryCapabilities = function () {
         var gl = this._context;
         if (!gl) return;
 
@@ -105,7 +105,7 @@
      * Get the WebGL context object.
      * @returns {WebGLRenderingContext} The WebGL 1 rendering context.
      */
-    Donkeycraft.GLContext.prototype.getGL = function() {
+    Donkeycraft.GLContext.prototype.getGL = function () {
         return this._context;
     };
 
@@ -113,7 +113,7 @@
      * Get the WebGL context object (alias for getGL).
      * @returns {WebGLRenderingContext} The WebGL 1 rendering context.
      */
-    Donkeycraft.GLContext.prototype.getContext = function() {
+    Donkeycraft.GLContext.prototype.getContext = function () {
         return this._context;
     };
 
@@ -121,7 +121,7 @@
      * Get maximum texture size supported by the GPU.
      * @returns {number} Maximum texture size in pixels.
      */
-    Donkeycraft.GLContext.prototype.getMaxTextureSize = function() {
+    Donkeycraft.GLContext.prototype.getMaxTextureSize = function () {
         return this._capabilities.maxTextureSize || 0;
     };
 
@@ -129,7 +129,7 @@
      * Get maximum vertex uniforms count.
      * @returns {number} Max vertex uniform vectors.
      */
-    Donkeycraft.GLContext.prototype.getMaxVertexUniforms = function() {
+    Donkeycraft.GLContext.prototype.getMaxVertexUniforms = function () {
         return this._capabilities.maxVertexUniforms || 0;
     };
 
@@ -138,7 +138,7 @@
      * @param {string} name - Extension name (e.g., "OES_standard_derivatives").
      * @returns {boolean} True if the extension is available.
      */
-    Donkeycraft.GLContext.prototype.isExtensionSupported = function(name) {
+    Donkeycraft.GLContext.prototype.isExtensionSupported = function (name) {
         if (!this._context || this._contextLost) return false;
         var ext = this._context.getExtension(name);
         if (ext) {
@@ -152,7 +152,7 @@
      * @param {string} name - Extension name (e.g., "OES_standard_derivatives").
      * @returns {Object|null} The extension object, or null if not available.
      */
-    Donkeycraft.GLContext.prototype.getExtension = function(name) {
+    Donkeycraft.GLContext.prototype.getExtension = function (name) {
         return this._extensions[name] || null;
     };
 
@@ -160,7 +160,7 @@
      * Check if the context is valid, active, and not lost.
      * @returns {boolean} True if context exists, is usable, and not lost.
      */
-    Donkeycraft.GLContext.prototype.isValid = function() {
+    Donkeycraft.GLContext.prototype.isValid = function () {
         return this._context !== null && !this._contextLost;
     };
 
@@ -169,7 +169,7 @@
      * Logs each error found via Logger.warn. Returns null if no errors were found.
      * @returns {number|null} First WebGL error code (e.g., 0x0501 for INVALID_ENUM), or null if the queue was empty.
      */
-    Donkeycraft.GLContext.prototype.getError = function() {
+    Donkeycraft.GLContext.prototype.getError = function () {
         if (!this._context || this._contextLost) return null;
         var firstErr = null;
         var err = this._context.getError();
@@ -187,7 +187,7 @@
     /**
      * Reset the internal error counter to zero.
      */
-    Donkeycraft.GLContext.prototype.resetErrorCount = function() {
+    Donkeycraft.GLContext.prototype.resetErrorCount = function () {
         this._errorCount = 0;
     };
 
@@ -195,7 +195,7 @@
      * Get the current error count since the last reset.
      * @returns {number} Number of errors detected.
      */
-    Donkeycraft.GLContext.prototype.getErrorCount = function() {
+    Donkeycraft.GLContext.prototype.getErrorCount = function () {
         return this._errorCount;
     };
 
@@ -203,7 +203,7 @@
      * Get queried capabilities.
      * @returns {Object} Capabilities object with texture size, units, renderer info, etc.
      */
-    Donkeycraft.GLContext.prototype.getCapabilities = function() {
+    Donkeycraft.GLContext.prototype.getCapabilities = function () {
         return this._capabilities;
     };
 
@@ -211,7 +211,7 @@
      * Get the WebGL context attributes (alpha, antialias, depth, etc.).
      * @returns {GLContextAttributes|null} Context attributes object, or null if context is invalid.
      */
-    Donkeycraft.GLContext.prototype.getContextAttributes = function() {
+    Donkeycraft.GLContext.prototype.getContextAttributes = function () {
         if (!this._context || this._contextLost) return null;
         try {
             return this._context.getContextAttributes();
@@ -224,7 +224,7 @@
      * Check if the context was lost due to an external event (GPU reset, tab crash, etc.).
      * @returns {boolean} True if the context has been lost.
      */
-    Donkeycraft.GLContext.prototype.isContextLost = function() {
+    Donkeycraft.GLContext.prototype.isContextLost = function () {
         return this._contextLost;
     };
 
@@ -233,7 +233,7 @@
      * @param {number} width - Viewport width in pixels.
      * @param {number} height - Viewport height in pixels.
      */
-    Donkeycraft.GLContext.prototype.setViewport = function(width, height) {
+    Donkeycraft.GLContext.prototype.setViewport = function (width, height) {
         if (this._context) {
             this._context.viewport(0, 0, width, height);
         }
@@ -243,7 +243,7 @@
      * Check whether the browser supports WebGL context restoration after a context lost event.
      * @returns {boolean} True if the context attribute 'preserveDrawingBuffer' is true (enabling restore).
      */
-    Donkeycraft.GLContext.prototype.hasContextRestoreSupport = function() {
+    Donkeycraft.GLContext.prototype.hasContextRestoreSupport = function () {
         var attrs = this.getContextAttributes();
         return attrs !== null && !!attrs.preserveDrawingBuffer;
     };
@@ -252,7 +252,7 @@
      * Destroy the context and free all WebGL resources.
      * Unbinds context lost/restored event listeners and gracefully loses the WebGL context via loseContext().
      */
-    Donkeycraft.GLContext.prototype.destroy = function() {
+    Donkeycraft.GLContext.prototype.destroy = function () {
         // Unbind context lost/restored event listeners
         if (this._canvas) {
             if (this._onContextLost) {

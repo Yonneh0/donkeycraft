@@ -1,6 +1,6 @@
 // Donkeycraft — Hunger System
 // Hunger mechanics: food level, saturation, starvation damage, auto-regeneration.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -11,7 +11,7 @@
      * @param {Donkeycraft.Player} player - Player entity instance.
      * @param {Donkeycraft.HurtBox} [hurtBox=null] - Optional HurtBox instance for health-based regen/starvation.
      */
-    Donkeycraft.Hunger = function(player, hurtBox) {
+    Donkeycraft.Hunger = function (player, hurtBox) {
         this._player = player;
         this._hurtBox = hurtBox || null;
 
@@ -41,7 +41,7 @@
      * Set the reference to the player's HurtBox system.
      * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance.
      */
-    Donkeycraft.Hunger.prototype.setHurtBox = function(hurtBox) {
+    Donkeycraft.Hunger.prototype.setHurtBox = function (hurtBox) {
         this._hurtBox = hurtBox;
     };
 
@@ -49,7 +49,7 @@
      * Get the current food level.
      * @returns {number} Food level (0-20).
      */
-    Donkeycraft.Hunger.prototype.getFoodLevel = function() {
+    Donkeycraft.Hunger.prototype.getFoodLevel = function () {
         return this._foodLevel;
     };
 
@@ -57,7 +57,7 @@
      * Set the food level.
      * @param {number} level - Food level to set (0-20).
      */
-    Donkeycraft.Hunger.prototype.setFoodLevel = function(level) {
+    Donkeycraft.Hunger.prototype.setFoodLevel = function (level) {
         var oldLevel = this._foodLevel;
         this._foodLevel = Math.max(0, Math.min(20, level));
 
@@ -68,7 +68,7 @@
                     foodLevel: this._foodLevel,
                     delta: this._foodLevel - oldLevel
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
@@ -76,7 +76,7 @@
      * Get the current saturation level.
      * @returns {number} Saturation value.
      */
-    Donkeycraft.Hunger.prototype.getSaturation = function() {
+    Donkeycraft.Hunger.prototype.getSaturation = function () {
         return this._saturation;
     };
 
@@ -84,7 +84,7 @@
      * Set the saturation level.
      * @param {number} saturation - Saturation value to set.
      */
-    Donkeycraft.Hunger.prototype.setSaturation = function(saturation) {
+    Donkeycraft.Hunger.prototype.setSaturation = function (saturation) {
         this._saturation = Math.max(0, saturation);
     };
 
@@ -92,7 +92,7 @@
      * Check if the player is starving (food level = 0).
      * @returns {boolean}
      */
-    Donkeycraft.Hunger.prototype.isStarving = function() {
+    Donkeycraft.Hunger.prototype.isStarving = function () {
         return this._foodLevel <= 0;
     };
 
@@ -102,7 +102,7 @@
      * @param {number} [saturationRatio=0.6] - Saturation-to-food ratio (0-1).
      * @returns {number} Actual food restored.
      */
-    Donkeycraft.Hunger.prototype.consumeFood = function(foodValue, saturationRatio) {
+    Donkeycraft.Hunger.prototype.consumeFood = function (foodValue, saturationRatio) {
         saturationRatio = saturationRatio || 0.6;
 
         // Clamp food value to valid range
@@ -125,7 +125,7 @@
                     foodLevel: this._foodLevel,
                     delta: foodRestored
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return foodRestored;
@@ -142,7 +142,7 @@
      * This is the authoritative source for health regeneration based on hunger state.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Hunger.prototype.tick = function(deltaTime) {
+    Donkeycraft.Hunger.prototype.tick = function (deltaTime) {
         if (!this._player.isAlive()) {
             return;
         }
@@ -161,7 +161,7 @@
                             foodLevel: 20,
                             delta: 20 - this._prevFoodLevel
                         });
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
             this._prevFoodLevel = 20;
@@ -222,7 +222,7 @@
                     foodLevel: this._foodLevel,
                     delta: this._foodLevel - this._prevFoodLevel
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
         this._prevFoodLevel = this._foodLevel;
 
@@ -242,7 +242,7 @@
      * Reduces food level by 1 per block sprinted (approximate).
      * @param {number} distance - Distance sprinted in blocks.
      */
-    Donkeycraft.Hunger.prototype.applySprintDegradation = function(distance) {
+    Donkeycraft.Hunger.prototype.applySprintDegradation = function (distance) {
         if (this._foodLevel <= 0) {
             return;
         }
@@ -258,7 +258,7 @@
      * Apply hunger degradation from walking.
      * @param {number} distance - Distance walked in blocks.
      */
-    Donkeycraft.Hunger.prototype.applyWalkDegradation = function(distance) {
+    Donkeycraft.Hunger.prototype.applyWalkDegradation = function (distance) {
         if (this._foodLevel <= 0) {
             return;
         }
@@ -275,7 +275,7 @@
      * @param {number} amount - Total degradation to apply.
      * @private
      */
-    Donkeycraft.Hunger.prototype._drainSaturationAndFood = function(amount) {
+    Donkeycraft.Hunger.prototype._drainSaturationAndFood = function (amount) {
         var oldFoodLevel = this._foodLevel;
 
         // Drain saturation first (saturation counts as half a food point per unit for drain purposes)
@@ -293,7 +293,7 @@
                     foodLevel: this._foodLevel,
                     delta: this._foodLevel - oldFoodLevel
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
@@ -301,7 +301,7 @@
      * Check if the player has enough food to consume.
      * @returns {boolean}
      */
-    Donkeycraft.Hunger.prototype.hasFood = function() {
+    Donkeycraft.Hunger.prototype.hasFood = function () {
         return this._foodLevel > 0;
     };
 
@@ -309,7 +309,7 @@
      * Get the remaining saturation as a fraction of max possible.
      * @returns {number} Saturation fraction (0-1).
      */
-    Donkeycraft.Hunger.prototype.getSaturationFraction = function() {
+    Donkeycraft.Hunger.prototype.getSaturationFraction = function () {
         var maxSaturation = this._foodLevel * 2;
         if (maxSaturation <= 0) {
             return 0;
@@ -320,7 +320,7 @@
     /**
      * Reset the hunger system to full state.
      */
-    Donkeycraft.Hunger.prototype.reset = function() {
+    Donkeycraft.Hunger.prototype.reset = function () {
         var oldLevel = this._foodLevel;
         this._foodLevel = 20;
         this._saturation = 20.0;
@@ -333,14 +333,14 @@
                     foodLevel: 20,
                     delta: 20 - oldLevel
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
     /**
      * Destroy the hunger system and free resources.
      */
-    Donkeycraft.Hunger.prototype.destroy = function() {
+    Donkeycraft.Hunger.prototype.destroy = function () {
         this._player = null;
         this._hurtBox = null;
     };

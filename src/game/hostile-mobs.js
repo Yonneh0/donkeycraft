@@ -1,6 +1,6 @@
 // Donkeycraft — Hostile Mobs
 // Zombie, skeleton, spider, creeper, enderman — chase, attack, explode.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -23,11 +23,11 @@
      * HostileMobStats — mob-specific statistics for hostile mobs.
      */
     Donkeycraft.HostileMobStats = {
-        zombie:     { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 3, sightRange: 16, glow: false, attackInterval: 2 },
-        skeleton:   { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 2, sightRange: 20, glow: false, attackInterval: 1.5 },
-        spider:     { health: 16, height: 1.1, width: 1.4, speed: 1.2, damage: 2, sightRange: 16, glow: false, attackInterval: 2 },
-        creeper:    { health: 10, height: 1.7, width: 0.6, speed: 1.0, damage: 25, sightRange: 10, glow: true, explodes: true, attackInterval: 1 },
-        enderman:   { health: 40, height: 2.9, width: 0.6, speed: 1.5, damage: 5, sightRange: 32, glow: false, teleports: true, attackInterval: 2 }
+        zombie: { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 3, sightRange: 16, glow: false, attackInterval: 2 },
+        skeleton: { health: 20, height: 1.9, width: 0.6, speed: 1.0, damage: 2, sightRange: 20, glow: false, attackInterval: 1.5 },
+        spider: { health: 16, height: 1.1, width: 1.4, speed: 1.2, damage: 2, sightRange: 16, glow: false, attackInterval: 2 },
+        creeper: { health: 10, height: 1.7, width: 0.6, speed: 1.0, damage: 25, sightRange: 10, glow: true, explodes: true, attackInterval: 1 },
+        enderman: { health: 40, height: 2.9, width: 0.6, speed: 1.5, damage: 5, sightRange: 32, glow: false, teleports: true, attackInterval: 2 }
     };
 
     /**
@@ -38,7 +38,7 @@
      * @param {number} [config.y=64] - Initial Y position.
      * @param {number} [config.z=0] - Initial Z position.
      */
-    Donkeycraft.HostileMob = function(config) {
+    Donkeycraft.HostileMob = function (config) {
         config = config || {};
 
         var stats = Donkeycraft.HostileMobStats[config.type];
@@ -146,7 +146,7 @@
      * @param {Donkeycraft.Player} player - Player to check against.
      * @returns {boolean} True if a player was found.
      */
-    Donkeycraft.HostileMob.prototype.findTargetPlayer = function(player) {
+    Donkeycraft.HostileMob.prototype.findTargetPlayer = function (player) {
         var pos = this._position;
         var pPos = player.getPosition();
 
@@ -171,7 +171,7 @@
      * @param {number} [targetY] - Optional target Y (for flying/jumping mobs).
      * @private
      */
-    Donkeycraft.HostileMob.prototype._moveToward = function(targetX, targetZ, targetY) {
+    Donkeycraft.HostileMob.prototype._moveToward = function (targetX, targetZ, targetY) {
         var dx = targetX - this._position.x;
         var dy = (targetY !== undefined) ? targetY - this._position.y : 0;
         var dz = targetZ - this._position.z;
@@ -196,7 +196,7 @@
      * @returns {boolean}
      * @private
      */
-    Donkeycraft.HostileMob.prototype._isCloseEnoughToAttack = function() {
+    Donkeycraft.HostileMob.prototype._isCloseEnoughToAttack = function () {
         if (!this._targetPlayer) {
             return false;
         }
@@ -210,7 +210,7 @@
     /**
      * Attack the target player.
      */
-    Donkeycraft.HostileMob.prototype.attack = function() {
+    Donkeycraft.HostileMob.prototype.attack = function () {
         if (!this._targetPlayer) {
             return;
         }
@@ -261,7 +261,7 @@
      * Handle creeper proximity ignition.
      * @param {Donkeycraft.Player} player - Player to check proximity against.
      */
-    Donkeycraft.HostileMob.prototype.handleCreeperProximity = function(player) {
+    Donkeycraft.HostileMob.prototype.handleCreeperProximity = function (player) {
         if (!this.explodes) {
             return;
         }
@@ -285,7 +285,7 @@
      * Explode the creeper (if applicable).
      * @returns {boolean} True if explosion occurred.
      */
-    Donkeycraft.HostileMob.prototype.explode = function() {
+    Donkeycraft.HostileMob.prototype.explode = function () {
         if (!this.explodes || !this._isIgnited) {
             return false;
         }
@@ -311,7 +311,7 @@
     /**
      * Teleport the enderman randomly (short-range teleport for repositioning).
      */
-    Donkeycraft.HostileMob.prototype.teleportRandomly = function() {
+    Donkeycraft.HostileMob.prototype.teleportRandomly = function () {
         if (!this.teleports) {
             return;
         }
@@ -347,7 +347,7 @@
      * Called when the mob dies.
      * @private
      */
-    Donkeycraft.HostileMob.prototype.onDeath = function() {
+    Donkeycraft.HostileMob.prototype.onDeath = function () {
         if (this.explodes && this._isIgnited) {
             this.explode();
         }
@@ -357,7 +357,7 @@
      * Tick method — chase players, attack on contact.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.HostileMob.prototype.tick = function(deltaTime) {
+    Donkeycraft.HostileMob.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
 
         // Call base tick (applies velocity to position)
@@ -416,7 +416,7 @@
      * @param {number} z - Z position.
      * @returns {Donkeycraft.HostileMob|null}
      */
-    Donkeycraft.HostileMob.create = function(type, x, y, z) {
+    Donkeycraft.HostileMob.create = function (type, x, y, z) {
         if (!Donkeycraft.HostileMobStats[type]) {
             return null; // Unknown type
         }

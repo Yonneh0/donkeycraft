@@ -1,7 +1,7 @@
 // Donkeycraft — Flying System
 // Creative/spectator flying state management: enable/disable fly mode, speed queries.
 // Physics application is handled by Movement._tickCreativeFly() to avoid duplicate velocity writes.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -16,7 +16,7 @@
      * @param {Donkeycraft.Player} player - Player entity instance.
      * @param {Donkeycraft.Input} input - Input handler instance.
      */
-    Donkeycraft.Flying = function(player, input) {
+    Donkeycraft.Flying = function (player, input) {
         this._player = player;
         this._input = input;
 
@@ -34,7 +34,7 @@
      * State management only; physics is handled by Movement.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Flying.prototype.tick = function(deltaTime) {
+    Donkeycraft.Flying.prototype.tick = function (deltaTime) {
         // No physics here. Movement._tickCreativeFly() and _tickSpectator() handle velocity.
     };
 
@@ -44,7 +44,7 @@
      * Creative mode returns true only when flyEnabled is set.
      * @returns {boolean} True if flying is active.
      */
-    Donkeycraft.Flying.prototype.isFlying = function() {
+    Donkeycraft.Flying.prototype.isFlying = function () {
         var gameMode = this._player.getGameMode();
         // Spectators always fly — no flag check needed.
         if (gameMode === 'spectator') return true;
@@ -59,7 +59,7 @@
      * Spectator mode: always flies — sets flag to true without toggling off.
      * @returns {boolean} True if the toggle was applied.
      */
-    Donkeycraft.Flying.prototype.toggleFlyMode = function() {
+    Donkeycraft.Flying.prototype.toggleFlyMode = function () {
         var gameMode = this._player.getGameMode();
 
         // Only creative and spectator can fly
@@ -89,7 +89,7 @@
      * Spectator mode always flies; this sets the internal flag for consistency.
      * @returns {boolean} True if enabled successfully.
      */
-    Donkeycraft.Flying.prototype.enableFlyMode = function() {
+    Donkeycraft.Flying.prototype.enableFlyMode = function () {
         var gameMode = this._player.getGameMode();
 
         // Only creative and spectator can fly
@@ -109,7 +109,7 @@
      * Spectator mode cannot be disabled — always flies.
      * @returns {boolean} True if disabled successfully.
      */
-    Donkeycraft.Flying.prototype.disableFlyMode = function() {
+    Donkeycraft.Flying.prototype.disableFlyMode = function () {
         var gameMode = this._player.getGameMode();
 
         // Spectators cannot disable flying
@@ -128,7 +128,7 @@
      * Get the current flying speed based on sprint state.
      * @returns {number} Flying speed in blocks per second.
      */
-    Donkeycraft.Flying.prototype.getFlySpeed = function() {
+    Donkeycraft.Flying.prototype.getFlySpeed = function () {
         var isSprinting = this._input && typeof this._input.isKeyDown === 'function'
             ? this._input.isKeyDown(Config.KEYBINDS.SPRINT)
             : false;
@@ -139,7 +139,7 @@
      * Check if the player is in spectator mode (can clip through blocks).
      * @returns {boolean} True if game mode is spectator.
      */
-    Donkeycraft.Flying.prototype.canSpectate = function() {
+    Donkeycraft.Flying.prototype.canSpectate = function () {
         return this._player.getGameMode() === 'spectator';
     };
 
@@ -147,7 +147,7 @@
      * Check if the player should clip through blocks (spectator mode only).
      * @returns {boolean} True if spectator mode is active.
      */
-    Donkeycraft.Flying.prototype.shouldClipThroughBlocks = function() {
+    Donkeycraft.Flying.prototype.shouldClipThroughBlocks = function () {
         return this._player.getGameMode() === 'spectator';
     };
 
@@ -155,7 +155,7 @@
      * Get the internal flying-enabled flag (creative only; spectators always fly).
      * @returns {boolean} True if creative flight is enabled.
      */
-    Donkeycraft.Flying.prototype.isEnabled = function() {
+    Donkeycraft.Flying.prototype.isEnabled = function () {
         return this._flyEnabled;
     };
 
@@ -163,7 +163,7 @@
      * Set the internal flying-enabled flag (creative only; spectators always fly).
      * @param {boolean} enabled - True to enable creative flight, false to disable.
      */
-    Donkeycraft.Flying.prototype.setEnabled = function(enabled) {
+    Donkeycraft.Flying.prototype.setEnabled = function (enabled) {
         var gameMode = this._player.getGameMode();
 
         // Only creative and spectator can fly
@@ -180,7 +180,7 @@
     /**
      * Destroy the flying system and free resources.
      */
-    Donkeycraft.Flying.prototype.destroy = function() {
+    Donkeycraft.Flying.prototype.destroy = function () {
         if (this._player) {
             this._player.flyEnabled = false;
             this._player = null;

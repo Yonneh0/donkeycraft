@@ -1,6 +1,6 @@
 // Donkeycraft — Mesh Optimizer
 // Face culling: removes faces between solid blocks, generates index buffers.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -8,7 +8,7 @@
     /**
      * MeshOptimizer — Optimizes chunk mesh data by culling hidden faces.
      */
-    Donkeycraft.MeshOptimizer = function() {
+    Donkeycraft.MeshOptimizer = function () {
         this._faceDataSize = 9; // position(3) + light(1) + UV(2) + normal(3)
     };
 
@@ -19,7 +19,7 @@
      * @param {number} [epsilon=0.001] - Float comparison tolerance.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.MeshOptimizer.prototype.generateIndexBuffer = function(geometry, epsilon) {
+    Donkeycraft.MeshOptimizer.prototype.generateIndexBuffer = function (geometry, epsilon) {
         epsilon = epsilon || 0.001;
         var vertices = geometry.vertices;
         var vertexCount = geometry.vertexCount;
@@ -73,7 +73,7 @@
             indices = new Uint16Array(quadCount * 6);
             for (var q = 0; q < quadCount; q++) {
                 var baseIdx = vertexToIndex[q * 4];
-                indices[q * 6]     = baseIdx;
+                indices[q * 6] = baseIdx;
                 indices[q * 6 + 1] = vertexToIndex[q * 4 + 1];
                 indices[q * 6 + 2] = vertexToIndex[q * 4 + 2];
                 indices[q * 6 + 3] = baseIdx;
@@ -97,7 +97,7 @@
      * @param {Donkeycraft.Vector3} cameraPos - Camera position for face culling.
      * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.MeshOptimizer.prototype.cullBackFaces = function(geometry, cameraPos) {
+    Donkeycraft.MeshOptimizer.prototype.cullBackFaces = function (geometry, cameraPos) {
         var vertices = geometry.vertices;
         var indices = geometry.indices;
         var indexCount = geometry.indexCount;
@@ -139,7 +139,7 @@
             var cz = cameraPos.z - (v0z + v1z + v2z) / 3;
 
             if (nx * cx + ny * cy + nz * cz > 0) {
-                keptIndices[keptCount * 3]     = i0;
+                keptIndices[keptCount * 3] = i0;
                 keptIndices[keptCount * 3 + 1] = i1;
                 keptIndices[keptCount * 3 + 2] = i2;
                 keptCount++;
@@ -160,7 +160,7 @@
      * @param {Donkeycraft.Vector3} [cameraPos] - Optional camera position for back-face culling.
      * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.MeshOptimizer.prototype.optimize = function(geometry, cameraPos) {
+    Donkeycraft.MeshOptimizer.prototype.optimize = function (geometry, cameraPos) {
         var result = geometry;
 
         result = this.generateIndexBuffer(result);

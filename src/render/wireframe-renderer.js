@@ -1,7 +1,7 @@
 // Donkeycraft — Wireframe Renderer
 // Debug wireframe drawing for solid blocks, bedrock, and clouds.
 // Draws colored line outlines around visible block faces for debugging.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
      * @param {WebGLRenderingContext} gl - WebGL context.
      * @param {ShaderManager} shaderManager - Shader manager instance.
      */
-    Donkeycraft.WireframeRenderer = function(gl, shaderManager) {
+    Donkeycraft.WireframeRenderer = function (gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
 
@@ -32,12 +32,12 @@
 
         // Color palette for different block types
         this._colors = {
-            bedrock:    [1.0, 0.2, 0.2, 1.0],   // Red
-            clouds:     [1.0, 1.0, 1.0, 0.8],   // White (semi-transparent)
-            solid:      [1.0, 0.0, 1.0, 1.0],   // Bright magenta (highly visible)
-            water:      [0.2, 0.4, 1.0, 0.6],   // Blue (water)
-            lava:       [1.0, 0.5, 0.0, 0.8],   // Orange (lava)
-            transparent:[0.5, 0.5, 0.5, 0.5]    // Gray (transparent blocks)
+            bedrock: [1.0, 0.2, 0.2, 1.0],   // Red
+            clouds: [1.0, 1.0, 1.0, 0.8],   // White (semi-transparent)
+            solid: [1.0, 0.0, 1.0, 1.0],   // Bright magenta (highly visible)
+            water: [0.2, 0.4, 1.0, 0.6],   // Blue (water)
+            lava: [1.0, 0.5, 0.0, 0.8],   // Orange (lava)
+            transparent: [0.5, 0.5, 0.5, 0.5]    // Gray (transparent blocks)
         };
     };
 
@@ -48,7 +48,7 @@
      * @param {boolean} [showClouds=false] - Show cloud outlines.
      * @param {boolean} [showSolidBlocks=true] - Show solid block outlines.
      */
-    Donkeycraft.WireframeRenderer.prototype.setEnabled = function(enabled, showBedrock, showClouds, showSolidBlocks) {
+    Donkeycraft.WireframeRenderer.prototype.setEnabled = function (enabled, showBedrock, showClouds, showSolidBlocks) {
         this._enabled = !!enabled;
         if (showBedrock !== undefined) this._showBedrock = !!showBedrock;
         if (showClouds !== undefined) this._showClouds = !!showClouds;
@@ -59,7 +59,7 @@
      * toggle — enable or disable wireframe rendering.
      * @returns {boolean} True if wireframes are now enabled.
      */
-    Donkeycraft.WireframeRenderer.prototype.toggle = function() {
+    Donkeycraft.WireframeRenderer.prototype.toggle = function () {
         this._enabled = !this._enabled;
         return this._enabled;
     };
@@ -85,9 +85,9 @@
 
         // 12 edges (pairs of corner indices)
         var edges = [
-            [0,1], [1,5], [5,4], [4,0],   // Bottom square
-            [2,3], [3,7], [7,6], [6,2],   // Top square
-            [0,2], [1,3], [4,6], [5,7]    // Vertical edges
+            [0, 1], [1, 5], [5, 4], [4, 0],   // Bottom square
+            [2, 3], [3, 7], [7, 6], [6, 2],   // Top square
+            [0, 2], [1, 3], [4, 6], [5, 7]    // Vertical edges
         ];
 
         var vertices = [];
@@ -117,7 +117,7 @@
      * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
      * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.WireframeRenderer.prototype._buildWireframeGeometry = function(chunks, chunkX, chunkZ, getBlockFunc) {
+    Donkeycraft.WireframeRenderer.prototype._buildWireframeGeometry = function (chunks, chunkX, chunkZ, getBlockFunc) {
         var allVertices = [];
 
         // Block ID classifications
@@ -137,7 +137,7 @@
                 px = refChunk.chunkX * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
                 pz = refChunk.chunkZ * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
             }
-        } catch (e) {}
+        } catch (e) { }
 
         // Max render radius in world coords — 64 blocks for better visibility
         var MAX_RADIUS = 64;
@@ -206,16 +206,16 @@
                         var cr = color[0], cg = color[1], cb = color[2], ca = color[3];
 
                         // 8 corners with epsilon offset so wireframes render slightly above terrain
-                        var c0=[x+EPS,y+EPS,z+EPS],     c1=[ex-EPS,y+EPS,z+EPS];
-                        var c2=[x+EPS,ey-EPS,z+EPS],    c3=[ex-EPS,ey-EPS,z+EPS];
-                        var c4=[x+EPS,y+EPS,ez-EPS],    c5=[ex-EPS,y+EPS,ez-EPS];
-                        var c6=[x+EPS,ey-EPS,ez-EPS],   c7=[ex-EPS,ey-EPS,ez-EPS];
+                        var c0 = [x + EPS, y + EPS, z + EPS], c1 = [ex - EPS, y + EPS, z + EPS];
+                        var c2 = [x + EPS, ey - EPS, z + EPS], c3 = [ex - EPS, ey - EPS, z + EPS];
+                        var c4 = [x + EPS, y + EPS, ez - EPS], c5 = [ex - EPS, y + EPS, ez - EPS];
+                        var c6 = [x + EPS, ey - EPS, ez - EPS], c7 = [ex - EPS, ey - EPS, ez - EPS];
 
                         // 12 edges as corner pairs forming box outline
                         var edges = [
-                            [c0,c1],[c1,c5],[c5,c4],[c4,c0],   // bottom (Y=min)
-                            [c2,c3],[c3,c7],[c7,c6],[c6,c2],   // top (Y=max)
-                            [c0,c2],[c1,c3],[c4,c6],[c5,c7]    // verticals (Z direction)
+                            [c0, c1], [c1, c5], [c5, c4], [c4, c0],   // bottom (Y=min)
+                            [c2, c3], [c3, c7], [c7, c6], [c6, c2],   // top (Y=max)
+                            [c0, c2], [c1, c3], [c4, c6], [c5, c7]    // verticals (Z direction)
                         ];
 
                         for (var e = 0; e < edges.length; e++) {
@@ -257,7 +257,7 @@
      * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
      * @param {Object[]} activeChunks - Array of currently loaded chunk objects.
      */
-    Donkeycraft.WireframeRenderer.prototype.render = function(camera, getBlockFunc, activeChunks) {
+    Donkeycraft.WireframeRenderer.prototype.render = function (camera, getBlockFunc, activeChunks) {
         var gl = this._gl;
         if (!gl) {
             Donkeycraft.Logger.warn('WireframeRenderer', 'render skipped: no WebGL context');
@@ -320,7 +320,7 @@
         // Donkeycraft.Logger.info('WireframeRenderer', 'uModel set via setMat4');
 
         // Set line width for visibility (may not work on all platforms)
-        try { gl.lineWidth(1.5); } catch (e) {}
+        try { gl.lineWidth(1.5); } catch (e) { }
 
         // Enable polygon offset to push wireframes slightly forward of terrain faces.
         // This prevents depth fighting where wireframes would be hidden behind terrain.
@@ -381,7 +381,7 @@
     /**
      * Destroy buffers and free GPU resources.
      */
-    Donkeycraft.WireframeRenderer.prototype.destroy = function() {
+    Donkeycraft.WireframeRenderer.prototype.destroy = function () {
         var gl = this._gl;
         if (!gl) return;
 

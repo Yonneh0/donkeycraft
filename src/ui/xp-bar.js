@@ -1,7 +1,7 @@
 // Donkeycraft — XP Bar UI
 // Animated XP progress bar with progressive level badge visualization.
 // Listens to xp:changed events and updates DOM with effects.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
      * @param {HTMLElement} container - Parent container for XP bar DOM.
      * @param {Donkeycraft.Experience} experience - Experience instance to observe.
      */
-    Donkeycraft.XPBar = function(container, experience) {
+    Donkeycraft.XPBar = function (container, experience) {
         this._experience = experience;
         this._container = container;
 
@@ -40,7 +40,7 @@
 
         // Bind + build
         var self = this;
-        this._onXPChanged = function(data) { self.updateFromExperience(data); };
+        this._onXPChanged = function (data) { self.updateFromExperience(data); };
 
         this._buildDOM();
         this._subscribeToEvents();
@@ -56,13 +56,13 @@
      * @private
      */
     Donkeycraft.XPBar.LEVEL_TIERS = [
-        { min: 1,  max: 9,   text: '#ffffff', bg: 'rgba(200,200,200,0.3)', glow: 'transparent', size: 36, hasText: true, ambient: 'none', sparkColor: '#ccc' },
-        { min: 10, max: 24,  text: '#00d4ff', bg: 'rgba(0,150,255,0.4)',   glow: 'rgba(0,150,255,0.8)', size: 38, hasText: true, ambient: 'pulse-glow', sparkColor: '#00d4ff' },
-        { min: 25, max: 49,  text: '#b44aff', bg: 'rgba(150,50,255,0.5)',  glow: 'rgba(150,50,255,0.6)', size: 42, hasText: true, ambient: 'ring-rotate', sparkColor: '#b44aff' },
-        { min: 50, max: 74,  text: '#ffd700', bg: 'rgba(255,200,0,0.6)',   glow: 'rgba(255,200,0,0.8)', size: 48, hasText: true, ambient: 'spark-float', sparkColor: '#ffd700' },
-        { min: 75, max: 98,  text: '#ff4422', bg: 'rgba(255,80,0,0.7)',    glow: 'rgba(255,80,0,0.9)', size: 52, hasText: true, ambient: 'intensified-pulse', sparkColor: '#ff4422' },
-        { min: 99, max: 99,  text: '#ff66cc', bg: 'linear-gradient(45deg,#f00,#ff0,#0f0,#0ff,#00f,#f00)', glow: 'multi-color', size: 56, hasText: true, textOverride: 'MAX', ambient: 'rainbow-shift', sparkColor: '#ff66cc' },
-        { min: 100,max: 100, text: null,       bg: 'rgba(255,215,0,0.8)',   glow: 'rgba(255,215,0,0.9)', size: 64, hasText: false, textOverride: 'DONE', ambient: 'golden-spectacle', sparkColor: '#ffd700' }
+        { min: 1, max: 9, text: '#ffffff', bg: 'rgba(200,200,200,0.3)', glow: 'transparent', size: 36, hasText: true, ambient: 'none', sparkColor: '#ccc' },
+        { min: 10, max: 24, text: '#00d4ff', bg: 'rgba(0,150,255,0.4)', glow: 'rgba(0,150,255,0.8)', size: 38, hasText: true, ambient: 'pulse-glow', sparkColor: '#00d4ff' },
+        { min: 25, max: 49, text: '#b44aff', bg: 'rgba(150,50,255,0.5)', glow: 'rgba(150,50,255,0.6)', size: 42, hasText: true, ambient: 'ring-rotate', sparkColor: '#b44aff' },
+        { min: 50, max: 74, text: '#ffd700', bg: 'rgba(255,200,0,0.6)', glow: 'rgba(255,200,0,0.8)', size: 48, hasText: true, ambient: 'spark-float', sparkColor: '#ffd700' },
+        { min: 75, max: 98, text: '#ff4422', bg: 'rgba(255,80,0,0.7)', glow: 'rgba(255,80,0,0.9)', size: 52, hasText: true, ambient: 'intensified-pulse', sparkColor: '#ff4422' },
+        { min: 99, max: 99, text: '#ff66cc', bg: 'linear-gradient(45deg,#f00,#ff0,#0f0,#0ff,#00f,#f00)', glow: 'multi-color', size: 56, hasText: true, textOverride: 'MAX', ambient: 'rainbow-shift', sparkColor: '#ff66cc' },
+        { min: 100, max: 100, text: null, bg: 'rgba(255,215,0,0.8)', glow: 'rgba(255,215,0,0.9)', size: 64, hasText: false, textOverride: 'DONE', ambient: 'golden-spectacle', sparkColor: '#ffd700' }
     ];
 
     /**
@@ -83,7 +83,7 @@
      * _subscribeToEvents — listen for xp:changed events.
      * @private
      */
-    Donkeycraft.XPBar.prototype._subscribeToEvents = function() {
+    Donkeycraft.XPBar.prototype._subscribeToEvents = function () {
         // Get the global EventBus instance (set by game.js via EventBus.setGlobal)
         var globalBus = Donkeycraft.EventBus && Donkeycraft.EventBus._global;
         if (globalBus) {
@@ -101,7 +101,7 @@
      * _buildDOM — create all XP bar elements inside the container.
      * @private
      */
-    Donkeycraft.XPBar.prototype._buildDOM = function() {
+    Donkeycraft.XPBar.prototype._buildDOM = function () {
         var container = this._container;
         if (!container) return;
 
@@ -176,7 +176,7 @@
      * Compares old vs new state and triggers appropriate animations.
      * @param {Object} data - { level, points, totalXP }.
      */
-    Donkeycraft.XPBar.prototype.updateFromExperience = function(data) {
+    Donkeycraft.XPBar.prototype.updateFromExperience = function (data) {
         var newLevel = data.level || 0;
         var newPoints = data.points || 0;
         var newTotalXP = data.totalXP || 0;
@@ -236,7 +236,7 @@
      * @param {number} level - XP level.
      * @returns {Object} Tier configuration.
      */
-    Donkeycraft.XPBar._getTier = function(level) {
+    Donkeycraft.XPBar._getTier = function (level) {
         var tiers = Donkeycraft.XPBar.LEVEL_TIERS;
         for (var i = 0; i < tiers.length; i++) {
             if (level >= tiers[i].min && level <= tiers[i].max) {
@@ -252,7 +252,7 @@
      * @param {number} progress - Fraction 0-1.
      * @param {Object} tier - Current tier config.
      */
-    Donkeycraft.XPBar.prototype._animateFill = function(progress, tier) {
+    Donkeycraft.XPBar.prototype._animateFill = function (progress, tier) {
         if (!this._fill) return;
 
         var pct = Math.max(0, Math.min(100, progress * 100));
@@ -281,7 +281,7 @@
      * @param {number} points - Current points.
      * @param {number} threshold - Level threshold.
      */
-    Donkeycraft.XPBar.prototype._animateWatermark = function(progress, points, threshold) {
+    Donkeycraft.XPBar.prototype._animateWatermark = function (progress, points, threshold) {
         if (!this._watermark) return;
 
         var pct = Math.round(progress * 100);
@@ -305,7 +305,7 @@
         }
         // After flash, settle to semi-transparent display
         var wmRef = this._watermark;
-        this._watermarkTimeout = setTimeout(function() {
+        this._watermarkTimeout = setTimeout(function () {
             if (wmRef) {
                 wmRef.style.opacity = '0.7';
             }
@@ -318,7 +318,7 @@
      * @param {number} newLevel - New level value.
      * @param {Object} newTier - New tier config.
      */
-    Donkeycraft.XPBar.prototype._animateLevelBadge = function(newLevel, newTier) {
+    Donkeycraft.XPBar.prototype._animateLevelBadge = function (newLevel, newTier) {
         if (!this._badgeBg || !this._badgeText) return;
 
         // Update text to new level BEFORE animation so it's visible during spin
@@ -342,7 +342,7 @@
      * _triggerLevelBurst — spawn expanding ring animation.
      * @private
      */
-    Donkeycraft.XPBar.prototype._triggerLevelBurst = function() {
+    Donkeycraft.XPBar.prototype._triggerLevelBurst = function () {
         if (!this._container) return;
 
         var burst = document.createElement('div');
@@ -357,7 +357,7 @@
         this._container.appendChild(burst);
 
         // Remove after animation completes
-        setTimeout((function(el) {
+        setTimeout((function (el) {
             if (el.parentNode) {
                 el.parentNode.removeChild(el);
             }
@@ -370,7 +370,7 @@
      * @param {number} count - Number of particles.
      * @param {Object} tier - Tier config (for colors).
      */
-    Donkeycraft.XPBar.prototype._spawnParticles = function(count, tier) {
+    Donkeycraft.XPBar.prototype._spawnParticles = function (count, tier) {
         if (!this._particleContainer || !tier) return;
 
         var particleColor = tier.sparkColor || '#ffffff';
@@ -392,7 +392,7 @@
 
             // Remove after animation
             var totalDuration = 600 + i * 15;
-            setTimeout((function(el) {
+            setTimeout((function (el) {
                 if (el.parentNode) {
                     el.parentNode.removeChild(el);
                 }
@@ -404,14 +404,14 @@
      * _triggerScreenShake — apply shake animation to XP bar container.
      * @private
      */
-    Donkeycraft.XPBar.prototype._triggerScreenShake = function() {
+    Donkeycraft.XPBar.prototype._triggerScreenShake = function () {
         // Shake only the badge background instead of the entire container.
         // Applying transform-based shake to the wrapper caused the whole XP bar
         // to shift layout on levels 75+. Shaking just the badge avoids this.
         if (!this._badgeBg) return;
 
         this._badgeBg.style.animation = 'badge-shake 150ms ease-out';
-        setTimeout((function(el) {
+        setTimeout((function (el) {
             el.style.animation = 'none';
             void el.offsetWidth; // force reflow
         }).bind(this, this._badgeBg), 150);
@@ -423,7 +423,7 @@
      * @param {number} level - Current level.
      * @param {Object} tier - Tier config.
      */
-    Donkeycraft.XPBar.prototype._updateBadgeStatic = function(level, tier) {
+    Donkeycraft.XPBar.prototype._updateBadgeStatic = function (level, tier) {
         if (!this._badgeBg || !this._badgeText || !this._badgeGlow || !tier) return;
 
         // Calculate size using formula: size = 36 + Math.min(level, 100) * 0.28, clamped to tier max
@@ -473,7 +473,7 @@
      * @private
      * @param {Object} tier - Current tier config.
      */
-    Donkeycraft.XPBar.prototype._triggerColorFlash = function(tier) {
+    Donkeycraft.XPBar.prototype._triggerColorFlash = function (tier) {
         if (!this._fill) return;
 
         this._fill.style.animation = 'none';
@@ -484,7 +484,7 @@
         if (this._flashTimeout) {
             clearTimeout(this._flashTimeout);
         }
-        this._flashTimeout = setTimeout((function() {
+        this._flashTimeout = setTimeout((function () {
             if (this._fill) {
                 this._fill.style.animation = 'none';
             }
@@ -497,7 +497,7 @@
      * @param {Object} newTier - New tier config.
      * @param {Object} oldTier - Previous tier config.
      */
-    Donkeycraft.XPBar.prototype._updateAmbientAnimation = function(newTier, oldTier) {
+    Donkeycraft.XPBar.prototype._updateAmbientAnimation = function (newTier, oldTier) {
         // Remove old ambient effects
         if (oldTier && this._badgeBg) {
             this._badgeBg.style.animation = 'none';
@@ -533,7 +533,7 @@
      * @private
      * @param {Object} tier - Tier config.
      */
-    Donkeycraft.XPBar.prototype._ensureAmbientRing = function(tier) {
+    Donkeycraft.XPBar.prototype._ensureAmbientRing = function (tier) {
         if (!this._badgeContainer) return;
 
         // Remove existing ring
@@ -557,7 +557,7 @@
      * @private
      * @param {Object} tier - Tier config.
      */
-    Donkeycraft.XPBar.prototype._ensureSparkElements = function(tier) {
+    Donkeycraft.XPBar.prototype._ensureSparkElements = function (tier) {
         if (!this._badgeContainer) return;
 
         // Remove existing sparks
@@ -592,7 +592,7 @@
      * @param {number} level - Current level.
      * @param {number} points - Current points.
      */
-    Donkeycraft.XPBar.prototype._updateVisibility = function(level, points) {
+    Donkeycraft.XPBar.prototype._updateVisibility = function (level, points) {
         if (!this._container) return;
 
         var hasXP = (level > 0 || points > 0);
@@ -608,7 +608,7 @@
      * Called when XP is reset to level 0.
      * @private
      */
-    Donkeycraft.XPBar.prototype.resetUI = function() {
+    Donkeycraft.XPBar.prototype.resetUI = function () {
         // Clear particle elements
         if (this._particleContainer) {
             this._particleContainer.innerHTML = '';
@@ -662,7 +662,7 @@
     /**
      * destroy — clean up all DOM and event listeners.
      */
-    Donkeycraft.XPBar.prototype.destroy = function() {
+    Donkeycraft.XPBar.prototype.destroy = function () {
         // Clear animations first
         this.resetUI();
 
@@ -671,7 +671,7 @@
         if (globalBus && this._onXPChanged) {
             try {
                 globalBus.off('xp:changed', this._onXPChanged);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // Clear timers

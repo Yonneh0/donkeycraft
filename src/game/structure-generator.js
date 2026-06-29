@@ -1,6 +1,6 @@
 // Donkeycraft — Structure Generator
 // Structure placement: ore veins, underground caves (noise-based), surface decoration.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * StructureGenerator — orchestrates full chunk generation pipeline.
      */
-    Donkeycraft.StructureGenerator = (function() {
+    Donkeycraft.StructureGenerator = (function () {
         // Cached block references
         var _blocks = {};
 

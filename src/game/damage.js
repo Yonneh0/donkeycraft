@@ -1,6 +1,6 @@
 // Donkeycraft — Hurt Box & Damage System
 // Hitbox management, damage reception, knockback, fall damage calculation.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * HurtBox — manages player hitbox, health, damage, and knockback.
      * @param {Donkeycraft.Player} player - Player entity instance.
      */
-    Donkeycraft.HurtBox = function(player) {
+    Donkeycraft.HurtBox = function (player) {
         this._player = player;
 
         /**
@@ -73,7 +73,7 @@
      * Get the player's current health.
      * @returns {number} Current HP (0-20).
      */
-    Donkeycraft.HurtBox.prototype.getHealth = function() {
+    Donkeycraft.HurtBox.prototype.getHealth = function () {
         return this._health;
     };
 
@@ -81,7 +81,7 @@
      * Get the maximum health points.
      * @returns {number}
      */
-    Donkeycraft.HurtBox.prototype.getMaxHealth = function() {
+    Donkeycraft.HurtBox.prototype.getMaxHealth = function () {
         return this.maxHealth;
     };
 
@@ -89,7 +89,7 @@
      * Get the current absorption (yellow health) points.
      * @returns {number}
      */
-    Donkeycraft.HurtBox.prototype.getAbsorption = function() {
+    Donkeycraft.HurtBox.prototype.getAbsorption = function () {
         return this._absorption;
     };
 
@@ -97,7 +97,7 @@
      * Set the absorption health value.
      * @param {number} amount - Absorption points to set.
      */
-    Donkeycraft.HurtBox.prototype.setAbsorption = function(amount) {
+    Donkeycraft.HurtBox.prototype.setAbsorption = function (amount) {
         this._absorption = Math.max(0, amount);
     };
 
@@ -105,7 +105,7 @@
      * Get the current saturation level.
      * @returns {number}
      */
-    Donkeycraft.HurtBox.prototype.getSaturation = function() {
+    Donkeycraft.HurtBox.prototype.getSaturation = function () {
         return this._saturation;
     };
 
@@ -113,7 +113,7 @@
      * Set the saturation level.
      * @param {number} amount - Saturation value to set.
      */
-    Donkeycraft.HurtBox.prototype.setSaturation = function(amount) {
+    Donkeycraft.HurtBox.prototype.setSaturation = function (amount) {
         this._saturation = Math.max(0, amount);
     };
 
@@ -121,7 +121,7 @@
      * Check if the player is on fire.
      * @returns {boolean}
      */
-    Donkeycraft.HurtBox.prototype.isOnFire = function() {
+    Donkeycraft.HurtBox.prototype.isOnFire = function () {
         return this._onFire;
     };
 
@@ -129,7 +129,7 @@
      * Set whether the player is on fire.
      * @param {boolean} onFire - True to set on fire, false to extinguish.
      */
-    Donkeycraft.HurtBox.prototype.setOnFire = function(onFire) {
+    Donkeycraft.HurtBox.prototype.setOnFire = function (onFire) {
         this._onFire = !!onFire;
         if (!onFire) {
             this._fireDamageTimer = 0;
@@ -142,7 +142,7 @@
      * @param {string} [source='generic'] - Damage source: 'generic', 'fall', 'fire', 'attack', 'lava', 'suffocation', 'starvation'.
      * @returns {number} Actual damage dealt (0 if immune).
      */
-    Donkeycraft.HurtBox.prototype.takeDamage = function(amount, source) {
+    Donkeycraft.HurtBox.prototype.takeDamage = function (amount, source) {
         source = source || 'generic';
 
         // Creative mode: immune to most damage sources
@@ -187,7 +187,7 @@
                     maxHealth: this.maxHealth,
                     delta: -actualDelta  // negative = damage taken
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return amount;
@@ -198,7 +198,7 @@
      * @param {number} amount - Health points to restore.
      * @returns {number} Actual health restored.
      */
-    Donkeycraft.HurtBox.prototype.heal = function(amount) {
+    Donkeycraft.HurtBox.prototype.heal = function (amount) {
         if (!this._player.isAlive()) {
             return 0;
         }
@@ -217,7 +217,7 @@
                     maxHealth: this.maxHealth,
                     delta: delta
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return delta;
@@ -227,7 +227,7 @@
      * Get the knockback velocity.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.HurtBox.prototype.getKnockback = function() {
+    Donkeycraft.HurtBox.prototype.getKnockback = function () {
         return this._player.getKnockback();
     };
 
@@ -237,14 +237,14 @@
      * @param {number} strength - Knockback strength in blocks/s.
      * @param {number} [upwardForce=0] - Upward component of knockback.
      */
-    Donkeycraft.HurtBox.prototype.applyKnockback = function(direction, strength, upwardForce) {
+    Donkeycraft.HurtBox.prototype.applyKnockback = function (direction, strength, upwardForce) {
         this._player.applyKnockback(direction, strength, upwardForce);
     };
 
     /**
      * Clear the current knockback velocity.
      */
-    Donkeycraft.HurtBox.prototype.clearKnockback = function() {
+    Donkeycraft.HurtBox.prototype.clearKnockback = function () {
         this._player.clearKnockback();
     };
 
@@ -252,7 +252,7 @@
      * Get the current fall distance for damage calculation.
      * @returns {number} Fall distance in blocks.
      */
-    Donkeycraft.HurtBox.prototype.getFallDistance = function() {
+    Donkeycraft.HurtBox.prototype.getFallDistance = function () {
         return this._player.getFallDistance();
     };
 
@@ -263,7 +263,7 @@
      * @param {number} [fallDistance=0] - Distance fallen in blocks.
      * @returns {number} Damage dealt in HP (0 if no fall damage).
      */
-    Donkeycraft.HurtBox.prototype.calculateFallDamage = function(fallDistance) {
+    Donkeycraft.HurtBox.prototype.calculateFallDamage = function (fallDistance) {
         fallDistance = fallDistance || this._player.getFallDistance();
 
         // No fall damage for first 3 blocks
@@ -280,7 +280,7 @@
      * Apply fall damage and reset fall distance tracking.
      * @returns {number} Damage dealt (0 if no fall damage).
      */
-    Donkeycraft.HurtBox.prototype.applyFallDamage = function() {
+    Donkeycraft.HurtBox.prototype.applyFallDamage = function () {
         var damage = this.calculateFallDamage();
 
         if (damage > 0) {
@@ -297,7 +297,7 @@
      * Get the player's bounding box (AABB).
      * @returns {{minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number}}
      */
-    Donkeycraft.HurtBox.prototype.getHurtBox = function() {
+    Donkeycraft.HurtBox.prototype.getHurtBox = function () {
         return this._player.getHurtBox();
     };
 
@@ -305,7 +305,7 @@
      * Check if the player is in creative mode (immune to most damage).
      * @returns {boolean}
      */
-    Donkeycraft.HurtBox.prototype.isCreative = function() {
+    Donkeycraft.HurtBox.prototype.isCreative = function () {
         return this._player.getGameMode() === 'creative';
     };
 
@@ -313,7 +313,7 @@
      * Register a death callback that fires when the player dies.
      * @param {Function} callback - Function called with (deathSource) on death.
      */
-    Donkeycraft.HurtBox.prototype.setOnDeath = function(callback) {
+    Donkeycraft.HurtBox.prototype.setOnDeath = function (callback) {
         this._onDeathCallback = callback;
     };
 
@@ -321,7 +321,7 @@
      * Handle player death — triggers death event via EventBus.
      * @param {string} [deathSource='generic'] - Cause of death.
      */
-    Donkeycraft.HurtBox.prototype.onDeath = function(deathSource) {
+    Donkeycraft.HurtBox.prototype.onDeath = function (deathSource) {
         deathSource = deathSource || 'generic';
 
         // Mark player as dead
@@ -358,7 +358,7 @@
      * Auto-regeneration is handled by Hunger.tick() to avoid duplicate healing.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.HurtBox.prototype.tick = function(deltaTime) {
+    Donkeycraft.HurtBox.prototype.tick = function (deltaTime) {
         if (!this._player.isAlive()) {
             return;
         }
@@ -385,7 +385,7 @@
     /**
      * Reset the hurt box to full health.
      */
-    Donkeycraft.HurtBox.prototype.reset = function() {
+    Donkeycraft.HurtBox.prototype.reset = function () {
         this._health = this.maxHealth;
         this._absorption = 0;
         this._saturation = 0;
@@ -399,7 +399,7 @@
     /**
      * Destroy the hurt box system and free resources.
      */
-    Donkeycraft.HurtBox.prototype.destroy = function() {
+    Donkeycraft.HurtBox.prototype.destroy = function () {
         this._player = null;
         this._onDeathCallback = null;
     };

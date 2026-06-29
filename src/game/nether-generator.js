@@ -1,6 +1,6 @@
 // Donkeycraft — Nether Terrain Generator
 // Nether terrain: bedrock ceiling/floor, lava seas, netherrack, unique structures.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * NetherGenerator — generates terrain for the Nether dimension.
      */
-    Donkeycraft.NetherGenerator = (function() {
+    Donkeycraft.NetherGenerator = (function () {
         var _chunkManager = null;
         var _bedrockId = 0;
         var _netherrackId = 0;

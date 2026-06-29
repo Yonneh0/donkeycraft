@@ -1,7 +1,7 @@
 // Donkeycraft — Chest UI
 // Chest GUI with 27 slots (single) or 54 slots (double-chest).
 // Supports slot click, drag-drop, key-based quick-move, and data persistence.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
      * @param {string} [config.chestKey=null] - Storage key for this chest.
      * @param {Array} [config.preloadedSlots=null] - Pre-loaded slot data arrays.
      */
-    Donkeycraft.ChestUI = function(container, config) {
+    Donkeycraft.ChestUI = function (container, config) {
         this._container = container || null;
 
         // Support legacy boolean parameter: ChestUI(container, true/false)
@@ -70,7 +70,7 @@
      * _buildDOM — creates the chest GUI DOM structure.
      * @private
      */
-    Donkeycraft.ChestUI.prototype._buildDOM = function() {
+    Donkeycraft.ChestUI.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-chest-ui';
         this._container.style.cssText = 'display: flex; flex-direction: column; padding: 16px; background: rgba(40,35,30,0.95); border-radius: 6px; user-select: none;';
@@ -108,8 +108,8 @@
             slotEl.appendChild(countEl);
 
             // Left-click handler — take item or start drag
-            slotEl.addEventListener('mousedown', function(idx) {
-                return function(e) {
+            slotEl.addEventListener('mousedown', function (idx) {
+                return function (e) {
                     e.preventDefault();
                     if (self._listeners.onClick) {
                         self._listeners.onClick(idx, e.button || 0);
@@ -128,7 +128,7 @@
      * isDoubleChest — checks if this is a double chest.
      * @returns {boolean}
      */
-    Donkeycraft.ChestUI.prototype.isDoubleChest = function() {
+    Donkeycraft.ChestUI.prototype.isDoubleChest = function () {
         return this._doubleChest;
     };
 
@@ -136,7 +136,7 @@
      * getSlotCount — gets the total number of slots.
      * @returns {number} 27 for single, 54 for double.
      */
-    Donkeycraft.ChestUI.prototype.getSlotCount = function() {
+    Donkeycraft.ChestUI.prototype.getSlotCount = function () {
         return this._slotCount;
     };
 
@@ -145,7 +145,7 @@
      * @param {number} index - Slot index.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.ChestUI.prototype.getSlot = function(index) {
+    Donkeycraft.ChestUI.prototype.getSlot = function (index) {
         if (typeof index !== 'number' || !Number.isFinite(index) || index < 0 || index >= this._slotCount) return null;
         return this._slots[index];
     };
@@ -156,7 +156,7 @@
      * @returns {boolean}
      * @private
      */
-    Donkeycraft.ChestUI.prototype._isValidStack = function(val) {
+    Donkeycraft.ChestUI.prototype._isValidStack = function (val) {
         if (val === null) return true;
         return typeof val.isEmpty === 'function' && typeof val.getItemId === 'function' && typeof val.getCount === 'function';
     };
@@ -167,7 +167,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.ChestUI.prototype.setSlot = function(index, stack) {
+    Donkeycraft.ChestUI.prototype.setSlot = function (index, stack) {
         if (typeof index !== 'number' || !Number.isFinite(index) || index < 0 || index >= this._slotCount) return false;
         if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[index];
@@ -186,7 +186,7 @@
      * @param {number} index - Slot index.
      * @returns {Donkeycraft.ItemStack|null} The taken stack, or null if empty.
      */
-    Donkeycraft.ChestUI.prototype.takeItem = function(index) {
+    Donkeycraft.ChestUI.prototype.takeItem = function (index) {
         if (typeof index !== 'number' || !Number.isFinite(index) || index < 0 || index >= this._slotCount) return null;
 
         var stack = this._slots[index];
@@ -209,7 +209,7 @@
      * @param {number} count - Number of items to take.
      * @returns {Donkeycraft.ItemStack|null} Partial stack taken, or null.
      */
-    Donkeycraft.ChestUI.prototype.takePartialItem = function(index, count) {
+    Donkeycraft.ChestUI.prototype.takePartialItem = function (index, count) {
         if (typeof index !== 'number' || !Number.isFinite(index) || index < 0 || index >= this._slotCount) return null;
         if (typeof count !== 'number' || count <= 0 || !Number.isFinite(count)) return null;
 
@@ -239,7 +239,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to display.
      * @private
      */
-    Donkeycraft.ChestUI.prototype._updateSlotDisplay = function(index, stack) {
+    Donkeycraft.ChestUI.prototype._updateSlotDisplay = function (index, stack) {
         // Use cached slot element array for O(1) access
         if (typeof index !== 'number' || index < 0 || index >= this._slotEls.length) return;
         var slotEl = this._slotEls[index];
@@ -272,7 +272,7 @@
      * @returns {string}
      * @private
      */
-    Donkeycraft.ChestUI.prototype._getItemDisplayChar = function(itemId) {
+    Donkeycraft.ChestUI.prototype._getItemDisplayChar = function (itemId) {
         var displayMap = {
             // Basic blocks
             1: '🪨', 2: '🧱', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
@@ -311,10 +311,10 @@
      * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
      * @private
      */
-    Donkeycraft.ChestUI.prototype._emitSlotChange = function(index, newStack, oldStack) {
+    Donkeycraft.ChestUI.prototype._emitSlotChange = function (index, newStack, oldStack) {
         if (!this._listeners.onSlotChange) return;
         for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-            try { this._listeners.onSlotChange[i](index, newStack, oldStack); } catch (e) {}
+            try { this._listeners.onSlotChange[i](index, newStack, oldStack); } catch (e) { }
         }
     };
 
@@ -324,10 +324,10 @@
      * @param {number} [slotIndex=-1] - Source slot index (-1 = unknown).
      * @private
      */
-    Donkeycraft.ChestUI.prototype._emitDrop = function(stack, slotIndex) {
+    Donkeycraft.ChestUI.prototype._emitDrop = function (stack, slotIndex) {
         if (!this._listeners.onDrop) return;
         for (var i = 0; i < this._listeners.onDrop.length; i++) {
-            try { this._listeners.onDrop[i](stack, slotIndex); } catch (e) {}
+            try { this._listeners.onDrop[i](stack, slotIndex); } catch (e) { }
         }
     };
 
@@ -339,7 +339,7 @@
      * @param {number} [button=0] - Mouse button (0=left, 2=right).
      * @returns {Donkeycraft.ItemStack|null} The taken stack, or null.
      */
-    Donkeycraft.ChestUI.prototype.handleClick = function(slotIndex, button) {
+    Donkeycraft.ChestUI.prototype.handleClick = function (slotIndex, button) {
         button = button || 0;
         if (typeof slotIndex !== 'number' || !Number.isFinite(slotIndex) || slotIndex < 0 || slotIndex >= this._slotCount) return null;
 
@@ -365,7 +365,7 @@
      * @param {number} slotIndex - Target slot index (-1 = first empty slot).
      * @returns {boolean} True if the drop was processed.
      */
-    Donkeycraft.ChestUI.prototype.handleDrop = function(itemStack, slotIndex) {
+    Donkeycraft.ChestUI.prototype.handleDrop = function (itemStack, slotIndex) {
         // Check: must be a valid ItemStack that is NOT null and NOT empty
         if (itemStack === null || itemStack === undefined) return false;
         if (typeof itemStack.isEmpty !== 'function') return false;
@@ -416,7 +416,7 @@
      * @param {Array} slots - Array of slot data (ItemStack, null, or serialized objects).
      * @private
      */
-    Donkeycraft.ChestUI.prototype._loadPreloadedSlots = function(slots) {
+    Donkeycraft.ChestUI.prototype._loadPreloadedSlots = function (slots) {
         if (!Array.isArray(slots)) return;
 
         for (var i = 0; i < this._slotCount && i < slots.length; i++) {
@@ -443,7 +443,7 @@
      * loadData — loads item stacks from a serialized data object.
      * @param {Object} data - Serialized chest data with { key: string, slots: Array|null }.
      */
-    Donkeycraft.ChestUI.prototype.loadData = function(data) {
+    Donkeycraft.ChestUI.prototype.loadData = function (data) {
         if (!data || !Array.isArray(data.slots)) return;
 
         // Update data key reference
@@ -458,7 +458,7 @@
      * serializeData — serializes current chest state for persistence.
      * @returns {Object} Serialized chest data object.
      */
-    Donkeycraft.ChestUI.prototype.serializeData = function() {
+    Donkeycraft.ChestUI.prototype.serializeData = function () {
         var slots = [];
         for (var i = 0; i < this._slotCount; i++) {
             if (this._slots[i] && !this._slots[i].isEmpty()) {
@@ -481,7 +481,7 @@
      * @param {string} key - Key identifier (e.g., 'Escape', 'Digit1').
      * @returns {boolean} True if the key was consumed.
      */
-    Donkeycraft.ChestUI.prototype.handleKeyPress = function(key) {
+    Donkeycraft.ChestUI.prototype.handleKeyPress = function (key) {
         // Escape is handled by GuiManager — do NOT consume it here
         if (key === 'Escape') return false;
 
@@ -521,10 +521,10 @@
      * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.ChestUI.prototype.onSlotChange = function(callback) {
+    Donkeycraft.ChestUI.prototype.onSlotChange = function (callback) {
         this._listeners.onSlotChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onSlotChange.indexOf(callback);
             if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
         };
@@ -535,10 +535,10 @@
      * @param {Function} callback - Called with (stack, slotIndex) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.ChestUI.prototype.onDrop = function(callback) {
+    Donkeycraft.ChestUI.prototype.onDrop = function (callback) {
         this._listeners.onDrop.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onDrop.indexOf(callback);
             if (idx >= 0) self._listeners.onDrop.splice(idx, 1);
         };
@@ -549,7 +549,7 @@
      * Used by external code to handle drag-and-drop and quick-move logic.
      * @param {Function} handler - Called with (slotIndex, button) arguments.
      */
-    Donkeycraft.ChestUI.prototype.setDoubleClickHandler = function(handler) {
+    Donkeycraft.ChestUI.prototype.setDoubleClickHandler = function (handler) {
         if (typeof handler === 'function') {
             this._listeners.onClick = handler;
         } else {
@@ -560,7 +560,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.ChestUI.prototype.destroy = function() {
+    Donkeycraft.ChestUI.prototype.destroy = function () {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);

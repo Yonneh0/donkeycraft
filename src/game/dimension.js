@@ -1,6 +1,6 @@
 // Donkeycraft — Dimension System
 // Overworld, Nether, End dimensions with chunk data isolation and coordinate transformation.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -45,7 +45,7 @@
      * @param {boolean} [bedWorks=true] - Can player sleep in this dimension?
      * @param {number} [coordinateScale=1] - Coordinate transformation multiplier.
      */
-    Donkeycraft.Dimension = function(type, name, height, minY, maxY, hasSkyLight, hasCeiling, ambientDarkness, respawnAtSpawn, hasPiglins, hasWeather, musicDisc, bedWorks, coordinateScale) {
+    Donkeycraft.Dimension = function (type, name, height, minY, maxY, hasSkyLight, hasCeiling, ambientDarkness, respawnAtSpawn, hasPiglins, hasWeather, musicDisc, bedWorks, coordinateScale) {
         /**
          * Dimension type constant.
          * @type {number}
@@ -138,7 +138,7 @@
     /**
      * Dimensions — central registry for all dimensions.
      */
-    Donkeycraft.Dimensions = (function() {
+    Donkeycraft.Dimensions = (function () {
         var _dimensions = {};       // type → Dimension
         var _chunkManagers = {};    // type → ChunkManager
         var _spawnPositions = {};   // type → {x, y, z}
@@ -331,7 +331,7 @@
         function _wireGenerationToChunkManager(chunkManager, dimensionType) {
             // Wire chunk load callback (generates terrain for new chunks).
             // Sets chunk.generated = true after terrain + lighting are applied.
-            chunkManager.onChunkLoad = function(chunk) {
+            chunkManager.onChunkLoad = function (chunk) {
                 var terrainGenerated = false;
 
                 // Generate terrain based on dimension
@@ -346,18 +346,18 @@
                             try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
-                     default: // Overworld — delegate to ChunkManager's built-in generation
-                         if (chunkManager.generateChunkTerrain) {
-                             chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
-                             terrainGenerated = true;
-                         }
-                         break;
-                 }
+                    default: // Overworld — delegate to ChunkManager's built-in generation
+                        if (chunkManager.generateChunkTerrain) {
+                            chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
+                            terrainGenerated = true;
+                        }
+                        break;
+                }
 
-                 // Fallback: if terrain generation callback didn't run, try direct generation
-                 if (!terrainGenerated && chunkManager.generateChunkTerrain) {
-                     try { chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
-                 }
+                // Fallback: if terrain generation callback didn't run, try direct generation
+                if (!terrainGenerated && chunkManager.generateChunkTerrain) {
+                    try { chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                }
 
                 // Mark as generated so getChunk won't attempt regeneration on future lookups
                 chunk.generated = true;
@@ -378,7 +378,7 @@
             };
 
             // Wire dirty chunk callback to update lighting on changes
-            chunkManager.onChunksChanged = function() {
+            chunkManager.onChunksChanged = function () {
                 var dirtyChunks = chunkManager.getDirtyChunks();
                 for (var i = 0; i < dirtyChunks.length; i++) {
                     if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.updateChunkLighting) {

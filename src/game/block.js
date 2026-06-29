@@ -1,6 +1,6 @@
 // Donkeycraft — Block Definitions
 // All 256+ vanilla Minecraft block definitions with IDs, names, hardness, blast resistance, drops, transparency flags.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -23,7 +23,7 @@
      * @param {number} [lightLevel=0] — Light level emitted (0-15).
      * @param {number} [lightOpacity=0] — How much light passes through (0 = fully transparent, 15 = fully opaque).
      */
-    Donkeycraft.Block = function(id, name, hardness, blastResistance, dropBlockId, dropItemCount, transparent, emissive, lightLevel, lightOpacity) {
+    Donkeycraft.Block = function (id, name, hardness, blastResistance, dropBlockId, dropItemCount, transparent, emissive, lightLevel, lightOpacity) {
         this.id = id;
         this.name = name;
         this.hardness = hardness !== undefined ? hardness : 1.0;
@@ -43,7 +43,7 @@
     /**
      * BlockRegistry — central registry of all vanilla Minecraft blocks.
      */
-    Donkeycraft.BlockRegistry = (function() {
+    Donkeycraft.BlockRegistry = (function () {
         var _blocks = {};         // id -> Block
         var _byName = {};         // name -> Block
         var _nextId = 0;          // auto-increment ID counter

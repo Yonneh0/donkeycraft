@@ -1,6 +1,6 @@
 // Donkeycraft — Entity Manager
 // Manages entity lifecycle: spawn, despawn, tick all entities, by-type queries.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -9,7 +9,7 @@
     /**
      * EntityManager — manages all active entities in the world.
      */
-    Donkeycraft.EntityManager = function() {
+    Donkeycraft.EntityManager = function () {
         /**
          * All active entities indexed by unique ID.
          * @type {Object}
@@ -43,7 +43,7 @@
      * @param {Donkeycraft.Entity} entity - Entity to spawn.
      * @returns {number|null} Entity ID, or null if spawn failed.
      */
-    Donkeycraft.EntityManager.prototype.spawn = function(entity) {
+    Donkeycraft.EntityManager.prototype.spawn = function (entity) {
         if (!entity || !entity.isAlive()) {
             return null;
         }
@@ -86,7 +86,7 @@
      * Despawn an entity by ID.
      * @param {number} id - Entity ID.
      */
-    Donkeycraft.EntityManager.prototype.despawn = function(id) {
+    Donkeycraft.EntityManager.prototype.despawn = function (id) {
         var entity = this._entities[id];
         if (!entity) {
             return;
@@ -124,7 +124,7 @@
      * @param {number} id - Entity ID.
      * @returns {Donkeycraft.Entity|null}
      */
-    Donkeycraft.EntityManager.prototype.getEntity = function(id) {
+    Donkeycraft.EntityManager.prototype.getEntity = function (id) {
         return this._entities[id] || null;
     };
 
@@ -134,7 +134,7 @@
      * @param {number} [maxResults=100] - Maximum number of results to return.
      * @returns {Donkeycraft.Entity[]} Array of entities.
      */
-    Donkeycraft.EntityManager.prototype.getByType = function(type, maxResults) {
+    Donkeycraft.EntityManager.prototype.getByType = function (type, maxResults) {
         maxResults = maxResults || 100;
         var list = this._byType[type];
         if (!list) {
@@ -159,7 +159,7 @@
      * @param {number} [range] - Maximum distance (blocks) (3D only).
      * @returns {Donkeycraft.Entity[]} Array of entities within range.
      */
-    Donkeycraft.EntityManager.prototype.getEntitiesInRange = function(cx, cy, cz, range) {
+    Donkeycraft.EntityManager.prototype.getEntitiesInRange = function (cx, cy, cz, range) {
         // Support 2D signature: getEntitiesInRange(cx, cz, radius)
         var is3D = arguments.length >= 4;
 
@@ -218,7 +218,7 @@
      * Get all alive entities.
      * @returns {Donkeycraft.Entity[]} Array of entities.
      */
-    Donkeycraft.EntityManager.prototype.getAllEntities = function() {
+    Donkeycraft.EntityManager.prototype.getAllEntities = function () {
         var result = [];
         for (var id in this._entities) {
             if (this._entities.hasOwnProperty(id)) {
@@ -235,7 +235,7 @@
      * Get the total number of entities (alive + dead).
      * @returns {number}
      */
-    Donkeycraft.EntityManager.prototype.getCount = function() {
+    Donkeycraft.EntityManager.prototype.getCount = function () {
         return Object.keys(this._entities).length;
     };
 
@@ -243,7 +243,7 @@
      * Get the count of alive entities.
      * @returns {number}
      */
-    Donkeycraft.EntityManager.prototype.getAliveCount = function() {
+    Donkeycraft.EntityManager.prototype.getAliveCount = function () {
         var count = 0;
         for (var id in this._entities) {
             if (this._entities.hasOwnProperty(id)) {
@@ -259,7 +259,7 @@
      * Tick all alive entities.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.EntityManager.prototype.tick = function(deltaTime) {
+    Donkeycraft.EntityManager.prototype.tick = function (deltaTime) {
         var idsToRemove = [];
 
         // Single pass: tick alive entities and collect dead ones
@@ -297,14 +297,14 @@
      * @param {number} id - Entity ID.
      * @returns {boolean}
      */
-    Donkeycraft.EntityManager.prototype.hasEntity = function(id) {
+    Donkeycraft.EntityManager.prototype.hasEntity = function (id) {
         return this._entities[id] !== undefined;
     };
 
     /**
      * Clear all entities.
      */
-    Donkeycraft.EntityManager.prototype.clear = function() {
+    Donkeycraft.EntityManager.prototype.clear = function () {
         for (var id in this._entities) {
             if (this._entities.hasOwnProperty(id)) {
                 this._entities[id].destroy();
@@ -318,7 +318,7 @@
     /**
      * Destroy the entity manager and free resources.
      */
-    Donkeycraft.EntityManager.prototype.destroy = function() {
+    Donkeycraft.EntityManager.prototype.destroy = function () {
         this.clear();
     };
 

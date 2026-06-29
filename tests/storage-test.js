@@ -1,7 +1,7 @@
 // Donkeycraft — Storage System Tests
 // Comprehensive functional tests for WorldStore, LevelData, and AssetCache.
 // Uses async/await to properly sequence IndexedDB operations before finishing.
-(function() {
+(function () {
     'use strict';
 
     var F = TestFramework;
@@ -17,7 +17,7 @@
     function await_(promise, label) {
         var result = null;
         var error = null;
-        promise.then(function(val) { result = val; }).catch(function(e) { error = e; });
+        promise.then(function (val) { result = val; }).catch(function (e) { error = e; });
         // Return placeholder — caller must use the sync check pattern below
         return { _pending: true };
     }
@@ -33,7 +33,7 @@
         // We'll chain all operations and call finish after the last one resolves
         var chain = Promise.resolve();
 
-        chain = chain.then(function() {
+        chain = chain.then(function () {
             return fn();
         });
 
@@ -65,9 +65,9 @@
 
     var section2Chain = Promise.resolve();
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('2. WorldStore — Init & Ready State');
-        return ws.init().then(function(result) {
+        return ws.init().then(function (result) {
             F.assertType(result, 'boolean', 'WorldStore.init returns a boolean');
             if (ws.isReady()) {
                 F.assert(ws._db !== null, 'WorldStore has DB reference after init');
@@ -82,7 +82,7 @@
     // Section 3: WorldStore — Chunk Format Normalization
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('3. WorldStore — Chunk Format Normalization');
 
         if (ws._normalizeChunks) {
@@ -135,7 +135,7 @@
     // Section 4: WorldStore — Full Save/Load/Delete Cycle with Verification
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('4. WorldStore — saveWorld / loadWorld / deleteWorld');
 
         if (!ws.isReady()) {
@@ -185,12 +185,12 @@
         ];
 
         // Save world
-        return ws.saveWorld(testWorldName, testLevelData, testChunks).then(function(saved) {
+        return ws.saveWorld(testWorldName, testLevelData, testChunks).then(function (saved) {
             F.assert(saved === true, 'saveWorld returns true on success');
 
             // Immediately load to verify data was written
             return ws.loadWorld(testWorldName);
-        }).then(function(worldData) {
+        }).then(function (worldData) {
             F.assertType(worldData, 'object', 'loadWorld returns object after save');
             F.assertType(worldData.levelData, 'object', 'loadWorld levelData is object');
             F.assert(Array.isArray(worldData.chunks), 'loadWorld chunks is array');
@@ -211,12 +211,12 @@
 
             // Delete world
             return ws.deleteWorld(testWorldName);
-        }).then(function(deleted) {
+        }).then(function (deleted) {
             F.assert(deleted === true, 'deleteWorld returns true on success');
 
             // Verify deletion
             return ws.loadWorld(testWorldName);
-        }).then(function(result) {
+        }).then(function (result) {
             F.assert(result === null, 'loadWorld returns null after delete');
         });
     });
@@ -225,7 +225,7 @@
     // Section 5: WorldStore — listWorlds
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('5. WorldStore — listWorlds');
 
         if (!ws.isReady()) {
@@ -233,7 +233,7 @@
             return Promise.resolve();
         }
 
-        return ws.listWorlds().then(function(worlds) {
+        return ws.listWorlds().then(function (worlds) {
             F.assert(Array.isArray(worlds), 'listWorlds returns array');
             F.assert(worlds.length >= 0, 'listWorlds returns non-negative length');
         });
@@ -243,7 +243,7 @@
     // Section 6: WorldStore — saveChunk / loadChunk Cycle
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('6. WorldStore — saveChunk / loadChunk');
 
         if (!ws.isReady()) {
@@ -261,12 +261,12 @@
             blockData: chunkBlockData,
             skyLight: chunkSkyLight,
             blockLight: new Array(16 * 256 * 16).fill(0)
-        }).then(function(saved) {
+        }).then(function (saved) {
             F.assert(saved === true || saved === false, 'saveChunk returns boolean');
 
             // Immediately load to verify
             return ws.loadChunk(chunkWorldName, 0, 0);
-        }).then(function(chunkData) {
+        }).then(function (chunkData) {
             if (chunkData) {
                 F.assertType(chunkData, 'object', 'loadChunk returns object when chunk exists');
                 F.assertType(chunkData.blockData, 'object', 'loaded chunk has blockData');
@@ -277,7 +277,7 @@
 
             // Load non-existent chunk
             return ws.loadChunk(chunkWorldName, 99, 99);
-        }).then(function(result) {
+        }).then(function (result) {
             F.assert(result === null, 'loadChunk returns null for non-existent chunk');
         });
     });
@@ -286,7 +286,7 @@
     // Section 7: WorldStore — getLevelData / setLevelData
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('7. WorldStore — getLevelData / setLevelData');
 
         if (!ws.isReady()) {
@@ -297,7 +297,7 @@
         var levelWorldName = 'audit-level-world-' + Date.now();
 
         // Get non-existent world
-        return ws.getLevelData(levelWorldName).then(function(data) {
+        return ws.getLevelData(levelWorldName).then(function (data) {
             F.assert(data === null, 'getLevelData returns null for non-existent world');
 
             // Set level data
@@ -305,12 +305,12 @@
                 spawn: { x: 10, y: 20, z: 30 },
                 gameMode: 'creative'
             });
-        }).then(function(success) {
+        }).then(function (success) {
             F.assertType(success, 'boolean', 'setLevelData returns boolean');
 
             // Get it back
             return ws.getLevelData(levelWorldName);
-        }).then(function(data) {
+        }).then(function (data) {
             if (data) {
                 F.assertEq(data.spawn.x, 10, 'getLevelData preserves spawn X');
                 F.assertEq(data.spawn.y, 20, 'getLevelData preserves spawn Y');
@@ -325,12 +325,12 @@
     // Section 8: WorldStore — setChunkManager / setEventBus
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('8. WorldStore — setChunkManager / setEventBus');
 
         var mockChunkManager = {
-            getDirtyChunks: function() { return []; },
-            isDirty: function() { return false; }
+            getDirtyChunks: function () { return []; },
+            isDirty: function () { return false; }
         };
         ws.setChunkManager(mockChunkManager);
         F.assert(ws._chunkManager === mockChunkManager, 'setChunkManager sets internal reference');
@@ -344,7 +344,7 @@
     // Section 9: LevelData — Construction & Defaults
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('9. LevelData — Construction & Defaults');
 
         var ld = new Donkeycraft.LevelData();
@@ -364,7 +364,7 @@
     // Section 10: LevelData — Setters & Getters
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('10. LevelData — Setters & Getters');
 
         var ld = new Donkeycraft.LevelData();
@@ -398,7 +398,7 @@
     // Section 11: LevelData — Player Data
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('11. LevelData — Player Data');
 
         var ld = new Donkeycraft.LevelData();
@@ -440,7 +440,7 @@
     // Section 12: LevelData — Inventory & XP Points
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('12. LevelData — Inventory & XP Points');
 
         var ld = new Donkeycraft.LevelData();
@@ -461,7 +461,7 @@
     // Section 13: LevelData — Serialization & Deserialization
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('13. LevelData — Serialization & Deserialization');
 
         var ld = new Donkeycraft.LevelData();
@@ -508,7 +508,7 @@
     // Section 14: LevelData — Validation & Reset
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('14. LevelData — Validation & Reset');
 
         var validLd = new Donkeycraft.LevelData();
@@ -533,7 +533,7 @@
     // Section 15: LevelData — Auto-Save System
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('15. LevelData — Auto-Save System');
 
         var autoSaveLd = new Donkeycraft.LevelData();
@@ -546,8 +546,8 @@
         F.assert(!autoSaveLd.isAutoSaveEnabled(), 'startAutoSave with null name does nothing');
 
         var mockWs = {
-            saveWorld: function() { return Promise.resolve(true); },
-            saveDirtyChunks: function() { return Promise.resolve(0); }
+            saveWorld: function () { return Promise.resolve(true); },
+            saveDirtyChunks: function () { return Promise.resolve(0); }
         };
         autoSaveLd.startAutoSave(mockWs, 'test-world', 5000);
         F.assert(autoSaveLd.isAutoSaveEnabled(), 'startAutoSave enables auto-save');
@@ -556,7 +556,7 @@
         F.assertEq(autoSaveLd._autoSaveTimer, 1000, 'tickAutoSave accumulates time in ms');
 
         var noStoreLd = new Donkeycraft.LevelData();
-        return noStoreLd.persistToStore().then(function(success) {
+        return noStoreLd.persistToStore().then(function (success) {
             F.assert(success === false, 'persistToStore returns false without WorldStore');
         });
     });
@@ -565,7 +565,7 @@
     // Section 16: LevelData — persistToStore with Real WorldStore
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('16. LevelData — persistToStore with Real WorldStore');
 
         if (!ws.isReady()) {
@@ -592,12 +592,12 @@
         F.assert(persistLd.isAutoSaveEnabled(), 'LevelData auto-save enabled with real WorldStore');
 
         // Call persistToStore immediately
-        return persistLd.persistToStore().then(function(success) {
+        return persistLd.persistToStore().then(function (success) {
             F.assert(success === true, 'persistToStore returns true on success');
 
             // Now load the world from WorldStore and verify data was persisted correctly
             return ws.loadWorld(persistWorldName);
-        }).then(function(worldData) {
+        }).then(function (worldData) {
             F.assertType(worldData, 'object', 'persisted world loads from WorldStore');
             if (worldData && worldData.levelData) {
                 F.assertEq(worldData.levelData.spawn.x, 500, 'persisted spawn X');
@@ -621,7 +621,7 @@
 
             // Clean up
             return ws.deleteWorld(persistWorldName);
-        }).then(function() {
+        }).then(function () {
             F.info('Persist test world deleted');
         });
     });
@@ -634,7 +634,7 @@
 
     var assetCacheInstance = null;
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('17. AssetCache — Initialization & Readiness');
 
         assetCacheInstance = new Donkeycraft.AssetCache('test-asset-cache-audit');
@@ -646,7 +646,7 @@
         F.assertType(Donkeycraft.ASSET_CACHE_DB_NAME, 'string', 'ASSET_CACHE_DB_NAME is a string');
         F.assertType(Donkeycraft.ASSET_CACHE_VERSION, 'number', 'ASSET_CACHE_VERSION is a number');
 
-        return assetCacheInstance.init().then(function(result) {
+        return assetCacheInstance.init().then(function (result) {
             F.assertType(result, 'boolean', 'AssetCache.init returns boolean');
             if (assetCacheInstance.isReady()) {
                 F.assert(assetCacheInstance._db !== null, 'AssetCache has DB reference after init');
@@ -661,7 +661,7 @@
     // Reuses assetCacheInstance from section 17.
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('18. AssetCache — Sound Cache/Load/Delete Cycle');
 
         if (!assetCacheInstance || !assetCacheInstance.isReady()) {
@@ -672,7 +672,7 @@
         var testSoundData = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
 
         // Set sound
-        return assetCacheInstance.setSound('audit_test_sound', testSoundData).then(function(saved) {
+        return assetCacheInstance.setSound('audit_test_sound', testSoundData).then(function (saved) {
             if (saved) {
                 F.assert(saved === true, 'setSound returns true on success');
 
@@ -682,23 +682,23 @@
                 F.info('setSound failed — may be quota restricted');
                 return null;
             }
-        }).then(function(soundData) {
+        }).then(function (soundData) {
             if (soundData) {
                 F.assertType(soundData, 'string', 'getSound returns string');
                 F.assertEq(soundData.substring(0, 25), testSoundData.substring(0, 25), 'getSound returns correct sound data');
 
                 // Check has() — key format is 'sound:audit_test_sound'
-                return assetCacheInstance.has('sound:audit_test_sound').then(function(hasIt) {
+                return assetCacheInstance.has('sound:audit_test_sound').then(function (hasIt) {
                     F.assert(hasIt === true, 'has returns true for cached sound');
 
                     // Delete it — same key format
-                    return assetCacheInstance.delete('sound:audit_test_sound').then(function(deleted) {
+                    return assetCacheInstance.delete('sound:audit_test_sound').then(function (deleted) {
                         F.assert(deleted === true, 'delete returns true on success');
 
                         // Verify deletion — use full key format
                         return assetCacheInstance.has('sound:audit_test_sound');
                     });
-                }).then(function(hasAfterDelete) {
+                }).then(function (hasAfterDelete) {
                     F.assert(hasAfterDelete === false, 'has returns false after delete');
                 });
             } else {
@@ -712,7 +712,7 @@
     // Reuses assetCacheInstance from section 17.
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('19. AssetCache — has/delete for non-existent key');
 
         if (!assetCacheInstance || !assetCacheInstance.isReady()) {
@@ -720,10 +720,10 @@
             return Promise.resolve();
         }
 
-        return assetCacheInstance.has('non-existent-key').then(function(hasIt) {
+        return assetCacheInstance.has('non-existent-key').then(function (hasIt) {
             F.assert(hasIt === false, 'has returns false for non-existent key');
 
-            return assetCacheInstance.delete('non-existent-key').then(function(deleted) {
+            return assetCacheInstance.delete('non-existent-key').then(function (deleted) {
                 F.assert(deleted === false, 'delete returns false for non-existent key');
             });
         });
@@ -734,7 +734,7 @@
     // Reuses assetCacheInstance from section 17. Closes connection after.
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('20. AssetCache — clearAll / getUsageStats');
 
         if (!assetCacheInstance || !assetCacheInstance.isReady()) {
@@ -742,20 +742,20 @@
             return Promise.resolve();
         }
 
-        return assetCacheInstance.clearAll().then(function() {
-            return assetCacheInstance.getUsageStats().then(function(stats) {
+        return assetCacheInstance.clearAll().then(function () {
+            return assetCacheInstance.getUsageStats().then(function (stats) {
                 F.assertType(stats, 'object', 'getUsageStats returns object');
                 F.assertType(stats.entryCount, 'number', 'stats.entryCount is number');
                 F.assertType(stats.totalSize, 'number', 'stats.totalSize is number');
                 F.assert(Array.isArray(stats.entries), 'stats.entries is array');
                 F.assertEq(stats.entryCount, 0, 'entryCount is 0 after clearAll');
 
-                return assetCacheInstance.getTotalSize().then(function(size) {
+                return assetCacheInstance.getTotalSize().then(function (size) {
                     F.assertType(size, 'number', 'getTotalSize returns number');
                     F.assertEq(size, 0, 'totalSize is 0 after clearAll');
                 });
             });
-        }).then(function() {
+        }).then(function () {
             // Close the AssetCache DB connection before cleanup
             if (assetCacheInstance.destroy) {
                 assetCacheInstance.destroy();
@@ -767,7 +767,7 @@
     // Section 21: Config Constants for Storage
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('21. Config Constants for Storage');
 
         F.assertType(Donkeycraft.Config.CHUNKS_PER_SAVE, 'number', 'Config.CHUNKS_PER_SAVE is number');
@@ -784,7 +784,7 @@
     // Cleanup: Close all DB connections then delete test databases
     // ============================================================
 
-    section2Chain = section2Chain.then(function() {
+    section2Chain = section2Chain.then(function () {
         F.section('Cleanup — Removing Test Databases');
 
         // Close the WorldStore connection first
@@ -801,18 +801,18 @@
         ];
 
         for (var i = 0; i < testDbNames.length; i++) {
-            (function(dbName) {
-                cleanupChain = cleanupChain.then(function() {
-                    return new Promise(function(resolve) {
+            (function (dbName) {
+                cleanupChain = cleanupChain.then(function () {
+                    return new Promise(function (resolve) {
                         // deleteDatabase silently succeeds if DB doesn't exist.
                         // If open connections exist, it waits for them to close first.
                         try {
                             var deleteReq = indexedDB.deleteDatabase(dbName);
-                            deleteReq.onsuccess = function() {
+                            deleteReq.onsuccess = function () {
                                 F.info('Deleted test database: ' + dbName);
                                 resolve();
                             };
-                            deleteReq.onerror = function() {
+                            deleteReq.onerror = function () {
                                 // Open connections may delay deletion — that's fine,
                                 // they close when the test page unloads.
                                 F.info('Deletion pending (open connections): ' + dbName);
@@ -834,11 +834,11 @@
     // Finish: wait for all async sections to complete
     // ============================================================
 
-    section2Chain.then(function() {
+    section2Chain.then(function () {
         F.section('Summary — All Storage Tests Complete');
         F.info('All IndexedDB operations have completed. Test databases cleaned up.');
         F.finishTests();
-    }).catch(function(e) {
+    }).catch(function (e) {
         F.section('Error');
         F.info('An error occurred during tests: ' + e.message);
         F.finishTests();

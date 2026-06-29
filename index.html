@@ -1,219 +1,221 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Donkeycraft</title>
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/gui.css">
-<style>
-/* Inline styles for dynamically-created elements */
-#dk-canvas-container {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donkeycraft</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/gui.css">
+    <style>
+        /* Inline styles for dynamically-created elements */
+        #dk-canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
 </head>
+
 <body>
 
-<!-- WebGL Canvas Container -->
-<div id="dk-canvas-container">
-    <canvas id="dk-canvas"></canvas>
-</div>
-
-<!-- Game Overlay (sits on top of canvas) -->
-<div id="dk-overlay">
-
-    <!-- Crosshair (centered) -->
-    <div id="dk-crosshair"></div>
-
-    <!-- Keybindings Panel (top-center, display-only) -->
-    <div id="dk-keybindings-panel" class="dk-keybindings-panel"></div>
-
-    <!-- Debug Overlay (F3 toggle) -->
-    <div id="dk-debug-overlay" class="dk-debug-info"></div>
-
-    <!-- GUI Backdrop (dims background when GUI open) -->
-    <div id="dk-gui-backdrop"></div>
-
-    <!-- GUI Panel Container (modal screens) -->
-    <div id="dk-gui-container" class="dk-interactive"></div>
-
-    <!-- Hotbar Container -->
-    <div id="dk-hotbar-container"></div>
-
-    <!-- XP Bar — independent container above hotbar -->
-    <div id="dk-xp-bar-wrapper" class="dk-xp-bar-wrapper">
-        <div class="dk-xp-bar-container">
-            <div class="dk-xp-segmented-bg"></div>
-            <div class="dk-xp-fill"></div>
-            <div class="dk-xp-watermark"></div>
-            <div class="dk-xp-badge-container">
-                <div class="dk-xp-badge-bg">
-                    <span class="dk-xp-badge-text">1</span>
-                </div>
-                <div class="dk-xp-badge-glow"></div>
-            </div>
-        </div>
+    <!-- WebGL Canvas Container -->
+    <div id="dk-canvas-container">
+        <canvas id="dk-canvas"></canvas>
     </div>
 
-    <!-- Health Bar — positioned above hotbar, left-aligned -->
-    <div id="dk-health-bar-wrapper" class="dk-health-bar-wrapper dk-interactive"></div>
+    <!-- Game Overlay (sits on top of canvas) -->
+    <div id="dk-overlay">
 
-    <!-- Hunger Bar — positioned above hotbar, right-aligned -->
-    <div id="dk-hunger-bar-wrapper" class="dk-hunger-bar-wrapper dk-interactive"></div>
+        <!-- Crosshair (centered) -->
+        <div id="dk-crosshair"></div>
 
-</div>
+        <!-- Keybindings Panel (top-center, display-only) -->
+        <div id="dk-keybindings-panel" class="dk-keybindings-panel"></div>
 
-<!-- Health & Hunger bars (outside overlay to avoid CSS conflicts) -->
-<div id="dk-health-bar-wrapper-external" class="dk-health-bar-wrapper dk-interactive" style="display:none;"></div>
-<div id="dk-hunger-bar-wrapper-external" class="dk-hunger-bar-wrapper dk-interactive" style="display:none;"></div>
+        <!-- Debug Overlay (F3 toggle) -->
+        <div id="dk-debug-overlay" class="dk-debug-info"></div>
 
-<!-- Error Screen (shown on fatal errors) -->
-<div id="dk-error-screen">
-    <div class="dk-error-title">Something went wrong</div>
-    <div class="dk-error-message" id="dk-error-message"></div>
-    <button class="dk-retry-btn" id="dk-retry-btn">Retry</button>
-</div>
+        <!-- GUI Backdrop (dims background when GUI open) -->
+        <div id="dk-gui-backdrop"></div>
 
-<!-- ============================================================
+        <!-- GUI Panel Container (modal screens) -->
+        <div id="dk-gui-container" class="dk-interactive"></div>
+
+        <!-- Hotbar Container -->
+        <div id="dk-hotbar-container"></div>
+
+        <!-- XP Bar — independent container above hotbar -->
+        <div id="dk-xp-bar-wrapper" class="dk-xp-bar-wrapper">
+            <div class="dk-xp-bar-container">
+                <div class="dk-xp-segmented-bg"></div>
+                <div class="dk-xp-fill"></div>
+                <div class="dk-xp-watermark"></div>
+                <div class="dk-xp-badge-container">
+                    <div class="dk-xp-badge-bg">
+                        <span class="dk-xp-badge-text">1</span>
+                    </div>
+                    <div class="dk-xp-badge-glow"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Health Bar — positioned above hotbar, left-aligned -->
+        <div id="dk-health-bar-wrapper" class="dk-health-bar-wrapper dk-interactive"></div>
+
+        <!-- Hunger Bar — positioned above hotbar, right-aligned -->
+        <div id="dk-hunger-bar-wrapper" class="dk-hunger-bar-wrapper dk-interactive"></div>
+
+    </div>
+
+    <!-- Health & Hunger bars (outside overlay to avoid CSS conflicts) -->
+    <div id="dk-health-bar-wrapper-external" class="dk-health-bar-wrapper dk-interactive" style="display:none;"></div>
+    <div id="dk-hunger-bar-wrapper-external" class="dk-hunger-bar-wrapper dk-interactive" style="display:none;"></div>
+
+    <!-- Error Screen (shown on fatal errors) -->
+    <div id="dk-error-screen">
+        <div class="dk-error-title">Something went wrong</div>
+        <div class="dk-error-message" id="dk-error-message"></div>
+        <button class="dk-retry-btn" id="dk-retry-btn">Retry</button>
+    </div>
+
+    <!-- ============================================================
      Load project scripts in dependency order
      ============================================================ -->
 
-<!-- Core Infrastructure -->
-<script src="src/core/namespace.js"></script>
-<script src="src/core/eventbus.js"></script>
-<script src="src/core/config.js"></script>
-<script src="src/core/logger.js"></script>
-<script src="src/core/timer.js"></script>
-<script src="src/core/input.js"></script>
-<script src="src/core/math-utils.js"></script>
-<script src="src/core/audio.js"></script>
+    <!-- Core Infrastructure -->
+    <script src="src/core/namespace.js"></script>
+    <script src="src/core/eventbus.js"></script>
+    <script src="src/core/config.js"></script>
+    <script src="src/core/logger.js"></script>
+    <script src="src/core/timer.js"></script>
+    <script src="src/core/input.js"></script>
+    <script src="src/core/math-utils.js"></script>
+    <script src="src/core/audio.js"></script>
 
-<!-- Block System -->
-<script src="src/game/block.js"></script>
-<script src="src/game/block-state.js"></script>
-<script src="src/game/block-types.js"></script>
-<script src="src/game/texture-atlas.js"></script>
-<script src="src/game/block-models.js"></script>
-<script src="src/game/recipe-registry.js"></script>
+    <!-- Block System -->
+    <script src="src/game/block.js"></script>
+    <script src="src/game/block-state.js"></script>
+    <script src="src/game/block-types.js"></script>
+    <script src="src/game/texture-atlas.js"></script>
+    <script src="src/game/block-models.js"></script>
+    <script src="src/game/recipe-registry.js"></script>
 
-<!-- World Generation -->
-<script src="src/game/chunk.js"></script>
-<script src="src/game/chunk-manager.js"></script>
-<script src="src/game/biome.js"></script>
-<script src="src/game/terrain-generator.js"></script>
-<script src="src/game/ore-generator.js"></script>
-<script src="src/game/cave-generator.js"></script>
-<script src="src/game/structure-generator.js"></script>
-<script src="src/game/water-generator.js"></script>
-<script src="src/game/terrain-surface.js"></script>
-<script src="src/game/lighting-engine.js"></script>
-<script src="src/game/physics.js"></script>
-<script src="src/game/world-utils.js"></script>
+    <!-- World Generation -->
+    <script src="src/game/chunk.js"></script>
+    <script src="src/game/chunk-manager.js"></script>
+    <script src="src/game/biome.js"></script>
+    <script src="src/game/terrain-generator.js"></script>
+    <script src="src/game/ore-generator.js"></script>
+    <script src="src/game/cave-generator.js"></script>
+    <script src="src/game/structure-generator.js"></script>
+    <script src="src/game/water-generator.js"></script>
+    <script src="src/game/terrain-surface.js"></script>
+    <script src="src/game/lighting-engine.js"></script>
+    <script src="src/game/physics.js"></script>
+    <script src="src/game/world-utils.js"></script>
 
 
-<!-- Player & Movement -->
-<script src="src/game/player.js"></script>
-<script src="src/game/movement.js"></script>
-<script src="src/game/collision.js"></script>
-<script src="src/game/jumping.js"></script>
-<script src="src/game/flying.js"></script>
-<script src="src/game/damage.js"></script>
-<script src="src/game/game-mode.js"></script>
-<script src="src/game/stats.js"></script>
-<script src="src/game/hunger.js"></script>
-<script src="src/game/experience.js"></script>
+    <!-- Player & Movement -->
+    <script src="src/game/player.js"></script>
+    <script src="src/game/movement.js"></script>
+    <script src="src/game/collision.js"></script>
+    <script src="src/game/jumping.js"></script>
+    <script src="src/game/flying.js"></script>
+    <script src="src/game/damage.js"></script>
+    <script src="src/game/game-mode.js"></script>
+    <script src="src/game/stats.js"></script>
+    <script src="src/game/hunger.js"></script>
+    <script src="src/game/experience.js"></script>
 
-<!-- Interaction -->
-<script src="src/game/raycast.js"></script>
-<script src="src/game/block-action.js"></script>
-<script src="src/game/block-placement.js"></script>
-<script src="src/game/interactable-blocks.js"></script>
+    <!-- Interaction -->
+    <script src="src/game/raycast.js"></script>
+    <script src="src/game/block-action.js"></script>
+    <script src="src/game/block-placement.js"></script>
+    <script src="src/game/interactable-blocks.js"></script>
 
-<!-- Asset Generation (refactored into src/gen/) -->
-<script src="src/gen/noise.js"></script>
-<script src="src/gen/texture-core.js"></script>
-<script src="src/gen/texture-terrain.js"></script>
-<script src="src/gen/texture-blocks.js"></script>
-<script src="src/gen/texture-special.js"></script>
-<script src="src/gen/texture-decorative.js"></script>
-<script src="src/gen/sound-manager.js"></script>
+    <!-- Asset Generation (refactored into src/gen/) -->
+    <script src="src/gen/noise.js"></script>
+    <script src="src/gen/texture-core.js"></script>
+    <script src="src/gen/texture-terrain.js"></script>
+    <script src="src/gen/texture-blocks.js"></script>
+    <script src="src/gen/texture-special.js"></script>
+    <script src="src/gen/texture-decorative.js"></script>
+    <script src="src/gen/sound-manager.js"></script>
 
-<!-- Loading Screen & Init -->
-<script src="src/core/init-sequence.js"></script>
-<script src="src/ui/loading-screen.js"></script>
+    <!-- Loading Screen & Init -->
+    <script src="src/core/init-sequence.js"></script>
+    <script src="src/ui/loading-screen.js"></script>
 
-<!-- Inventory & UI -->
-<script src="src/ui/item-stack.js"></script>
-<script src="src/ui/inventory.js"></script>
-<script src="src/ui/gui-manager.js"></script>
-<script src="src/ui/hotbar.js"></script>
-<script src="src/ui/crafting-grid.js"></script>
-<script src="src/ui/creative-inventory.js"></script>
-<script src="src/ui/furnace-ui.js"></script>
-<script src="src/ui/chest-ui.js"></script>
-<script src="src/ui/anvil-ui.js"></script>
-<script src="src/ui/enchanting-ui.js"></script>
-<script src="src/ui/debug-overlay.js"></script>
+    <!-- Inventory & UI -->
+    <script src="src/ui/item-stack.js"></script>
+    <script src="src/ui/inventory.js"></script>
+    <script src="src/ui/gui-manager.js"></script>
+    <script src="src/ui/hotbar.js"></script>
+    <script src="src/ui/crafting-grid.js"></script>
+    <script src="src/ui/creative-inventory.js"></script>
+    <script src="src/ui/furnace-ui.js"></script>
+    <script src="src/ui/chest-ui.js"></script>
+    <script src="src/ui/anvil-ui.js"></script>
+    <script src="src/ui/enchanting-ui.js"></script>
+    <script src="src/ui/debug-overlay.js"></script>
 
-<!-- Entities & Mobs -->
-<script src="src/game/entity.js"></script>
-<script src="src/game/entity-manager.js"></script>
-<script src="src/game/passive-mobs.js"></script>
-<script src="src/game/hostile-mobs.js"></script>
-<script src="src/game/boss-mobs.js"></script>
-<script src="src/game/mob-ai.js"></script>
-<script src="src/game/projectiles.js"></script>
-<script src="src/game/animals.js"></script>
-<script src="src/game/mob-spawning.js"></script>
+    <!-- Entities & Mobs -->
+    <script src="src/game/entity.js"></script>
+    <script src="src/game/entity-manager.js"></script>
+    <script src="src/game/passive-mobs.js"></script>
+    <script src="src/game/hostile-mobs.js"></script>
+    <script src="src/game/boss-mobs.js"></script>
+    <script src="src/game/mob-ai.js"></script>
+    <script src="src/game/projectiles.js"></script>
+    <script src="src/game/animals.js"></script>
+    <script src="src/game/mob-spawning.js"></script>
 
-<!-- Redstone -->
-<script src="src/game/redstone-engine.js"></script>
-<script src="src/game/wiring.js"></script>
-<script src="src/game/repeater-comparator.js"></script>
-<script src="src/game/observers.js"></script>
-<script src="src/game/pistons.js"></script>
-<script src="src/game/tnt.js"></script>
+    <!-- Redstone -->
+    <script src="src/game/redstone-engine.js"></script>
+    <script src="src/game/wiring.js"></script>
+    <script src="src/game/repeater-comparator.js"></script>
+    <script src="src/game/observers.js"></script>
+    <script src="src/game/pistons.js"></script>
+    <script src="src/game/tnt.js"></script>
 
-<!-- Dimensions -->
-<script src="src/game/dimension.js"></script>
-<script src="src/game/portal.js"></script>
-<script src="src/game/nether-generator.js"></script>
-<script src="src/game/end-generator.js"></script>
+    <!-- Dimensions -->
+    <script src="src/game/dimension.js"></script>
+    <script src="src/game/portal.js"></script>
+    <script src="src/game/nether-generator.js"></script>
+    <script src="src/game/end-generator.js"></script>
 
-<!-- Time & Weather -->
-<script src="src/game/time.js"></script>
-<script src="src/render/weather.js"></script>
+    <!-- Time & Weather -->
+    <script src="src/game/time.js"></script>
+    <script src="src/render/weather.js"></script>
 
-<!-- Storage -->
-<script src="src/core/world-store.js"></script>
-<script src="src/core/level-data.js"></script>
-<script src="src/core/cache.js"></script>
+    <!-- Storage -->
+    <script src="src/core/world-store.js"></script>
+    <script src="src/core/level-data.js"></script>
+    <script src="src/core/cache.js"></script>
 
-<!-- Enchanting & Potions -->
-<script src="src/game/enchantment.js"></script>
-<script src="src/game/potion.js"></script>
+    <!-- Enchanting & Potions -->
+    <script src="src/game/enchantment.js"></script>
+    <script src="src/game/potion.js"></script>
 
-<!-- Tools -->
-<script src="src/game/tool.js"></script>
+    <!-- Tools -->
+    <script src="src/game/tool.js"></script>
 
-<!-- UI Elements -->
-<script src="src/ui/gui-elements.js"></script>
+    <!-- UI Elements -->
+    <script src="src/ui/gui-elements.js"></script>
 
-<!-- Keybindings Panel -->
-<script src="src/ui/keybindings-panel.js"></script>
+    <!-- Keybindings Panel -->
+    <script src="src/ui/keybindings-panel.js"></script>
 
-<!-- XP Bar UI -->
-<script src="src/ui/xp-bar.js"></script>
+    <!-- XP Bar UI -->
+    <script src="src/ui/xp-bar.js"></script>
 
-<!-- Health Bar & Hunger Bar UI -->
-<script src="src/ui/health-bar.js"></script>
-<script src="src/ui/hunger-bar.js"></script>
+    <!-- Health Bar & Hunger Bar UI -->
+    <script src="src/ui/health-bar.js"></script>
+    <script src="src/ui/hunger-bar.js"></script>
 
-<!-- Shader Sources (embedded for file:/// compatibility) -->
-<script type="text/plain" id="dk-vertex-shaders">
+    <!-- Shader Sources (embedded for file:/// compatibility) -->
+    <script type="text/plain" id="dk-vertex-shaders">
 // Donkeycraft — Vertex Shaders
 // All vertex shaders as string resources for terrain, particles, and GUI rendering.
 
@@ -341,7 +343,7 @@ void main() {
 `;
 </script>
 
-<script type="text/plain" id="dk-fragment-shaders">
+    <script type="text/plain" id="dk-fragment-shaders">
 // Donkeycraft — Fragment Shaders
 // All fragment shaders for terrain lighting, fog, sky, and GUI rendering.
 
@@ -466,684 +468,683 @@ void main() {
 `;
 </script>
 
-<!-- WebGL Rendering -->
-<script src="src/render/gl-context.js"></script>
-<script src="src/render/shader-manager.js"></script>
-<script src="src/render/geometry-builder.js"></script>
-<script src="src/render/mesh-optimizer.js"></script>
-<script src="src/render/chunk-mesh.js"></script>
-<script src="src/render/terrain-renderer.js"></script>
-<script src="src/render/camera.js"></script>
-<script src="src/render/fog.js"></script>
-<script src="src/render/sky.js"></script>
-<script src="src/render/lighting.js"></script>
-<script src="src/render/hand-renderer.js"></script>
-<script src="src/render/break-particles.js"></script>
-<script src="src/render/gui-renderer.js"></script>
-<script src="src/render/wireframe-renderer.js"></script>
-<!-- Main Entry Point & Game Loop -->
-<script src="src/game.js"></script>
+    <!-- WebGL Rendering -->
+    <script src="src/render/gl-context.js"></script>
+    <script src="src/render/shader-manager.js"></script>
+    <script src="src/render/geometry-builder.js"></script>
+    <script src="src/render/mesh-optimizer.js"></script>
+    <script src="src/render/chunk-mesh.js"></script>
+    <script src="src/render/terrain-renderer.js"></script>
+    <script src="src/render/camera.js"></script>
+    <script src="src/render/fog.js"></script>
+    <script src="src/render/sky.js"></script>
+    <script src="src/render/lighting.js"></script>
+    <script src="src/render/hand-renderer.js"></script>
+    <script src="src/render/break-particles.js"></script>
+    <script src="src/render/gui-renderer.js"></script>
+    <script src="src/render/wireframe-renderer.js"></script>
+    <!-- Main Entry Point & Game Loop -->
+    <script src="src/game.js"></script>
 
-<!-- Game initialization (Main Entry Point & Game Loop) -->
-<script>
-(function() {
-    'use strict';
+    <!-- Game initialization (Main Entry Point & Game Loop) -->
+    <script>
+        (function () {
+            'use strict';
 
-    /**
-     * Start the game after async initialization completes.
-     * Called by InitSequence pipeline on 'game:ready' event.
-     * @private
-     * @param {Object} gameSystems - Game system constructors/options.
-     * @param {Object} initSystems - Initialization result (worldStore, assetCache, etc.).
-     */
-    function startGame(gameSystems, initSystems) {
+            /**
+             * Start the game after async initialization completes.
+             * Called by InitSequence pipeline on 'game:ready' event.
+             * @private
+             * @param {Object} gameSystems - Game system constructors/options.
+             * @param {Object} initSystems - Initialization result (worldStore, assetCache, etc.).
+             */
+            function startGame(gameSystems, initSystems) {
 
-        // Create the game instance
-        var game = new Donkeycraft.Game({
-            renderDistance: gameSystems.renderDistance,
-            gameMode: gameSystems.gameMode || 'survival'
-        });
+                // Create the game instance
+                var game = new Donkeycraft.Game({
+                    renderDistance: gameSystems.renderDistance,
+                    gameMode: gameSystems.gameMode || 'survival'
+                });
 
-        // Initialize all subsystems (WebGL, shaders, player, chunks, etc.)
-        var initOk = game.init();
-        if (!initOk) {
-            showError('Failed to initialize game. WebGL may not be supported.');
-            return;
-        }
-
-        // Wire up external systems: movement, collision, jump, flying, raycast, block actions
-        game.setSystems(
-            gameSystems.movementSystem,
-            gameSystems.collisionSystem,
-            gameSystems.jumpSystem,
-            gameSystems.flyingSystem,
-            gameSystems.raycastSystem,
-            gameSystems.blockActionSystem,
-            gameSystems.blockPlacementSystem,
-            gameSystems.interactableBlocksSystem
-        );
-
-        // Wire up storage systems (WorldStore + LevelData auto-save)
-        if (initSystems && initSystems.worldStore && initSystems.worldStore.isReady()) {
-            var worldStore = initSystems.worldStore;
-
-            // Set WorldStore on Game for auto-save
-            game.setWorldStore(worldStore);
-
-            // Create and configure LevelData
-            var levelData = new Donkeycraft.LevelData();
-            levelData.setWorldName('DefaultWorld');
-            levelData.setSpawn(0, Math.floor(Donkeycraft.Config.WORLD_HEIGHT / 2), 0);
-            levelData.setGameMode('survival');
-
-            // Connect WorldStore to LevelData for persistence
-            worldStore.setChunkManager(game.getChunkManager());
-            worldStore.setEventBus(game.getEventBus());
-
-            // Wire LevelData onto Game for auto-save tick and final persist
-            game.setLevelData(levelData);
-
-            // Try loading existing world data
-            worldStore.loadWorld('DefaultWorld').then(function(worldData) {
-                if (worldData && worldData.levelData) {
-                    levelData.deserialize(worldData.levelData);
-                    Donkeycraft.Logger.info('Game', 'World loaded from storage (saved at: ' + new Date(worldData.savedAt).toLocaleString() + ')');
-                } else {
-                    Donkeycraft.Logger.info('Game', 'New world created — no existing save found');
+                // Initialize all subsystems (WebGL, shaders, player, chunks, etc.)
+                var initOk = game.init();
+                if (!initOk) {
+                    showError('Failed to initialize game. WebGL may not be supported.');
+                    return;
                 }
 
-                // Start auto-save system
-                levelData.startAutoSave(worldStore, 'DefaultWorld');
-            }).catch(function(err) {
-                Donkeycraft.Logger.warn('Game', 'Failed to load world data: ' + err.message);
-            });
+                // Wire up external systems: movement, collision, jump, flying, raycast, block actions
+                game.setSystems(
+                    gameSystems.movementSystem,
+                    gameSystems.collisionSystem,
+                    gameSystems.jumpSystem,
+                    gameSystems.flyingSystem,
+                    gameSystems.raycastSystem,
+                    gameSystems.blockActionSystem,
+                    gameSystems.blockPlacementSystem,
+                    gameSystems.interactableBlocksSystem
+                );
 
-            // Wire up LevelData destroy to WorldStore cleanup
-            var origDestroy = game.destroy.bind(game);
-            game.destroy = function() {
-                if (levelData && levelData.destroy) {
-                    levelData.destroy();
+                // Wire up storage systems (WorldStore + LevelData auto-save)
+                if (initSystems && initSystems.worldStore && initSystems.worldStore.isReady()) {
+                    var worldStore = initSystems.worldStore;
+
+                    // Set WorldStore on Game for auto-save
+                    game.setWorldStore(worldStore);
+
+                    // Create and configure LevelData
+                    var levelData = new Donkeycraft.LevelData();
+                    levelData.setWorldName('DefaultWorld');
+                    levelData.setSpawn(0, Math.floor(Donkeycraft.Config.WORLD_HEIGHT / 2), 0);
+                    levelData.setGameMode('survival');
+
+                    // Connect WorldStore to LevelData for persistence
+                    worldStore.setChunkManager(game.getChunkManager());
+                    worldStore.setEventBus(game.getEventBus());
+
+                    // Wire LevelData onto Game for auto-save tick and final persist
+                    game.setLevelData(levelData);
+
+                    // Try loading existing world data
+                    worldStore.loadWorld('DefaultWorld').then(function (worldData) {
+                        if (worldData && worldData.levelData) {
+                            levelData.deserialize(worldData.levelData);
+                            Donkeycraft.Logger.info('Game', 'World loaded from storage (saved at: ' + new Date(worldData.savedAt).toLocaleString() + ')');
+                        } else {
+                            Donkeycraft.Logger.info('Game', 'New world created — no existing save found');
+                        }
+
+                        // Start auto-save system
+                        levelData.startAutoSave(worldStore, 'DefaultWorld');
+                    }).catch(function (err) {
+                        Donkeycraft.Logger.warn('Game', 'Failed to load world data: ' + err.message);
+                    });
+
+                    // Wire up LevelData destroy to WorldStore cleanup
+                    var origDestroy = game.destroy.bind(game);
+                    game.destroy = function () {
+                        if (levelData && levelData.destroy) {
+                            levelData.destroy();
+                        }
+                        origDestroy();
+                    };
                 }
-                origDestroy();
-            };
-        }
 
-        // AssetCache: attempt to load cached texture atlas from IndexedDB
-        if (initSystems && initSystems.assetCache && initSystems.assetCache.isReady()) {
-            Donkeycraft.Logger.info('Game', 'AssetCache initialized — checking for cached assets');
-        }
-
-        // Set overlay reference for pointer lock
-        game.setOverlay(document.getElementById('dk-overlay'));
-
-        // --- Input: Pointer Lock & AudioContext Resume ---
-        // NOTE: Click handler must be on canvas, NOT overlay. The overlay has
-        // pointer-events: none in CSS, so clicks pass through to the canvas.
-        var canvas = document.getElementById('dk-canvas');
-        canvas.addEventListener('click', function() {
-            // Hide cursor class — set on body when pointer is locked so CSS can hide it.
-            if (!document.pointerLockElement) {
-                game.requestPointerLock();
-            }
-            // Resume AudioContext if suspended — required on mobile browsers
-            // and some desktop browsers that defer audio until user gesture.
-            // Check both the Game instance's _audioContext and any AudioSystem from init-sequence.
-            var audioCtx = null;
-            if (window._dkGame && window._dkGame._audioContext) {
-                audioCtx = window._dkGame._audioContext;
-            } else if (window._dkInitSystems && window._dkInitSystems.audioSystem && window._dkInitSystems.audioSystem._context) {
-                audioCtx = window._dkInitSystems.audioSystem._context;
-            }
-            if (audioCtx && audioCtx.state === 'suspended') {
-                try { audioCtx.resume().catch(function() {}); } catch (e) {}
-            }
-        });
-
-        // --- Input: Pointer Lock state change — toggle cursor hiding class ---
-        document.addEventListener('pointerlockchange', function() {
-            if (document.pointerLockElement) {
-                document.body.classList.add('dk-pointer-locked');
-            } else {
-                document.body.classList.remove('dk-pointer-locked');
-            }
-        });
-
-        // --- Input: Mouse Movement (camera rotation) ---
-        canvas.addEventListener('mousemove', function(e) {
-            if (!document.pointerLockElement) return;
-            var dx = e.movementX || 0;
-            var dy = e.movementY || 0;
-            var camera = game.getCamera();
-            if (camera) {
-                camera.applyMouseDelta(dx, dy);
-            }
-        });
-
-        // --- Input: Keyboard ---
-        document.addEventListener('keydown', function(e) {
-            // F3 — toggle debug overlay
-            if (e.code === 'F3') {
-                e.preventDefault();
-                var visible = game.toggleDebugOverlay();
-                // Start/stop DebugOverlay auto-listening on toggle
-                if (visible && game._debugOverlay && game._debugOverlay.startListening) {
-                    game._debugOverlay.startListening();
-                } else if (!visible && game._debugOverlay && game._debugOverlay.stopListening) {
-                    game._debugOverlay.stopListening();
+                // AssetCache: attempt to load cached texture atlas from IndexedDB
+                if (initSystems && initSystems.assetCache && initSystems.assetCache.isReady()) {
+                    Donkeycraft.Logger.info('Game', 'AssetCache initialized — checking for cached assets');
                 }
-            }
-            // Escape — close GUI first, then exit pointer lock
-            if (e.code === 'Escape') {
-                e.preventDefault();
-                var guiMgr = game._guiManager;
-                if (guiMgr && guiMgr.hasOpenScreens) {
-                    guiMgr.closeTopScreen();
-                } else {
-                    game.exitPointerLock();
-                }
-            }
-            // Number keys 1-9 — select hotbar slot
-            var digitCode = e.code;
-            if (digitCode >= 'Digit1' && digitCode <= 'Digit9') {
-                var slotIndex = parseInt(digitCode.charAt(6), 10) - 1;
-                if (slotIndex >= 0 && slotIndex < 9 && game._hotbar) {
-                    game._hotbar.setSelectedSlot(slotIndex);
-                }
-            }
-            // E — toggle creative inventory
-            if (e.code === 'KeyE') {
-                e.preventDefault();
-                var guiMgr2 = game._guiManager;
-                if (guiMgr2 && guiMgr2.hasOpenScreens) {
-                    guiMgr2.closeTopScreen();
-                }
-            }
-            // F — toggle creative flying
-            if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey) {
-                var player = game.getPlayer();
-                if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
-                    var flyingSys = game._flyingSystem;
-                    if (flyingSys) {
-                        flyingSys.toggleFlyMode();
+
+                // Set overlay reference for pointer lock
+                game.setOverlay(document.getElementById('dk-overlay'));
+
+                // --- Input: Pointer Lock & AudioContext Resume ---
+                // NOTE: Click handler must be on canvas, NOT overlay. The overlay has
+                // pointer-events: none in CSS, so clicks pass through to the canvas.
+                var canvas = document.getElementById('dk-canvas');
+                canvas.addEventListener('click', function () {
+                    // Hide cursor class — set on body when pointer is locked so CSS can hide it.
+                    if (!document.pointerLockElement) {
+                        game.requestPointerLock();
                     }
+                    // Resume AudioContext if suspended — required on mobile browsers
+                    // and some desktop browsers that defer audio until user gesture.
+                    // Check both the Game instance's _audioContext and any AudioSystem from init-sequence.
+                    var audioCtx = null;
+                    if (window._dkGame && window._dkGame._audioContext) {
+                        audioCtx = window._dkGame._audioContext;
+                    } else if (window._dkInitSystems && window._dkInitSystems.audioSystem && window._dkInitSystems.audioSystem._context) {
+                        audioCtx = window._dkInitSystems.audioSystem._context;
+                    }
+                    if (audioCtx && audioCtx.state === 'suspended') {
+                        try { audioCtx.resume().catch(function () { }); } catch (e) { }
+                    }
+                });
+
+                // --- Input: Pointer Lock state change — toggle cursor hiding class ---
+                document.addEventListener('pointerlockchange', function () {
+                    if (document.pointerLockElement) {
+                        document.body.classList.add('dk-pointer-locked');
+                    } else {
+                        document.body.classList.remove('dk-pointer-locked');
+                    }
+                });
+
+                // --- Input: Mouse Movement (camera rotation) ---
+                canvas.addEventListener('mousemove', function (e) {
+                    if (!document.pointerLockElement) return;
+                    var dx = e.movementX || 0;
+                    var dy = e.movementY || 0;
+                    var camera = game.getCamera();
+                    if (camera) {
+                        camera.applyMouseDelta(dx, dy);
+                    }
+                });
+
+                // --- Input: Keyboard ---
+                document.addEventListener('keydown', function (e) {
+                    // F3 — toggle debug overlay
+                    if (e.code === 'F3') {
+                        e.preventDefault();
+                        var visible = game.toggleDebugOverlay();
+                        // Start/stop DebugOverlay auto-listening on toggle
+                        if (visible && game._debugOverlay && game._debugOverlay.startListening) {
+                            game._debugOverlay.startListening();
+                        } else if (!visible && game._debugOverlay && game._debugOverlay.stopListening) {
+                            game._debugOverlay.stopListening();
+                        }
+                    }
+                    // Escape — close GUI first, then exit pointer lock
+                    if (e.code === 'Escape') {
+                        e.preventDefault();
+                        var guiMgr = game._guiManager;
+                        if (guiMgr && guiMgr.hasOpenScreens) {
+                            guiMgr.closeTopScreen();
+                        } else {
+                            game.exitPointerLock();
+                        }
+                    }
+                    // Number keys 1-9 — select hotbar slot
+                    var digitCode = e.code;
+                    if (digitCode >= 'Digit1' && digitCode <= 'Digit9') {
+                        var slotIndex = parseInt(digitCode.charAt(6), 10) - 1;
+                        if (slotIndex >= 0 && slotIndex < 9 && game._hotbar) {
+                            game._hotbar.setSelectedSlot(slotIndex);
+                        }
+                    }
+                    // E — toggle creative inventory
+                    if (e.code === 'KeyE') {
+                        e.preventDefault();
+                        var guiMgr2 = game._guiManager;
+                        if (guiMgr2 && guiMgr2.hasOpenScreens) {
+                            guiMgr2.closeTopScreen();
+                        }
+                    }
+                    // F — toggle creative flying
+                    if (e.code === 'KeyF' && !e.ctrlKey && !e.metaKey) {
+                        var player = game.getPlayer();
+                        if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
+                            var flyingSys = game._flyingSystem;
+                            if (flyingSys) {
+                                flyingSys.toggleFlyMode();
+                            }
+                        }
+                    }
+                });
+
+                // --- Input: Mouse buttons (break/place) ---
+                // Handled by input.js event listeners — game.js _processInteractions()
+                // uses isMouseButtonPressed('left') and isMouseButtonPressed('right').
+
+                // Prevent context menu on right-click
+                canvas.addEventListener('contextmenu', function (e) {
+                    e.preventDefault();
+                });
+
+                // --- Start the game loop ---
+                game.start();
+
+                // Store globally for debugging / cleanup
+                window._dkGame = game;
+            }
+
+            /**
+             * Hide the loading screen before showing an error.
+             * @private
+             */
+            function hideLoadingScreen() {
+                if (typeof loadingScreen !== 'undefined' && loadingScreen && loadingScreen.dispose) {
+                    try { loadingScreen.dispose(); } catch (e) { }
                 }
             }
-        });
 
-        // --- Input: Mouse buttons (break/place) ---
-        // Handled by input.js event listeners — game.js _processInteractions()
-        // uses isMouseButtonPressed('left') and isMouseButtonPressed('right').
-
-        // Prevent context menu on right-click
-        canvas.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-
-        // --- Start the game loop ---
-        game.start();
-
-        // Store globally for debugging / cleanup
-        window._dkGame = game;
-    }
-
-    /**
-     * Hide the loading screen before showing an error.
-     * @private
-     */
-    function hideLoadingScreen() {
-        if (typeof loadingScreen !== 'undefined' && loadingScreen && loadingScreen.dispose) {
-            try { loadingScreen.dispose(); } catch (e) {}
-        }
-    }
-
-    /**
-     * Show error screen on fatal error.
-     * Disposes the loading screen first to prevent it from staying visible.
-     * @private
-     * @param {string} message - Error message to display.
-     */
-    function showError(message) {
-        hideLoadingScreen();
-        var errorScreen = document.getElementById('dk-error-screen');
-        var errorMessage = document.getElementById('dk-error-message');
-        if (errorScreen && errorMessage) {
-            errorMessage.textContent = message;
-            errorScreen.style.display = 'flex';
-        }
-    }
-
-    /**
-     * Retry button handler — reload the page.
-     * @private
-     */
-    function setupRetry() {
-        var retryBtn = document.getElementById('dk-retry-btn');
-        if (retryBtn) {
-            retryBtn.addEventListener('click', function() {
-                location.reload();
-            });
-        }
-    }
-
-    // ============================================================
-    // Initialize: run async pipeline, then start game
-    // ============================================================
-    setupRetry();
-
-    // Create LoadingScreen instance (constructor already creates+shows DOM)
-    var loadingScreen = new Donkeycraft.LoadingScreen();
-
-    // Run the async initialization pipeline
-    var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
-
-    // Wire loading screen progress updates to init phases
-    // Progress: before config=0%, after config=25%, after texture-atlas=50%, after audio=75%, after indexeddb=100%
-    initSeq.on('init:phase:start', function(data) {
-        loadingScreen.setMessage('Initializing ' + data.phase.replace('-', ' ') + '...');
-    });
-
-    initSeq.on('init:phase:end', function(data) {
-        var phaseOrder = ['config', 'texture-atlas', 'audio', 'indexeddb'];
-        var idx = phaseOrder.indexOf(data.phase);
-        if (idx >= 0) {
-            loadingScreen.updateProgress((idx + 1) * 25);
-        }
-    });
-
-    // Set initial progress to 0% before pipeline starts
-    loadingScreen.updateProgress(0);
-
-    initSeq.on('init:error', function(data) {
-        loadingScreen.showError(data.error.message || 'Unknown error');
-    });
-
-    // Store init systems globally for audio context resume and debugging
-    window._dkInitSystems = null;
-
-    // Start the async pipeline and handle completion
-    initSeq.initialize().then(function(systems) {
-        // Store globally so the click handler can access the AudioContext
-        window._dkInitSystems = systems;
-
-        // Update progress to 100%
-        loadingScreen.updateProgress(100);
-        loadingScreen.setMessage('Ready!');
-
-        // Extract systems from init result
-        var gameSystems = {
-            renderDistance: Donkeycraft.Config.RENDER_DISTANCE,
-            gameMode: 'survival',
-            movementSystem: Donkeycraft.Movement,
-            collisionSystem: Donkeycraft.Collision,
-            jumpSystem: Donkeycraft.Jumping,
-            flyingSystem: Donkeycraft.Flying,
-            raycastSystem: Donkeycraft.Raycast,
-            blockActionSystem: Donkeycraft.BlockAction,
-            blockPlacementSystem: Donkeycraft.BlockPlacement,
-            interactableBlocksSystem: Donkeycraft.InteractableBlocks
-        };
-
-        // Start the game with all systems wired up
-        startGame(gameSystems, systems);
-
-        // Wire up additional UI systems immediately (no setTimeout — hotbar/GUI must appear on first frame)
-        var game2 = window._dkGame;
-        if (game2) {
-            // --- Wire up Hotbar UI ---
-            var hotbarContainer = document.getElementById('dk-hotbar-container');
-            if (hotbarContainer && Donkeycraft.Hotbar && game2._guiRenderer && game2._canvas) {
-                var hotbar = new Donkeycraft.Hotbar(hotbarContainer, game2._guiRenderer, game2._canvas);
-                game2.setHotbar(hotbar);
-
-                // Sync player inventory to hotbar display
-                if (game2._player && game2._player.getInventory) {
-                    try {
-                        var inv = game2._player.getInventory();
-                        if (inv && typeof inv.getHotbarStacks === 'function') {
-                            hotbar.setSlots(inv.getHotbarStacks());
-                        }
-                    } catch (e) {}
+            /**
+             * Show error screen on fatal error.
+             * Disposes the loading screen first to prevent it from staying visible.
+             * @private
+             * @param {string} message - Error message to display.
+             */
+            function showError(message) {
+                hideLoadingScreen();
+                var errorScreen = document.getElementById('dk-error-screen');
+                var errorMessage = document.getElementById('dk-error-message');
+                if (errorScreen && errorMessage) {
+                    errorMessage.textContent = message;
+                    errorScreen.style.display = 'flex';
                 }
+            }
 
-                // Listen for hotbar selection changes
-                if (hotbar.onSelectedChange) {
-                    hotbar.onSelectedChange(function(newSlot, oldSlot) {
-                        // Sync player selected slot
-                        if (game2._player && game2._player.setSelectedHotbarSlot) {
-                            game2._player.setSelectedHotbarSlot(newSlot);
-                        }
+            /**
+             * Retry button handler — reload the page.
+             * @private
+             */
+            function setupRetry() {
+                var retryBtn = document.getElementById('dk-retry-btn');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', function () {
+                        location.reload();
                     });
                 }
             }
 
-            // --- Wire up HurtBox & Hunger systems (deferred from setSystems — player created in init()) ---
-            try {
-                var hurtBox = new Donkeycraft.HurtBox(game2._player);
-                game2._hurtBox = hurtBox;
-                Donkeycraft._hurtBox = hurtBox;
+            // ============================================================
+            // Initialize: run async pipeline, then start game
+            // ============================================================
+            setupRetry();
 
-                var hunger = new Donkeycraft.Hunger(game2._player, hurtBox);
-                game2._hungerSystem = hunger;
-                Donkeycraft._hungerSystem = hunger;
+            // Create LoadingScreen instance (constructor already creates+shows DOM)
+            var loadingScreen = new Donkeycraft.LoadingScreen();
 
-                // Wire hunger system into Movement for degradation tracking
-                if (game2._movementSystem) {
-                    try { game2._movementSystem.setHungerSystem(hunger); } catch (e3) {}
+            // Run the async initialization pipeline
+            var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
+
+            // Wire loading screen progress updates to init phases
+            // Progress: before config=0%, after config=25%, after texture-atlas=50%, after audio=75%, after indexeddb=100%
+            initSeq.on('init:phase:start', function (data) {
+                loadingScreen.setMessage('Initializing ' + data.phase.replace('-', ' ') + '...');
+            });
+
+            initSeq.on('init:phase:end', function (data) {
+                var phaseOrder = ['config', 'texture-atlas', 'audio', 'indexeddb'];
+                var idx = phaseOrder.indexOf(data.phase);
+                if (idx >= 0) {
+                    loadingScreen.updateProgress((idx + 1) * 25);
                 }
+            });
 
-                // Wire HurtBox into Movement for fall damage application
-                if (game2._movementSystem) {
-                    try { game2._movementSystem.setHurtBox(hurtBox); } catch (e4) {
-                        Donkeycraft.Logger.warn('Game', 'Failed to wire HurtBox into Movement: ' + e4.message);
+            // Set initial progress to 0% before pipeline starts
+            loadingScreen.updateProgress(0);
+
+            initSeq.on('init:error', function (data) {
+                loadingScreen.showError(data.error.message || 'Unknown error');
+            });
+
+            // Store init systems globally for audio context resume and debugging
+            window._dkInitSystems = null;
+
+            // Start the async pipeline and handle completion
+            initSeq.initialize().then(function (systems) {
+                // Store globally so the click handler can access the AudioContext
+                window._dkInitSystems = systems;
+
+                // Update progress to 100%
+                loadingScreen.updateProgress(100);
+                loadingScreen.setMessage('Ready!');
+
+                // Extract systems from init result
+                var gameSystems = {
+                    renderDistance: Donkeycraft.Config.RENDER_DISTANCE,
+                    gameMode: 'survival',
+                    movementSystem: Donkeycraft.Movement,
+                    collisionSystem: Donkeycraft.Collision,
+                    jumpSystem: Donkeycraft.Jumping,
+                    flyingSystem: Donkeycraft.Flying,
+                    raycastSystem: Donkeycraft.Raycast,
+                    blockActionSystem: Donkeycraft.BlockAction,
+                    blockPlacementSystem: Donkeycraft.BlockPlacement,
+                    interactableBlocksSystem: Donkeycraft.InteractableBlocks
+                };
+
+                // Start the game with all systems wired up
+                startGame(gameSystems, systems);
+
+                // Wire up additional UI systems immediately (no setTimeout — hotbar/GUI must appear on first frame)
+                var game2 = window._dkGame;
+                if (game2) {
+                    // --- Wire up Hotbar UI ---
+                    var hotbarContainer = document.getElementById('dk-hotbar-container');
+                    if (hotbarContainer && Donkeycraft.Hotbar && game2._guiRenderer && game2._canvas) {
+                        var hotbar = new Donkeycraft.Hotbar(hotbarContainer, game2._guiRenderer, game2._canvas);
+                        game2.setHotbar(hotbar);
+
+                        // Sync player inventory to hotbar display
+                        if (game2._player && game2._player.getInventory) {
+                            try {
+                                var inv = game2._player.getInventory();
+                                if (inv && typeof inv.getHotbarStacks === 'function') {
+                                    hotbar.setSlots(inv.getHotbarStacks());
+                                }
+                            } catch (e) { }
+                        }
+
+                        // Listen for hotbar selection changes
+                        if (hotbar.onSelectedChange) {
+                            hotbar.onSelectedChange(function (newSlot, oldSlot) {
+                                // Sync player selected slot
+                                if (game2._player && game2._player.setSelectedHotbarSlot) {
+                                    game2._player.setSelectedHotbarSlot(newSlot);
+                                }
+                            });
+                        }
                     }
-                }
-            } catch (e) {
-                Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
-            }
 
-            // --- Wire up Health Bar UI ---
-            try {
-                var healthBarContainer = document.getElementById('dk-health-bar-wrapper');
-                if (healthBarContainer && Donkeycraft.HealthBar && game2._hurtBox) {
-                    var healthBar = new Donkeycraft.HealthBar(healthBarContainer, game2._hurtBox);
-                    Donkeycraft._healthBar = healthBar;
-                } else {
-                    Donkeycraft.Logger.warn('Game', 'HealthBar skipped - container:', !!healthBarContainer, 'class:', typeof Donkeycraft.HealthBar, 'hurtBox:', !!game2._hurtBox);
-                }
-            } catch (e) {
-                Donkeycraft.Logger.error('Game', 'HealthBar error: ' + e.message);
-            }
-
-            // --- Wire up Hunger Bar UI ---
-            try {
-                var hungerBarContainer = document.getElementById('dk-hunger-bar-wrapper');
-                if (hungerBarContainer && Donkeycraft.HungerBar && game2._hungerSystem) {
-                    var hungerBar = new Donkeycraft.HungerBar(hungerBarContainer, game2._hungerSystem);
-                    Donkeycraft._hungerBar = hungerBar;
-                } else {
-                    Donkeycraft.Logger.warn('Game', 'HungerBar skipped - container:', !!hungerBarContainer, 'class:', typeof Donkeycraft.HungerBar, 'hunger:', !!game2._hungerSystem);
-                }
-            } catch (e) {
-                Donkeycraft.Logger.error('Game', 'HungerBar error: ' + e.message);
-            }
-
-            // --- Wire up XP Bar UI ---
-            try {
-                var experience = new Donkeycraft.Experience(game2._player);
-                // Make experience instance accessible for test buttons
-                Donkeycraft._xpInstance = experience;
-
-                // Wire XP bar UI (DOM container already exists in HTML)
-                var xpBarContainer = document.getElementById('dk-xp-bar-wrapper');
-                if (xpBarContainer && Donkeycraft.XPBar) {
-                    var xpBar = new Donkeycraft.XPBar(xpBarContainer, experience);
-                    // Store XPBar reference globally for test button access
-                    Donkeycraft._xpBar = xpBar;
-                }
-            } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'XP Bar initialization failed: ' + e.message);
-            }
-
-            // --- Wire up GuiManager ---
-            if (Donkeycraft.GuiManager) {
-                var guiContainer = document.getElementById('dk-gui-container');
-                var guiBackdrop = document.getElementById('dk-gui-backdrop');
-                try {
-                    var guiManager = new Donkeycraft.GuiManager(guiContainer, guiBackdrop);
-                    game2.setGuiManager(guiManager);
-
-                    // Close GUI on backdrop click (only when no panels exist to avoid double-close)
-                    if (guiBackdrop) {
-                        guiBackdrop.addEventListener('click', function() {
-                            if (guiManager.isOpen()) {
-                                guiManager.close();
-                            }
-                        });
-                    }
-
-                    // Register all GUI component types with the manager
+                    // --- Wire up HurtBox & Hunger systems (deferred from setSystems — player created in init()) ---
                     try {
-                        // Register proper GUI wrapper classes instead of data classes
-                        if (Donkeycraft.InventoryGui) {
-                            guiManager.registerComponent('inventory', Donkeycraft.InventoryGui);
-                        } else if (Donkeycraft.Inventory) {
-                            guiManager.registerComponent('inventory', Donkeycraft.Inventory);
+                        var hurtBox = new Donkeycraft.HurtBox(game2._player);
+                        game2._hurtBox = hurtBox;
+                        Donkeycraft._hurtBox = hurtBox;
+
+                        var hunger = new Donkeycraft.Hunger(game2._player, hurtBox);
+                        game2._hungerSystem = hunger;
+                        Donkeycraft._hungerSystem = hunger;
+
+                        // Wire hunger system into Movement for degradation tracking
+                        if (game2._movementSystem) {
+                            try { game2._movementSystem.setHungerSystem(hunger); } catch (e3) { }
                         }
-                        if (Donkeycraft.CraftingGrid) {
-                            guiManager.registerComponent('crafting_table', Donkeycraft.CraftingGrid);
-                        }
-                        if (Donkeycraft.FurnaceUI) {
-                            guiManager.registerComponent('furnace', Donkeycraft.FurnaceUI);
-                        }
-                        if (Donkeycraft.ChestUI) {
-                            guiManager.registerComponent('chest', Donkeycraft.ChestUI);
-                        }
-                        if (Donkeycraft.AnvilUI) {
-                            guiManager.registerComponent('anvil', Donkeycraft.AnvilUI);
-                        }
-                        if (Donkeycraft.EnchantingUI) {
-                            guiManager.registerComponent('enchanting_table', Donkeycraft.EnchantingUI);
-                        }
-                        if (Donkeycraft.CreativeInventory) {
-                            guiManager.registerComponent('creative_inventory', Donkeycraft.CreativeInventory);
+
+                        // Wire HurtBox into Movement for fall damage application
+                        if (game2._movementSystem) {
+                            try { game2._movementSystem.setHurtBox(hurtBox); } catch (e4) {
+                                Donkeycraft.Logger.warn('Game', 'Failed to wire HurtBox into Movement: ' + e4.message);
+                            }
                         }
                     } catch (e) {
-                        Donkeycraft.Logger.warn('Game', 'GUI component registration failed: ' + e.message);
+                        Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
                     }
 
-                    // --- Wire up DebugOverlay (F3) ---
+                    // --- Wire up Health Bar UI ---
                     try {
-                        var debugOverlay = new Donkeycraft.DebugOverlay(game2.getEventBus(), Donkeycraft.Config);
-                        debugOverlay.setPlayer(game2._player);
-                        debugOverlay.setChunkManager(game2._chunkManager);
-                        debugOverlay.setTimer(game2._timer);
-                        debugOverlay.setBiome(Donkeycraft.Biome || null);
-                        debugOverlay.setGameMode(game2._gameMode);
-
-                    // Wire wireframe renderer reference into DebugOverlay for status display.
-                    if (game2._wireframeRenderer) {
-                        debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
-                    }
-                    // Wire terrain renderer reference so the F3 overlay can show rendering stats.
-                    if (game2._terrainRenderer) {
-                        debugOverlay.setTerrainRenderer(game2._terrainRenderer);
-                    }
-
-                        // Store reference for toggleDebugOverlay to use
-                        game2._debugOverlay = debugOverlay;
-
-                        // Override toggleDebugOverlay to start/stop auto-listening
-                        var origToggle = game2.toggleDebugOverlay.bind(game2);
-                        game2.toggleDebugOverlay = function() {
-                            var visible = origToggle();
-                            if (visible && debugOverlay.startListening) {
-                                debugOverlay.startListening();
-                            } else if (!visible && debugOverlay.stopListening) {
-                                debugOverlay.stopListening();
-                            }
-                            return visible;
-                        };
-                    } catch (e) {
-                        Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
-                    }
-
-                    // --- Wire FurnaceUI timer auto-start when furnace GUI opens ---
-                    var origGuiOpen = guiManager.open.bind(guiManager);
-                    guiManager.open = function(type, data) {
-                        var result = origGuiOpen(type, data);
-                        if (type === 'furnace' && this._guiStack.length > 0) {
-                            var topEntry = this._guiStack[this._guiStack.length - 1];
-                            if (topEntry.ui && topEntry.ui.setTimer && topEntry.ui.startListening) {
-                                try {
-                                    topEntry.ui.setTimer(game2._timer);
-                                    topEntry.ui.startListening();
-                                } catch (e3) {}
-                            }
+                        var healthBarContainer = document.getElementById('dk-health-bar-wrapper');
+                        if (healthBarContainer && Donkeycraft.HealthBar && game2._hurtBox) {
+                            var healthBar = new Donkeycraft.HealthBar(healthBarContainer, game2._hurtBox);
+                            Donkeycraft._healthBar = healthBar;
+                        } else {
+                            Donkeycraft.Logger.warn('Game', 'HealthBar skipped - container:', !!healthBarContainer, 'class:', typeof Donkeycraft.HealthBar, 'hurtBox:', !!game2._hurtBox);
                         }
-                        return result;
-                    };
+                    } catch (e) {
+                        Donkeycraft.Logger.error('Game', 'HealthBar error: ' + e.message);
+                    }
 
-                    // --- Chest data store: persists chest contents across GUI open/close ---
-                    var _chestDataStore = {}; // key "x,y,z" → { doubleChest: boolean, slots: Array }
-
-                    // Listen for guiOpen:chest events from InteractableBlocks
+                    // --- Wire up Hunger Bar UI ---
                     try {
-                        var eventBus = game2.getEventBus();
-                        if (eventBus) {
-                            eventBus.on('guiOpen:chest', function(data) {
-                                var cx = data.x, cy = data.y, cz = data.z;
-                                var chestKey = cx + ',' + cy + ',' + cz;
+                        var hungerBarContainer = document.getElementById('dk-hunger-bar-wrapper');
+                        if (hungerBarContainer && Donkeycraft.HungerBar && game2._hungerSystem) {
+                            var hungerBar = new Donkeycraft.HungerBar(hungerBarContainer, game2._hungerSystem);
+                            Donkeycraft._hungerBar = hungerBar;
+                        } else {
+                            Donkeycraft.Logger.warn('Game', 'HungerBar skipped - container:', !!hungerBarContainer, 'class:', typeof Donkeycraft.HungerBar, 'hunger:', !!game2._hungerSystem);
+                        }
+                    } catch (e) {
+                        Donkeycraft.Logger.error('Game', 'HungerBar error: ' + e.message);
+                    }
 
-                                // Double-chest detection: check adjacent positions
-                                var doubleChest = false;
-                                var adjKeys = [
-                                    (cx-1) + ',' + cy + ',' + cz,
-                                    (cx+1) + ',' + cy + ',' + cz,
-                                    cx + ',' + cy + ',' + (cz-1),
-                                    cx + ',' + cy + ',' + (cz+1)
-                                ];
-                                for (var d = 0; d < adjKeys.length; d++) {
-                                    if (_chestDataStore[adjKeys[d]] && _chestDataStore[adjKeys[d]].doubleChest) {
-                                        doubleChest = true;
-                                        break;
+                    // --- Wire up XP Bar UI ---
+                    try {
+                        var experience = new Donkeycraft.Experience(game2._player);
+                        // Make experience instance accessible for test buttons
+                        Donkeycraft._xpInstance = experience;
+
+                        // Wire XP bar UI (DOM container already exists in HTML)
+                        var xpBarContainer = document.getElementById('dk-xp-bar-wrapper');
+                        if (xpBarContainer && Donkeycraft.XPBar) {
+                            var xpBar = new Donkeycraft.XPBar(xpBarContainer, experience);
+                            // Store XPBar reference globally for test button access
+                            Donkeycraft._xpBar = xpBar;
+                        }
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'XP Bar initialization failed: ' + e.message);
+                    }
+
+                    // --- Wire up GuiManager ---
+                    if (Donkeycraft.GuiManager) {
+                        var guiContainer = document.getElementById('dk-gui-container');
+                        var guiBackdrop = document.getElementById('dk-gui-backdrop');
+                        try {
+                            var guiManager = new Donkeycraft.GuiManager(guiContainer, guiBackdrop);
+                            game2.setGuiManager(guiManager);
+
+                            // Close GUI on backdrop click (only when no panels exist to avoid double-close)
+                            if (guiBackdrop) {
+                                guiBackdrop.addEventListener('click', function () {
+                                    if (guiManager.isOpen()) {
+                                        guiManager.close();
+                                    }
+                                });
+                            }
+
+                            // Register all GUI component types with the manager
+                            try {
+                                // Register proper GUI wrapper classes instead of data classes
+                                if (Donkeycraft.InventoryGui) {
+                                    guiManager.registerComponent('inventory', Donkeycraft.InventoryGui);
+                                } else if (Donkeycraft.Inventory) {
+                                    guiManager.registerComponent('inventory', Donkeycraft.Inventory);
+                                }
+                                if (Donkeycraft.CraftingGrid) {
+                                    guiManager.registerComponent('crafting_table', Donkeycraft.CraftingGrid);
+                                }
+                                if (Donkeycraft.FurnaceUI) {
+                                    guiManager.registerComponent('furnace', Donkeycraft.FurnaceUI);
+                                }
+                                if (Donkeycraft.ChestUI) {
+                                    guiManager.registerComponent('chest', Donkeycraft.ChestUI);
+                                }
+                                if (Donkeycraft.AnvilUI) {
+                                    guiManager.registerComponent('anvil', Donkeycraft.AnvilUI);
+                                }
+                                if (Donkeycraft.EnchantingUI) {
+                                    guiManager.registerComponent('enchanting_table', Donkeycraft.EnchantingUI);
+                                }
+                                if (Donkeycraft.CreativeInventory) {
+                                    guiManager.registerComponent('creative_inventory', Donkeycraft.CreativeInventory);
+                                }
+                            } catch (e) {
+                                Donkeycraft.Logger.warn('Game', 'GUI component registration failed: ' + e.message);
+                            }
+
+                            // --- Wire up DebugOverlay (F3) ---
+                            try {
+                                var debugOverlay = new Donkeycraft.DebugOverlay(game2.getEventBus(), Donkeycraft.Config);
+                                debugOverlay.setPlayer(game2._player);
+                                debugOverlay.setChunkManager(game2._chunkManager);
+                                debugOverlay.setTimer(game2._timer);
+                                debugOverlay.setBiome(Donkeycraft.Biome || null);
+                                debugOverlay.setGameMode(game2._gameMode);
+
+                                // Wire wireframe renderer reference into DebugOverlay for status display.
+                                if (game2._wireframeRenderer) {
+                                    debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
+                                }
+                                // Wire terrain renderer reference so the F3 overlay can show rendering stats.
+                                if (game2._terrainRenderer) {
+                                    debugOverlay.setTerrainRenderer(game2._terrainRenderer);
+                                }
+
+                                // Store reference for toggleDebugOverlay to use
+                                game2._debugOverlay = debugOverlay;
+
+                                // Override toggleDebugOverlay to start/stop auto-listening
+                                var origToggle = game2.toggleDebugOverlay.bind(game2);
+                                game2.toggleDebugOverlay = function () {
+                                    var visible = origToggle();
+                                    if (visible && debugOverlay.startListening) {
+                                        debugOverlay.startListening();
+                                    } else if (!visible && debugOverlay.stopListening) {
+                                        debugOverlay.stopListening();
+                                    }
+                                    return visible;
+                                };
+                            } catch (e) {
+                                Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
+                            }
+
+                            // --- Wire FurnaceUI timer auto-start when furnace GUI opens ---
+                            var origGuiOpen = guiManager.open.bind(guiManager);
+                            guiManager.open = function (type, data) {
+                                var result = origGuiOpen(type, data);
+                                if (type === 'furnace' && this._guiStack.length > 0) {
+                                    var topEntry = this._guiStack[this._guiStack.length - 1];
+                                    if (topEntry.ui && topEntry.ui.setTimer && topEntry.ui.startListening) {
+                                        try {
+                                            topEntry.ui.setTimer(game2._timer);
+                                            topEntry.ui.startListening();
+                                        } catch (e3) { }
                                     }
                                 }
+                                return result;
+                            };
 
-                                // Load chest data from store
-                                var chestData = _chestDataStore[chestKey] || { key: chestKey, doubleChest: doubleChest, slots: new Array(doubleChest ? 54 : 27) };
-                                chestData.doubleChest = doubleChest;
+                            // --- Chest data store: persists chest contents across GUI open/close ---
+                            var _chestDataStore = {}; // key "x,y,z" → { doubleChest: boolean, slots: Array }
 
-                                // Open chest GUI with data
-                                guiManager.open('chest', {
-                                    doubleChest: doubleChest,
-                                    chestKey: chestKey,
-                                    preloadedSlots: chestData.slots
-                                });
-                            });
+                            // Listen for guiOpen:chest events from InteractableBlocks
+                            try {
+                                var eventBus = game2.getEventBus();
+                                if (eventBus) {
+                                    eventBus.on('guiOpen:chest', function (data) {
+                                        var cx = data.x, cy = data.y, cz = data.z;
+                                        var chestKey = cx + ',' + cy + ',' + cz;
 
-                            // guiClose:chest events are handled by the guiManager.close override above,
-                            // which saves chest data before closing. No separate event listener needed.
+                                        // Double-chest detection: check adjacent positions
+                                        var doubleChest = false;
+                                        var adjKeys = [
+                                            (cx - 1) + ',' + cy + ',' + cz,
+                                            (cx + 1) + ',' + cy + ',' + cz,
+                                            cx + ',' + cy + ',' + (cz - 1),
+                                            cx + ',' + cy + ',' + (cz + 1)
+                                        ];
+                                        for (var d = 0; d < adjKeys.length; d++) {
+                                            if (_chestDataStore[adjKeys[d]] && _chestDataStore[adjKeys[d]].doubleChest) {
+                                                doubleChest = true;
+                                                break;
+                                            }
+                                        }
+
+                                        // Load chest data from store
+                                        var chestData = _chestDataStore[chestKey] || { key: chestKey, doubleChest: doubleChest, slots: new Array(doubleChest ? 54 : 27) };
+                                        chestData.doubleChest = doubleChest;
+
+                                        // Open chest GUI with data
+                                        guiManager.open('chest', {
+                                            doubleChest: doubleChest,
+                                            chestKey: chestKey,
+                                            preloadedSlots: chestData.slots
+                                        });
+                                    });
+
+                                    // guiClose:chest events are handled by the guiManager.close override above,
+                                    // which saves chest data before closing. No separate event listener needed.
+                                }
+                            } catch (e4) {
+                                Donkeycraft.Logger.warn('Game', 'Chest event wiring failed: ' + e4.message);
+                            }
+
+                            // Save chest data when any GUI is closed
+                            var origGuiClose = guiManager.close.bind(guiManager);
+                            guiManager.close = function () {
+                                if (this._guiStack.length > 0) {
+                                    var topBefore = this._guiStack[this._guiStack.length - 1];
+                                    // Save chest data if closing a chest GUI
+                                    if (topBefore.type === 'chest' && topBefore.ui && topBefore.ui.serializeData) {
+                                        var serialized = topBefore.ui.serializeData();
+                                        if (serialized.key) {
+                                            _chestDataStore[serialized.key] = {
+                                                doubleChest: serialized.doubleChest,
+                                                slots: serialized.slots
+                                            };
+                                        }
+                                    }
+                                }
+                                return origGuiClose();
+                            };
+
+                        } catch (e) {
+                            Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
                         }
-                    } catch (e4) {
-                        Donkeycraft.Logger.warn('Game', 'Chest event wiring failed: ' + e4.message);
                     }
 
-                    // Save chest data when any GUI is closed
-                    var origGuiClose = guiManager.close.bind(guiManager);
-                    guiManager.close = function() {
-                        if (this._guiStack.length > 0) {
-                            var topBefore = this._guiStack[this._guiStack.length - 1];
-                            // Save chest data if closing a chest GUI
-                            if (topBefore.type === 'chest' && topBefore.ui && topBefore.ui.serializeData) {
-                                var serialized = topBefore.ui.serializeData();
-                                if (serialized.key) {
-                                    _chestDataStore[serialized.key] = {
-                                        doubleChest: serialized.doubleChest,
-                                        slots: serialized.slots
-                                    };
-                                }
-                            }
+                    // ============================================================
+                    // Wire up Keybindings Panel (display-only, top-center)
+                    // ============================================================
+                    try {
+                        var keybindPanel = new Donkeycraft.KeybindingsPanel();
+                        if (game2._timer && keybindPanel.startListening) {
+                            keybindPanel.startListening(game2._timer);
                         }
-                        return origGuiClose();
-                    };
+                        // Store reference for cleanup on game destroy
+                        game2._keybindingsPanel = keybindPanel;
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'KeybindingsPanel initialization failed: ' + e.message);
+                    }
 
-                } catch (e) {
-                    Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
+                    // ============================================================
+                    // Post-init validation: ensure critical systems are wired.
+                    // If key subsystems failed to initialize, log a warning so
+                    // the user knows which features may be missing.
+                    // ============================================================
+                    var _missingSystems = [];
+                    if (!game2._camera) _missingSystems.push('Camera');
+                    if (!game2._player) _missingSystems.push('Player');
+                    if (!game2._chunkManager) _missingSystems.push('Chunk Manager');
+                    if (!game2._terrainRenderer) _missingSystems.push('Terrain Renderer');
+                    if (_missingSystems.length > 0) {
+                        Donkeycraft.Logger.warn('Game', 'Critical systems missing after init: ' + _missingSystems.join(', ') + ' — some features may not work.');
+                    } else {
+                        Donkeycraft.Logger.info('Game', 'All critical systems initialized successfully');
+                    }
+
+                    // ============================================================
+                    // Post-init validation: check that the WebGL context and shader programs are functional.
+                    // If WebGL failed silently, surface an error instead of a black screen.
+                    // ============================================================
+                    var _glIssues = [];
+                    if (!game2._gl) _glIssues.push('WebGL context null');
+                    var _shaderStats = game2._shaderManager ? game2._shaderManager.getStats() : null;
+                    if (!_shaderStats || _shaderStats.programs === 0) {
+                        _glIssues.push('No shader programs compiled');
+                    }
+                    if (_glIssues.length > 0) {
+                        Donkeycraft.Logger.error('Game', 'WebGL issues detected: ' + _glIssues.join('; '));
+                    }
+
+                    // Dispose loading screen after game starts and UI is wired up
+                    loadingScreen.dispose();
                 }
-            }
-
-            // ============================================================
-            // Wire up Keybindings Panel (display-only, top-center)
-            // ============================================================
-            try {
-                var keybindPanel = new Donkeycraft.KeybindingsPanel();
-                if (game2._timer && keybindPanel.startListening) {
-                    keybindPanel.startListening(game2._timer);
+            }).catch(function (err) {
+                if (loadingScreen) {
+                    loadingScreen.showError(err.message || 'Initialization failed');
                 }
-                // Store reference for cleanup on game destroy
-                game2._keybindingsPanel = keybindPanel;
-            } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'KeybindingsPanel initialization failed: ' + e.message);
+            });
+
+            // Debug test buttons — gated behind ?debug=1 URL parameter.
+            // Uncomment below to re-enable during development.
+            if (new URLSearchParams(window.location.search).get('debug') === '1') {
+                var _testButtons = document.createElement('div');
+                _testButtons.className = 'dk-xp-test-buttons';
+                _testButtons.style.cssText = 'position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:9999;background:#222;color:#fff;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;display:flex;flex-direction:column;gap:4px;';
+
+                var _healthBtns = document.createElement('div');
+                _healthBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+                _healthBtns.innerHTML =
+                    '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>' +
+                    '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:h-Donkeycraft._hurtBox._health+10})}">-10</button>' +
+                    '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,(Donkeycraft._hurtBox._health||20)-1);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-1})}">-1</button>' +
+                    '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-(Donkeycraft._hurtBox._health||20)})}">DEATH</button>';
+
+                var _hungerBtns = document.createElement('div');
+                _hungerBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+                _hungerBtns.innerHTML =
+                    '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(20);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-(Donkeycraft._hungerSystem.getFoodLevel()||0)})}">FULL</button>' +
+                    '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-10);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-10})}">-10</button>' +
+                    '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-1);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-1})}">-1</button>';
+
+                var _xpBtns = document.createElement('div');
+                _xpBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
+                _xpBtns.innerHTML =
+                    '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1)">+1</button>' +
+                    '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(10)">+10</button>' +
+                    '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+1)}">+Lvl</button>';
+
+                _testButtons.appendChild(_healthBtns);
+                _testButtons.appendChild(_hungerBtns);
+                _testButtons.appendChild(_xpBtns);
+                document.body.appendChild(_testButtons);
             }
 
-            // ============================================================
-            // Post-init validation: ensure critical systems are wired.
-            // If key subsystems failed to initialize, log a warning so
-            // the user knows which features may be missing.
-            // ============================================================
-            var _missingSystems = [];
-            if (!game2._camera) _missingSystems.push('Camera');
-            if (!game2._player) _missingSystems.push('Player');
-            if (!game2._chunkManager) _missingSystems.push('Chunk Manager');
-            if (!game2._terrainRenderer) _missingSystems.push('Terrain Renderer');
-            if (_missingSystems.length > 0) {
-                Donkeycraft.Logger.warn('Game', 'Critical systems missing after init: ' + _missingSystems.join(', ') + ' — some features may not work.');
-            } else {
-                Donkeycraft.Logger.info('Game', 'All critical systems initialized successfully');
-            }
-
-            // ============================================================
-            // Post-init validation: check that the WebGL context and shader programs are functional.
-            // If WebGL failed silently, surface an error instead of a black screen.
-            // ============================================================
-            var _glIssues = [];
-            if (!game2._gl) _glIssues.push('WebGL context null');
-            var _shaderStats = game2._shaderManager ? game2._shaderManager.getStats() : null;
-            if (!_shaderStats || _shaderStats.programs === 0) {
-                _glIssues.push('No shader programs compiled');
-            }
-            if (_glIssues.length > 0) {
-                Donkeycraft.Logger.error('Game', 'WebGL issues detected: ' + _glIssues.join('; '));
-            }
-
-            // Dispose loading screen after game starts and UI is wired up
-            loadingScreen.dispose();
-        }
-    }).catch(function(err) {
-        if (loadingScreen) {
-            loadingScreen.showError(err.message || 'Initialization failed');
-        }
-    });
-
-    // Debug test buttons — gated behind ?debug=1 URL parameter.
-    // Uncomment below to re-enable during development.
-    /*
-    if (new URLSearchParams(window.location.search).get('debug') === '1') {
-        var _testButtons = document.createElement('div');
-        _testButtons.className = 'dk-xp-test-buttons';
-        _testButtons.style.cssText = 'position:fixed;right:10px;top:50%;transform:translateY(-50%);z-index:9999;background:#222;color:#fff;padding:8px;border-radius:4px;font-family:monospace;font-size:11px;display:flex;flex-direction:column;gap:4px;';
-
-        var _healthBtns = document.createElement('div');
-        _healthBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
-        _healthBtns.innerHTML =
-            '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>' +
-            '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:h-Donkeycraft._hurtBox._health+10})}">-10</button>' +
-            '<button onclick="if(Donkeycraft._hurtBox){var h=Math.max(0,(Donkeycraft._hurtBox._health||20)-1);Donkeycraft._hurtBox._health=h;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-1})}">-1</button>' +
-            '<button onclick="if(Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;if(Donkeycraft._healthBar)Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-(Donkeycraft._hurtBox._health||20)})}">DEATH</button>';
-
-        var _hungerBtns = document.createElement('div');
-        _hungerBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
-        _hungerBtns.innerHTML =
-            '<button onclick="if(Donkeycraft._hungerSystem){Donkeycraft._hungerSystem.setFoodLevel(20);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-(Donkeycraft._hungerSystem.getFoodLevel()||0)})}">FULL</button>' +
-            '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-10);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-10})}">-10</button>' +
-            '<button onclick="if(Donkeycraft._hungerSystem){var f=Math.max(0,(Donkeycraft._hungerSystem.getFoodLevel()||20)-1);Donkeycraft._hungerSystem.setFoodLevel(f);if(Donkeycraft._hungerBar)Donkeycraft._hungerBar.updateFromFood({foodLevel:f,delta:-1})}">-1</button>';
-
-        var _xpBtns = document.createElement('div');
-        _xpBtns.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px;';
-        _xpBtns.innerHTML =
-            '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(1)">+1</button>' +
-            '<button onclick="if(Donkeycraft._xpInstance)Donkeycraft._xpInstance.addXP(10)">+10</button>' +
-            '<button onclick="if(Donkeycraft._xpInstance){var e=Donkeycraft._xpInstance;e.setLevel(e.getLevel()+1)}">+Lvl</button>';
-
-        _testButtons.appendChild(_healthBtns);
-        _testButtons.appendChild(_hungerBtns);
-        _testButtons.appendChild(_xpBtns);
-        document.body.appendChild(_testButtons);
-    }
-    */
-
-})();
-</script>
+        })();
+    </script>
 
 </body>
+
 </html>

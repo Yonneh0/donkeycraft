@@ -1,6 +1,6 @@
 // Donkeycraft — Block Models
 // Baked models: face definitions for each block, AO (ambient occlusion) data.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -84,7 +84,7 @@
      * @param {boolean} [options.useAO=false] — Whether to use ambient occlusion.
      * @param {Object.<string, string>} [options.faces] — Custom face texture overrides: {up: 'stone', down: 'dirt', ...}.
      */
-    Donkeycraft.BlockModel = function(blockId, options) {
+    Donkeycraft.BlockModel = function (blockId, options) {
         options = options || {};
         this.blockId = blockId;
         this.useAO = options.useAO || false;
@@ -97,7 +97,7 @@
      * Build the default cube model for a block.
      * @private
      */
-    Donkeycraft.BlockModel.prototype._buildDefaultModel = function() {
+    Donkeycraft.BlockModel.prototype._buildDefaultModel = function () {
         var block = Donkeycraft.BlockRegistry.getBlockById(this.blockId);
         var textureName = block ? block.name : 'stone';
 
@@ -121,7 +121,7 @@
      * @param {string} faceName — Face name: "up", "down", "north", "south", "east", "west".
      * @returns {string} Texture/block name for this face.
      */
-    Donkeycraft.BlockModel.prototype.getFaceTexture = function(faceName) {
+    Donkeycraft.BlockModel.prototype.getFaceTexture = function (faceName) {
         return this.faces[faceName] || this.faces['up'] || 'stone';
     };
 
@@ -129,7 +129,7 @@
      * Check if this model uses ambient occlusion.
      * @returns {boolean}
      */
-    Donkeycraft.BlockModel.prototype.hasAO = function() {
+    Donkeycraft.BlockModel.prototype.hasAO = function () {
         return this.useAO;
     };
 
@@ -138,7 +138,7 @@
      * @param {string} faceName — Face name.
      * @returns {number[]} Array of 4 AO weight values.
      */
-    Donkeycraft.BlockModel.prototype.getAOWeights = function(faceName) {
+    Donkeycraft.BlockModel.prototype.getAOWeights = function (faceName) {
         return this.aoWeights[faceName] || AO_WEIGHTS.full;
     };
 
@@ -147,7 +147,7 @@
      * @param {string} faceName — Face name.
      * @returns {Object[]} Array of 4 corner objects with x, y, z, u, v.
      */
-    Donkeycraft.BlockModel.prototype.getFaceCorners = function(faceName) {
+    Donkeycraft.BlockModel.prototype.getFaceCorners = function (faceName) {
         return FACE_CORNERS[faceName] || FACE_CORNERS['north'];
     };
 
@@ -158,7 +158,7 @@
     /**
      * BlockModelRegistry — central registry of all block models.
      */
-    Donkeycraft.BlockModelRegistry = (function() {
+    Donkeycraft.BlockModelRegistry = (function () {
         var _models = {};  // blockId -> BlockModel
 
         // ---- Register special models with AO ----

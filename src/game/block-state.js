@@ -1,6 +1,6 @@
 // Donkeycraft — Block State System
 // Block state metadata: variants (oak log direction, wool color), property system.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -13,7 +13,7 @@
      * BlockState — holds property key-value pairs for a block variant.
      * @param {Object.<string, string|number>} [properties={}] — Property name -> value map.
      */
-    Donkeycraft.BlockState = function(properties) {
+    Donkeycraft.BlockState = function (properties) {
         this._properties = properties || {};
     };
 
@@ -22,7 +22,7 @@
      * @param {string} name - Property name (e.g., "axis", "color").
      * @returns {string|number|null} The property value, or null if not set.
      */
-    Donkeycraft.BlockState.prototype.get = function(name) {
+    Donkeycraft.BlockState.prototype.get = function (name) {
         return this._properties[name] !== undefined ? this._properties[name] : null;
     };
 
@@ -32,7 +32,7 @@
      * @param {string|number} value - Property value.
      * @returns {Donkeycraft.BlockState} this (for chaining)
      */
-    Donkeycraft.BlockState.prototype.set = function(name, value) {
+    Donkeycraft.BlockState.prototype.set = function (name, value) {
         this._properties[name] = value;
         return this;
     };
@@ -42,7 +42,7 @@
      * @param {Donkeycraft.BlockState} other - Another block state.
      * @returns {boolean} True if all properties match.
      */
-    Donkeycraft.BlockState.prototype.matches = function(other) {
+    Donkeycraft.BlockState.prototype.matches = function (other) {
         if (!other || !other._properties) return false;
         var keys = Object.keys(this._properties);
         for (var i = 0; i < keys.length; i++) {
@@ -61,7 +61,7 @@
      * Get all property names.
      * @returns {string[]}
      */
-    Donkeycraft.BlockState.prototype.getPropertyNames = function() {
+    Donkeycraft.BlockState.prototype.getPropertyNames = function () {
         return Object.keys(this._properties);
     };
 
@@ -69,7 +69,7 @@
      * Check if this state has any properties set.
      * @returns {boolean}
      */
-    Donkeycraft.BlockState.prototype.isEmpty = function() {
+    Donkeycraft.BlockState.prototype.isEmpty = function () {
         return Object.keys(this._properties).length === 0;
     };
 
@@ -77,7 +77,7 @@
      * Clone this block state.
      * @returns {Donkeycraft.BlockState}
      */
-    Donkeycraft.BlockState.prototype.clone = function() {
+    Donkeycraft.BlockState.prototype.clone = function () {
         var copy = {};
         for (var key in this._properties) {
             if (this._properties.hasOwnProperty(key)) {
@@ -157,7 +157,7 @@
     /**
      * BlockStateRegistry — defines which blocks have variants and what states are valid.
      */
-    Donkeycraft.BlockStateRegistry = (function() {
+    Donkeycraft.BlockStateRegistry = (function () {
         var _blockStates = {};  // blockId -> array of BlockState objects
         var _stateIndex = {};   // "blockId:stateString" -> BlockState
 
@@ -248,8 +248,8 @@
 
         // Wool: color property (16 colors)
         var woolColors = ['white', 'orange', 'magenta', 'light_blue', 'yellow', 'lime',
-                          'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown',
-                          'green', 'red', 'black'];
+            'pink', 'gray', 'light_gray', 'cyan', 'purple', 'blue', 'brown',
+            'green', 'red', 'black'];
         var woolStates = [];
         for (var w = 0; w < woolColors.length; w++) {
             woolStates.push({ color: woolColors[w] });

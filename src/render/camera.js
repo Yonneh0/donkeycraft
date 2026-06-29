@@ -1,6 +1,6 @@
 // Donkeycraft — Camera
 // First-person camera: position, rotation, projection matrix, FOV.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -8,7 +8,7 @@
     /**
      * Camera — First-person camera with position, rotation, projection matrix, and FOV.
      */
-    Donkeycraft.Camera = function(fov, near, far) {
+    Donkeycraft.Camera = function (fov, near, far) {
         this._position = new Donkeycraft.Vector3(0, 64, 0);
         this._yaw = 0;
         this._pitch = 0;
@@ -28,7 +28,7 @@
      * Get the camera position.
      * @returns {Donkeycraft.Vector3} The camera position vector.
      */
-    Donkeycraft.Camera.prototype.getPosition = function() {
+    Donkeycraft.Camera.prototype.getPosition = function () {
         return this._position;
     };
 
@@ -38,7 +38,7 @@
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
      */
-    Donkeycraft.Camera.prototype.setPosition = function(x, y, z) {
+    Donkeycraft.Camera.prototype.setPosition = function (x, y, z) {
         this._position.set(x, y, z);
     };
 
@@ -46,7 +46,7 @@
      * Get the camera yaw (Y-axis rotation in radians).
      * @returns {number} Yaw angle in radians.
      */
-    Donkeycraft.Camera.prototype.getYaw = function() {
+    Donkeycraft.Camera.prototype.getYaw = function () {
         return this._yaw;
     };
 
@@ -54,7 +54,7 @@
      * Get the camera pitch (X-axis rotation in radians).
      * @returns {number} Pitch angle in radians.
      */
-    Donkeycraft.Camera.prototype.getPitch = function() {
+    Donkeycraft.Camera.prototype.getPitch = function () {
         return this._pitch;
     };
 
@@ -63,7 +63,7 @@
      * @param {number} yaw - Y-axis rotation in radians.
      * @param {number} pitch - X-axis rotation in radians.
      */
-    Donkeycraft.Camera.prototype.setRotation = function(yaw, pitch) {
+    Donkeycraft.Camera.prototype.setRotation = function (yaw, pitch) {
         this._yaw = yaw;
         this._pitch = Donkeycraft.clamp(pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
     };
@@ -74,7 +74,7 @@
      * @param {number} deltaY - Mouse Y movement delta.
      * @param {number} [sensitivity] - Mouse sensitivity multiplier.
      */
-    Donkeycraft.Camera.prototype.applyMouseDelta = function(deltaX, deltaY, sensitivity) {
+    Donkeycraft.Camera.prototype.applyMouseDelta = function (deltaX, deltaY, sensitivity) {
         sensitivity = sensitivity || Donkeycraft.Config.MOUSE_SENSITIVITY;
         this._yaw -= deltaX * sensitivity;
         this._pitch -= deltaY * sensitivity;
@@ -86,7 +86,7 @@
      * Used for stable strafing and walking movement.
      * @returns {Donkeycraft.Vector3} Normalized horizontal forward vector.
      */
-    Donkeycraft.Camera.prototype.getForward = function() {
+    Donkeycraft.Camera.prototype.getForward = function () {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
 
@@ -105,7 +105,7 @@
      * Used for creative/spectator flying where looking up = moving up.
      * @returns {Donkeycraft.Vector3} Normalized 3D forward vector.
      */
-    Donkeycraft.Camera.prototype.getForward3D = function() {
+    Donkeycraft.Camera.prototype.getForward3D = function () {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
         var cosPitch = Math.cos(this._pitch);
@@ -125,7 +125,7 @@
      * Reuses cached vector.
      * @returns {Donkeycraft.Vector3} Normalized right vector.
      */
-    Donkeycraft.Camera.prototype.getRight = function() {
+    Donkeycraft.Camera.prototype.getRight = function () {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
 
@@ -138,7 +138,7 @@
      * Get the up direction vector.
      * @returns {Donkeycraft.Vector3} Normalized up vector.
      */
-    Donkeycraft.Camera.prototype.getUp = function() {
+    Donkeycraft.Camera.prototype.getUp = function () {
         return new Donkeycraft.Vector3(0, 1, 0);
     };
 
@@ -146,7 +146,7 @@
      * Get the camera's target point (position + forward).
      * @returns {Donkeycraft.Vector3} The world position the camera is looking at.
      */
-    Donkeycraft.Camera.prototype.getTarget = function() {
+    Donkeycraft.Camera.prototype.getTarget = function () {
         var forward = this.getForward();
         return new Donkeycraft.Vector3(
             this._position.x + forward.x,
@@ -159,7 +159,7 @@
      * Update the projection matrix based on current aspect ratio and FOV.
      * @returns {Donkeycraft.Matrix4} The updated projection matrix.
      */
-    Donkeycraft.Camera.prototype.updateProjection = function() {
+    Donkeycraft.Camera.prototype.updateProjection = function () {
         var fovRadians = this._fov * Math.PI / 180;
         this._projectionMatrix = Donkeycraft.Matrix4.createPerspective(
             fovRadians, this._aspect, this._near, this._far
@@ -170,7 +170,7 @@
      * Update the view matrix based on current position and rotation.
      * @returns {Donkeycraft.Matrix4} The updated view matrix.
      */
-    Donkeycraft.Camera.prototype.updateView = function() {
+    Donkeycraft.Camera.prototype.updateView = function () {
         var target = this.getTarget();
         this._viewMatrix = Donkeycraft.Matrix4.createLookAt(
             this._position, target, new Donkeycraft.Vector3(0, 1, 0)
@@ -181,7 +181,7 @@
      * Get the current projection matrix (updates if stale).
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Camera.prototype.getProjection = function() {
+    Donkeycraft.Camera.prototype.getProjection = function () {
         if (!this._projectionMatrix) {
             this.updateProjection();
         }
@@ -192,7 +192,7 @@
      * Get the current view matrix (updates if stale).
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Camera.prototype.getView = function() {
+    Donkeycraft.Camera.prototype.getView = function () {
         if (!this._viewMatrix) {
             this.updateView();
         }
@@ -203,7 +203,7 @@
      * Get both view and projection matrices.
      * @returns {{view: Donkeycraft.Matrix4, projection: Donkeycraft.Matrix4}}
      */
-    Donkeycraft.Camera.prototype.getMatrices = function() {
+    Donkeycraft.Camera.prototype.getMatrices = function () {
         return {
             view: this.getView(),
             projection: this.getProjection()
@@ -214,7 +214,7 @@
      * Set the aspect ratio.
      * @param {number} aspect - Width/height ratio.
      */
-    Donkeycraft.Camera.prototype.setAspect = function(aspect) {
+    Donkeycraft.Camera.prototype.setAspect = function (aspect) {
         this._aspect = aspect;
         this._projectionMatrix = null;
     };
@@ -223,7 +223,7 @@
      * Get the aspect ratio.
      * @returns {number}
      */
-    Donkeycraft.Camera.prototype.getAspect = function() {
+    Donkeycraft.Camera.prototype.getAspect = function () {
         return this._aspect;
     };
 
@@ -231,7 +231,7 @@
      * Move the camera forward/backward (horizontal movement for walking).
      * @param {number} amount - Distance to move (positive = forward).
      */
-    Donkeycraft.Camera.prototype.moveForward = function(amount) {
+    Donkeycraft.Camera.prototype.moveForward = function (amount) {
         var forward = this.getForward();
         this._position.x += forward.x * amount;
         this._position.y += forward.y * amount;
@@ -243,7 +243,7 @@
      * Looking up moves upward, looking down moves downward.
      * @param {number} amount - Distance to move (positive = forward).
      */
-    Donkeycraft.Camera.prototype.moveForward3D = function(amount) {
+    Donkeycraft.Camera.prototype.moveForward3D = function (amount) {
         var forward = this.getForward3D();
         this._position.x += forward.x * amount;
         this._position.y += forward.y * amount;
@@ -254,7 +254,7 @@
      * Move the camera left/right (horizontal strafing for walking).
      * @param {number} amount - Distance to strafe (positive = right).
      */
-    Donkeycraft.Camera.prototype.moveRight = function(amount) {
+    Donkeycraft.Camera.prototype.moveRight = function (amount) {
         var right = this.getRight();
         this._position.x += right.x * amount;
         this._position.y += right.y * amount;
@@ -266,7 +266,7 @@
      * Uses a horizontal right vector so strafing stays level regardless of pitch.
      * @param {number} amount - Distance to strafe (positive = right).
      */
-    Donkeycraft.Camera.prototype.moveRight3D = function(amount) {
+    Donkeycraft.Camera.prototype.moveRight3D = function (amount) {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
         // Horizontal right vector (Y=0) for stable strafing in any pitch.
@@ -280,14 +280,14 @@
      * Move the camera up/down.
      * @param {number} amount - Distance to move (positive = up).
      */
-    Donkeycraft.Camera.prototype.moveUp = function(amount) {
+    Donkeycraft.Camera.prototype.moveUp = function (amount) {
         this._position.y += amount;
     };
 
     /**
      * Reset camera to default position and rotation.
      */
-    Donkeycraft.Camera.prototype.reset = function() {
+    Donkeycraft.Camera.prototype.reset = function () {
         this._position.set(0, 64, 0);
         this._yaw = 0;
         this._pitch = 0;

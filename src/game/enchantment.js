@@ -1,6 +1,6 @@
 // Donkeycraft — Enchantment System
 // Enchantment registry, compatibility rules, slot restrictions, and application logic.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -20,7 +20,7 @@
      * @param {Array<number>} compatibleWith - Array of enchantment IDs this can coexist with.
      * @param {number} [minLevel=1] - Minimum level to apply.
      */
-    Donkeycraft.Enchantment = function(id, name, maxLevel, weight, slots, incompatible, compatibleWith, minLevel) {
+    Donkeycraft.Enchantment = function (id, name, maxLevel, weight, slots, incompatible, compatibleWith, minLevel) {
         this.id = id;
         this.name = name;
         this.maxLevel = maxLevel || 1;
@@ -38,7 +38,7 @@
     /**
      * EnchantmentRegistry — static class managing all enchantment definitions and rules.
      */
-    Donkeycraft.EnchantmentRegistry = (function() {
+    Donkeycraft.EnchantmentRegistry = (function () {
         var _enchantments = {};       // id -> Enchantment
         var _byName = {};             // name -> Enchantment
         var _slotIndex = { weapon: [], armor: [] };  // slot -> [Enchantment]
@@ -345,15 +345,15 @@
 
             // Effect definitions keyed by enchantment ID
             var effectDefs = {
-                1:  { type: 'attackDamage', value: enchantId === 1 ? 1.5 : 0 },       // Sharpness: +1.5 damage per level
-                2:  { type: 'undeadDamage', value: enchantId === 2 ? 2.5 : 0 },        // Smite: +2.5 damage per level vs undead
-                3:  { type: 'arthropodDamage', value: enchantId === 3 ? 1.5 : 0 },     // BaneOfArthropods: +1.5 damage + slowness
-                4:  { type: 'damageReduction', value: 1 },                             // Protection: -1 damage per level
-                5:  { type: 'fireDamageReduction', value: 0.25 },                      // FireProtection: -25% fire damage per level
-                6:  { type: 'explosionDamageReduction', value: 0.15 },                 // BlastProtection: -15% explosion damage per level
-                7:  { type: 'projectileDamageReduction', value: 0.2 },                 // ProjectileProtection: -20% projectile damage per level
-                8:  { type: 'blockDrops', value: 'extra' },                            // Fortune: chance for extra drops
-                9:  { type: 'blockDrops', value: 'silk' },                             // SilkTouch: drop block itself
+                1: { type: 'attackDamage', value: enchantId === 1 ? 1.5 : 0 },       // Sharpness: +1.5 damage per level
+                2: { type: 'undeadDamage', value: enchantId === 2 ? 2.5 : 0 },        // Smite: +2.5 damage per level vs undead
+                3: { type: 'arthropodDamage', value: enchantId === 3 ? 1.5 : 0 },     // BaneOfArthropods: +1.5 damage + slowness
+                4: { type: 'damageReduction', value: 1 },                             // Protection: -1 damage per level
+                5: { type: 'fireDamageReduction', value: 0.25 },                      // FireProtection: -25% fire damage per level
+                6: { type: 'explosionDamageReduction', value: 0.15 },                 // BlastProtection: -15% explosion damage per level
+                7: { type: 'projectileDamageReduction', value: 0.2 },                 // ProjectileProtection: -20% projectile damage per level
+                8: { type: 'blockDrops', value: 'extra' },                            // Fortune: chance for extra drops
+                9: { type: 'blockDrops', value: 'silk' },                             // SilkTouch: drop block itself
                 10: { type: 'breakSpeed', value: 1.3 },                               // Efficiency: +30% break speed per level
                 12: { type: 'attackFire', value: true },                               // FireAspect: set attacker on fire
                 13: { type: 'arrowDamage', value: 1 },                                 // Power: +1 arrow damage per level

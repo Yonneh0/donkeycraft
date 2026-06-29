@@ -1,6 +1,6 @@
 // Donkeycraft — Player Statistics
 // Track player statistics: blocks mined/placed, mobs killed, distance walked, time played.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * PlayerStats — tracks player statistics and achievements.
      * @param {Donkeycraft.Player} player - Player entity instance.
      */
-    Donkeycraft.PlayerStats = function(player) {
+    Donkeycraft.PlayerStats = function (player) {
         this._player = player;
 
         /**
@@ -86,7 +86,7 @@
      * @param {string} statName - Name of the statistic.
      * @param {number} [amount=1] - Amount to increment by.
      */
-    Donkeycraft.PlayerStats.prototype.increment = function(statName, amount) {
+    Donkeycraft.PlayerStats.prototype.increment = function (statName, amount) {
         amount = amount || 1;
 
         if (this._stats.hasOwnProperty(statName)) {
@@ -114,7 +114,7 @@
      * @param {string} statName - Name of the statistic.
      * @returns {number} Current value.
      */
-    Donkeycraft.PlayerStats.prototype.getStat = function(statName) {
+    Donkeycraft.PlayerStats.prototype.getStat = function (statName) {
         return this._stats[statName] || 0;
     };
 
@@ -123,7 +123,7 @@
      * @param {string} statName - Name of the statistic.
      * @param {number} value - Value to set.
      */
-    Donkeycraft.PlayerStats.prototype.setStat = function(statName, value) {
+    Donkeycraft.PlayerStats.prototype.setStat = function (statName, value) {
         if (this._stats.hasOwnProperty(statName)) {
             this._stats[statName] = Math.max(0, value);
         } else {
@@ -135,7 +135,7 @@
      * Get all statistics as a plain object.
      * @returns {Object} All stats.
      */
-    Donkeycraft.PlayerStats.prototype.getAllStats = function() {
+    Donkeycraft.PlayerStats.prototype.getAllStats = function () {
         var result = {};
         for (var key in this._stats) {
             if (this._stats.hasOwnProperty(key)) {
@@ -150,7 +150,7 @@
      * @param {string} prefix - Prefix to filter stats.
      * @returns {Object} Matching stats.
      */
-    Donkeycraft.PlayerStats.prototype.getStatsByPrefix = function(prefix) {
+    Donkeycraft.PlayerStats.prototype.getStatsByPrefix = function (prefix) {
         var result = {};
         for (var key in this._stats) {
             if (this._stats.hasOwnProperty(key) && key.indexOf(prefix) === 0) {
@@ -164,7 +164,7 @@
      * Tick the stats system — update time-based stats.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.PlayerStats.prototype.tick = function(deltaTime) {
+    Donkeycraft.PlayerStats.prototype.tick = function (deltaTime) {
         // Advance time since death counter
         this._stats.timeSinceDeath += deltaTime;
 
@@ -185,7 +185,7 @@
      * @param {number} distance - Distance in blocks.
      * @param {string} [type='walked'] - Movement type: 'walked', 'sprinted', 'crouched', 'swum', 'fallen'.
      */
-    Donkeycraft.PlayerStats.prototype.recordDistance = function(distance, type) {
+    Donkeycraft.PlayerStats.prototype.recordDistance = function (distance, type) {
         if (distance <= 0) {
             return;
         }
@@ -208,7 +208,7 @@
      * Record a block being mined.
      * @param {string} [blockId=0] - Block ID that was mined.
      */
-    Donkeycraft.PlayerStats.prototype.recordBlockMine = function(blockId) {
+    Donkeycraft.PlayerStats.prototype.recordBlockMine = function (blockId) {
         this.increment('blockMine');
         this.increment('blockBroken');
     };
@@ -217,7 +217,7 @@
      * Record a block being placed.
      * @param {string} [blockId=0] - Block ID that was placed.
      */
-    Donkeycraft.PlayerStats.prototype.recordBlockPlace = function(blockId) {
+    Donkeycraft.PlayerStats.prototype.recordBlockPlace = function (blockId) {
         this.increment('blockPlaced');
     };
 
@@ -225,7 +225,7 @@
      * Record a block interaction (right-click).
      * @param {string} [blockId=0] - Block ID that was interacted with.
      */
-    Donkeycraft.PlayerStats.prototype.recordBlockInteract = function(blockId) {
+    Donkeycraft.PlayerStats.prototype.recordBlockInteract = function (blockId) {
         this.increment('blockInteractedWith');
     };
 
@@ -233,7 +233,7 @@
      * Record damage dealt to an entity.
      * @param {number} amount - Damage dealt.
      */
-    Donkeycraft.PlayerStats.prototype.recordDamageDealt = function(amount) {
+    Donkeycraft.PlayerStats.prototype.recordDamageDealt = function (amount) {
         this.increment('damageDealt', amount);
     };
 
@@ -242,7 +242,7 @@
      * @param {number} amount - Damage taken.
      * @param {string} [source='generic'] - Damage source.
      */
-    Donkeycraft.PlayerStats.prototype.recordDamageTaken = function(amount, source) {
+    Donkeycraft.PlayerStats.prototype.recordDamageTaken = function (amount, source) {
         this.increment('damageTaken', amount);
 
         // Note: entityKilledBy is only updated on actual kills (recordEntityKill / recordDeath),
@@ -253,7 +253,7 @@
      * Record an entity kill.
      * @param {string} entityType - Type of entity killed.
      */
-    Donkeycraft.PlayerStats.prototype.recordEntityKill = function(entityType) {
+    Donkeycraft.PlayerStats.prototype.recordEntityKill = function (entityType) {
         this.increment('mobsKilled');
 
         if (!this._stats.entityKilledBy[entityType]) {
@@ -266,7 +266,7 @@
      * Record a player death.
      * @param {string} [cause='generic'] - Cause of death.
      */
-    Donkeycraft.PlayerStats.prototype.recordDeath = function(cause) {
+    Donkeycraft.PlayerStats.prototype.recordDeath = function (cause) {
         this.increment('deaths');
         this._stats.timeSinceDeath = 0;
 
@@ -281,7 +281,7 @@
      * Serialize stats for save/load.
      * @returns {Object} Serialized state.
      */
-    Donkeycraft.PlayerStats.prototype.serialize = function() {
+    Donkeycraft.PlayerStats.prototype.serialize = function () {
         // entityKilledBy is already included in getAllStats(), no need to duplicate.
         return {
             stats: this.getAllStats()
@@ -292,7 +292,7 @@
      * Deserialize stats from saved data.
      * @param {Object} data - Serialized state.
      */
-    Donkeycraft.PlayerStats.prototype.fromObject = function(data) {
+    Donkeycraft.PlayerStats.prototype.fromObject = function (data) {
         if (data.stats) {
             for (var key in data.stats) {
                 if (data.stats.hasOwnProperty(key)) {
@@ -308,7 +308,7 @@
     /**
      * Reset all statistics to zero.
      */
-    Donkeycraft.PlayerStats.prototype.reset = function() {
+    Donkeycraft.PlayerStats.prototype.reset = function () {
         for (var key in this._stats) {
             if (this._stats.hasOwnProperty(key)) {
                 if (typeof this._stats[key] === 'object') {
@@ -325,14 +325,14 @@
      * Get the time since last death in seconds.
      * @returns {number} Seconds since death.
      */
-    Donkeycraft.PlayerStats.prototype.getTimeSinceDeath = function() {
+    Donkeycraft.PlayerStats.prototype.getTimeSinceDeath = function () {
         return this._stats.timeSinceDeath;
     };
 
     /**
      * Destroy the stats system and free resources.
      */
-    Donkeycraft.PlayerStats.prototype.destroy = function() {
+    Donkeycraft.PlayerStats.prototype.destroy = function () {
         this._player = null;
     };
 

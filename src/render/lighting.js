@@ -1,6 +1,6 @@
 // Donkeycraft — Lighting
 // Directional light (sun), ambient light, sky color computation.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -8,7 +8,7 @@
     /**
      * Lighting — Computes sun intensity, ambient light, and sky color based on world time of day.
      */
-    Donkeycraft.Lighting = function() {
+    Donkeycraft.Lighting = function () {
         this._timeOfDay = 0.5;
     };
 
@@ -16,7 +16,7 @@
      * Set the world time of day.
      * @param {number} t - Time value in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
      */
-    Donkeycraft.Lighting.prototype.setTimeOfDay = function(t) {
+    Donkeycraft.Lighting.prototype.setTimeOfDay = function (t) {
         t = t - Math.floor(t);
         if (t < 0) t += 1;
         this._timeOfDay = t;
@@ -26,7 +26,7 @@
      * Get the current time of day.
      * @returns {number} Time value in [0, 1).
      */
-    Donkeycraft.Lighting.prototype.getTimeOfDay = function() {
+    Donkeycraft.Lighting.prototype.getTimeOfDay = function () {
         return this._timeOfDay;
     };
 
@@ -35,7 +35,7 @@
      * Returns 1.0 at noon, 0.0 at midnight.
      * @returns {number} Sun intensity in [0, 1].
      */
-    Donkeycraft.Lighting.prototype.getSunIntensity = function() {
+    Donkeycraft.Lighting.prototype.getSunIntensity = function () {
         var sunHeight = Math.sin((this._timeOfDay - 0.25) * Math.PI * 2);
         return sunHeight > 0 ? Math.pow(sunHeight, 0.7) : 0;
     };
@@ -44,7 +44,7 @@
      * Compute ambient light level based on time of day.
      * @returns {number} Ambient intensity in [0.08, 1.0].
      */
-    Donkeycraft.Lighting.prototype.getAmbientLight = function() {
+    Donkeycraft.Lighting.prototype.getAmbientLight = function () {
         return Donkeycraft.clamp(0.08 + 0.92 * this.getSunIntensity(), 0.08, 1.0);
     };
 
@@ -53,7 +53,7 @@
      * Uses continuous piecewise-linear blending to avoid boundary discontinuities.
      * @returns {{r: number, g: number, b: number}} Sky color components in [0, 1].
      */
-    Donkeycraft.Lighting.prototype.getSkyColor = function() {
+    Donkeycraft.Lighting.prototype.getSkyColor = function () {
         var t = this._timeOfDay;
 
         // Smooth sky color keyframes: [time, r, g, b]
@@ -105,7 +105,7 @@
      * Get sun direction vector for directional lighting.
      * @returns {Donkeycraft.Vector3} Normalized sun direction.
      */
-    Donkeycraft.Lighting.prototype.getSunDirection = function() {
+    Donkeycraft.Lighting.prototype.getSunDirection = function () {
         var sunAngle = (this._timeOfDay - 0.25) * Math.PI * 2;
         return new Donkeycraft.Vector3(
             Math.cos(sunAngle),
@@ -121,7 +121,7 @@
      * @param {ShaderManager} shaderManager - The shader manager instance.
      * @returns {boolean} True if uniforms were set successfully.
      */
-    Donkeycraft.Lighting.prototype.applyToShader = function(shaderManager) {
+    Donkeycraft.Lighting.prototype.applyToShader = function (shaderManager) {
         if (!shaderManager) return false;
 
         var sunIntensity = this.getSunIntensity();

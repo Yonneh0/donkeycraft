@@ -1,6 +1,6 @@
 // Donkeycraft — Physics
 // Block physics: gravity blocks (sand/gravel), liquid flow, redstone signal propagation.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * Physics — handles block physics simulations.
      */
-    Donkeycraft.Physics = (function() {
+    Donkeycraft.Physics = (function () {
         // Block sets for gravity-affected and liquid blocks
         var _gravityBlocks = {};
         var _liquidBlocks = {};
@@ -57,8 +57,8 @@
         function _doResolveBlocks() {
             if (!Donkeycraft.BlockRegistry) return;
 
-             // Resolve gravity-affected blocks by name from BlockRegistry — only sand and gravel fall
-             var gravityBlockNames = ['sand', 'gravel'];
+            // Resolve gravity-affected blocks by name from BlockRegistry — only sand and gravel fall
+            var gravityBlockNames = ['sand', 'gravel'];
 
             for (var i = 0; i < gravityBlockNames.length; i++) {
                 var block = Donkeycraft.BlockRegistry.getBlockByName(gravityBlockNames[i]);
@@ -218,76 +218,76 @@
             return newLevel;
         }
 
-         /**
-          * Get the liquid level for a block. Since chunk data doesn't store per-block
-          * liquid levels in this minimal implementation, liquids default to level 8 (full).
-          * @param {Donkeycraft.Chunk} chunk - The chunk.
-          * @param {number} x - Local X.
-          * @param {number} y - Local Y.
-          * @param {number} z - Local Z.
-          * @param {number} blockId - Expected liquid block ID (unused, for signature compatibility).
-          * @returns {number} Liquid level (0-8).
-          * @private
-          */
-         function _getLiquidLevel(chunk, x, y, z, blockId) {
-             // Default full level — per-block levels not stored in chunk data.
-             // For accurate liquid simulation, store level as metadata in chunk._liquidLevels Map.
-             var key = x + ',' + y + ',' + z;
-             if (chunk._liquidLevels && chunk._liquidLevels.has(key)) {
-                 return chunk._liquidLevels.get(key);
-             }
-             return 8; // Default full level
-         }
+        /**
+         * Get the liquid level for a block. Since chunk data doesn't store per-block
+         * liquid levels in this minimal implementation, liquids default to level 8 (full).
+         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * @param {number} x - Local X.
+         * @param {number} y - Local Y.
+         * @param {number} z - Local Z.
+         * @param {number} blockId - Expected liquid block ID (unused, for signature compatibility).
+         * @returns {number} Liquid level (0-8).
+         * @private
+         */
+        function _getLiquidLevel(chunk, x, y, z, blockId) {
+            // Default full level — per-block levels not stored in chunk data.
+            // For accurate liquid simulation, store level as metadata in chunk._liquidLevels Map.
+            var key = x + ',' + y + ',' + z;
+            if (chunk._liquidLevels && chunk._liquidLevels.has(key)) {
+                return chunk._liquidLevels.get(key);
+            }
+            return 8; // Default full level
+        }
 
-         /**
-          * Set the liquid level for a block. Stores in chunk._liquidLevels Map.
-          * @param {Donkeycraft.Chunk} chunk - The chunk.
-          * @param {number} x - Local X.
-          * @param {number} y - Local Y.
-          * @param {number} z - Local Z.
-          * @param {number} level - Liquid level (0-8).
-          * @private
-          */
-         function _setLiquidLevel(chunk, x, y, z, level) {
-             if (!chunk._liquidLevels) {
-                 chunk._liquidLevels = new Map();
-             }
-             var key = x + ',' + y + ',' + z;
-             chunk._liquidLevels.set(key, Donkeycraft.clamp(level, 0, 8));
-         }
+        /**
+         * Set the liquid level for a block. Stores in chunk._liquidLevels Map.
+         * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * @param {number} x - Local X.
+         * @param {number} y - Local Y.
+         * @param {number} z - Local Z.
+         * @param {number} level - Liquid level (0-8).
+         * @private
+         */
+        function _setLiquidLevel(chunk, x, y, z, level) {
+            if (!chunk._liquidLevels) {
+                chunk._liquidLevels = new Map();
+            }
+            var key = x + ',' + y + ',' + z;
+            chunk._liquidLevels.set(key, Donkeycraft.clamp(level, 0, 8));
+        }
 
-         /**
-          * Simulate liquid flow across all liquid blocks in a chunk.
-          * Processes from lowest Y upward to prevent cascading issues.
-          * Skips if no liquid blocks found (optimization).
-          * @param {Donkeycraft.Chunk} chunk - The chunk to process.
-          */
-         function simulateLiquidFlow(chunk) {
-             // Find all liquid blocks
-             var liquids = [];
+        /**
+         * Simulate liquid flow across all liquid blocks in a chunk.
+         * Processes from lowest Y upward to prevent cascading issues.
+         * Skips if no liquid blocks found (optimization).
+         * @param {Donkeycraft.Chunk} chunk - The chunk to process.
+         */
+        function simulateLiquidFlow(chunk) {
+            // Find all liquid blocks
+            var liquids = [];
 
-             for (var x = 0; x < CHUNK_SIZE; x++) {
-                 for (var y = 0; y < WORLD_HEIGHT; y++) {
-                     for (var z = 0; z < CHUNK_SIZE; z++) {
-                         var blockId = chunk.getBlock(x, y, z);
-                         if (_liquidBlocks[blockId]) {
-                             liquids.push({ x: x, y: y, z: z, blockId: blockId });
-                         }
-                     }
-                 }
-             }
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var y = 0; y < WORLD_HEIGHT; y++) {
+                    for (var z = 0; z < CHUNK_SIZE; z++) {
+                        var blockId = chunk.getBlock(x, y, z);
+                        if (_liquidBlocks[blockId]) {
+                            liquids.push({ x: x, y: y, z: z, blockId: blockId });
+                        }
+                    }
+                }
+            }
 
-             // Early exit if no liquids
-             if (liquids.length === 0) return;
+            // Early exit if no liquids
+            if (liquids.length === 0) return;
 
-             // Process from lowest to highest (prevents cascading issues)
-             liquids.sort(function(a, b) { return a.y - b.y; });
+            // Process from lowest to highest (prevents cascading issues)
+            liquids.sort(function (a, b) { return a.y - b.y; });
 
-             for (var i = 0; i < liquids.length; i++) {
-                 var l = liquids[i];
-                 flowLiquid(chunk, l.x, l.y, l.z, 8); // Default level 8
-             }
-         }
+            for (var i = 0; i < liquids.length; i++) {
+                var l = liquids[i];
+                flowLiquid(chunk, l.x, l.y, l.z, 8); // Default level 8
+            }
+        }
 
         /**
          * Check if a block ID is gravity-affected (sand, gravel, etc.).

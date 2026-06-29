@@ -1,6 +1,6 @@
 // Donkeycraft — Passive Mobs
 // Cow, pig, sheep, chicken — spawn, wander, flee players.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -37,7 +37,7 @@
      * @param {number} [config.y=64] - Initial Y position.
      * @param {number} [config.z=0] - Initial Z position.
      */
-    Donkeycraft.PassiveMob = function(config) {
+    Donkeycraft.PassiveMob = function (config) {
         config = config || {};
 
         var stats = Donkeycraft.MobStats[config.type];
@@ -113,7 +113,7 @@
      * Pick a new random wander target.
      * @private
      */
-    Donkeycraft.PassiveMob.prototype._pickWanderTarget = function() {
+    Donkeycraft.PassiveMob.prototype._pickWanderTarget = function () {
         // Random direction and distance
         var angle = Math.random() * Math.PI * 2;
         var distance = 3 + Math.random() * 7; // 3-10 blocks
@@ -132,7 +132,7 @@
      * @param {number} fleeRange - Range to detect player (blocks).
      * @returns {boolean} True if player is near.
      */
-    Donkeycraft.PassiveMob.prototype.isPlayerNearby = function(player, fleeRange) {
+    Donkeycraft.PassiveMob.prototype.isPlayerNearby = function (player, fleeRange) {
         fleeRange = fleeRange || 8;
         var dx = this._position.x - player.getPosition().x;
         var dy = this._position.y - player.getPosition().y;
@@ -145,7 +145,7 @@
      * Flee from a player position.
      * @param {Donkeycraft.Vector3} playerPos - Player position.
      */
-    Donkeycraft.PassiveMob.prototype.fleeFrom = function(playerPos) {
+    Donkeycraft.PassiveMob.prototype.fleeFrom = function (playerPos) {
         var dx = this._position.x - playerPos.x;
         var dz = this._position.z - playerPos.z;
         var dist = Math.sqrt(dx * dx + dz * dz);
@@ -165,7 +165,7 @@
      * Emits 'mob:drop' event via EventBus. The game's item system should listen for this event.
      * @private
      */
-    Donkeycraft.PassiveMob.prototype.onDeath = function() {
+    Donkeycraft.PassiveMob.prototype.onDeath = function () {
         // Emit item drop event via global EventBus for external systems to handle
         if (Donkeycraft.EventBus) {
             try {
@@ -188,7 +188,7 @@
      * Tick method — wander, flee from players.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.PassiveMob.prototype.tick = function(deltaTime) {
+    Donkeycraft.PassiveMob.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
 
         // Call base tick (applies velocity to position)
@@ -236,7 +236,7 @@
      * Get the mob's drop item type.
      * @returns {string}
      */
-    Donkeycraft.PassiveMob.prototype.getDropItem = function() {
+    Donkeycraft.PassiveMob.prototype.getDropItem = function () {
         return this.dropItem;
     };
 
@@ -244,7 +244,7 @@
      * Get the min/max drop count.
      * @returns {number[]} [min, max]
      */
-    Donkeycraft.PassiveMob.prototype.getDropCount = function() {
+    Donkeycraft.PassiveMob.prototype.getDropCount = function () {
         return this.dropCount.slice();
     };
 
@@ -256,7 +256,7 @@
      * @param {number} z - Z position.
      * @returns {Donkeycraft.PassiveMob|null}
      */
-    Donkeycraft.PassiveMob.create = function(type, x, y, z) {
+    Donkeycraft.PassiveMob.create = function (type, x, y, z) {
         if (!Donkeycraft.MobStats[type]) {
             return null; // Unknown type
         }

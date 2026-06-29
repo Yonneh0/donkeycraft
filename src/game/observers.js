@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone Observers
 // Observer blocks: detect block changes, emit pulse on change.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -26,7 +26,7 @@
      * RedstoneObservers — manages observer blocks: detects block changes
      * in front face, emits a 1-tick pulse on the back face.
      */
-    Donkeycraft.RedstoneObservers = (function() {
+    Donkeycraft.RedstoneObservers = (function () {
 
         // Observer states: Map<"x,y,z", { facing: number, lastBlockId: number, lastBlockMeta: number, cooldown: number }}
         var _observerStates = {};
@@ -120,10 +120,10 @@
             switch (facing) {
                 case FACING_SOUTH: return { x: x, y: y, z: z + 1 };
                 case FACING_NORTH: return { x: x, y: y, z: z - 1 };
-                case FACING_WEST:  return { x: x + 1, y: y, z: z };
-                case FACING_EAST:  return { x: x - 1, y: y, z: z };
-                case FACING_UP:    return { x: x, y: y + 1, z: z };
-                case FACING_DOWN:  return { x: x, y: y - 1, z: z };
+                case FACING_WEST: return { x: x + 1, y: y, z: z };
+                case FACING_EAST: return { x: x - 1, y: y, z: z };
+                case FACING_UP: return { x: x, y: y + 1, z: z };
+                case FACING_DOWN: return { x: x, y: y - 1, z: z };
             }
             return null;
         }
@@ -142,8 +142,8 @@
             switch (facing) {
                 case FACING_SOUTH: backPos = { x: x, y: y, z: z - 1 }; break;
                 case FACING_NORTH: backPos = { x: x, y: y, z: z + 1 }; break;
-                case FACING_WEST:  backPos = { x: x - 1, y: y, z: z }; break;
-                case FACING_EAST:  backPos = { x: x + 1, y: y, z: z }; break;
+                case FACING_WEST: backPos = { x: x - 1, y: y, z: z }; break;
+                case FACING_EAST: backPos = { x: x + 1, y: y, z: z }; break;
             }
 
             if (!backPos) return;

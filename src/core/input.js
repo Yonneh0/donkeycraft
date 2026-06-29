@@ -1,6 +1,6 @@
 // Donkeycraft — Input Handler
 // Keyboard/mouse input handler: key states, mouse capture, wheel events.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -18,7 +18,7 @@
      * Call `updateKeyStates()` and `updateMouseButtonStates()` at the start
      * of each game frame to refresh just-pressed detection.
      */
-    Donkeycraft.Input = function() {
+    Donkeycraft.Input = function () {
         // --- Key state tracking ---
         this._keyStates = {};
         this._keyJustPressed = {};
@@ -74,7 +74,7 @@
      * the 'pointerlockchange' event — do NOT set it synchronously here.
      * @param {HTMLElement} element - Element to request pointer lock on.
      */
-    Donkeycraft.Input.prototype.captureMouse = function(element) {
+    Donkeycraft.Input.prototype.captureMouse = function (element) {
         if (!this._mouseCaptured) {
             try {
                 element.requestPointerLock();
@@ -87,7 +87,7 @@
     /**
      * Release pointer lock.
      */
-    Donkeycraft.Input.prototype.releaseMouse = function() {
+    Donkeycraft.Input.prototype.releaseMouse = function () {
         if (this._mouseCaptured && document.pointerLockElement) {
             document.exitPointerLock();
         }
@@ -97,7 +97,7 @@
      * Check if mouse is currently captured (pointer locked).
      * @returns {boolean}
      */
-    Donkeycraft.Input.prototype.isMouseCaptured = function() {
+    Donkeycraft.Input.prototype.isMouseCaptured = function () {
         return this._mouseCaptured;
     };
 
@@ -110,7 +110,7 @@
      * @param {string} keyCode - The key code (e.g., 'KeyW', 'Space').
      * @returns {boolean}
      */
-    Donkeycraft.Input.prototype.isKeyDown = function(keyCode) {
+    Donkeycraft.Input.prototype.isKeyDown = function (keyCode) {
         return !!this._keyStates[keyCode];
     };
 
@@ -119,7 +119,7 @@
      * @param {string} keyCode - The key code (e.g., 'KeyW', 'Space').
      * @returns {boolean}
      */
-    Donkeycraft.Input.prototype.isKeyJustPressed = function(keyCode) {
+    Donkeycraft.Input.prototype.isKeyJustPressed = function (keyCode) {
         return !!this._keyJustPressed[keyCode];
     };
 
@@ -129,13 +129,13 @@
      * press+release), and (2) state transitions detected by comparing against last
      * frame's snapshot.
      */
-    Donkeycraft.Input.prototype.updateKeyStates = function() {
+    Donkeycraft.Input.prototype.updateKeyStates = function () {
         // Clear all just-pressed flags — re-set only valid ones this frame.
         this._keyJustPressed = {};
 
         // Merge raw just-pressed from event handlers (same-frame press+release).
         var self = this;
-        Object.keys(this._keyJustPressedRaw).forEach(function(key) {
+        Object.keys(this._keyJustPressedRaw).forEach(function (key) {
             if (self._keyJustPressedRaw[key]) {
                 self._keyJustPressed[key] = true;
             }
@@ -143,7 +143,7 @@
         this._keyJustPressedRaw = {};
 
         // Keys currently pressed but not pressed last frame = newly pressed.
-        Object.keys(this._keyStates).forEach(function(key) {
+        Object.keys(this._keyStates).forEach(function (key) {
             if (self._keyStates[key] && !self._keyLastFrame[key]) {
                 self._keyJustPressed[key] = true;
             }
@@ -151,7 +151,7 @@
 
         // Snapshot current state for next frame's comparison.
         this._keyLastFrame = {};
-        Object.keys(this._keyStates).forEach(function(key) {
+        Object.keys(this._keyStates).forEach(function (key) {
             self._keyLastFrame[key] = !!self._keyStates[key];
         });
     };
@@ -165,7 +165,7 @@
      * @param {string} button - Button name: 'left', 'right', or 'middle'.
      * @returns {boolean}
      */
-    Donkeycraft.Input.prototype.isMouseButtonPressed = function(button) {
+    Donkeycraft.Input.prototype.isMouseButtonPressed = function (button) {
         return !!this._mouseState[button];
     };
 
@@ -174,7 +174,7 @@
      * @param {string} button - Button name: 'left', 'right', or 'middle'.
      * @returns {boolean}
      */
-    Donkeycraft.Input.prototype.isMouseButtonJustPressed = function(button) {
+    Donkeycraft.Input.prototype.isMouseButtonJustPressed = function (button) {
         return !!this._mouseButtonJustPressed[button];
     };
 
@@ -182,13 +182,13 @@
      * Update just-pressed detection for mouse buttons. Call at the start of each
      * frame, alongside or before updateKeyStates().
      */
-    Donkeycraft.Input.prototype.updateMouseButtonStates = function() {
+    Donkeycraft.Input.prototype.updateMouseButtonStates = function () {
         // Clear all just-pressed flags — re-set only valid ones this frame.
         this._mouseButtonJustPressed = { left: false, right: false, middle: false };
 
         // Merge raw just-pressed from event handlers (same-frame press+release).
         var self = this;
-        Object.keys(this._mouseButtonJustPressedRaw).forEach(function(btn) {
+        Object.keys(this._mouseButtonJustPressedRaw).forEach(function (btn) {
             if (self._mouseButtonJustPressedRaw[btn]) {
                 self._mouseButtonJustPressed[btn] = true;
             }
@@ -196,7 +196,7 @@
         this._mouseButtonJustPressedRaw = { left: false, right: false, middle: false };
 
         // Detect transitions: button is pressed now but wasn't last frame.
-        Object.keys(this._mouseState).forEach(function(btn) {
+        Object.keys(this._mouseState).forEach(function (btn) {
             if (btn === 'x' || btn === 'y' || btn === 'deltaX' || btn === 'deltaY') return;
             if (self._mouseState[btn] && !self._mouseButtonLastFrame[btn]) {
                 self._mouseButtonJustPressed[btn] = true;
@@ -205,7 +205,7 @@
 
         // Snapshot current state for next frame.
         this._mouseButtonLastFrame = {};
-        Object.keys(this._mouseState).forEach(function(btn) {
+        Object.keys(this._mouseState).forEach(function (btn) {
             if (btn === 'x' || btn === 'y' || btn === 'deltaX' || btn === 'deltaY') return;
             self._mouseButtonLastFrame[btn] = !!self._mouseState[btn];
         });
@@ -221,7 +221,7 @@
      * or resetMouseDelta() for auto-reset behavior.
      * @returns {{left: boolean, right: boolean, middle: boolean, x: number, y: number, deltaX: number, deltaY: number}}
      */
-    Donkeycraft.Input.prototype.getMouseState = function() {
+    Donkeycraft.Input.prototype.getMouseState = function () {
         return {
             left: this._mouseState.left,
             right: this._mouseState.right,
@@ -238,7 +238,7 @@
      * Returns {{deltaX: number, deltaY: number}} and resets deltas to zero.
      * @returns {{deltaX: number, deltaY: number}}
      */
-    Donkeycraft.Input.prototype.getMouseDelta = function() {
+    Donkeycraft.Input.prototype.getMouseDelta = function () {
         var dx = this._mouseState.deltaX;
         var dy = this._mouseState.deltaY;
         this._mouseState.deltaX = 0;
@@ -249,7 +249,7 @@
     /**
      * Reset accumulated mouse delta to zero without reading it.
      */
-    Donkeycraft.Input.prototype.resetMouseDelta = function() {
+    Donkeycraft.Input.prototype.resetMouseDelta = function () {
         this._mouseState.deltaX = 0;
         this._mouseState.deltaY = 0;
     };
@@ -262,7 +262,7 @@
      * Get the wheel delta (and reset it to zero).
      * @returns {number}
      */
-    Donkeycraft.Input.prototype.getWheelDelta = function() {
+    Donkeycraft.Input.prototype.getWheelDelta = function () {
         var delta = this._wheelDelta;
         this._wheelDelta = 0;
         return delta;
@@ -276,7 +276,7 @@
      * Destroy the input handler and remove all event listeners.
      * Releases pointer lock if active, clears all internal state.
      */
-    Donkeycraft.Input.prototype.destroy = function() {
+    Donkeycraft.Input.prototype.destroy = function () {
         // Release pointer lock if active to prevent browser from staying locked
         if (this._mouseCaptured) {
             this.releaseMouse();
@@ -318,7 +318,7 @@
      * Key down event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onKeyDown = function(e) {
+    Donkeycraft.Input.prototype._onKeyDown = function (e) {
         this._keyStates[e.code] = true;
 
         // Only mark as just-pressed on initial key-down, not auto-repeats.
@@ -342,7 +342,7 @@
      * Key up event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onKeyUp = function(e) {
+    Donkeycraft.Input.prototype._onKeyUp = function (e) {
         this._keyStates[e.code] = false;
         // Don't clear _keyJustPressedRaw — the key WAS pressed this frame,
         // and updateKeyStates() will handle merging/cleanup.
@@ -352,7 +352,7 @@
      * Mouse down event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onMouseDown = function(e) {
+    Donkeycraft.Input.prototype._onMouseDown = function (e) {
         switch (e.button) {
             case 0: this._mouseState.left = true; this._mouseButtonJustPressedRaw.left = true; break;
             case 1: this._mouseState.middle = true; this._mouseButtonJustPressedRaw.middle = true; break;
@@ -364,7 +364,7 @@
      * Mouse up event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onMouseUp = function(e) {
+    Donkeycraft.Input.prototype._onMouseUp = function (e) {
         switch (e.button) {
             case 0: this._mouseState.left = false; break;
             case 1: this._mouseState.middle = false; break;
@@ -376,7 +376,7 @@
      * Mouse move event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onMouseMove = function(e) {
+    Donkeycraft.Input.prototype._onMouseMove = function (e) {
         // Always track absolute mouse position (client coordinates).
         this._mouseState.x = e.clientX;
         this._mouseState.y = e.clientY;
@@ -392,7 +392,7 @@
      * Wheel event handler.
      * @private
      */
-    Donkeycraft.Input.prototype._onWheel = function(e) {
+    Donkeycraft.Input.prototype._onWheel = function (e) {
         this._wheelDelta += e.deltaY;
         e.preventDefault();
     };
@@ -401,7 +401,7 @@
      * Context menu event handler — block right-click context menu.
      * @private
      */
-    Donkeycraft.Input.prototype._onContextMenu = function(e) {
+    Donkeycraft.Input.prototype._onContextMenu = function (e) {
         e.preventDefault();
     };
 
@@ -409,7 +409,7 @@
      * Pointer lock change event handler — updates _mouseCaptured flag.
      * @private
      */
-    Donkeycraft.Input.prototype._onPointerLockChange = function() {
+    Donkeycraft.Input.prototype._onPointerLockChange = function () {
         this._mouseCaptured = (document.pointerLockElement !== null);
     };
 

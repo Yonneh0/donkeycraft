@@ -1,6 +1,6 @@
 // Donkeycraft — Jump Mechanics
 // Jump mechanics: height, frequency, swing through blocks, water swimming.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -13,7 +13,7 @@
      * @param {Donkeycraft.Input} input - Input handler instance.
      * @param {Donkeycraft.Collision} collision - Collision detection instance.
      */
-    Donkeycraft.Jumping = function(player, input, collision) {
+    Donkeycraft.Jumping = function (player, input, collision) {
         this._player = player;
         this._input = input;
         this._collision = collision;
@@ -37,7 +37,7 @@
      * Main jump tick — called every game tick.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Jumping.prototype.tick = function(deltaTime) {
+    Donkeycraft.Jumping.prototype.tick = function (deltaTime) {
         var player = this._player;
         var input = this._input;
 
@@ -76,7 +76,7 @@
      * Check if the player can jump (on ground and cooldown expired).
      * @returns {boolean}
      */
-    Donkeycraft.Jumping.prototype.canJump = function() {
+    Donkeycraft.Jumping.prototype.canJump = function () {
         return this._player.onGround && this._jumpCooldown <= 0;
     };
 
@@ -84,7 +84,7 @@
      * Perform a jump — applies jump force to vertical velocity.
      * @returns {boolean} True if the jump was performed.
      */
-    Donkeycraft.Jumping.prototype.performJump = function() {
+    Donkeycraft.Jumping.prototype.performJump = function () {
         var player = this._player;
 
         // Can only jump if on ground
@@ -110,7 +110,7 @@
      * Check if the player is currently swimming upward.
      * @returns {boolean}
      */
-    Donkeycraft.Jumping.prototype.isSwimmingUp = function() {
+    Donkeycraft.Jumping.prototype.isSwimmingUp = function () {
         var pos = this._player.getPosition();
         var inWater = this._collision.isBlockLiquid(pos.x, pos.y + 0.3, pos.z);
         return inWater && this._input.isKeyDown(Config.KEYBINDS.JUMP);
@@ -120,7 +120,7 @@
      * Get the current jump force from config.
      * @returns {number} Jump force (blocks/s).
      */
-    Donkeycraft.Jumping.prototype.getJumpForce = function() {
+    Donkeycraft.Jumping.prototype.getJumpForce = function () {
         return Config.PLAYER_JUMP_FORCE;
     };
 
@@ -128,14 +128,14 @@
      * Get the current jump cooldown remaining.
      * @returns {number} Cooldown in seconds.
      */
-    Donkeycraft.Jumping.prototype.getCooldown = function() {
+    Donkeycraft.Jumping.prototype.getCooldown = function () {
         return this._jumpCooldown;
     };
 
     /**
      * Destroy the jumping system and free resources.
      */
-    Donkeycraft.Jumping.prototype.destroy = function() {
+    Donkeycraft.Jumping.prototype.destroy = function () {
         this._player = null;
         this._input = null;
         this._collision = null;

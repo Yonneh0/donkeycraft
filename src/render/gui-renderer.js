@@ -1,6 +1,6 @@
 // Donkeycraft — GUI Renderer
 // HUD overlay: crosshair, hotbar, inventory slots, debug screen.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -9,7 +9,7 @@
      * GUIRenderer — Renders 2D HUD elements on top of the 3D scene.
      * Includes crosshair, hotbar background, health hearts, and hunger drumsticks.
      */
-    Donkeycraft.GUIRenderer = function(gl, shaderManager) {
+    Donkeycraft.GUIRenderer = function (gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
 
@@ -41,13 +41,13 @@
         // Listen for WebGL context loss/restoration
         if (gl && gl.canvas) {
             var self = this;
-            gl.canvas.addEventListener('webglcontextlost', function(e) {
+            gl.canvas.addEventListener('webglcontextlost', function (e) {
                 e.preventDefault();
                 self._contextLost = true;
                 self._heartBuffer = null;
                 self._drumstickBuffer = null;
             });
-            gl.canvas.addEventListener('webglcontextrestored', function() {
+            gl.canvas.addEventListener('webglcontextrestored', function () {
                 self._contextLost = false;
                 self._heartBuffer = null;
                 self._drumstickBuffer = null;
@@ -60,21 +60,21 @@
      * Two crossing line quads with position(3) + UV(2) + color(4) = 9 floats per vertex.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._buildCrosshairGeometry = function() {
+    Donkeycraft.GUIRenderer.prototype._buildCrosshairGeometry = function () {
         var lineWidth = 0.005;
         var lineLength = 0.03;
 
         var vertices = new Float32Array([
             // Horizontal line — 4 vertices × 9 floats
-            -lineLength, 0, 0,   0, 0,   1, 1, 1, 1,
-             lineLength, 0, 0,   1, 0,   1, 1, 1, 1,
-             lineLength, lineWidth, 0,   1, 1,   1, 1, 1, 1,
-            -lineLength, lineWidth, 0,   0, 1,   1, 1, 1, 1,
+            -lineLength, 0, 0, 0, 0, 1, 1, 1, 1,
+            lineLength, 0, 0, 1, 0, 1, 1, 1, 1,
+            lineLength, lineWidth, 0, 1, 1, 1, 1, 1, 1,
+            -lineLength, lineWidth, 0, 0, 1, 1, 1, 1, 1,
             // Vertical line — 4 vertices × 9 floats
-            0, -lineLength, 0,   0, 0,   1, 1, 1, 1,
-            lineWidth, -lineLength, 0,   1, 0,   1, 1, 1, 1,
-            lineWidth, lineLength, 0,   1, 1,   1, 1, 1, 1,
-            0, lineLength, 0,   0, 1,   1, 1, 1, 1
+            0, -lineLength, 0, 0, 0, 1, 1, 1, 1,
+            lineWidth, -lineLength, 0, 1, 0, 1, 1, 1, 1,
+            lineWidth, lineLength, 0, 1, 1, 1, 1, 1, 1,
+            0, lineLength, 0, 0, 1, 1, 1, 1, 1
         ]);
 
         var indices = new Uint16Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
@@ -92,7 +92,7 @@
      * Each slot is a quad with position(3) + UV(2) + Color(4) = 9 floats per vertex.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._buildHotbarGeometry = function() {
+    Donkeycraft.GUIRenderer.prototype._buildHotbarGeometry = function () {
         var slotWidth = 0.08;
         var slotHeight = 0.08;
         var slotGap = 0.005;
@@ -109,10 +109,10 @@
 
             // Quad vertices: position(3) + UV(2) + Color(4)
             vertices.push(
-                x, y, 0,   0, 0,   0.5, 0.5, 0.5, 1,
-                x + slotWidth, y, 0,   1, 0,   0.5, 0.5, 0.5, 1,
-                x + slotWidth, y + slotHeight, 0,   1, 1,   0.5, 0.5, 0.5, 1,
-                x, y + slotHeight, 0,   0, 1,   0.5, 0.5, 0.5, 1
+                x, y, 0, 0, 0, 0.5, 0.5, 0.5, 1,
+                x + slotWidth, y, 0, 1, 0, 0.5, 0.5, 0.5, 1,
+                x + slotWidth, y + slotHeight, 0, 1, 1, 0.5, 0.5, 0.5, 1,
+                x, y + slotHeight, 0, 0, 1, 0.5, 0.5, 0.5, 1
             );
 
             indices.push(
@@ -133,7 +133,7 @@
     /**
      * Initialize all GUI mesh buffers.
      */
-    Donkeycraft.GUIRenderer.prototype._initBuffers = function() {
+    Donkeycraft.GUIRenderer.prototype._initBuffers = function () {
         var gl = this._gl;
         if (!gl) return;
 
@@ -168,7 +168,7 @@
      * Rebuild GPU buffers after a WebGL context restore event.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._rebuildBuffers = function() {
+    Donkeycraft.GUIRenderer.prototype._rebuildBuffers = function () {
         // Buffers are lazily recreated on next render call via null checks —
         // no explicit rebuild needed since geometry data is static.
     };
@@ -177,7 +177,7 @@
      * Get or create a cached orthographic projection matrix.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._getCachedProjMatrix = function(canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype._getCachedProjMatrix = function (canvasWidth, canvasHeight) {
         var aspect = canvasWidth / canvasHeight;
         if (this._projMatrixCache && this._lastAspect === aspect) {
             return this._projMatrixCache;
@@ -192,7 +192,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderCrosshair = function(canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderCrosshair = function (canvasWidth, canvasHeight) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight || !this._crosshairVertBuf) return;
 
@@ -246,7 +246,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderHotbar = function(selectedSlot, canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderHotbar = function (selectedSlot, canvasWidth, canvasHeight) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
 
@@ -282,7 +282,7 @@
                 var baseVertex = i * 4;
                 for (var v = 0; v < 4; v++) {
                     var ci = (baseVertex + v) * 9 + 5;
-                    vertices[ci]     = color[0];
+                    vertices[ci] = color[0];
                     vertices[ci + 1] = color[1];
                     vertices[ci + 2] = color[2];
                     vertices[ci + 3] = color[3];
@@ -330,7 +330,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderHearts = function(health, maxHealth, canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderHearts = function (health, maxHealth, canvasWidth, canvasHeight) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
 
@@ -378,32 +378,32 @@
      * Uses drawArrays since the geometry is too small to benefit from indexing.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._drawHeart = function(gl, x, y, size, color) {
+    Donkeycraft.GUIRenderer.prototype._drawHeart = function (gl, x, y, size, color) {
         var s = size;
         var h = size * 0.9; // Heart height
 
         // 15 vertices: 6 for left lobe (2 tri), 6 for right lobe (2 tri), 3 for bottom point (1 tri)
         var vertices = new Float32Array([
             // Left lobe — triangle 1
-            x - s, y + h * 0.3, 0,   0, 0,   color[0], color[1], color[2], color[3],
+            x - s, y + h * 0.3, 0, 0, 0, color[0], color[1], color[2], color[3],
             // Left lobe — triangle 2
-            x - s * 0.1, y + h * 0.3, 0,   0.5, 0,   color[0], color[1], color[2], color[3],
-            x - s * 0.1, y + h * 0.7, 0,   0.5, 0.5,   color[0], color[1], color[2], color[3],
-            x - s, y + h * 0.3, 0,   0, 0,   color[0], color[1], color[2], color[3],
-            x - s * 0.1, y + h * 0.7, 0,   0.5, 0.5,   color[0], color[1], color[2], color[3],
-            x - s, y + h * 0.7, 0,   0, 0.5,   color[0], color[1], color[2], color[3],
+            x - s * 0.1, y + h * 0.3, 0, 0.5, 0, color[0], color[1], color[2], color[3],
+            x - s * 0.1, y + h * 0.7, 0, 0.5, 0.5, color[0], color[1], color[2], color[3],
+            x - s, y + h * 0.3, 0, 0, 0, color[0], color[1], color[2], color[3],
+            x - s * 0.1, y + h * 0.7, 0, 0.5, 0.5, color[0], color[1], color[2], color[3],
+            x - s, y + h * 0.7, 0, 0, 0.5, color[0], color[1], color[2], color[3],
             // Right lobe — triangle 1
-            x + s * 0.1, y + h * 0.3, 0,   0.5, 0,   color[0], color[1], color[2], color[3],
-            x + s, y + h * 0.3, 0,   1, 0,   color[0], color[1], color[2], color[3],
-            x + s, y + h * 0.7, 0,   1, 0.5,   color[0], color[1], color[2], color[3],
+            x + s * 0.1, y + h * 0.3, 0, 0.5, 0, color[0], color[1], color[2], color[3],
+            x + s, y + h * 0.3, 0, 1, 0, color[0], color[1], color[2], color[3],
+            x + s, y + h * 0.7, 0, 1, 0.5, color[0], color[1], color[2], color[3],
             // Right lobe — triangle 2
-            x + s * 0.1, y + h * 0.3, 0,   0.5, 0,   color[0], color[1], color[2], color[3],
-            x + s, y + h * 0.7, 0,   1, 0.5,   color[0], color[1], color[2], color[3],
-            x + s * 0.1, y + h * 0.7, 0,   0.5, 0.5,   color[0], color[1], color[2], color[3],
+            x + s * 0.1, y + h * 0.3, 0, 0.5, 0, color[0], color[1], color[2], color[3],
+            x + s, y + h * 0.7, 0, 1, 0.5, color[0], color[1], color[2], color[3],
+            x + s * 0.1, y + h * 0.7, 0, 0.5, 0.5, color[0], color[1], color[2], color[3],
             // Bottom point — single triangle
-            x - s * 0.3, y + h * 0.5, 0,   0.25, 0.5,   color[0], color[1], color[2], color[3],
-            x + s * 0.3, y + h * 0.5, 0,   0.75, 0.5,   color[0], color[1], color[2], color[3],
-            x, y - h * 0.5, 0,   0.5, 1,   color[0], color[1], color[2], color[3]
+            x - s * 0.3, y + h * 0.5, 0, 0.25, 0.5, color[0], color[1], color[2], color[3],
+            x + s * 0.3, y + h * 0.5, 0, 0.75, 0.5, color[0], color[1], color[2], color[3],
+            x, y - h * 0.5, 0, 0.5, 1, color[0], color[1], color[2], color[3]
         ]);
 
         if (!this._heartBuffer) {
@@ -444,7 +444,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderHunger = function(food, maxFood, canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderHunger = function (food, maxFood, canvasWidth, canvasHeight) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
 
@@ -492,24 +492,24 @@
      * Uses drawArrays since the geometry is too small to benefit from indexing.
      * @private
      */
-    Donkeycraft.GUIRenderer.prototype._drawDrumstick = function(gl, x, y, size, color) {
+    Donkeycraft.GUIRenderer.prototype._drawDrumstick = function (gl, x, y, size, color) {
         var s = size;
         var h = size * 1.5;
 
         // 7 vertices: 4 for body (2 tri), 3 for bone end (1 tri)
         var vertices = new Float32Array([
             // Body — triangle 1
-            x - s * 0.3, y - h * 0.4, 0,   0, 0,   color[0], color[1], color[2], color[3],
+            x - s * 0.3, y - h * 0.4, 0, 0, 0, color[0], color[1], color[2], color[3],
             // Body — triangle 2
-            x + s * 0.3, y - h * 0.4, 0,   0.5, 0,   color[0], color[1], color[2], color[3],
-            x + s * 0.3, y + h * 0.3, 0,   0.5, 0.7,   color[0], color[1], color[2], color[3],
-            x - s * 0.3, y - h * 0.4, 0,   0, 0,   color[0], color[1], color[2], color[3],
-            x + s * 0.3, y + h * 0.3, 0,   0.5, 0.7,   color[0], color[1], color[2], color[3],
-            x - s * 0.3, y + h * 0.3, 0,   0, 0.7,   color[0], color[1], color[2], color[3],
+            x + s * 0.3, y - h * 0.4, 0, 0.5, 0, color[0], color[1], color[2], color[3],
+            x + s * 0.3, y + h * 0.3, 0, 0.5, 0.7, color[0], color[1], color[2], color[3],
+            x - s * 0.3, y - h * 0.4, 0, 0, 0, color[0], color[1], color[2], color[3],
+            x + s * 0.3, y + h * 0.3, 0, 0.5, 0.7, color[0], color[1], color[2], color[3],
+            x - s * 0.3, y + h * 0.3, 0, 0, 0.7, color[0], color[1], color[2], color[3],
             // Bone end — single triangle
-            x, y + h * 0.5, 0,   0.5, 1,   0.85, 0.80, 0.70, color[3],
-            x - s * 0.25, y + h * 0.35, 0,   0.25, 0.75,   0.85, 0.80, 0.70, color[3],
-            x + s * 0.25, y + h * 0.35, 0,   0.75, 0.75,   0.85, 0.80, 0.70, color[3]
+            x, y + h * 0.5, 0, 0.5, 1, 0.85, 0.80, 0.70, color[3],
+            x - s * 0.25, y + h * 0.35, 0, 0.25, 0.75, 0.85, 0.80, 0.70, color[3],
+            x + s * 0.25, y + h * 0.35, 0, 0.75, 0.75, 0.85, 0.80, 0.70, color[3]
         ]);
 
         if (!this._drumstickBuffer) {
@@ -550,7 +550,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderDebugInfo = function(debugInfo, canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderDebugInfo = function (debugInfo, canvasWidth, canvasHeight) {
         // Phase 2: debug info rendered via HTML overlay (no WebGL needed yet)
     };
 
@@ -560,7 +560,7 @@
      * @param {number} canvasWidth - Canvas width in pixels.
      * @param {number} canvasHeight - Canvas height in pixels.
      */
-    Donkeycraft.GUIRenderer.prototype.renderAll = function(state, canvasWidth, canvasHeight) {
+    Donkeycraft.GUIRenderer.prototype.renderAll = function (state, canvasWidth, canvasHeight) {
         state = state || {};
 
         // 1. Health hearts (top-left of HUD row)
@@ -595,7 +595,7 @@
     /**
      * Destroy GUI renderer resources.
      */
-    Donkeycraft.GUIRenderer.prototype.destroy = function() {
+    Donkeycraft.GUIRenderer.prototype.destroy = function () {
         var gl = this._gl;
         if (!gl) return;
 

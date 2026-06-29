@@ -1,6 +1,6 @@
 // Donkeycraft — Block Action
 // Block breaking: hardness timer, tool speed multipliers, drop spawning.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -37,7 +37,7 @@
      *
      * @namespace
      */
-    Donkeycraft.BlockAction = (function() {
+    Donkeycraft.BlockAction = (function () {
         // Current break states: Map of "x,y,z" → BreakState
         var _breakStates = {};
 

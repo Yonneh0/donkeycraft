@@ -1,7 +1,7 @@
 // Donkeycraft — Keybindings Panel
 // Display-only top-center panel showing all keybindings and input lock status.
 // Transparent, non-interactive — all clicks pass through to the rendered area below.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -11,7 +11,7 @@
      * Uses emoji/unicode for keys and shows input lock status with a mouse emoji.
      * The panel is display-only: pointer-events: none ensures clicks pass through.
      */
-    Donkeycraft.KeybindingsPanel = function() {
+    Donkeycraft.KeybindingsPanel = function () {
         this._element = null;
         this._unsubscribeRender = null;
         this._initDOM();
@@ -21,7 +21,7 @@
      * _initDOM — caches a reference to the keybindings panel DOM element.
      * @private
      */
-    Donkeycraft.KeybindingsPanel.prototype._initDOM = function() {
+    Donkeycraft.KeybindingsPanel.prototype._initDOM = function () {
         this._element = document.getElementById('dk-keybindings-panel');
     };
 
@@ -31,7 +31,7 @@
      * @param {string} keyCode - The key code from Config.KEYBINDS.
      * @returns {string} Display label with emoji and styled key text.
      */
-    Donkeycraft.KeybindingsPanel.prototype._getKeyLabel = function(keyCode) {
+    Donkeycraft.KeybindingsPanel.prototype._getKeyLabel = function (keyCode) {
         // Map known key codes to display labels wrapped in brackets
         var keyMap = {
             'KeyW': '[W]',
@@ -64,7 +64,7 @@
      * @private
      * @returns {string} HTML for the keybindings display.
      */
-    Donkeycraft.KeybindingsPanel.prototype._buildHTML = function() {
+    Donkeycraft.KeybindingsPanel.prototype._buildHTML = function () {
         var kb = Donkeycraft.Config.KEYBINDS;
         if (!kb) return '';
 
@@ -153,7 +153,7 @@
      * Called every render frame to keep the lock status indicator current.
      * @param {Donkeycraft.Input} [input] - Input instance (unused, lock status uses document.pointerLockElement).
      */
-    Donkeycraft.KeybindingsPanel.prototype.update = function(input) {
+    Donkeycraft.KeybindingsPanel.prototype.update = function (input) {
         if (!this._element) return;
 
         // Build HTML once, then update only the lock status each frame
@@ -178,12 +178,12 @@
      * startListening — starts auto-updating on each render frame via Timer.onRender().
      * @param {Object} timer - Donkeycraft.Timer instance (must have onRender method).
      */
-    Donkeycraft.KeybindingsPanel.prototype.startListening = function(timer) {
+    Donkeycraft.KeybindingsPanel.prototype.startListening = function (timer) {
         if (this._unsubscribeRender || !timer) return;
 
         var self = this;
         try {
-            this._unsubscribeRender = timer.onRender(function() {
+            this._unsubscribeRender = timer.onRender(function () {
                 self.update();
             });
         } catch (e) {
@@ -194,9 +194,9 @@
     /**
      * stopListening — stops auto-updating.
      */
-    Donkeycraft.KeybindingsPanel.prototype.stopListening = function() {
+    Donkeycraft.KeybindingsPanel.prototype.stopListening = function () {
         if (this._unsubscribeRender) {
-            try { this._unsubscribeRender(); } catch (e) {}
+            try { this._unsubscribeRender(); } catch (e) { }
             this._unsubscribeRender = null;
         }
     };
@@ -204,7 +204,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.KeybindingsPanel.prototype.destroy = function() {
+    Donkeycraft.KeybindingsPanel.prototype.destroy = function () {
         this.stopListening();
         if (this._element) {
             this._element.innerHTML = '';

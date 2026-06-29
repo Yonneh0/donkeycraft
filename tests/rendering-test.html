@@ -1,949 +1,955 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Donkeycraft — WebGL Rendering Engine Tests</title>
-<link rel="stylesheet" href="test.css">
+    <meta charset="UTF-8">
+    <title>Donkeycraft — WebGL Rendering Engine Tests</title>
+    <link rel="stylesheet" href="test.css">
 </head>
+
 <body>
-<h1>Donkeycraft — WebGL Rendering Engine Tests</h1>
-<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Comprehensive functional tests for all 14 WebGL rendering modules: GLContext, ShaderManager, GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer, BreakParticles, GUIRenderer, Weather.</div>
-
-<!-- Results container -->
-<div id="results"></div>
-
-<!-- Hidden canvas for WebGL context creation in tests -->
-<canvas id="test-canvas" width="320" height="180" style="display:none;"></canvas>
-
-<!-- Load project scripts in dependency order -->
-<script src="../src/core/namespace.js"></script>
-<script src="../src/core/eventbus.js"></script>
-<script src="../src/core/config.js"></script>
-<script src="../src/core/logger.js"></script>
-<script src="../src/core/timer.js"></script>
-<script src="../src/core/input.js"></script>
-<script src="../src/core/math-utils.js"></script>
-<script src="../src/core/audio.js"></script>
-
-<!-- Rendering engine scripts -->
-<script src="../src/render/gl-context.js"></script>
-<script src="../src/render/shader-manager.js"></script>
-<script src="../src/render/geometry-builder.js"></script>
-<script src="../src/render/mesh-optimizer.js"></script>
-<script src="../src/render/chunk-mesh.js"></script>
-<script src="../src/render/terrain-renderer.js"></script>
-<script src="../src/render/camera.js"></script>
-<script src="../src/render/fog.js"></script>
-<script src="../src/render/sky.js"></script>
-<script src="../src/render/lighting.js"></script>
-<script src="../src/render/hand-renderer.js"></script>
-<script src="../src/render/break-particles.js"></script>
-<script src="../src/render/gui-renderer.js"></script>
-<script src="../src/render/weather.js"></script>
-
-<!-- Load shared test framework -->
-<script src="test.js"></script>
-
-<script>
-(function() {
-    'use strict';
-
-    var F = TestFramework;
-    F.init('results');
-
-    var canvas = document.getElementById('test-canvas');
-    var gl = null;
-
-    // Try to get WebGL context for tests that need it
-    try {
-        if (canvas.getContext) {
-            gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: true });
-        }
-    } catch(e) {
-        // WebGL not available
-    }
-
-    var hasWebGL = gl !== null;
-
-    // ============================================================
-    // Section 1: GLContext Tests
-    // ============================================================
-    F.section('1. GLContext');
-
-    if (hasWebGL) {
-        var ctx = new Donkeycraft.GLContext(canvas);
-        F.assertType(ctx, 'object', 'GLContext instance created');
-        F.assert(ctx.isValid(), 'GLContext is valid');
-        F.assert(!ctx.isContextLost(), 'Context not lost');
-        F.assertType(ctx.getGL(), 'object', 'getGL() returns WebGL context');
-        F.assertType(ctx.getContext(), 'object', 'getContext() returns WebGL context');
-        F.assertEq(ctx.getGL(), ctx.getContext(), 'getGL() === getContext()');
-        F.assertType(ctx.getMaxTextureSize(), 'number', 'getMaxTextureSize() returns number');
-        F.assert(ctx.getMaxTextureSize() > 0, 'getMaxTextureSize() > 0');
-        F.assertType(ctx.getMaxVertexUniforms(), 'number', 'getMaxVertexUniforms() returns number');
-        F.assert(ctx.getMaxVertexUniforms() > 0, 'getMaxVertexUniforms() > 0');
-
-        // Capabilities
-        var caps = ctx.getCapabilities();
-        F.assertType(caps, 'object', 'getCapabilities() returns object');
-        F.assertType(caps.maxTextureSize, 'number', 'capabilities.maxTextureSize is number');
-        F.assertType(caps.renderer, 'string', 'capabilities.renderer is string');
-
-        // Viewport
-        ctx.setViewport(320, 180);
-        F.info('Viewport set to 320x180');
-
-        // Error handling
-        ctx.resetErrorCount();
-        F.assertEq(ctx.getErrorCount(), 0, 'getErrorCount() starts at 0');
-        var err = ctx.getError();
-        F.assert(err === null || typeof err === 'number', 'getError() returns null or number');
-
-        // Extension support check
-        F.assertType(ctx.isExtensionSupported('OES_standard_derivatives'), 'boolean', 'isExtensionSupported() returns boolean');
-        F.assertType(ctx.getExtension('OES_standard_derivatives'), 'object', 'getExtension() returns object or null');
-
-        // Context attributes
-        var attrs = ctx.getContextAttributes();
-        F.assert(attrs !== null, 'getContextAttributes() is not null');
-        F.assert(!attrs.alpha, 'Context has alpha: false');
-        F.assert(!attrs.antialias, 'Context has antialias: false');
-        F.assert(!!attrs.depth, 'Context has depth: true');
-
-        // Context restore support
-        F.assertType(ctx.hasContextRestoreSupport(), 'boolean', 'hasContextRestoreSupport() returns boolean');
-
-        // Destroy
-        ctx.destroy();
-        F.assert(!ctx.isValid(), 'GLContext is invalid after destroy');
-        F.assert(ctx.isContextLost(), 'Context is lost after destroy');
-    } else {
-        F.info('WebGL not available — GLContext tests skipped');
-    }
-
-    // Recreate WebGL context after GLContext.destroy() invalidates it.
-    // Subsequent tests need a fresh valid context.
-    var testGl = null;
-    try {
-        if (canvas.getContext) {
-            testGl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: true });
-        }
-    } catch(e2) {}
-
-    // ============================================================
-    // Section 2: ShaderManager Tests
-    // ============================================================
-    F.section('2. ShaderManager');
-
-    if (testGl) {
-        var sm = new Donkeycraft.ShaderManager(testGl);
-        F.assertType(sm, 'object', 'ShaderManager instance created');
-        F.assertType(sm.getStats(), 'object', 'getStats() returns object');
-        F.assertEq(sm.getStats().shaders, 0, 'Initial shader count is 0');
-        F.assertEq(sm.getStats().programs, 0, 'Initial program count is 0');
-
-        // Test shader compilation with a simple pass-through shader
-        var vertSrc = 'attribute vec3 aPos; void main() { gl_Position = vec4(aPos, 1.0); }';
-        var fragSrc = 'precision mediump float; void main() { gl_FragColor = vec4(1.0); }';
-
-        var vertShader = sm.compileShader(vertSrc, 'vertex');
-        F.assert(vertShader !== null, 'Vertex shader compiled successfully');
-        F.assertEq(sm.getStats().shaders, 1, 'Shader count incremented to 1');
-
-        var fragShader = sm.compileShader(fragSrc, 'fragment');
-        F.assert(fragShader !== null, 'Fragment shader compiled successfully');
-        F.assertEq(sm.getStats().shaders, 2, 'Shader count incremented to 2');
-
-        // Test program linking
-        var prog = sm.linkProgram(vertShader, fragShader);
-        F.assert(prog !== null, 'Program linked successfully');
-        F.assertEq(sm.getStats().programs, 1, 'Program count incremented to 1');
-
-        // Test program creation via createProgram
-        var testProg = sm.createProgram('test', vertSrc, fragSrc);
-        F.assert(testProg !== null, 'createProgram() returns valid program');
-        F.assert(sm.getProgram('test') !== null, 'getProgram("test") returns program');
-
-        // Test use/useProgram
-        F.assert(sm.use('test'), 'use("test") returns true');
-        F.assert(sm.useProgram(testProg), 'useProgram(prog) returns true');
-
-        // Create a full-featured test shader that declares all uniform types being tested.
-        var fullVertSrc = [
-            'attribute vec3 aPos;',
-            'uniform mat4 uTestMatrix;',
-            'void main() { gl_Position = uTestMatrix * vec4(aPos, 1.0); }'
-        ].join('\n');
-
-        var fullFragSrc = [
-            'precision mediump float;',
-            'uniform float uTestFloat;',
-            'uniform int uTestInt;',
-            'uniform vec2 uTestVec2;',
-            'uniform vec3 uTestVec3;',
-            'uniform vec4 uTestVec4;',
-            'uniform sampler2D uTestSampler;',
-            'void main() {',
-            '  float f = uTestFloat;',
-            '  int i = uTestInt;',
-            '  vec2 v2 = uTestVec2;',
-            '  vec3 v3 = uTestVec3;',
-            '  vec4 v4 = uTestVec4;',
-            '  vec4 tc = texture2D(uTestSampler, v2);',
-            '  gl_FragColor = tc * f * float(i) * v4 * vec4(v3, 1.0);',
-            '}'
-        ].join('\n');
-
-        var fullProg = sm.createProgram('fullTest', fullVertSrc, fullFragSrc);
-        F.assert(fullProg !== null, 'Full-featured test program compiled and linked');
-        F.assert(sm.use('fullTest'), 'use("fullTest") returns true');
-
-        // Now test all uniform setters — they should find their uniforms in the shader.
-        var mat4Val = Donkeycraft.Matrix4.createIdentity();
-        F.assert(sm.setMat4('uTestMatrix', mat4Val), 'setMat4 works with declared uniform');
-
-        F.assert(sm.setFloat('uTestFloat', 0.5), 'setFloat works with declared uniform');
-        F.assert(sm.setInt('uTestInt', 1), 'setInt works with declared uniform');
-        F.assert(sm.setVec2('uTestVec2', 0.5, 0.5), 'setVec2 works with declared uniform');
-        F.assert(sm.setVec3('uTestVec3', 1, 2, 3), 'setVec3 works with declared uniform');
-        F.assert(sm.setVec4('uTestVec4', 1, 2, 3, 4), 'setVec4 works with declared uniform');
-
-        // Test sampler — bind a texture and set the uniform
-        testGl.activeTexture(testGl.TEXTURE0);
-        var placeholderTex = testGl.createTexture();
-        testGl.bindTexture(testGl.TEXTURE_2D, placeholderTex);
-        F.assert(sm.setSampler('uTestSampler', 0), 'setSampler works with declared uniform');
-
-        // Test getAttribute (returns -1 if not found)
-        F.assertEq(sm.getAttribute('nonexistent'), -1, 'getAttribute("nonexistent") returns -1');
-
-        // Test getUniformLocation (should find uTestFloat since we're on fullTest program)
-        F.assert(sm.getUniformLocation('uTestFloat') !== null, 'getUniformLocation returns location for existing uniform');
-
-        // Destroy
-        sm.destroy();
-        F.assertEq(sm.getStats().shaders, 0, 'Shader count reset after destroy');
-        F.assertEq(sm.getStats().programs, 0, 'Program count reset after destroy');
-        F.assert(Object.keys(sm._programs || {}).length === 0, 'Programs cleared after destroy');
-
-        testGl.deleteTexture(placeholderTex);
-    } else {
-        F.info('WebGL not available — ShaderManager tests skipped');
-    }
-
-    // ============================================================
-    // Section 3: GeometryBuilder Tests
-    // ============================================================
-    F.section('3. GeometryBuilder');
-
-    var gb = new Donkeycraft.GeometryBuilder();
-    F.assertType(gb, 'object', 'GeometryBuilder instance created');
-
-    // Test isTransparent fallback
-    F.assert(!gb.isTransparent(1), 'isTransparent(1) [stone] = false');
-    F.assert(!gb.isTransparent(2), 'isTransparent(2) [grass] = false');
-    F.assert(gb.isTransparent(0), 'isTransparent(0) [air] = true');
-    F.assert(gb.isTransparent(9), 'isTransparent(9) [water] = true');
-
-    // Test buildQuad
-    var quad = gb.buildQuad(1.0, 0.0);
-    F.assertType(quad, 'object', 'buildQuad() returns object');
-    F.assertType(quad.vertices, 'object', 'buildQuad().vertices is Float32Array');
-    F.assertType(quad.indices, 'object', 'buildQuad().indices is Uint16Array');
-    F.assertEq(quad.vertexCount, 4, 'Quad has 4 vertices');
-    F.assertEq(quad.indexCount, 6, 'Quad has 6 indices');
-
-    // Test buildCube
-    var cube = gb.buildCube(1.0, 0.5);
-    F.assertType(cube, 'object', 'buildCube() returns object');
-    F.assertType(cube.vertices, 'object', 'buildCube().vertices is Float32Array');
-    F.assertType(cube.indices, 'object', 'buildCube().indices is Uint16Array');
-    F.assertEq(cube.vertexCount, 24, 'Cube has 24 vertices');
-    F.assertEq(cube.indexCount, 36, 'Cube has 36 indices');
-
-    // Test buildChunk with a simple block world
-    var cs = Donkeycraft.Config.CHUNK_SIZE || 16;
-    var wh = Donkeycraft.Config.WORLD_HEIGHT || 256;
-    var testBlocks = new Array(cs * wh * cs).fill(0);
-    for (var x = 0; x < cs; x++) {
-        for (var z = 0; z < cs; z++) {
-            testBlocks[x * wh * cs + 10 * cs + z] = 1;
-        }
-    }
-
-    var getBlockFunc = function(lx, y, lz) {
-        return testBlocks[lx * wh * cs + y * cs + lz];
-    };
-
-    var chunkGeo = gb.buildChunk(0, 0, getBlockFunc);
-    F.assertType(chunkGeo, 'object', 'buildChunk() returns object');
-    F.assertType(chunkGeo.vertices, 'object', 'buildChunk().vertices is Float32Array');
-    F.assertType(chunkGeo.indices, 'object', 'buildChunk().indices is Uint32Array');
-    F.assert(chunkGeo.vertexCount > 0, 'buildChunk() produces vertices for stone layer');
-    F.assert(chunkGeo.indexCount > 0, 'buildChunk() produces indices');
-    F.assert(chunkGeo.useUint32 === true, 'buildChunk() uses Uint32 indices');
-
-    F.info('GeometryBuilder tests complete — quad: ' + quad.vertexCount + ' verts, cube: ' + cube.vertexCount + ' verts, chunk: ' + chunkGeo.vertexCount + ' verts');
-
-    // ============================================================
-    // Section 4: MeshOptimizer Tests
-    // ============================================================
-    F.section('4. MeshOptimizer');
-
-    var mo = new Donkeycraft.MeshOptimizer();
-    F.assertType(mo, 'object', 'MeshOptimizer instance created');
-
-    // Test generateIndexBuffer with quad geometry
-    var quadGeo = {
-        vertices: quad.vertices,
-        indices: null,
-        vertexCount: 4,
-        indexCount: 0
-    };
-    var indexedQuad = mo.generateIndexBuffer(quadGeo);
-    F.assertType(indexedQuad, 'object', 'generateIndexBuffer() returns object');
-    F.assert(indexedQuad.vertexCount <= quadGeo.vertexCount, 'generateIndexBuffer() reduces or keeps vertex count');
-    F.assert(indexedQuad.indexCount > 0, 'generateIndexBuffer() produces indices');
-
-    // Test generateIndexBuffer with cube geometry (has indices)
-    var cubeGeo = {
-        vertices: cube.vertices,
-        indices: cube.indices,
-        vertexCount: cube.vertexCount,
-        indexCount: cube.indexCount
-    };
-    var indexedCube = mo.generateIndexBuffer(cubeGeo);
-    F.assert(indexedCube.vertexCount <= cubeGeo.vertexCount, 'generateIndexBuffer() reduces or keeps vertex count for cube');
-
-    // Test cullBackFaces with camera position
-    var camPos = new Donkeycraft.Vector3(0, 10, 20);
-    var culled = mo.cullBackFaces(cubeGeo, camPos);
-    F.assertType(culled, 'object', 'cullBackFaces() returns object');
-    F.assert(culled.indexCount <= cubeGeo.indexCount, 'cullBackFaces() reduces or keeps index count');
-
-    // Test optimize (full pipeline)
-    var optimized = mo.optimize(cubeGeo, camPos);
-    F.assertType(optimized, 'object', 'optimize() returns object');
-    F.assert(optimized.vertexCount > 0, 'optimize() produces valid vertex count');
-    F.assert(optimized.indexCount >= 0, 'optimize() produces valid index count');
-
-    // Test optimize without camera (no back-face culling)
-    var optimizedNoCam = mo.optimize(cubeGeo);
-    F.assert(optimizedNoCam.vertexCount > 0, 'optimize() without camera produces valid vertex count');
-
-    F.info('MeshOptimizer tests complete — quad indexed: ' + indexedQuad.vertexCount + ' verts, cube culled: ' + culled.indexCount + ' indices');
-
-    // ============================================================
-    // Section 5: Camera Tests
-    // ============================================================
-    F.section('5. Camera');
-
-    var cam = new Donkeycraft.Camera(70, 0.1, 1000);
-    F.assertType(cam, 'object', 'Camera instance created');
-
-    // Position
-    F.assertType(cam.getPosition(), 'object', 'getPosition() returns Vector3');
-    F.assertEq(cam.getPosition().x, 0, 'Initial position x = 0');
-    F.assertEq(cam.getPosition().y, 64, 'Initial position y = 64');
-    F.assertEq(cam.getPosition().z, 0, 'Initial position z = 0');
-
-    // Rotation
-    F.assertEq(cam.getYaw(), 0, 'Initial yaw = 0');
-    F.assertEq(cam.getPitch(), 0, 'Initial pitch = 0');
-
-    // Set position
-    cam.setPosition(10, 20, 30);
-    F.assertEq(cam.getPosition().x, 10, 'setPosition x works');
-    F.assertEq(cam.getPosition().y, 20, 'setPosition y works');
-    F.assertEq(cam.getPosition().z, 30, 'setPosition z works');
-
-    // Set rotation
-    cam.setRotation(Math.PI / 4, Math.PI / 8);
-    F.assertNear(cam.getYaw(), Math.PI / 4, 0.001, 'setRotation yaw works');
-    F.assertNear(cam.getPitch(), Math.PI / 8, 0.001, 'setRotation pitch works');
-
-    // Apply mouse delta
-    cam.applyMouseDelta(10, 5);
-    F.assert(cam.getYaw() < Math.PI / 4, 'applyMouseDelta reduces yaw (negative rotation)');
-    F.assert(cam.getPitch() < Math.PI / 8, 'applyMouseDelta reduces pitch');
-
-    // Pitch clamping
-    cam.applyMouseDelta(0, -100);
-    F.assert(cam.getPitch() <= Math.PI / 2 - 0.01, 'Pitch clamped to max');
-    cam.applyMouseDelta(0, 100);
-    F.assert(cam.getPitch() >= -Math.PI / 2 + 0.01, 'Pitch clamped to min');
-
-    // Direction vectors
-    cam.setRotation(0, 0);
-    var fwd = cam.getForward();
-    F.assertType(fwd, 'object', 'getForward() returns Vector3');
-    F.assertNear(fwd.x, 0, 0.01, 'Forward X at yaw=0 ≈ 0');
-    F.assertNear(fwd.z, -1, 0.01, 'Forward Z at yaw=0 ≈ -1');
-
-    var right = cam.getRight();
-    F.assertType(right, 'object', 'getRight() returns Vector3');
-    F.assertNear(right.x, 1, 0.01, 'Right X at yaw=0 ≈ 1');
-    F.assertNear(right.z, 0, 0.01, 'Right Z at yaw=0 ≈ 0');
-
-    var up = cam.getUp();
-    F.assertType(up, 'object', 'getUp() returns Vector3');
-    F.assertNear(up.y, 1, 0.01, 'Up Y ≈ 1');
-
-    // 3D forward (with pitch)
-    cam.setRotation(0, -Math.PI / 4);
-    var fwd3d = cam.getForward3D();
-    F.assert(fwd3d.y > 0, '3D forward Y > 0 when looking up');
-
-    // Target
-    var target = cam.getTarget();
-    F.assertType(target, 'object', 'getTarget() returns Vector3');
-
-    // Matrices
-    cam.setAspect(16 / 9);
-    F.assertEq(cam.getAspect(), 16 / 9, 'getAspect() returns correct value');
-
-    var proj = cam.getProjection();
-    F.assertType(proj, 'object', 'getProjection() returns Matrix4');
-
-    var view = cam.getView();
-    F.assertType(view, 'object', 'getView() returns Matrix4');
-
-    var mats = cam.getMatrices();
-    F.assertType(mats.projection, 'object', 'getMatrices().projection is object');
-    F.assertType(mats.view, 'object', 'getMatrices().view is object');
-
-    // Movement
-    cam.setPosition(0, 0, 0);
-    cam.setRotation(0, 0);
-    cam.moveForward(5);
-    F.assertNear(cam.getPosition().z, -5, 0.01, 'moveForward moves in -Z direction');
-
-    cam.setPosition(0, 0, 0);
-    cam.moveRight(5);
-    F.assertNear(cam.getPosition().x, 5, 0.01, 'moveRight moves in +X direction');
-
-    cam.moveUp(3);
-    F.assertEq(cam.getPosition().y, 3, 'moveUp increases Y');
-
-    // moveForward3D / moveRight3D
-    cam.setPosition(0, 0, 0);
-    cam.setRotation(0, -Math.PI / 4);
-    cam.moveForward3D(10);
-    F.assert(cam.getPosition().y > 0, 'moveForward3D moves up when looking up');
-
-    cam.setPosition(0, 0, 0);
-    cam.setRotation(Math.PI / 2, 0);
-    cam.moveRight3D(5);
-    F.assert(cam.getPosition().z < 0, 'moveRight3D moves in -Z at yaw=90°');
-
-    // Reset
-    cam.reset();
-    F.assertEq(cam.getPosition().x, 0, 'reset x = 0');
-    F.assertEq(cam.getPosition().y, 64, 'reset y = 64');
-    F.assertEq(cam.getYaw(), 0, 'reset yaw = 0');
-
-    // FOV config
-    var cam2 = new Donkeycraft.Camera(90, 0.1, 1000);
-    F.assertEq(cam2._fov, 90, 'Custom FOV accepted');
-    var cam3 = new Donkeycraft.Camera();
-    F.assertType(cam3._fov, 'number', 'Default FOV from Config is number');
-
-    F.info('Camera tests complete — position: (' + cam.getPosition().x + ', ' + cam.getPosition().y + ', ' + cam.getPosition().z + ')');
-
-    // ============================================================
-    // Section 6: Fog Tests
-    // ============================================================
-    F.section('6. Fog');
-
-    var fog = new Donkeycraft.Fog();
-    F.assertType(fog, 'object', 'Fog instance created');
-
-    F.assertEq(fog.getDensity(), 0.015, 'Default density = 0.015');
-    F.assert(fog.isEnabled(), 'Fog enabled by default');
-
-    fog.setDensity(0.05);
-    F.assertEq(fog.getDensity(), 0.05, 'setDensity works');
-
-    fog.setEnabled(false);
-    F.assert(!fog.isEnabled(), 'Fog disabled');
-    fog.setEnabled(true);
-    F.assert(fog.isEnabled(), 'Fog re-enabled');
-
-    fog.setColor(0.2, 0.3, 0.4);
-    var col = fog.getColor();
-    F.assertEq(col.r, 0.2, 'Fog color r = 0.2');
-    F.assertEq(col.g, 0.3, 'Fog color g = 0.3');
-    F.assertEq(col.b, 0.4, 'Fog color b = 0.4');
-
-    fog.updateFromSky({ r: 0.5, g: 0.6, b: 0.7 });
-    var col2 = fog.getColor();
-    F.assertEq(col2.r, 0.5, 'updateFromSky sets r');
-    F.assertEq(col2.g, 0.6, 'updateFromSky sets g');
-    F.assertEq(col2.b, 0.7, 'updateFromSky sets b');
-
-    // applyToFogUniforms (requires shader manager)
-    if (testGl) {
-        var smFog = new Donkeycraft.ShaderManager(testGl);
-        var fogVS = [
-            'precision mediump float;',
-            'attribute vec3 aPos;',
-            'uniform float uFogDensity;',
-            'void main() {',
-            '  gl_Position = vec4(aPos, 1.0);',
-            '  gl_Position += uFogDensity * 0.0;',
-            '}'
-        ].join('\n');
-
-        var fogFS = [
-            'precision mediump float;',
-            'uniform vec3 uFogColor;',
-            'uniform float uFogDensity;',
-            'void main() {',
-            '  gl_FragColor = vec4(uFogColor, 1.0 - uFogDensity);',
-            '}'
-        ].join('\n');
-
-        smFog.createProgram('fogTest', fogVS, fogFS);
-        smFog.use('fogTest');
-
-        var applyResult = fog.applyToFogUniforms(smFog);
-        F.assert(applyResult, 'applyToFogUniforms returns true when uniforms set');
-
-        smFog.destroy();
-    } else {
-        F.info('WebGL not available — applyToFogUniforms test skipped');
-    }
-
-    // ============================================================
-    // Section 7: Lighting Tests
-    // ============================================================
-    F.section('7. Lighting');
-
-    var light = new Donkeycraft.Lighting();
-    F.assertType(light, 'object', 'Lighting instance created');
-
-    light.setTimeOfDay(0.5);
-    F.assertNear(light.getTimeOfDay(), 0.5, 0.001, 'Time of day = 0.5 (noon)');
-
-    light.setTimeOfDay(0.25);
-    F.assertNear(light.getTimeOfDay(), 0.25, 0.001, 'Time of day = 0.25 (sunrise)');
-
-    // Sun intensity at noon
-    light.setTimeOfDay(0.5);
-    var sunNoon = light.getSunIntensity();
-    F.assert(sunNoon > 0.9, 'Sun intensity at noon > 0.9 (got ' + sunNoon.toFixed(3) + ')');
-
-    // Sun intensity at midnight
-    light.setTimeOfDay(0.0);
-    var sunMid = light.getSunIntensity();
-    F.assert(sunMid === 0, 'Sun intensity at midnight = 0');
-
-    // Sun intensity at sunrise
-    light.setTimeOfDay(0.3);
-    var sunRise = light.getSunIntensity();
-    F.assert(sunRise > 0 && sunRise < 0.5, 'Sun intensity at sunrise between 0 and 0.5 (got ' + sunRise.toFixed(3) + ')');
-
-    // Ambient light
-    light.setTimeOfDay(0.5);
-    var ambNoon = light.getAmbientLight();
-    F.assert(ambNoon > 0.9, 'Ambient at noon > 0.9 (got ' + ambNoon.toFixed(3) + ')');
-
-    light.setTimeOfDay(0.0);
-    var ambMid = light.getAmbientLight();
-    F.assertNear(ambMid, 0.08, 0.01, 'Ambient at midnight ≈ 0.08 (got ' + ambMid.toFixed(3) + ')');
-
-    // Sky color
-    light.setTimeOfDay(0.5);
-    var skyDay = light.getSkyColor();
-    F.assert(skyDay.r > 0 && skyDay.r <= 1, 'Day sky r in [0,1]');
-    F.assert(skyDay.g > 0 && skyDay.g <= 1, 'Day sky g in [0,1]');
-    F.assert(skyDay.b >= 0 && skyDay.b <= 1, 'Day sky b in [0,1]');
-
-    light.setTimeOfDay(0.0);
-    var skyNight = light.getSkyColor();
-    F.assert(skyNight.r < 0.1, 'Night sky r < 0.1 (got ' + skyNight.r.toFixed(3) + ')');
-    F.assert(skyNight.g < 0.1, 'Night sky g < 0.1');
-
-    // Sunrise sky color
-    light.setTimeOfDay(0.25);
-    var skySunrise = light.getSkyColor();
-    F.assert(skySunrise.r > 0 && skySunrise.r < 1, 'Sunrise sky r in [0,1]');
-
-    // Sun direction
-    light.setTimeOfDay(0.5);
-    var sunDir = light.getSunDirection();
-    F.assertType(sunDir, 'object', 'getSunDirection() returns Vector3');
-
-    // applyToShader — use all uniforms in fragment output so WebGL doesn't optimize them out.
-    if (testGl) {
-        var smLight = new Donkeycraft.ShaderManager(testGl);
-        var vSrcLight = [
-            'precision mediump float;',
-            'attribute vec3 aPos;',
-            'uniform float uSunIntensity;',
-            'uniform float uAmbient;',
-            'uniform float uLightFactor;',
-            'uniform vec3 uSkyColor;',
-            'uniform vec3 uSunDirection;',
-            'void main() {',
-            '  gl_Position = vec4(aPos, 1.0);',
-            '  gl_Position += uSunIntensity * 0.0;',
-            '  gl_Position += uLightFactor * 0.0;',
-            '}'
-        ].join('\n');
-
-        var fSrcLight = [
-            'precision mediump float;',
-            'uniform float uSunIntensity;',
-            'uniform float uAmbient;',
-            'uniform float uLightFactor;',
-            'uniform vec3 uSkyColor;',
-            'uniform vec3 uSunDirection;',
-            'void main() {',
-            '  vec3 dir = normalize(uSunDirection);',
-            '  float dotL = max(dot(dir, vec3(0.0, 1.0, 0.0)), 0.0);',
-            '  float mixed = uSunIntensity * uAmbient * (0.5 + 0.5 * dotL) * uLightFactor;',
-            '  gl_FragColor = vec4(uSkyColor * mixed, 1.0);',
-            '}'
-        ].join('\n');
-
-        smLight.createProgram('lightTest', vSrcLight, fSrcLight);
-        smLight.use('lightTest');
-
-        var applyLightResult = light.applyToShader(smLight);
-        F.assert(applyLightResult, 'applyToShader returns true');
-
-        smLight.destroy();
-    } else {
-        F.info('WebGL not available — applyToShader test skipped');
-    }
-
-    // Time wrapping
-    light.setTimeOfDay(1.5);
-    F.assertNear(light.getTimeOfDay(), 0.5, 0.001, 'Time of day wraps at 1.5 → 0.5');
-    light.setTimeOfDay(-0.25);
-    F.assertNear(light.getTimeOfDay(), 0.75, 0.001, 'Negative time wraps: -0.25 → 0.75');
-
-    // ============================================================
-    // Section 8: Fog + Lighting Integration
-    // ============================================================
-    F.section('8. Fog + Lighting Integration');
-
-    var fog2 = new Donkeycraft.Fog();
-    var light2 = new Donkeycraft.Lighting();
-
-    light2.setTimeOfDay(0.5);
-    var skyCol = light2.getSkyColor();
-    fog2.updateFromSky(skyCol);
-    var fogCol = fog2.getColor();
-    F.assertNear(fogCol.r, skyCol.r, 0.01, 'Fog color matches sky r after updateFromSky');
-    F.assertNear(fogCol.g, skyCol.g, 0.01, 'Fog color matches sky g');
-    F.assertNear(fogCol.b, skyCol.b, 0.01, 'Fog color matches sky b');
-
-    // Night cycle
-    light2.setTimeOfDay(0.0);
-    var nightSky = light2.getSkyColor();
-    fog2.updateFromSky(nightSky);
-    var nightFog = fog2.getColor();
-    F.assert(nightFog.r < 0.1, 'Night fog r < 0.1');
-    F.assert(nightFog.g < 0.1, 'Night fog g < 0.1');
-
-    F.info('Fog+Lighting integration tests complete — day fog: (' + fogCol.r.toFixed(2) + ', ' + fogCol.g.toFixed(2) + ', ' + fogCol.b.toFixed(2) + '), night fog: (' + nightFog.r.toFixed(2) + ', ' + nightFog.g.toFixed(2) + ', ' + nightFog.b.toFixed(2) + ')');
-
-    // ============================================================
-    // Section 9: Weather System Tests
-    // ============================================================
-    F.section('9. Weather System');
-
-    var weather = new Donkeycraft.Weather();
-    F.assertType(weather, 'object', 'Weather instance created');
-
-    // Initial state
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Initial weather is CLEAR');
-    F.assert(!weather.isRaining(), 'Not raining initially');
-    F.assert(!weather.isThundering(), 'Not thundering initially');
-    F.assert(!weather.isSnowing(), 'Not snowing initially');
-    F.assertEq(weather.getParticleDensity(), 0, 'Clear particle density = 0');
-
-    // Set rain
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_RAIN, 'Weather is RAIN');
-    F.assert(weather.isRaining(), 'isRaining() = true');
-    F.assert(!weather.isThundering(), 'isThundering() = false for rain');
-    F.assert(weather.getParticleDensity() > 0, 'Rain particle density > 0');
-
-    // Set thunder (must follow rain)
-    weather.setWeather(Donkeycraft.WEATHER_THUNDER);
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_THUNDER, 'Weather is THUNDER');
-    F.assert(weather.isThundering(), 'isThundering() = true');
-    F.assert(weather.isRaining(), 'isRaining() = true for thunder');
-
-    // Set snow
-    weather.setWeather(Donkeycraft.WEATHER_SNOW);
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_SNOW, 'Weather is SNOW');
-    F.assert(weather.isSnowing(), 'isSnowing() = true');
-
-    // Invalid state falls back to clear
-    weather.setWeather('invalid_state');
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Invalid weather falls back to CLEAR');
-
-    // Tick
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    weather._weatherTimer = 50;
-    weather.tick();
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_RAIN, 'Weather unchanged below minimum tick');
-
-    // Force change
-    weather.forceChange(Donkeycraft.WEATHER_SNOW);
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_SNOW, 'forceChange sets SNOW');
-
-    // Clear
-    weather.clear();
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'clear() sets CLEAR');
-
-    // Thunder intensity — set RAIN first (thunder follows rain), then tick to trigger fluctuation
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    weather.setWeather(Donkeycraft.WEATHER_THUNDER);
-    weather.tick();
-    F.assert(weather.getThunderIntensity() >= 0.7 && weather.getThunderIntensity() <= 1.0, 'Thunder intensity in [0.7, 1.0]');
-
-    // setThunderIntensity
-    weather.setThunderIntensity(0.5);
-    F.assertEq(weather.getThunderIntensity(), 0.5, 'setThunderIntensity works');
-
-    // Duration
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    var duration = weather.getWeatherDuration();
-    F.assert(duration > 0, 'Weather duration > 0');
-
-    weather.setWeatherDuration(1000);
-    F.assertEq(weather.getWeatherDuration(), 1000, 'setWeatherDuration works');
-
-    // Biome weather restrictions
-    var desertRestrictions = weather.getBiomeWeatherRestrictions(2);
-    F.assert(!desertRestrictions.canRain, 'Desert cannot rain');
-    F.assert(!desertRestrictions.canSnow, 'Desert cannot snow');
-
-    var oceanRestrictions = weather.getBiomeWeatherRestrictions(6);
-    F.assert(oceanRestrictions.canRain, 'Ocean can rain');
-    F.assert(!oceanRestrictions.canSnow, 'Ocean cannot snow');
-
-    // Custom restriction
-    weather.setBiomeWeatherRestriction(99, { canRain: true, canSnow: false });
-    var custom = weather.getBiomeWeatherRestrictions(99);
-    F.assert(custom.canRain, 'Custom biome can rain');
-    F.assert(!custom.canSnow, 'Custom biome cannot snow');
-
-    // Serialization
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    var serialized = weather.serialize();
-    F.assertEq(serialized.weatherState, Donkeycraft.WEATHER_RAIN, 'Serialized weather state is RAIN');
-    F.assertType(serialized.weatherDuration, 'number', 'Serialized duration is number');
-
-    // Deserialization
-    var weather2 = new Donkeycraft.Weather();
-    weather2.deserialize({ weatherState: Donkeycraft.WEATHER_SNOW, weatherDuration: 5000, weatherTimer: 100 });
-    F.assertEq(weather2.getWeather(), Donkeycraft.WEATHER_SNOW, 'Deserialized weather state is SNOW');
-
-    // Constants
-    F.assertEq(Donkeycraft.WEATHER_CLEAR, 'clear', 'WEATHER_CLEAR constant');
-    F.assertEq(Donkeycraft.WEATHER_RAIN, 'rain', 'WEATHER_RAIN constant');
-    F.assertEq(Donkeycraft.WEATHER_THUNDER, 'thunder', 'WEATHER_THUNDER constant');
-    F.assertEq(Donkeycraft.WEATHER_SNOW, 'snow', 'WEATHER_SNOW constant');
-
-    // Destroy
-    weather.destroy();
-    F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Weather cleared after destroy');
-
-    F.info('Weather system tests complete — all states and restrictions verified');
-
-    // ============================================================
-    // Section 10: Math Utility Integration (used by rendering)
-    // ============================================================
-    F.section('10. Math Utilities (Vector3, Matrix4)');
-
-    var v = new Donkeycraft.Vector3(1, 2, 3);
-    F.assertType(v, 'object', 'Vector3 instance created');
-    F.assertEq(v.x, 1, 'Vector3 x = 1');
-    F.assertEq(v.y, 2, 'Vector3 y = 2');
-    F.assertEq(v.z, 3, 'Vector3 z = 3');
-
-    v.set(4, 5, 6);
-    F.assertEq(v.x, 4, 'Vector3.set x works');
-    F.assertEq(v.y, 5, 'Vector3.set y works');
-    F.assertEq(v.z, 6, 'Vector3.set z works');
-
-    var v2 = new Donkeycraft.Vector3(3, 0, 0);
-    var v2norm = v2.normalized();
-    F.assertNear(v2norm.length(), 1, 0.001, 'normalized vector has length ≈ 1');
-
-    var a = new Donkeycraft.Vector3(1, 0, 0);
-    var b = new Donkeycraft.Vector3(0, 1, 0);
-    F.assertEq(a.dot(b), 0, 'Orthogonal vectors dot product = 0');
-
-    var c = new Donkeycraft.Vector3(1, 0, 0);
-    F.assertEq(a.dot(c), 1, 'Same direction vectors dot product = 1');
-
-    var d = new Donkeycraft.Vector3(1, 0, 0);
-    var e = new Donkeycraft.Vector3(0, 1, 0);
-    var crossResult = d.cross(e);
-    F.assertNear(crossResult.x, 0, 0.01, 'cross X ≈ 0');
-    F.assertNear(crossResult.y, 0, 0.01, 'cross Y ≈ 0');
-    F.assertNear(crossResult.z, 1, 0.01, 'cross Z ≈ 1');
-
-    var f = new Donkeycraft.Vector3(3, 4, 0);
-    F.assertNear(f.length(), 5, 0.01, 'Vector3(3,4,0).length() = 5');
-
-    var g = new Donkeycraft.Vector3(10, 0, 0);
-    g.normalize();
-    F.assertNear(g.x, 1, 0.01, 'normalize(10,0,0) = (1,0,0)');
-
-    // Matrix4
-    var identity = Donkeycraft.Matrix4.createIdentity();
-    F.assertType(identity, 'object', 'Matrix4.createIdentity() returns object');
-    F.assertType(identity.getData, 'function', 'Matrix4 has getData() method');
-
-    var perspective = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, 16/9, 0.1, 1000);
-    F.assertType(perspective, 'object', 'createPerspective returns object');
-    F.assertType(perspective.getData, 'function', 'perspective has getData()');
-
-    var lookAt = Donkeycraft.Matrix4.createLookAt(
-        new Donkeycraft.Vector3(0, 64, 0),
-        new Donkeycraft.Vector3(0, 64, -10),
-        new Donkeycraft.Vector3(0, 1, 0)
-    );
-    F.assertType(lookAt, 'object', 'createLookAt returns object');
-
-    var ortho = Donkeycraft.Matrix4.createOrthographic(-16/9, 16/9, -1, 1, -1, 1);
-    F.assertType(ortho, 'object', 'createOrthographic returns object');
-
-    var translation = Donkeycraft.Matrix4.createTranslation(10, 20, 30);
-    F.assertType(translation, 'object', 'createTranslation returns object');
-
-    var scale = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    F.assertType(scale, 'object', 'createScale returns object');
-
-    var rotation = Donkeycraft.Matrix4.createRotation(Math.PI / 4, new Donkeycraft.Vector3(0, 1, 0));
-    F.assertType(rotation, 'object', 'createRotation returns object');
-
-    var m1 = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
-    var m2 = Donkeycraft.Matrix4.createScale(2, 2, 2);
-    var multiplied = Donkeycraft.Matrix4.multiply(m1, m2);
-    F.assertType(multiplied, 'object', 'Matrix4.multiply returns object');
-
-    // Utility functions
-    F.assertEq(Donkeycraft.lerp(0, 10, 0), 0, 'lerp(0,10,0) = 0');
-    F.assertEq(Donkeycraft.lerp(0, 10, 1), 10, 'lerp(0,10,1) = 10');
-    F.assertEq(Donkeycraft.lerp(0, 10, 0.5), 5, 'lerp(0,10,0.5) = 5');
-
-    F.assertEq(Donkeycraft.clamp(-5, 0, 10), 0, 'clamp(-5,0,10) = 0');
-    F.assertEq(Donkeycraft.clamp(5, 0, 10), 5, 'clamp(5,0,10) = 5');
-    F.assertEq(Donkeycraft.clamp(15, 0, 10), 10, 'clamp(15,0,10) = 10');
-
-    if (typeof Donkeycraft.noise2D === 'function') {
-        F.assertType(Donkeycraft.noise2D(0, 0), 'number', 'noise2D returns number');
-        var nVal = Donkeycraft.noise2D(10, 20);
-        F.assert(nVal >= -1 && nVal <= 1, 'noise2D returns value in [-1, 1]');
-    } else {
-        F.info('noise2D not available (may not be implemented yet)');
-    }
-
-    if (typeof Donkeycraft.noise3D === 'function') {
-        F.assertType(Donkeycraft.noise3D(0, 0, 0), 'number', 'noise3D returns number');
-    } else {
-        F.info('noise3D not available (may not be implemented yet)');
-    }
-
-    if (typeof Donkeycraft.perlin2D === 'function') {
-        F.assertType(Donkeycraft.perlin2D(0, 0), 'number', 'perlin2D returns number');
-    } else {
-        F.info('perlin2D not available (may not be implemented yet)');
-    }
-
-    F.info('Math utility tests complete — Vector3, Matrix4, lerp, clamp verified');
-
-    // ============================================================
-    // Section 11: IIFE & Namespace Compliance
-    // ============================================================
-    F.section('11. IIFE & Namespace Compliance');
-
-    var renderClasses = [
-        'GLContext', 'ShaderManager', 'GeometryBuilder', 'MeshOptimizer',
-        'ChunkMesh', 'TerrainRenderer', 'Camera', 'Fog', 'Sky',
-        'Lighting', 'HandRenderer', 'BreakParticles', 'GUIRenderer',
-        'Weather'
-    ];
-
-    var allRegistered = true;
-    for (var i = 0; i < renderClasses.length; i++) {
-        var cls = renderClasses[i];
-        if (typeof Donkeycraft[cls] !== 'function') {
-            F.assert(false, cls + ' registered on Donkeycraft namespace');
-            allRegistered = false;
-        }
-    }
-    if (allRegistered) {
-        F.assert(true, 'All ' + renderClasses.length + ' render classes registered on Donkeycraft namespace');
-    }
-
-    F.assert(typeof Donkeycraft.GLContext === 'function', 'GLContext is a function (constructor)');
-    F.assert(typeof Donkeycraft.ShaderManager === 'function', 'ShaderManager is a function (constructor)');
-    F.assert(typeof Donkeycraft.Camera === 'function', 'Camera is a function (constructor)');
-
-    F.assertType(Donkeycraft.WEATHER_CLEAR, 'string', 'WEATHER_CLEAR is string');
-    F.assertType(Donkeycraft.WEATHER_RAIN, 'string', 'WEATHER_RAIN is string');
-    F.assertType(Donkeycraft.WEATHER_THUNDER, 'string', 'WEATHER_THUNDER is string');
-    F.assertType(Donkeycraft.WEATHER_SNOW, 'string', 'WEATHER_SNOW is string');
-
-    F.info('IIFE & namespace compliance verified for all render modules');
-
-    // ============================================================
-    // Section 12: Edge Cases & Error Handling
-    // ============================================================
-    F.section('12. Edge Cases & Error Handling');
-
-    var airGetBlock = function() { return 0; };
-    var airChunk = gb.buildChunk(0, 0, airGetBlock);
-    F.assertEq(airChunk.vertexCount, 0, 'All-air chunk has 0 vertices');
-    F.assertEq(airChunk.indexCount, 0, 'All-air chunk has 0 indices');
-
-    var singleBlockGetBlock = function(x, y, z) {
-        return (x === 8 && y === 10 && z === 8) ? 1 : 0;
-    };
-    var singleChunk = gb.buildChunk(0, 0, singleBlockGetBlock);
-    F.assert(singleChunk.vertexCount > 0, 'Single block chunk has vertices');
-
-    var emptyGeo = { vertices: new Float32Array(0), indices: new Uint32Array(0), vertexCount: 0, indexCount: 0 };
-    var optimizedEmpty = mo.optimize(emptyGeo);
-    F.assertEq(optimizedEmpty.vertexCount, 0, 'Optimized empty geometry has 0 vertices');
-
-    var wideCam = new Donkeycraft.Camera(120, 0.1, 1000);
-    F.assertType(wideCam.getProjection(), 'object', 'Wide FOV camera projection works');
-
-    var thinFog = new Donkeycraft.Fog();
-    thinFog.setDensity(0);
-    F.assertEq(thinFog.getDensity(), 0, 'Zero fog density accepted');
-
-    light.setTimeOfDay(0.99);
-    F.assert(light.getSunIntensity() >= 0, 'Sun intensity valid at t=0.99');
-    light.setTimeOfDay(0.01);
-    F.assert(light.getSunIntensity() === 0, 'Sun intensity = 0 at t=0.01');
-
-    var desertBiome = { isDesert: true };
-    weather.setWeather(Donkeycraft.WEATHER_RAIN);
-    weather._weatherTimer = 200;
-    weather.tick(desertBiome);
-    F.info('Desert biome weather after tick: ' + weather.getWeather());
-
-    F.info('Edge case tests complete — all boundary conditions handled gracefully');
-
-    // ============================================================
-    // Finish: render summary
-    // ============================================================
-    F.finishTests();
-
-})();
-</script>
+    <h1>Donkeycraft — WebGL Rendering Engine Tests</h1>
+    <nav style="margin-bottom: 12px;"><a href="index.html"
+            style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+    <div class="subtitle">Comprehensive functional tests for all 14 WebGL rendering modules: GLContext, ShaderManager,
+        GeometryBuilder, MeshOptimizer, ChunkMesh, TerrainRenderer, Camera, Fog, Sky, Lighting, HandRenderer,
+        BreakParticles, GUIRenderer, Weather.</div>
+
+    <!-- Results container -->
+    <div id="results"></div>
+
+    <!-- Hidden canvas for WebGL context creation in tests -->
+    <canvas id="test-canvas" width="320" height="180" style="display:none;"></canvas>
+
+    <!-- Load project scripts in dependency order -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+    <script src="../src/core/timer.js"></script>
+    <script src="../src/core/input.js"></script>
+    <script src="../src/core/math-utils.js"></script>
+    <script src="../src/core/audio.js"></script>
+
+    <!-- Rendering engine scripts -->
+    <script src="../src/render/gl-context.js"></script>
+    <script src="../src/render/shader-manager.js"></script>
+    <script src="../src/render/geometry-builder.js"></script>
+    <script src="../src/render/mesh-optimizer.js"></script>
+    <script src="../src/render/chunk-mesh.js"></script>
+    <script src="../src/render/terrain-renderer.js"></script>
+    <script src="../src/render/camera.js"></script>
+    <script src="../src/render/fog.js"></script>
+    <script src="../src/render/sky.js"></script>
+    <script src="../src/render/lighting.js"></script>
+    <script src="../src/render/hand-renderer.js"></script>
+    <script src="../src/render/break-particles.js"></script>
+    <script src="../src/render/gui-renderer.js"></script>
+    <script src="../src/render/weather.js"></script>
+
+    <!-- Load shared test framework -->
+    <script src="test.js"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            var F = TestFramework;
+            F.init('results');
+
+            var canvas = document.getElementById('test-canvas');
+            var gl = null;
+
+            // Try to get WebGL context for tests that need it
+            try {
+                if (canvas.getContext) {
+                    gl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: true });
+                }
+            } catch (e) {
+                // WebGL not available
+            }
+
+            var hasWebGL = gl !== null;
+
+            // ============================================================
+            // Section 1: GLContext Tests
+            // ============================================================
+            F.section('1. GLContext');
+
+            if (hasWebGL) {
+                var ctx = new Donkeycraft.GLContext(canvas);
+                F.assertType(ctx, 'object', 'GLContext instance created');
+                F.assert(ctx.isValid(), 'GLContext is valid');
+                F.assert(!ctx.isContextLost(), 'Context not lost');
+                F.assertType(ctx.getGL(), 'object', 'getGL() returns WebGL context');
+                F.assertType(ctx.getContext(), 'object', 'getContext() returns WebGL context');
+                F.assertEq(ctx.getGL(), ctx.getContext(), 'getGL() === getContext()');
+                F.assertType(ctx.getMaxTextureSize(), 'number', 'getMaxTextureSize() returns number');
+                F.assert(ctx.getMaxTextureSize() > 0, 'getMaxTextureSize() > 0');
+                F.assertType(ctx.getMaxVertexUniforms(), 'number', 'getMaxVertexUniforms() returns number');
+                F.assert(ctx.getMaxVertexUniforms() > 0, 'getMaxVertexUniforms() > 0');
+
+                // Capabilities
+                var caps = ctx.getCapabilities();
+                F.assertType(caps, 'object', 'getCapabilities() returns object');
+                F.assertType(caps.maxTextureSize, 'number', 'capabilities.maxTextureSize is number');
+                F.assertType(caps.renderer, 'string', 'capabilities.renderer is string');
+
+                // Viewport
+                ctx.setViewport(320, 180);
+                F.info('Viewport set to 320x180');
+
+                // Error handling
+                ctx.resetErrorCount();
+                F.assertEq(ctx.getErrorCount(), 0, 'getErrorCount() starts at 0');
+                var err = ctx.getError();
+                F.assert(err === null || typeof err === 'number', 'getError() returns null or number');
+
+                // Extension support check
+                F.assertType(ctx.isExtensionSupported('OES_standard_derivatives'), 'boolean', 'isExtensionSupported() returns boolean');
+                F.assertType(ctx.getExtension('OES_standard_derivatives'), 'object', 'getExtension() returns object or null');
+
+                // Context attributes
+                var attrs = ctx.getContextAttributes();
+                F.assert(attrs !== null, 'getContextAttributes() is not null');
+                F.assert(!attrs.alpha, 'Context has alpha: false');
+                F.assert(!attrs.antialias, 'Context has antialias: false');
+                F.assert(!!attrs.depth, 'Context has depth: true');
+
+                // Context restore support
+                F.assertType(ctx.hasContextRestoreSupport(), 'boolean', 'hasContextRestoreSupport() returns boolean');
+
+                // Destroy
+                ctx.destroy();
+                F.assert(!ctx.isValid(), 'GLContext is invalid after destroy');
+                F.assert(ctx.isContextLost(), 'Context is lost after destroy');
+            } else {
+                F.info('WebGL not available — GLContext tests skipped');
+            }
+
+            // Recreate WebGL context after GLContext.destroy() invalidates it.
+            // Subsequent tests need a fresh valid context.
+            var testGl = null;
+            try {
+                if (canvas.getContext) {
+                    testGl = canvas.getContext('webgl', { alpha: false, antialias: false, depth: true });
+                }
+            } catch (e2) { }
+
+            // ============================================================
+            // Section 2: ShaderManager Tests
+            // ============================================================
+            F.section('2. ShaderManager');
+
+            if (testGl) {
+                var sm = new Donkeycraft.ShaderManager(testGl);
+                F.assertType(sm, 'object', 'ShaderManager instance created');
+                F.assertType(sm.getStats(), 'object', 'getStats() returns object');
+                F.assertEq(sm.getStats().shaders, 0, 'Initial shader count is 0');
+                F.assertEq(sm.getStats().programs, 0, 'Initial program count is 0');
+
+                // Test shader compilation with a simple pass-through shader
+                var vertSrc = 'attribute vec3 aPos; void main() { gl_Position = vec4(aPos, 1.0); }';
+                var fragSrc = 'precision mediump float; void main() { gl_FragColor = vec4(1.0); }';
+
+                var vertShader = sm.compileShader(vertSrc, 'vertex');
+                F.assert(vertShader !== null, 'Vertex shader compiled successfully');
+                F.assertEq(sm.getStats().shaders, 1, 'Shader count incremented to 1');
+
+                var fragShader = sm.compileShader(fragSrc, 'fragment');
+                F.assert(fragShader !== null, 'Fragment shader compiled successfully');
+                F.assertEq(sm.getStats().shaders, 2, 'Shader count incremented to 2');
+
+                // Test program linking
+                var prog = sm.linkProgram(vertShader, fragShader);
+                F.assert(prog !== null, 'Program linked successfully');
+                F.assertEq(sm.getStats().programs, 1, 'Program count incremented to 1');
+
+                // Test program creation via createProgram
+                var testProg = sm.createProgram('test', vertSrc, fragSrc);
+                F.assert(testProg !== null, 'createProgram() returns valid program');
+                F.assert(sm.getProgram('test') !== null, 'getProgram("test") returns program');
+
+                // Test use/useProgram
+                F.assert(sm.use('test'), 'use("test") returns true');
+                F.assert(sm.useProgram(testProg), 'useProgram(prog) returns true');
+
+                // Create a full-featured test shader that declares all uniform types being tested.
+                var fullVertSrc = [
+                    'attribute vec3 aPos;',
+                    'uniform mat4 uTestMatrix;',
+                    'void main() { gl_Position = uTestMatrix * vec4(aPos, 1.0); }'
+                ].join('\n');
+
+                var fullFragSrc = [
+                    'precision mediump float;',
+                    'uniform float uTestFloat;',
+                    'uniform int uTestInt;',
+                    'uniform vec2 uTestVec2;',
+                    'uniform vec3 uTestVec3;',
+                    'uniform vec4 uTestVec4;',
+                    'uniform sampler2D uTestSampler;',
+                    'void main() {',
+                    '  float f = uTestFloat;',
+                    '  int i = uTestInt;',
+                    '  vec2 v2 = uTestVec2;',
+                    '  vec3 v3 = uTestVec3;',
+                    '  vec4 v4 = uTestVec4;',
+                    '  vec4 tc = texture2D(uTestSampler, v2);',
+                    '  gl_FragColor = tc * f * float(i) * v4 * vec4(v3, 1.0);',
+                    '}'
+                ].join('\n');
+
+                var fullProg = sm.createProgram('fullTest', fullVertSrc, fullFragSrc);
+                F.assert(fullProg !== null, 'Full-featured test program compiled and linked');
+                F.assert(sm.use('fullTest'), 'use("fullTest") returns true');
+
+                // Now test all uniform setters — they should find their uniforms in the shader.
+                var mat4Val = Donkeycraft.Matrix4.createIdentity();
+                F.assert(sm.setMat4('uTestMatrix', mat4Val), 'setMat4 works with declared uniform');
+
+                F.assert(sm.setFloat('uTestFloat', 0.5), 'setFloat works with declared uniform');
+                F.assert(sm.setInt('uTestInt', 1), 'setInt works with declared uniform');
+                F.assert(sm.setVec2('uTestVec2', 0.5, 0.5), 'setVec2 works with declared uniform');
+                F.assert(sm.setVec3('uTestVec3', 1, 2, 3), 'setVec3 works with declared uniform');
+                F.assert(sm.setVec4('uTestVec4', 1, 2, 3, 4), 'setVec4 works with declared uniform');
+
+                // Test sampler — bind a texture and set the uniform
+                testGl.activeTexture(testGl.TEXTURE0);
+                var placeholderTex = testGl.createTexture();
+                testGl.bindTexture(testGl.TEXTURE_2D, placeholderTex);
+                F.assert(sm.setSampler('uTestSampler', 0), 'setSampler works with declared uniform');
+
+                // Test getAttribute (returns -1 if not found)
+                F.assertEq(sm.getAttribute('nonexistent'), -1, 'getAttribute("nonexistent") returns -1');
+
+                // Test getUniformLocation (should find uTestFloat since we're on fullTest program)
+                F.assert(sm.getUniformLocation('uTestFloat') !== null, 'getUniformLocation returns location for existing uniform');
+
+                // Destroy
+                sm.destroy();
+                F.assertEq(sm.getStats().shaders, 0, 'Shader count reset after destroy');
+                F.assertEq(sm.getStats().programs, 0, 'Program count reset after destroy');
+                F.assert(Object.keys(sm._programs || {}).length === 0, 'Programs cleared after destroy');
+
+                testGl.deleteTexture(placeholderTex);
+            } else {
+                F.info('WebGL not available — ShaderManager tests skipped');
+            }
+
+            // ============================================================
+            // Section 3: GeometryBuilder Tests
+            // ============================================================
+            F.section('3. GeometryBuilder');
+
+            var gb = new Donkeycraft.GeometryBuilder();
+            F.assertType(gb, 'object', 'GeometryBuilder instance created');
+
+            // Test isTransparent fallback
+            F.assert(!gb.isTransparent(1), 'isTransparent(1) [stone] = false');
+            F.assert(!gb.isTransparent(2), 'isTransparent(2) [grass] = false');
+            F.assert(gb.isTransparent(0), 'isTransparent(0) [air] = true');
+            F.assert(gb.isTransparent(9), 'isTransparent(9) [water] = true');
+
+            // Test buildQuad
+            var quad = gb.buildQuad(1.0, 0.0);
+            F.assertType(quad, 'object', 'buildQuad() returns object');
+            F.assertType(quad.vertices, 'object', 'buildQuad().vertices is Float32Array');
+            F.assertType(quad.indices, 'object', 'buildQuad().indices is Uint16Array');
+            F.assertEq(quad.vertexCount, 4, 'Quad has 4 vertices');
+            F.assertEq(quad.indexCount, 6, 'Quad has 6 indices');
+
+            // Test buildCube
+            var cube = gb.buildCube(1.0, 0.5);
+            F.assertType(cube, 'object', 'buildCube() returns object');
+            F.assertType(cube.vertices, 'object', 'buildCube().vertices is Float32Array');
+            F.assertType(cube.indices, 'object', 'buildCube().indices is Uint16Array');
+            F.assertEq(cube.vertexCount, 24, 'Cube has 24 vertices');
+            F.assertEq(cube.indexCount, 36, 'Cube has 36 indices');
+
+            // Test buildChunk with a simple block world
+            var cs = Donkeycraft.Config.CHUNK_SIZE || 16;
+            var wh = Donkeycraft.Config.WORLD_HEIGHT || 256;
+            var testBlocks = new Array(cs * wh * cs).fill(0);
+            for (var x = 0; x < cs; x++) {
+                for (var z = 0; z < cs; z++) {
+                    testBlocks[x * wh * cs + 10 * cs + z] = 1;
+                }
+            }
+
+            var getBlockFunc = function (lx, y, lz) {
+                return testBlocks[lx * wh * cs + y * cs + lz];
+            };
+
+            var chunkGeo = gb.buildChunk(0, 0, getBlockFunc);
+            F.assertType(chunkGeo, 'object', 'buildChunk() returns object');
+            F.assertType(chunkGeo.vertices, 'object', 'buildChunk().vertices is Float32Array');
+            F.assertType(chunkGeo.indices, 'object', 'buildChunk().indices is Uint32Array');
+            F.assert(chunkGeo.vertexCount > 0, 'buildChunk() produces vertices for stone layer');
+            F.assert(chunkGeo.indexCount > 0, 'buildChunk() produces indices');
+            F.assert(chunkGeo.useUint32 === true, 'buildChunk() uses Uint32 indices');
+
+            F.info('GeometryBuilder tests complete — quad: ' + quad.vertexCount + ' verts, cube: ' + cube.vertexCount + ' verts, chunk: ' + chunkGeo.vertexCount + ' verts');
+
+            // ============================================================
+            // Section 4: MeshOptimizer Tests
+            // ============================================================
+            F.section('4. MeshOptimizer');
+
+            var mo = new Donkeycraft.MeshOptimizer();
+            F.assertType(mo, 'object', 'MeshOptimizer instance created');
+
+            // Test generateIndexBuffer with quad geometry
+            var quadGeo = {
+                vertices: quad.vertices,
+                indices: null,
+                vertexCount: 4,
+                indexCount: 0
+            };
+            var indexedQuad = mo.generateIndexBuffer(quadGeo);
+            F.assertType(indexedQuad, 'object', 'generateIndexBuffer() returns object');
+            F.assert(indexedQuad.vertexCount <= quadGeo.vertexCount, 'generateIndexBuffer() reduces or keeps vertex count');
+            F.assert(indexedQuad.indexCount > 0, 'generateIndexBuffer() produces indices');
+
+            // Test generateIndexBuffer with cube geometry (has indices)
+            var cubeGeo = {
+                vertices: cube.vertices,
+                indices: cube.indices,
+                vertexCount: cube.vertexCount,
+                indexCount: cube.indexCount
+            };
+            var indexedCube = mo.generateIndexBuffer(cubeGeo);
+            F.assert(indexedCube.vertexCount <= cubeGeo.vertexCount, 'generateIndexBuffer() reduces or keeps vertex count for cube');
+
+            // Test cullBackFaces with camera position
+            var camPos = new Donkeycraft.Vector3(0, 10, 20);
+            var culled = mo.cullBackFaces(cubeGeo, camPos);
+            F.assertType(culled, 'object', 'cullBackFaces() returns object');
+            F.assert(culled.indexCount <= cubeGeo.indexCount, 'cullBackFaces() reduces or keeps index count');
+
+            // Test optimize (full pipeline)
+            var optimized = mo.optimize(cubeGeo, camPos);
+            F.assertType(optimized, 'object', 'optimize() returns object');
+            F.assert(optimized.vertexCount > 0, 'optimize() produces valid vertex count');
+            F.assert(optimized.indexCount >= 0, 'optimize() produces valid index count');
+
+            // Test optimize without camera (no back-face culling)
+            var optimizedNoCam = mo.optimize(cubeGeo);
+            F.assert(optimizedNoCam.vertexCount > 0, 'optimize() without camera produces valid vertex count');
+
+            F.info('MeshOptimizer tests complete — quad indexed: ' + indexedQuad.vertexCount + ' verts, cube culled: ' + culled.indexCount + ' indices');
+
+            // ============================================================
+            // Section 5: Camera Tests
+            // ============================================================
+            F.section('5. Camera');
+
+            var cam = new Donkeycraft.Camera(70, 0.1, 1000);
+            F.assertType(cam, 'object', 'Camera instance created');
+
+            // Position
+            F.assertType(cam.getPosition(), 'object', 'getPosition() returns Vector3');
+            F.assertEq(cam.getPosition().x, 0, 'Initial position x = 0');
+            F.assertEq(cam.getPosition().y, 64, 'Initial position y = 64');
+            F.assertEq(cam.getPosition().z, 0, 'Initial position z = 0');
+
+            // Rotation
+            F.assertEq(cam.getYaw(), 0, 'Initial yaw = 0');
+            F.assertEq(cam.getPitch(), 0, 'Initial pitch = 0');
+
+            // Set position
+            cam.setPosition(10, 20, 30);
+            F.assertEq(cam.getPosition().x, 10, 'setPosition x works');
+            F.assertEq(cam.getPosition().y, 20, 'setPosition y works');
+            F.assertEq(cam.getPosition().z, 30, 'setPosition z works');
+
+            // Set rotation
+            cam.setRotation(Math.PI / 4, Math.PI / 8);
+            F.assertNear(cam.getYaw(), Math.PI / 4, 0.001, 'setRotation yaw works');
+            F.assertNear(cam.getPitch(), Math.PI / 8, 0.001, 'setRotation pitch works');
+
+            // Apply mouse delta
+            cam.applyMouseDelta(10, 5);
+            F.assert(cam.getYaw() < Math.PI / 4, 'applyMouseDelta reduces yaw (negative rotation)');
+            F.assert(cam.getPitch() < Math.PI / 8, 'applyMouseDelta reduces pitch');
+
+            // Pitch clamping
+            cam.applyMouseDelta(0, -100);
+            F.assert(cam.getPitch() <= Math.PI / 2 - 0.01, 'Pitch clamped to max');
+            cam.applyMouseDelta(0, 100);
+            F.assert(cam.getPitch() >= -Math.PI / 2 + 0.01, 'Pitch clamped to min');
+
+            // Direction vectors
+            cam.setRotation(0, 0);
+            var fwd = cam.getForward();
+            F.assertType(fwd, 'object', 'getForward() returns Vector3');
+            F.assertNear(fwd.x, 0, 0.01, 'Forward X at yaw=0 ≈ 0');
+            F.assertNear(fwd.z, -1, 0.01, 'Forward Z at yaw=0 ≈ -1');
+
+            var right = cam.getRight();
+            F.assertType(right, 'object', 'getRight() returns Vector3');
+            F.assertNear(right.x, 1, 0.01, 'Right X at yaw=0 ≈ 1');
+            F.assertNear(right.z, 0, 0.01, 'Right Z at yaw=0 ≈ 0');
+
+            var up = cam.getUp();
+            F.assertType(up, 'object', 'getUp() returns Vector3');
+            F.assertNear(up.y, 1, 0.01, 'Up Y ≈ 1');
+
+            // 3D forward (with pitch)
+            cam.setRotation(0, -Math.PI / 4);
+            var fwd3d = cam.getForward3D();
+            F.assert(fwd3d.y > 0, '3D forward Y > 0 when looking up');
+
+            // Target
+            var target = cam.getTarget();
+            F.assertType(target, 'object', 'getTarget() returns Vector3');
+
+            // Matrices
+            cam.setAspect(16 / 9);
+            F.assertEq(cam.getAspect(), 16 / 9, 'getAspect() returns correct value');
+
+            var proj = cam.getProjection();
+            F.assertType(proj, 'object', 'getProjection() returns Matrix4');
+
+            var view = cam.getView();
+            F.assertType(view, 'object', 'getView() returns Matrix4');
+
+            var mats = cam.getMatrices();
+            F.assertType(mats.projection, 'object', 'getMatrices().projection is object');
+            F.assertType(mats.view, 'object', 'getMatrices().view is object');
+
+            // Movement
+            cam.setPosition(0, 0, 0);
+            cam.setRotation(0, 0);
+            cam.moveForward(5);
+            F.assertNear(cam.getPosition().z, -5, 0.01, 'moveForward moves in -Z direction');
+
+            cam.setPosition(0, 0, 0);
+            cam.moveRight(5);
+            F.assertNear(cam.getPosition().x, 5, 0.01, 'moveRight moves in +X direction');
+
+            cam.moveUp(3);
+            F.assertEq(cam.getPosition().y, 3, 'moveUp increases Y');
+
+            // moveForward3D / moveRight3D
+            cam.setPosition(0, 0, 0);
+            cam.setRotation(0, -Math.PI / 4);
+            cam.moveForward3D(10);
+            F.assert(cam.getPosition().y > 0, 'moveForward3D moves up when looking up');
+
+            cam.setPosition(0, 0, 0);
+            cam.setRotation(Math.PI / 2, 0);
+            cam.moveRight3D(5);
+            F.assert(cam.getPosition().z < 0, 'moveRight3D moves in -Z at yaw=90°');
+
+            // Reset
+            cam.reset();
+            F.assertEq(cam.getPosition().x, 0, 'reset x = 0');
+            F.assertEq(cam.getPosition().y, 64, 'reset y = 64');
+            F.assertEq(cam.getYaw(), 0, 'reset yaw = 0');
+
+            // FOV config
+            var cam2 = new Donkeycraft.Camera(90, 0.1, 1000);
+            F.assertEq(cam2._fov, 90, 'Custom FOV accepted');
+            var cam3 = new Donkeycraft.Camera();
+            F.assertType(cam3._fov, 'number', 'Default FOV from Config is number');
+
+            F.info('Camera tests complete — position: (' + cam.getPosition().x + ', ' + cam.getPosition().y + ', ' + cam.getPosition().z + ')');
+
+            // ============================================================
+            // Section 6: Fog Tests
+            // ============================================================
+            F.section('6. Fog');
+
+            var fog = new Donkeycraft.Fog();
+            F.assertType(fog, 'object', 'Fog instance created');
+
+            F.assertEq(fog.getDensity(), 0.015, 'Default density = 0.015');
+            F.assert(fog.isEnabled(), 'Fog enabled by default');
+
+            fog.setDensity(0.05);
+            F.assertEq(fog.getDensity(), 0.05, 'setDensity works');
+
+            fog.setEnabled(false);
+            F.assert(!fog.isEnabled(), 'Fog disabled');
+            fog.setEnabled(true);
+            F.assert(fog.isEnabled(), 'Fog re-enabled');
+
+            fog.setColor(0.2, 0.3, 0.4);
+            var col = fog.getColor();
+            F.assertEq(col.r, 0.2, 'Fog color r = 0.2');
+            F.assertEq(col.g, 0.3, 'Fog color g = 0.3');
+            F.assertEq(col.b, 0.4, 'Fog color b = 0.4');
+
+            fog.updateFromSky({ r: 0.5, g: 0.6, b: 0.7 });
+            var col2 = fog.getColor();
+            F.assertEq(col2.r, 0.5, 'updateFromSky sets r');
+            F.assertEq(col2.g, 0.6, 'updateFromSky sets g');
+            F.assertEq(col2.b, 0.7, 'updateFromSky sets b');
+
+            // applyToFogUniforms (requires shader manager)
+            if (testGl) {
+                var smFog = new Donkeycraft.ShaderManager(testGl);
+                var fogVS = [
+                    'precision mediump float;',
+                    'attribute vec3 aPos;',
+                    'uniform float uFogDensity;',
+                    'void main() {',
+                    '  gl_Position = vec4(aPos, 1.0);',
+                    '  gl_Position += uFogDensity * 0.0;',
+                    '}'
+                ].join('\n');
+
+                var fogFS = [
+                    'precision mediump float;',
+                    'uniform vec3 uFogColor;',
+                    'uniform float uFogDensity;',
+                    'void main() {',
+                    '  gl_FragColor = vec4(uFogColor, 1.0 - uFogDensity);',
+                    '}'
+                ].join('\n');
+
+                smFog.createProgram('fogTest', fogVS, fogFS);
+                smFog.use('fogTest');
+
+                var applyResult = fog.applyToFogUniforms(smFog);
+                F.assert(applyResult, 'applyToFogUniforms returns true when uniforms set');
+
+                smFog.destroy();
+            } else {
+                F.info('WebGL not available — applyToFogUniforms test skipped');
+            }
+
+            // ============================================================
+            // Section 7: Lighting Tests
+            // ============================================================
+            F.section('7. Lighting');
+
+            var light = new Donkeycraft.Lighting();
+            F.assertType(light, 'object', 'Lighting instance created');
+
+            light.setTimeOfDay(0.5);
+            F.assertNear(light.getTimeOfDay(), 0.5, 0.001, 'Time of day = 0.5 (noon)');
+
+            light.setTimeOfDay(0.25);
+            F.assertNear(light.getTimeOfDay(), 0.25, 0.001, 'Time of day = 0.25 (sunrise)');
+
+            // Sun intensity at noon
+            light.setTimeOfDay(0.5);
+            var sunNoon = light.getSunIntensity();
+            F.assert(sunNoon > 0.9, 'Sun intensity at noon > 0.9 (got ' + sunNoon.toFixed(3) + ')');
+
+            // Sun intensity at midnight
+            light.setTimeOfDay(0.0);
+            var sunMid = light.getSunIntensity();
+            F.assert(sunMid === 0, 'Sun intensity at midnight = 0');
+
+            // Sun intensity at sunrise
+            light.setTimeOfDay(0.3);
+            var sunRise = light.getSunIntensity();
+            F.assert(sunRise > 0 && sunRise < 0.5, 'Sun intensity at sunrise between 0 and 0.5 (got ' + sunRise.toFixed(3) + ')');
+
+            // Ambient light
+            light.setTimeOfDay(0.5);
+            var ambNoon = light.getAmbientLight();
+            F.assert(ambNoon > 0.9, 'Ambient at noon > 0.9 (got ' + ambNoon.toFixed(3) + ')');
+
+            light.setTimeOfDay(0.0);
+            var ambMid = light.getAmbientLight();
+            F.assertNear(ambMid, 0.08, 0.01, 'Ambient at midnight ≈ 0.08 (got ' + ambMid.toFixed(3) + ')');
+
+            // Sky color
+            light.setTimeOfDay(0.5);
+            var skyDay = light.getSkyColor();
+            F.assert(skyDay.r > 0 && skyDay.r <= 1, 'Day sky r in [0,1]');
+            F.assert(skyDay.g > 0 && skyDay.g <= 1, 'Day sky g in [0,1]');
+            F.assert(skyDay.b >= 0 && skyDay.b <= 1, 'Day sky b in [0,1]');
+
+            light.setTimeOfDay(0.0);
+            var skyNight = light.getSkyColor();
+            F.assert(skyNight.r < 0.1, 'Night sky r < 0.1 (got ' + skyNight.r.toFixed(3) + ')');
+            F.assert(skyNight.g < 0.1, 'Night sky g < 0.1');
+
+            // Sunrise sky color
+            light.setTimeOfDay(0.25);
+            var skySunrise = light.getSkyColor();
+            F.assert(skySunrise.r > 0 && skySunrise.r < 1, 'Sunrise sky r in [0,1]');
+
+            // Sun direction
+            light.setTimeOfDay(0.5);
+            var sunDir = light.getSunDirection();
+            F.assertType(sunDir, 'object', 'getSunDirection() returns Vector3');
+
+            // applyToShader — use all uniforms in fragment output so WebGL doesn't optimize them out.
+            if (testGl) {
+                var smLight = new Donkeycraft.ShaderManager(testGl);
+                var vSrcLight = [
+                    'precision mediump float;',
+                    'attribute vec3 aPos;',
+                    'uniform float uSunIntensity;',
+                    'uniform float uAmbient;',
+                    'uniform float uLightFactor;',
+                    'uniform vec3 uSkyColor;',
+                    'uniform vec3 uSunDirection;',
+                    'void main() {',
+                    '  gl_Position = vec4(aPos, 1.0);',
+                    '  gl_Position += uSunIntensity * 0.0;',
+                    '  gl_Position += uLightFactor * 0.0;',
+                    '}'
+                ].join('\n');
+
+                var fSrcLight = [
+                    'precision mediump float;',
+                    'uniform float uSunIntensity;',
+                    'uniform float uAmbient;',
+                    'uniform float uLightFactor;',
+                    'uniform vec3 uSkyColor;',
+                    'uniform vec3 uSunDirection;',
+                    'void main() {',
+                    '  vec3 dir = normalize(uSunDirection);',
+                    '  float dotL = max(dot(dir, vec3(0.0, 1.0, 0.0)), 0.0);',
+                    '  float mixed = uSunIntensity * uAmbient * (0.5 + 0.5 * dotL) * uLightFactor;',
+                    '  gl_FragColor = vec4(uSkyColor * mixed, 1.0);',
+                    '}'
+                ].join('\n');
+
+                smLight.createProgram('lightTest', vSrcLight, fSrcLight);
+                smLight.use('lightTest');
+
+                var applyLightResult = light.applyToShader(smLight);
+                F.assert(applyLightResult, 'applyToShader returns true');
+
+                smLight.destroy();
+            } else {
+                F.info('WebGL not available — applyToShader test skipped');
+            }
+
+            // Time wrapping
+            light.setTimeOfDay(1.5);
+            F.assertNear(light.getTimeOfDay(), 0.5, 0.001, 'Time of day wraps at 1.5 → 0.5');
+            light.setTimeOfDay(-0.25);
+            F.assertNear(light.getTimeOfDay(), 0.75, 0.001, 'Negative time wraps: -0.25 → 0.75');
+
+            // ============================================================
+            // Section 8: Fog + Lighting Integration
+            // ============================================================
+            F.section('8. Fog + Lighting Integration');
+
+            var fog2 = new Donkeycraft.Fog();
+            var light2 = new Donkeycraft.Lighting();
+
+            light2.setTimeOfDay(0.5);
+            var skyCol = light2.getSkyColor();
+            fog2.updateFromSky(skyCol);
+            var fogCol = fog2.getColor();
+            F.assertNear(fogCol.r, skyCol.r, 0.01, 'Fog color matches sky r after updateFromSky');
+            F.assertNear(fogCol.g, skyCol.g, 0.01, 'Fog color matches sky g');
+            F.assertNear(fogCol.b, skyCol.b, 0.01, 'Fog color matches sky b');
+
+            // Night cycle
+            light2.setTimeOfDay(0.0);
+            var nightSky = light2.getSkyColor();
+            fog2.updateFromSky(nightSky);
+            var nightFog = fog2.getColor();
+            F.assert(nightFog.r < 0.1, 'Night fog r < 0.1');
+            F.assert(nightFog.g < 0.1, 'Night fog g < 0.1');
+
+            F.info('Fog+Lighting integration tests complete — day fog: (' + fogCol.r.toFixed(2) + ', ' + fogCol.g.toFixed(2) + ', ' + fogCol.b.toFixed(2) + '), night fog: (' + nightFog.r.toFixed(2) + ', ' + nightFog.g.toFixed(2) + ', ' + nightFog.b.toFixed(2) + ')');
+
+            // ============================================================
+            // Section 9: Weather System Tests
+            // ============================================================
+            F.section('9. Weather System');
+
+            var weather = new Donkeycraft.Weather();
+            F.assertType(weather, 'object', 'Weather instance created');
+
+            // Initial state
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Initial weather is CLEAR');
+            F.assert(!weather.isRaining(), 'Not raining initially');
+            F.assert(!weather.isThundering(), 'Not thundering initially');
+            F.assert(!weather.isSnowing(), 'Not snowing initially');
+            F.assertEq(weather.getParticleDensity(), 0, 'Clear particle density = 0');
+
+            // Set rain
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_RAIN, 'Weather is RAIN');
+            F.assert(weather.isRaining(), 'isRaining() = true');
+            F.assert(!weather.isThundering(), 'isThundering() = false for rain');
+            F.assert(weather.getParticleDensity() > 0, 'Rain particle density > 0');
+
+            // Set thunder (must follow rain)
+            weather.setWeather(Donkeycraft.WEATHER_THUNDER);
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_THUNDER, 'Weather is THUNDER');
+            F.assert(weather.isThundering(), 'isThundering() = true');
+            F.assert(weather.isRaining(), 'isRaining() = true for thunder');
+
+            // Set snow
+            weather.setWeather(Donkeycraft.WEATHER_SNOW);
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_SNOW, 'Weather is SNOW');
+            F.assert(weather.isSnowing(), 'isSnowing() = true');
+
+            // Invalid state falls back to clear
+            weather.setWeather('invalid_state');
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Invalid weather falls back to CLEAR');
+
+            // Tick
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            weather._weatherTimer = 50;
+            weather.tick();
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_RAIN, 'Weather unchanged below minimum tick');
+
+            // Force change
+            weather.forceChange(Donkeycraft.WEATHER_SNOW);
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_SNOW, 'forceChange sets SNOW');
+
+            // Clear
+            weather.clear();
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'clear() sets CLEAR');
+
+            // Thunder intensity — set RAIN first (thunder follows rain), then tick to trigger fluctuation
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            weather.setWeather(Donkeycraft.WEATHER_THUNDER);
+            weather.tick();
+            F.assert(weather.getThunderIntensity() >= 0.7 && weather.getThunderIntensity() <= 1.0, 'Thunder intensity in [0.7, 1.0]');
+
+            // setThunderIntensity
+            weather.setThunderIntensity(0.5);
+            F.assertEq(weather.getThunderIntensity(), 0.5, 'setThunderIntensity works');
+
+            // Duration
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            var duration = weather.getWeatherDuration();
+            F.assert(duration > 0, 'Weather duration > 0');
+
+            weather.setWeatherDuration(1000);
+            F.assertEq(weather.getWeatherDuration(), 1000, 'setWeatherDuration works');
+
+            // Biome weather restrictions
+            var desertRestrictions = weather.getBiomeWeatherRestrictions(2);
+            F.assert(!desertRestrictions.canRain, 'Desert cannot rain');
+            F.assert(!desertRestrictions.canSnow, 'Desert cannot snow');
+
+            var oceanRestrictions = weather.getBiomeWeatherRestrictions(6);
+            F.assert(oceanRestrictions.canRain, 'Ocean can rain');
+            F.assert(!oceanRestrictions.canSnow, 'Ocean cannot snow');
+
+            // Custom restriction
+            weather.setBiomeWeatherRestriction(99, { canRain: true, canSnow: false });
+            var custom = weather.getBiomeWeatherRestrictions(99);
+            F.assert(custom.canRain, 'Custom biome can rain');
+            F.assert(!custom.canSnow, 'Custom biome cannot snow');
+
+            // Serialization
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            var serialized = weather.serialize();
+            F.assertEq(serialized.weatherState, Donkeycraft.WEATHER_RAIN, 'Serialized weather state is RAIN');
+            F.assertType(serialized.weatherDuration, 'number', 'Serialized duration is number');
+
+            // Deserialization
+            var weather2 = new Donkeycraft.Weather();
+            weather2.deserialize({ weatherState: Donkeycraft.WEATHER_SNOW, weatherDuration: 5000, weatherTimer: 100 });
+            F.assertEq(weather2.getWeather(), Donkeycraft.WEATHER_SNOW, 'Deserialized weather state is SNOW');
+
+            // Constants
+            F.assertEq(Donkeycraft.WEATHER_CLEAR, 'clear', 'WEATHER_CLEAR constant');
+            F.assertEq(Donkeycraft.WEATHER_RAIN, 'rain', 'WEATHER_RAIN constant');
+            F.assertEq(Donkeycraft.WEATHER_THUNDER, 'thunder', 'WEATHER_THUNDER constant');
+            F.assertEq(Donkeycraft.WEATHER_SNOW, 'snow', 'WEATHER_SNOW constant');
+
+            // Destroy
+            weather.destroy();
+            F.assertEq(weather.getWeather(), Donkeycraft.WEATHER_CLEAR, 'Weather cleared after destroy');
+
+            F.info('Weather system tests complete — all states and restrictions verified');
+
+            // ============================================================
+            // Section 10: Math Utility Integration (used by rendering)
+            // ============================================================
+            F.section('10. Math Utilities (Vector3, Matrix4)');
+
+            var v = new Donkeycraft.Vector3(1, 2, 3);
+            F.assertType(v, 'object', 'Vector3 instance created');
+            F.assertEq(v.x, 1, 'Vector3 x = 1');
+            F.assertEq(v.y, 2, 'Vector3 y = 2');
+            F.assertEq(v.z, 3, 'Vector3 z = 3');
+
+            v.set(4, 5, 6);
+            F.assertEq(v.x, 4, 'Vector3.set x works');
+            F.assertEq(v.y, 5, 'Vector3.set y works');
+            F.assertEq(v.z, 6, 'Vector3.set z works');
+
+            var v2 = new Donkeycraft.Vector3(3, 0, 0);
+            var v2norm = v2.normalized();
+            F.assertNear(v2norm.length(), 1, 0.001, 'normalized vector has length ≈ 1');
+
+            var a = new Donkeycraft.Vector3(1, 0, 0);
+            var b = new Donkeycraft.Vector3(0, 1, 0);
+            F.assertEq(a.dot(b), 0, 'Orthogonal vectors dot product = 0');
+
+            var c = new Donkeycraft.Vector3(1, 0, 0);
+            F.assertEq(a.dot(c), 1, 'Same direction vectors dot product = 1');
+
+            var d = new Donkeycraft.Vector3(1, 0, 0);
+            var e = new Donkeycraft.Vector3(0, 1, 0);
+            var crossResult = d.cross(e);
+            F.assertNear(crossResult.x, 0, 0.01, 'cross X ≈ 0');
+            F.assertNear(crossResult.y, 0, 0.01, 'cross Y ≈ 0');
+            F.assertNear(crossResult.z, 1, 0.01, 'cross Z ≈ 1');
+
+            var f = new Donkeycraft.Vector3(3, 4, 0);
+            F.assertNear(f.length(), 5, 0.01, 'Vector3(3,4,0).length() = 5');
+
+            var g = new Donkeycraft.Vector3(10, 0, 0);
+            g.normalize();
+            F.assertNear(g.x, 1, 0.01, 'normalize(10,0,0) = (1,0,0)');
+
+            // Matrix4
+            var identity = Donkeycraft.Matrix4.createIdentity();
+            F.assertType(identity, 'object', 'Matrix4.createIdentity() returns object');
+            F.assertType(identity.getData, 'function', 'Matrix4 has getData() method');
+
+            var perspective = Donkeycraft.Matrix4.createPerspective(Math.PI / 4, 16 / 9, 0.1, 1000);
+            F.assertType(perspective, 'object', 'createPerspective returns object');
+            F.assertType(perspective.getData, 'function', 'perspective has getData()');
+
+            var lookAt = Donkeycraft.Matrix4.createLookAt(
+                new Donkeycraft.Vector3(0, 64, 0),
+                new Donkeycraft.Vector3(0, 64, -10),
+                new Donkeycraft.Vector3(0, 1, 0)
+            );
+            F.assertType(lookAt, 'object', 'createLookAt returns object');
+
+            var ortho = Donkeycraft.Matrix4.createOrthographic(-16 / 9, 16 / 9, -1, 1, -1, 1);
+            F.assertType(ortho, 'object', 'createOrthographic returns object');
+
+            var translation = Donkeycraft.Matrix4.createTranslation(10, 20, 30);
+            F.assertType(translation, 'object', 'createTranslation returns object');
+
+            var scale = Donkeycraft.Matrix4.createScale(2, 2, 2);
+            F.assertType(scale, 'object', 'createScale returns object');
+
+            var rotation = Donkeycraft.Matrix4.createRotation(Math.PI / 4, new Donkeycraft.Vector3(0, 1, 0));
+            F.assertType(rotation, 'object', 'createRotation returns object');
+
+            var m1 = Donkeycraft.Matrix4.createTranslation(1, 2, 3);
+            var m2 = Donkeycraft.Matrix4.createScale(2, 2, 2);
+            var multiplied = Donkeycraft.Matrix4.multiply(m1, m2);
+            F.assertType(multiplied, 'object', 'Matrix4.multiply returns object');
+
+            // Utility functions
+            F.assertEq(Donkeycraft.lerp(0, 10, 0), 0, 'lerp(0,10,0) = 0');
+            F.assertEq(Donkeycraft.lerp(0, 10, 1), 10, 'lerp(0,10,1) = 10');
+            F.assertEq(Donkeycraft.lerp(0, 10, 0.5), 5, 'lerp(0,10,0.5) = 5');
+
+            F.assertEq(Donkeycraft.clamp(-5, 0, 10), 0, 'clamp(-5,0,10) = 0');
+            F.assertEq(Donkeycraft.clamp(5, 0, 10), 5, 'clamp(5,0,10) = 5');
+            F.assertEq(Donkeycraft.clamp(15, 0, 10), 10, 'clamp(15,0,10) = 10');
+
+            if (typeof Donkeycraft.noise2D === 'function') {
+                F.assertType(Donkeycraft.noise2D(0, 0), 'number', 'noise2D returns number');
+                var nVal = Donkeycraft.noise2D(10, 20);
+                F.assert(nVal >= -1 && nVal <= 1, 'noise2D returns value in [-1, 1]');
+            } else {
+                F.info('noise2D not available (may not be implemented yet)');
+            }
+
+            if (typeof Donkeycraft.noise3D === 'function') {
+                F.assertType(Donkeycraft.noise3D(0, 0, 0), 'number', 'noise3D returns number');
+            } else {
+                F.info('noise3D not available (may not be implemented yet)');
+            }
+
+            if (typeof Donkeycraft.perlin2D === 'function') {
+                F.assertType(Donkeycraft.perlin2D(0, 0), 'number', 'perlin2D returns number');
+            } else {
+                F.info('perlin2D not available (may not be implemented yet)');
+            }
+
+            F.info('Math utility tests complete — Vector3, Matrix4, lerp, clamp verified');
+
+            // ============================================================
+            // Section 11: IIFE & Namespace Compliance
+            // ============================================================
+            F.section('11. IIFE & Namespace Compliance');
+
+            var renderClasses = [
+                'GLContext', 'ShaderManager', 'GeometryBuilder', 'MeshOptimizer',
+                'ChunkMesh', 'TerrainRenderer', 'Camera', 'Fog', 'Sky',
+                'Lighting', 'HandRenderer', 'BreakParticles', 'GUIRenderer',
+                'Weather'
+            ];
+
+            var allRegistered = true;
+            for (var i = 0; i < renderClasses.length; i++) {
+                var cls = renderClasses[i];
+                if (typeof Donkeycraft[cls] !== 'function') {
+                    F.assert(false, cls + ' registered on Donkeycraft namespace');
+                    allRegistered = false;
+                }
+            }
+            if (allRegistered) {
+                F.assert(true, 'All ' + renderClasses.length + ' render classes registered on Donkeycraft namespace');
+            }
+
+            F.assert(typeof Donkeycraft.GLContext === 'function', 'GLContext is a function (constructor)');
+            F.assert(typeof Donkeycraft.ShaderManager === 'function', 'ShaderManager is a function (constructor)');
+            F.assert(typeof Donkeycraft.Camera === 'function', 'Camera is a function (constructor)');
+
+            F.assertType(Donkeycraft.WEATHER_CLEAR, 'string', 'WEATHER_CLEAR is string');
+            F.assertType(Donkeycraft.WEATHER_RAIN, 'string', 'WEATHER_RAIN is string');
+            F.assertType(Donkeycraft.WEATHER_THUNDER, 'string', 'WEATHER_THUNDER is string');
+            F.assertType(Donkeycraft.WEATHER_SNOW, 'string', 'WEATHER_SNOW is string');
+
+            F.info('IIFE & namespace compliance verified for all render modules');
+
+            // ============================================================
+            // Section 12: Edge Cases & Error Handling
+            // ============================================================
+            F.section('12. Edge Cases & Error Handling');
+
+            var airGetBlock = function () { return 0; };
+            var airChunk = gb.buildChunk(0, 0, airGetBlock);
+            F.assertEq(airChunk.vertexCount, 0, 'All-air chunk has 0 vertices');
+            F.assertEq(airChunk.indexCount, 0, 'All-air chunk has 0 indices');
+
+            var singleBlockGetBlock = function (x, y, z) {
+                return (x === 8 && y === 10 && z === 8) ? 1 : 0;
+            };
+            var singleChunk = gb.buildChunk(0, 0, singleBlockGetBlock);
+            F.assert(singleChunk.vertexCount > 0, 'Single block chunk has vertices');
+
+            var emptyGeo = { vertices: new Float32Array(0), indices: new Uint32Array(0), vertexCount: 0, indexCount: 0 };
+            var optimizedEmpty = mo.optimize(emptyGeo);
+            F.assertEq(optimizedEmpty.vertexCount, 0, 'Optimized empty geometry has 0 vertices');
+
+            var wideCam = new Donkeycraft.Camera(120, 0.1, 1000);
+            F.assertType(wideCam.getProjection(), 'object', 'Wide FOV camera projection works');
+
+            var thinFog = new Donkeycraft.Fog();
+            thinFog.setDensity(0);
+            F.assertEq(thinFog.getDensity(), 0, 'Zero fog density accepted');
+
+            light.setTimeOfDay(0.99);
+            F.assert(light.getSunIntensity() >= 0, 'Sun intensity valid at t=0.99');
+            light.setTimeOfDay(0.01);
+            F.assert(light.getSunIntensity() === 0, 'Sun intensity = 0 at t=0.01');
+
+            var desertBiome = { isDesert: true };
+            weather.setWeather(Donkeycraft.WEATHER_RAIN);
+            weather._weatherTimer = 200;
+            weather.tick(desertBiome);
+            F.info('Desert biome weather after tick: ' + weather.getWeather());
+
+            F.info('Edge case tests complete — all boundary conditions handled gracefully');
+
+            // ============================================================
+            // Finish: render summary
+            // ============================================================
+            F.finishTests();
+
+        })();
+    </script>
 </body>
+
 </html>

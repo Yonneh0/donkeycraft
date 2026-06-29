@@ -1,6 +1,6 @@
 // Donkeycraft — Cave Generator
 // Cave system: 3D noise-based cave generation, lava caves, mushroom caves.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * CaveGenerator — generates cave systems using 3D noise.
      */
-    Donkeycraft.CaveGenerator = (function() {
+    Donkeycraft.CaveGenerator = (function () {
         // Cave density threshold — fbm value below which caves form.
         // fbm returns [-1, 1]; -0.7 carves the lowest ~12% of values for natural cave density.
         var _caveDensity = -0.7;

@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone Engine
 // Core redstone tick system: updates at game speed (20 TPS), signal propagation order, manages all redstone subsystems.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -16,7 +16,7 @@
      * and coordination between all redstone subsystems (wiring, repeaters,
      * comparators, observers, pistons, TNT).
      */
-    Donkeycraft.RedstoneEngine = (function() {
+    Donkeycraft.RedstoneEngine = (function () {
 
         // Dirty redstone block queue: array of {x, y, z, chunkX, chunkZ}
         var _dirtyQueue = [];
@@ -112,11 +112,11 @@
          * @returns {Function} Unsubscribe function.
          */
         function start() {
-            if (_running || !_timer) return function() {};
+            if (_running || !_timer) return function () { };
 
             _running = true;
 
-            var unsubscribe = _timer.onTick(function(dt, tickCount) {
+            var unsubscribe = _timer.onTick(function (dt, tickCount) {
                 _currentTick = tickCount;
                 _processTick();
             });

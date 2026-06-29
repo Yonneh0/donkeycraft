@@ -1,6 +1,6 @@
 // Donkeycraft — Water Generator
 // Water source placement: lakes, ocean floors, surface water per biome.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * WaterGenerator — places water sources in chunks.
      */
-    Donkeycraft.WaterGenerator = (function() {
+    Donkeycraft.WaterGenerator = (function () {
         var _waterLevel = 63; // Default sea level
         var _waterBlockId = null; // Cached water block ID from BlockRegistry
         var _liquidBlocks = {}; // Cache of liquid block IDs for quick lookup

@@ -1,7 +1,7 @@
 // Donkeycraft — Asset Cache
 // IndexedDB-based persistent cache for procedurally generated assets (textures, sounds).
 // Uses checksum-based invalidation: if generation parameters change, cache is invalidated.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -18,7 +18,7 @@
      * Stores texture atlas canvases as blob URLs and sounds as base64 data URIs.
      * @param {string} [dbName=donkeycraft-assets] — IndexedDB database name.
      */
-    Donkeycraft.AssetCache = function(dbName) {
+    Donkeycraft.AssetCache = function (dbName) {
         this._dbName = dbName || Donkeycraft.ASSET_CACHE_DB_NAME;
         this._db = null;
         this._ready = false;
@@ -28,9 +28,9 @@
      * Initialize the IndexedDB database and create object stores.
      * @returns {Promise<boolean>} Resolves true when DB is ready.
      */
-    Donkeycraft.AssetCache.prototype.init = function() {
+    Donkeycraft.AssetCache.prototype.init = function () {
         var self = this;
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 if (typeof indexedDB === 'undefined') {
                     resolve(false); // IndexedDB not supported
@@ -39,18 +39,18 @@
 
                 var request = indexedDB.open(self._dbName, Donkeycraft.ASSET_CACHE_VERSION);
 
-                request.onerror = function() {
+                request.onerror = function () {
                     self._ready = false;
                     resolve(false); // Graceful fallback
                 };
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     self._db = request.result;
                     self._ready = true;
                     resolve(true);
                 };
 
-                request.onupgradeneeded = function(event) {
+                request.onupgradeneeded = function (event) {
                     var db = event.target.result;
                     if (!db.objectStoreNames.contains(Donkeycraft.ASSET_CACHE_STORE_NAME)) {
                         db.createObjectStore(Donkeycraft.ASSET_CACHE_STORE_NAME, { keyPath: 'key' });
@@ -67,7 +67,7 @@
      * Check if the cache is ready (database opened successfully).
      * @returns {boolean} True if ready.
      */
-    Donkeycraft.AssetCache.prototype.isReady = function() {
+    Donkeycraft.AssetCache.prototype.isReady = function () {
         return this._ready && !!this._db;
     };
 
@@ -77,7 +77,7 @@
      * @param {Object} obj — Object to checksum.
      * @returns {string} Hexadecimal checksum string.
      */
-    Donkeycraft.AssetCache.prototype._computeChecksum = function(obj) {
+    Donkeycraft.AssetCache.prototype._computeChecksum = function (obj) {
         if (!obj) return 'empty';
         var str = JSON.stringify(obj, Object.keys(obj).sort());
         var hash = 0;
@@ -95,20 +95,20 @@
      * @param {string} [worldName=default] — World name for cache key.
      * @returns {Promise<HTMLCanvasElement|null>} Resolves with canvas or null if not cached.
      */
-    Donkeycraft.AssetCache.prototype.getTextureAtlas = function(worldName) {
+    Donkeycraft.AssetCache.prototype.getTextureAtlas = function (worldName) {
         var self = this;
         worldName = worldName || 'default';
         if (!this.isReady()) {
             return Promise.resolve(null);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.get('texture-atlas:' + worldName);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     if (!request.result || !request.result.imageData) {
                         resolve(null);
                         return;
@@ -150,7 +150,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(null);
                 };
             } catch (e) {
@@ -166,14 +166,14 @@
      * @param {string} [worldName=default] — World name for cache key.
      * @returns {Promise<boolean>} Resolves true on success.
      */
-    Donkeycraft.AssetCache.prototype.setTextureAtlas = function(canvas, worldName) {
+    Donkeycraft.AssetCache.prototype.setTextureAtlas = function (canvas, worldName) {
         var self = this;
         worldName = worldName || 'default';
         if (!this.isReady() || !canvas) {
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var w = canvas.width;
                 var h = canvas.height;
@@ -198,20 +198,20 @@
 
                 var request = store.put(data);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     resolve(true);
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     // Quota exceeded — remove oldest entries and retry
                     if (request.error && request.error.name === 'QuotaExceededError') {
-                        self.clearExpired().then(function() {
+                        self.clearExpired().then(function () {
                             // Retry once after clearing expired entries
                             var txn2 = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                             var store2 = txn2.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                             var req2 = store2.put(data);
-                            req2.onsuccess = function() { resolve(true); };
-                            req2.onerror = function() { resolve(false); };
+                            req2.onsuccess = function () { resolve(true); };
+                            req2.onerror = function () { resolve(false); };
                         });
                     } else {
                         resolve(false);
@@ -228,19 +228,19 @@
      * @param {string} soundName — Sound name/identifier.
      * @returns {Promise<string|null>} Resolves with base64 data URI or null if not cached.
      */
-    Donkeycraft.AssetCache.prototype.getSound = function(soundName) {
+    Donkeycraft.AssetCache.prototype.getSound = function (soundName) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(null);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.get('sound:' + soundName);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     if (request.result && request.result.data) {
                         resolve(request.result.data);
                     } else {
@@ -248,7 +248,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(null);
                 };
             } catch (e) {
@@ -263,13 +263,13 @@
      * @param {string} base64Data — Base64-encoded audio data URI (e.g., 'data:audio/wav;base64,...').
      * @returns {Promise<boolean>} Resolves true on success.
      */
-    Donkeycraft.AssetCache.prototype.setSound = function(soundName, base64Data) {
+    Donkeycraft.AssetCache.prototype.setSound = function (soundName, base64Data) {
         var self = this;
         if (!this.isReady() || !soundName || typeof base64Data !== 'string') {
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
@@ -282,18 +282,18 @@
 
                 var request = store.put(data);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     resolve(true);
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     if (request.error && request.error.name === 'QuotaExceededError') {
-                        self.clearExpired().then(function() {
+                        self.clearExpired().then(function () {
                             var txn2 = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                             var store2 = txn2.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                             var req2 = store2.put(data);
-                            req2.onsuccess = function() { resolve(true); };
-                            req2.onerror = function() { resolve(false); };
+                            req2.onsuccess = function () { resolve(true); };
+                            req2.onerror = function () { resolve(false); };
                         });
                     } else {
                         resolve(false);
@@ -310,23 +310,23 @@
      * @param {string} key — Cache key (e.g., 'texture-atlas:default', 'sound:step1').
      * @returns {Promise<boolean>} True if the key exists in cache.
      */
-    Donkeycraft.AssetCache.prototype.has = function(key) {
+    Donkeycraft.AssetCache.prototype.has = function (key) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.get(key);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     resolve(!!request.result);
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(false);
                 };
             } catch (e) {
@@ -341,29 +341,29 @@
      * @param {string} key — Cache key to delete.
      * @returns {Promise<boolean>} True if deleted, false if key not found.
      */
-    Donkeycraft.AssetCache.prototype.delete = function(key) {
+    Donkeycraft.AssetCache.prototype.delete = function (key) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
         // First verify the key exists
-        return self.has(key).then(function(exists) {
+        return self.has(key).then(function (exists) {
             if (!exists) {
                 return false;
             }
 
-            return new Promise(function(resolve) {
+            return new Promise(function (resolve) {
                 try {
                     var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                     var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                     var request = store.delete(key);
 
-                    request.onsuccess = function() {
+                    request.onsuccess = function () {
                         resolve(true);
                     };
 
-                    request.onerror = function() {
+                    request.onerror = function () {
                         resolve(false);
                     };
                 } catch (e) {
@@ -379,7 +379,7 @@
      * @param {number} [maxAgeMs=86400000] — Maximum age in milliseconds before an entry is considered expired.
      * @returns {Promise<number>} Number of entries cleared.
      */
-    Donkeycraft.AssetCache.prototype.clearExpired = function(maxAgeMs) {
+    Donkeycraft.AssetCache.prototype.clearExpired = function (maxAgeMs) {
         var self = this;
         maxAgeMs = maxAgeMs || 86400000; // 24 hours default
 
@@ -390,13 +390,13 @@
         var cutoff = Date.now() - maxAgeMs;
         var cleared = 0;
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.openCursor();
 
-                request.onsuccess = function(event) {
+                request.onsuccess = function (event) {
                     var cursor = event.target.result;
                     if (cursor) {
                         if (cursor.value.cachedAt && cursor.value.cachedAt < cutoff) {
@@ -409,7 +409,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(cleared);
                 };
             } catch (e) {
@@ -422,23 +422,23 @@
      * Clear all cached assets.
      * @returns {Promise<number>} Number of entries cleared.
      */
-    Donkeycraft.AssetCache.prototype.clearAll = function() {
+    Donkeycraft.AssetCache.prototype.clearAll = function () {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(0);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.clear();
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     resolve(0); // clear() doesn't return count, but all entries are gone
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(0);
                 };
             } catch (e) {
@@ -451,20 +451,20 @@
      * Get cache usage statistics.
      * @returns {Promise<Object>} Stats object with entryCount, totalSize, and entries array.
      */
-    Donkeycraft.AssetCache.prototype.getUsageStats = function() {
+    Donkeycraft.AssetCache.prototype.getUsageStats = function () {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve({ entryCount: 0, totalSize: 0, entries: [] });
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
                 var request = store.openCursor();
                 var entries = [];
 
-                request.onsuccess = function(event) {
+                request.onsuccess = function (event) {
                     var cursor = event.target.result;
                     if (cursor) {
                         var size = 0;
@@ -495,7 +495,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve({ entryCount: 0, totalSize: 0, entries: [] });
                 };
             } catch (e) {
@@ -508,9 +508,9 @@
      * Get the total cache size in bytes (approximate).
      * @returns {Promise<number>} Approximate size in bytes.
      */
-    Donkeycraft.AssetCache.prototype.getTotalSize = function() {
+    Donkeycraft.AssetCache.prototype.getTotalSize = function () {
         var self = this;
-        return self.getUsageStats().then(function(stats) {
+        return self.getUsageStats().then(function (stats) {
             return stats.totalSize;
         });
     };
@@ -518,7 +518,7 @@
     /**
      * Destroy the AssetCache and close the IndexedDB connection.
      */
-    Donkeycraft.AssetCache.prototype.destroy = function() {
+    Donkeycraft.AssetCache.prototype.destroy = function () {
         if (this._db) {
             this._db.close();
             this._db = null;

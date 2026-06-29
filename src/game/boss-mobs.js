@@ -1,6 +1,6 @@
 // Donkeycraft — Boss Mobs
 // Ender Dragon and Wither — health, phases, attacks, death rewards.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -46,7 +46,7 @@
      * @param {number} [config.y=64] - Initial Y position.
      * @param {number} [config.z=0] - Initial Z position.
      */
-    Donkeycraft.BossMob = function(config) {
+    Donkeycraft.BossMob = function (config) {
         config = config || {};
 
         var stats = Donkeycraft.BossMobStats[config.type];
@@ -175,7 +175,7 @@
      * @param {Donkeycraft.Player} player - Player to check against.
      * @returns {boolean} True if a player was found.
      */
-    Donkeycraft.BossMob.prototype.findTargetPlayer = function(player) {
+    Donkeycraft.BossMob.prototype.findTargetPlayer = function (player) {
         var pos = this._position;
         var pPos = player.getPosition();
 
@@ -196,7 +196,7 @@
     /**
      * Switch to the next phase.
      */
-    Donkeycraft.BossMob.prototype._nextPhase = function() {
+    Donkeycraft.BossMob.prototype._nextPhase = function () {
         // If already in death phase, never switch away
         if (this.currentPhase === 'death') {
             return;
@@ -222,7 +222,7 @@
     /**
      * Attack the target player.
      */
-    Donkeycraft.BossMob.prototype.attack = function() {
+    Donkeycraft.BossMob.prototype.attack = function () {
         if (!this._targetPlayer || !this._targetPlayer.isAlive()) {
             return;
         }
@@ -263,7 +263,7 @@
     /**
      * Emit a breath attack toward the target (dragon fireball/breath).
      */
-    Donkeycraft.BossMob.prototype.emitBreathAttack = function() {
+    Donkeycraft.BossMob.prototype.emitBreathAttack = function () {
         if (!this._targetPlayer) {
             return;
         }
@@ -286,7 +286,7 @@
     /**
      * Shoot a projectile at the target.
      */
-    Donkeycraft.BossMob.prototype.shootProjectile = function() {
+    Donkeycraft.BossMob.prototype.shootProjectile = function () {
         if (!this._targetPlayer) {
             return;
         }
@@ -314,7 +314,7 @@
      * Called when the boss dies — awards death loot and emits death event.
      * @private
      */
-    Donkeycraft.BossMob.prototype.onDeath = function() {
+    Donkeycraft.BossMob.prototype.onDeath = function () {
         // Award death loot once
         if (!this._lootAwarded && this.deathLoot) {
             this._lootAwarded = true;
@@ -353,7 +353,7 @@
      * Tick method — phase management, chase players, attack.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.BossMob.prototype.tick = function(deltaTime) {
+    Donkeycraft.BossMob.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
 
         // Call base tick (applies velocity to position)
@@ -438,7 +438,7 @@
      * @param {number} z - Z position.
      * @returns {Donkeycraft.BossMob|null}
      */
-    Donkeycraft.BossMob.create = function(type, x, y, z) {
+    Donkeycraft.BossMob.create = function (type, x, y, z) {
         if (!Donkeycraft.BossMobStats[type]) {
             return null; // Unknown type
         }

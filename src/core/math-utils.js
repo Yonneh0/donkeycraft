@@ -1,6 +1,6 @@
 // Donkeycraft — Math Utilities
 // Vector3, Matrix4, Quaternion classes, noise functions (Perlin/Simplex).
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -15,7 +15,7 @@
      * @param {number} [y=0]
      * @param {number} [z=0]
      */
-    Donkeycraft.Vector3 = function(x, y, z) {
+    Donkeycraft.Vector3 = function (x, y, z) {
         this.x = (x !== undefined && !isNaN(x)) ? x : 0;
         this.y = (y !== undefined && !isNaN(y)) ? y : 0;
         this.z = (z !== undefined && !isNaN(z)) ? z : 0;
@@ -25,7 +25,7 @@
      * Create a zero vector.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.zero = function() {
+    Donkeycraft.Vector3.zero = function () {
         return new Donkeycraft.Vector3(0, 0, 0);
     };
 
@@ -33,7 +33,7 @@
      * Create a unit vector.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.one = function() {
+    Donkeycraft.Vector3.one = function () {
         return new Donkeycraft.Vector3(1, 1, 1);
     };
 
@@ -42,7 +42,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.copy = function(v) {
+    Donkeycraft.Vector3.copy = function (v) {
         return new Donkeycraft.Vector3(v.x, v.y, v.z);
     };
 
@@ -51,7 +51,7 @@
      * @param {number[]} arr
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.fromArray = function(arr) {
+    Donkeycraft.Vector3.fromArray = function (arr) {
         return new Donkeycraft.Vector3(arr[0], arr[1], arr[2]);
     };
 
@@ -62,7 +62,7 @@
      * @param {number} z
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.set = function(x, y, z) {
+    Donkeycraft.Vector3.prototype.set = function (x, y, z) {
         this.x = (x !== undefined && !isNaN(x)) ? x : 0;
         this.y = (y !== undefined && !isNaN(y)) ? y : 0;
         this.z = (z !== undefined && !isNaN(z)) ? z : 0;
@@ -74,7 +74,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.add = function(v) {
+    Donkeycraft.Vector3.prototype.add = function (v) {
         this.x += v.x;
         this.y += v.y;
         this.z += v.z;
@@ -86,7 +86,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.sub = function(v) {
+    Donkeycraft.Vector3.prototype.sub = function (v) {
         this.x -= v.x;
         this.y -= v.y;
         this.z -= v.z;
@@ -98,7 +98,7 @@
      * @param {number} s
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.scale = function(s) {
+    Donkeycraft.Vector3.prototype.scale = function (s) {
         this.x *= s;
         this.y *= s;
         this.z *= s;
@@ -110,7 +110,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {number}
      */
-    Donkeycraft.Vector3.prototype.dot = function(v) {
+    Donkeycraft.Vector3.prototype.dot = function (v) {
         return this.x * v.x + this.y * v.y + this.z * v.z;
     };
 
@@ -119,7 +119,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.cross = function(v) {
+    Donkeycraft.Vector3.prototype.cross = function (v) {
         var x = this.x, y = this.y, z = this.z;
         this.x = y * v.z - z * v.y;
         this.y = z * v.x - x * v.z;
@@ -131,7 +131,7 @@
      * Length squared.
      * @returns {number}
      */
-    Donkeycraft.Vector3.prototype.lengthSq = function() {
+    Donkeycraft.Vector3.prototype.lengthSq = function () {
         return this.x * this.x + this.y * this.y + this.z * this.z;
     };
 
@@ -139,7 +139,7 @@
      * Length (magnitude).
      * @returns {number}
      */
-    Donkeycraft.Vector3.prototype.length = function() {
+    Donkeycraft.Vector3.prototype.length = function () {
         return Math.sqrt(this.lengthSq());
     };
 
@@ -147,7 +147,7 @@
      * Normalize in place.
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.normalize = function() {
+    Donkeycraft.Vector3.prototype.normalize = function () {
         var len = this.length();
         if (len > 0.00001) {
             this.x /= len;
@@ -163,7 +163,7 @@
      * Returns a normalized copy.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.prototype.normalized = function() {
+    Donkeycraft.Vector3.prototype.normalized = function () {
         return Donkeycraft.Vector3.copy(this).normalize();
     };
 
@@ -172,7 +172,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {number}
      */
-    Donkeycraft.Vector3.prototype.distanceTo = function(v) {
+    Donkeycraft.Vector3.prototype.distanceTo = function (v) {
         var dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z;
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     };
@@ -181,7 +181,7 @@
      * Floor components to integers.
      * @returns {Donkeycraft.Vector3} this (for chaining)
      */
-    Donkeycraft.Vector3.prototype.floor = function() {
+    Donkeycraft.Vector3.prototype.floor = function () {
         this.x = Math.floor(this.x);
         this.y = Math.floor(this.y);
         this.z = Math.floor(this.z);
@@ -194,18 +194,18 @@
      * @param {number} [epsilon=0.001] — Tolerance for approximate comparison. Pass 0 for exact comparison.
      * @returns {boolean}
      */
-    Donkeycraft.Vector3.prototype.equals = function(v, epsilon) {
+    Donkeycraft.Vector3.prototype.equals = function (v, epsilon) {
         epsilon = (epsilon !== undefined) ? epsilon : 0.001;
         return Math.abs(this.x - v.x) < epsilon &&
-               Math.abs(this.y - v.y) < epsilon &&
-               Math.abs(this.z - v.z) < epsilon;
+            Math.abs(this.y - v.y) < epsilon &&
+            Math.abs(this.z - v.z) < epsilon;
     };
 
     /**
      * Check if this vector is zero (or near-zero).
      * @returns {boolean}
      */
-    Donkeycraft.Vector3.prototype.isZero = function() {
+    Donkeycraft.Vector3.prototype.isZero = function () {
         return this.x === 0 && this.y === 0 && this.z === 0;
     };
 
@@ -216,7 +216,7 @@
      * @param {number} t - Interpolation factor [0, 1].
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.lerp = function(a, b, t) {
+    Donkeycraft.Vector3.lerp = function (a, b, t) {
         return new Donkeycraft.Vector3(
             Donkeycraft.lerp(a.x, b.x, t),
             Donkeycraft.lerp(a.y, b.y, t),
@@ -231,7 +231,7 @@
      * @param {number} theta - Azimuthal angle in radians (0 = +X axis, π/2 = +Z axis).
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Vector3.fromSpherical = function(length, phi, theta) {
+    Donkeycraft.Vector3.fromSpherical = function (length, phi, theta) {
         var sinPhi = Math.sin(phi);
         return new Donkeycraft.Vector3(
             length * sinPhi * Math.cos(theta),
@@ -245,7 +245,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {number}
      */
-    Donkeycraft.Vector3.prototype.distanceToSq = function(v) {
+    Donkeycraft.Vector3.prototype.distanceToSq = function (v) {
         var dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z;
         return dx * dx + dy * dy + dz * dz;
     };
@@ -258,7 +258,7 @@
      * Matrix4 — 4×4 column-major matrix.
      * @param {Float32Array} [data=null]
      */
-    Donkeycraft.Matrix4 = function(data) {
+    Donkeycraft.Matrix4 = function (data) {
         this._data = data || new Float32Array(16);
     };
 
@@ -266,11 +266,11 @@
      * Create identity matrix.
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createIdentity = function() {
+    Donkeycraft.Matrix4.createIdentity = function () {
         var data = new Float32Array(16);
-        data[0] = 1;  data[1] = 0;  data[2] = 0;  data[3] = 0;
-        data[4] = 0;  data[5] = 1;  data[6] = 0;  data[7] = 0;
-        data[8] = 0;  data[9] = 0;  data[10] = 1; data[11] = 0;
+        data[0] = 1; data[1] = 0; data[2] = 0; data[3] = 0;
+        data[4] = 0; data[5] = 1; data[6] = 0; data[7] = 0;
+        data[8] = 0; data[9] = 0; data[10] = 1; data[11] = 0;
         data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
         return new Donkeycraft.Matrix4(data);
     };
@@ -283,14 +283,14 @@
      * @param {number} far
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createPerspective = function(fovRadians, aspect, near, far) {
+    Donkeycraft.Matrix4.createPerspective = function (fovRadians, aspect, near, far) {
         var f = 1.0 / Math.tan(fovRadians / 2);
         var nf = 1 / (near - far);
         var data = new Float32Array(16);
-        data[0]  = f / aspect;    data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
-        data[4]  = 0;             data[5]  = f;             data[6]  = 0;              data[7]  = 0;
-        data[8]  = 0;             data[9]  = 0;             data[10] = (far + near) * nf; data[11] = -1;
-        data[12] = 0;             data[13] = 0;             data[14] = 2 * far * near * nf; data[15] = 0;
+        data[0] = f / aspect; data[1] = 0; data[2] = 0; data[3] = 0;
+        data[4] = 0; data[5] = f; data[6] = 0; data[7] = 0;
+        data[8] = 0; data[9] = 0; data[10] = (far + near) * nf; data[11] = -1;
+        data[12] = 0; data[13] = 0; data[14] = 2 * far * near * nf; data[15] = 0;
         return new Donkeycraft.Matrix4(data);
     };
 
@@ -304,12 +304,12 @@
      * @param {number} far
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createOrthographic = function(left, right, bottom, top, near, far) {
+    Donkeycraft.Matrix4.createOrthographic = function (left, right, bottom, top, near, far) {
         var dx = right - left, dy = top - bottom, dz = far - near;
         var data = new Float32Array(16);
-        data[0]  = 2 / dx;        data[1]  = 0;             data[2]  = 0;              data[3]  = 0;
-        data[4]  = 0;             data[5]  = 2 / dy;      data[6]  = 0;              data[7]  = 0;
-        data[8]  = 0;             data[9]  = 0;             data[10] = -2 / dz;        data[11] = 0;
+        data[0] = 2 / dx; data[1] = 0; data[2] = 0; data[3] = 0;
+        data[4] = 0; data[5] = 2 / dy; data[6] = 0; data[7] = 0;
+        data[8] = 0; data[9] = 0; data[10] = -2 / dz; data[11] = 0;
         data[12] = -(right + left) / dx;
         data[13] = -(top + bottom) / dy;
         data[14] = -(far + near) / dz;
@@ -324,15 +324,15 @@
      * @param {Donkeycraft.Vector3} up
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createLookAt = function(eye, target, up) {
+    Donkeycraft.Matrix4.createLookAt = function (eye, target, up) {
         var zAxis = Donkeycraft.Vector3.copy(eye).sub(target).normalize();
         var xAxis = Donkeycraft.Vector3.copy(up).cross(zAxis).normalize();
         var yAxis = Donkeycraft.Vector3.copy(zAxis).cross(xAxis);
 
         var data = new Float32Array(16);
-        data[0]  = xAxis.x;       data[1]  = yAxis.x;       data[2]  = zAxis.x;      data[3]  = 0;
-        data[4]  = xAxis.y;       data[5]  = yAxis.y;       data[6]  = zAxis.y;      data[7]  = 0;
-        data[8]  = xAxis.z;       data[9]  = yAxis.z;       data[10] = zAxis.z;      data[11] = 0;
+        data[0] = xAxis.x; data[1] = yAxis.x; data[2] = zAxis.x; data[3] = 0;
+        data[4] = xAxis.y; data[5] = yAxis.y; data[6] = zAxis.y; data[7] = 0;
+        data[8] = xAxis.z; data[9] = yAxis.z; data[10] = zAxis.z; data[11] = 0;
         data[12] = -xAxis.dot(eye);
         data[13] = -yAxis.dot(eye);
         data[14] = -zAxis.dot(eye);
@@ -347,7 +347,7 @@
      * @param {number} z
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createTranslation = function(x, y, z) {
+    Donkeycraft.Matrix4.createTranslation = function (x, y, z) {
         var m = Donkeycraft.Matrix4.createIdentity();
         m._data[12] = x;
         m._data[13] = y;
@@ -362,11 +362,11 @@
      * @param {number} z - Scale factor on Z axis.
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createScale = function(x, y, z) {
+    Donkeycraft.Matrix4.createScale = function (x, y, z) {
         var data = new Float32Array(16);
-        data[0] = x;  data[1] = 0;  data[2] = 0;  data[3] = 0;
-        data[4] = 0;  data[5] = y;  data[6] = 0;  data[7] = 0;
-        data[8] = 0;  data[9] = 0;  data[10] = z; data[11] = 0;
+        data[0] = x; data[1] = 0; data[2] = 0; data[3] = 0;
+        data[4] = 0; data[5] = y; data[6] = 0; data[7] = 0;
+        data[8] = 0; data[9] = 0; data[10] = z; data[11] = 0;
         data[12] = 0; data[13] = 0; data[14] = 0; data[15] = 1;
         return new Donkeycraft.Matrix4(data);
     };
@@ -377,7 +377,7 @@
      * @param {Donkeycraft.Vector3} axis - Axis of rotation (will be normalized internally).
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.createRotation = function(angle, axis) {
+    Donkeycraft.Matrix4.createRotation = function (angle, axis) {
         var c = Math.cos(angle), s = Math.sin(angle);
 
         // Normalize the axis vector for correctness
@@ -417,15 +417,15 @@
      * @param {Donkeycraft.Matrix4} b
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.multiply = function(a, b) {
+    Donkeycraft.Matrix4.multiply = function (a, b) {
         var aa = a._data, bb = b._data;
         var r = new Float32Array(16);
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
-                r[i * 4 + j] = aa[i * 4]     * bb[j]       +
-                               aa[i * 4 + 1] * bb[4 + j] +
-                               aa[i * 4 + 2] * bb[8 + j]  +
-                               aa[i * 4 + 3] * bb[12 + j];
+                r[i * 4 + j] = aa[i * 4] * bb[j] +
+                    aa[i * 4 + 1] * bb[4 + j] +
+                    aa[i * 4 + 2] * bb[8 + j] +
+                    aa[i * 4 + 3] * bb[12 + j];
             }
         }
         return new Donkeycraft.Matrix4(r);
@@ -436,17 +436,17 @@
      * @param {Donkeycraft.Matrix4} m
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.prototype.multiply = function(m) {
+    Donkeycraft.Matrix4.prototype.multiply = function (m) {
         var a = this._data, b = m._data;
         var r = new Float32Array(16);
         // Column-major multiplication: R = A × B
         // R[i*4+j] = Σ(k=0..3) A[i*4+k] × B[k*4+j]
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
-                r[i * 4 + j] = a[i * 4]     * b[j]       +
-                               a[i * 4 + 1] * b[4 + j] +
-                               a[i * 4 + 2] * b[8 + j]  +
-                               a[i * 4 + 3] * b[12 + j];
+                r[i * 4 + j] = a[i * 4] * b[j] +
+                    a[i * 4 + 1] * b[4 + j] +
+                    a[i * 4 + 2] * b[8 + j] +
+                    a[i * 4 + 3] * b[12 + j];
             }
         }
         return new Donkeycraft.Matrix4(r);
@@ -458,7 +458,7 @@
      * @param {number} [w=0]
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Matrix4.prototype.transformVector = function(v, w) {
+    Donkeycraft.Matrix4.prototype.transformVector = function (v, w) {
         var d = this._data;
         var x = v.x, y = v.y, z = v.z, ww = w || 0;
         var ox = d[0] * x + d[4] * y + d[8] * z + d[12] * ww;
@@ -475,7 +475,7 @@
      * Get the Float32Array data.
      * @returns {Float32Array}
      */
-    Donkeycraft.Matrix4.prototype.getData = function() {
+    Donkeycraft.Matrix4.prototype.getData = function () {
         return this._data;
     };
 
@@ -483,7 +483,7 @@
      * Create a deep copy of this matrix.
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.prototype.clone = function() {
+    Donkeycraft.Matrix4.prototype.clone = function () {
         return new Donkeycraft.Matrix4(new Float32Array(this._data));
     };
 
@@ -491,14 +491,14 @@
      * Transpose the matrix in place.
      * @returns {Donkeycraft.Matrix4} this
      */
-    Donkeycraft.Matrix4.prototype.transpose = function() {
+    Donkeycraft.Matrix4.prototype.transpose = function () {
         var d = this._data;
         var tmp;
-        tmp = d[1];  d[1] = d[4];  d[4] = tmp;
-        tmp = d[2];  d[2] = d[8];  d[8] = tmp;
-        tmp = d[3];  d[3] = d[12]; d[12] = tmp;
-        tmp = d[6];  d[6] = d[9];  d[9] = tmp;
-        tmp = d[7];  d[7] = d[13]; d[13] = tmp;
+        tmp = d[1]; d[1] = d[4]; d[4] = tmp;
+        tmp = d[2]; d[2] = d[8]; d[8] = tmp;
+        tmp = d[3]; d[3] = d[12]; d[12] = tmp;
+        tmp = d[6]; d[6] = d[9]; d[9] = tmp;
+        tmp = d[7]; d[7] = d[13]; d[13] = tmp;
         tmp = d[11]; d[11] = d[14]; d[14] = tmp;
         return this;
     };
@@ -508,75 +508,75 @@
      * Returns a new Matrix4; does not modify the original.
      * @returns {Donkeycraft.Matrix4} A new inverted matrix.
      */
-    Donkeycraft.Matrix4.prototype.invert = function() {
+    Donkeycraft.Matrix4.prototype.invert = function () {
         var d = this._data; // source data (not mutated)
         var inv = new Float32Array(16);
         var det;
 
         // Unroll for performance
-        inv[0]  = d[5]  * (d[10] * d[15] - d[14] * d[11])
-                - d[9]  * (d[6]  * d[15] - d[14] * d[10])
-                + d[13] * (d[6]  * d[11] - d[10] * d[7]);
+        inv[0] = d[5] * (d[10] * d[15] - d[14] * d[11])
+            - d[9] * (d[6] * d[15] - d[14] * d[10])
+            + d[13] * (d[6] * d[11] - d[10] * d[7]);
 
-        inv[4]  = -d[4]  * (d[10] * d[15] - d[14] * d[11])
-                  + d[8]  * (d[6]  * d[15] - d[14] * d[10])
-                  - d[12] * (d[6]  * d[11] - d[10] * d[7]);
+        inv[4] = -d[4] * (d[10] * d[15] - d[14] * d[11])
+            + d[8] * (d[6] * d[15] - d[14] * d[10])
+            - d[12] * (d[6] * d[11] - d[10] * d[7]);
 
-        inv[8]  = d[4]  * (d[9]  * d[15] - d[13] * d[10])
-                  - d[8]  * (d[5]  * d[15] - d[13] * d[6])
-                  + d[12] * (d[5]  * d[10] - d[9]  * d[6]);
+        inv[8] = d[4] * (d[9] * d[15] - d[13] * d[10])
+            - d[8] * (d[5] * d[15] - d[13] * d[6])
+            + d[12] * (d[5] * d[10] - d[9] * d[6]);
 
-        inv[12] = -d[4]  * (d[9]  * d[14] - d[13] * d[11])
-                  + d[8]  * (d[5]  * d[14] - d[13] * d[7])
-                  - d[12] * (d[5]  * d[11] - d[9]  * d[7]);
+        inv[12] = -d[4] * (d[9] * d[14] - d[13] * d[11])
+            + d[8] * (d[5] * d[14] - d[13] * d[7])
+            - d[12] * (d[5] * d[11] - d[9] * d[7]);
 
-        inv[1]  = -d[1]  * (d[10] * d[15] - d[14] * d[11])
-                  + d[9]  * (d[2]  * d[15] - d[14] * d[10])
-                  - d[13] * (d[2]  * d[11] - d[10] * d[3]);
+        inv[1] = -d[1] * (d[10] * d[15] - d[14] * d[11])
+            + d[9] * (d[2] * d[15] - d[14] * d[10])
+            - d[13] * (d[2] * d[11] - d[10] * d[3]);
 
-        inv[5]  = d[0]  * (d[10] * d[15] - d[14] * d[11])
-                  - d[8]  * (d[2]  * d[15] - d[14] * d[10])
-                  + d[12] * (d[2]  * d[11] - d[10] * d[3]);
+        inv[5] = d[0] * (d[10] * d[15] - d[14] * d[11])
+            - d[8] * (d[2] * d[15] - d[14] * d[10])
+            + d[12] * (d[2] * d[11] - d[10] * d[3]);
 
-        inv[9]  = -d[0]  * (d[9]  * d[15] - d[13] * d[10])
-                  + d[8]  * (d[1]  * d[15] - d[13] * d[6])
-                  - d[12] * (d[1]  * d[10] - d[9]  * d[6]);
+        inv[9] = -d[0] * (d[9] * d[15] - d[13] * d[10])
+            + d[8] * (d[1] * d[15] - d[13] * d[6])
+            - d[12] * (d[1] * d[10] - d[9] * d[6]);
 
-        inv[13] = d[0]  * (d[9]  * d[14] - d[13] * d[11])
-                  - d[8]  * (d[1]  * d[14] - d[13] * d[7])
-                  + d[12] * (d[1]  * d[11] - d[9]  * d[7]);
+        inv[13] = d[0] * (d[9] * d[14] - d[13] * d[11])
+            - d[8] * (d[1] * d[14] - d[13] * d[7])
+            + d[12] * (d[1] * d[11] - d[9] * d[7]);
 
-        inv[2]  = d[1]  * (d[6]  * d[15] - d[14] * d[10])
-                  - d[5]  * (d[2]  * d[15] - d[14] * d[10])
-                  + d[13] * (d[2]  * d[10] - d[6]  * d[3]);
+        inv[2] = d[1] * (d[6] * d[15] - d[14] * d[10])
+            - d[5] * (d[2] * d[15] - d[14] * d[10])
+            + d[13] * (d[2] * d[10] - d[6] * d[3]);
 
-        inv[6]  = -d[0]  * (d[6]  * d[15] - d[14] * d[10])
-                  + d[4]  * (d[2]  * d[15] - d[14] * d[10])
-                  - d[12] * (d[2]  * d[10] - d[6]  * d[3]);
+        inv[6] = -d[0] * (d[6] * d[15] - d[14] * d[10])
+            + d[4] * (d[2] * d[15] - d[14] * d[10])
+            - d[12] * (d[2] * d[10] - d[6] * d[3]);
 
-        inv[10] = d[0]  * (d[5]  * d[15] - d[13] * d[6])
-                  - d[4]  * (d[1]  * d[15] - d[13] * d[2])
-                  + d[12] * (d[1]  * d[10] - d[5]  * d[2]);
+        inv[10] = d[0] * (d[5] * d[15] - d[13] * d[6])
+            - d[4] * (d[1] * d[15] - d[13] * d[2])
+            + d[12] * (d[1] * d[10] - d[5] * d[2]);
 
-        inv[14] = -d[0]  * (d[5]  * d[14] - d[13] * d[7])
-                  + d[4]  * (d[1]  * d[14] - d[13] * d[3])
-                  - d[12] * (d[1]  * d[11] - d[5]  * d[3]);
+        inv[14] = -d[0] * (d[5] * d[14] - d[13] * d[7])
+            + d[4] * (d[1] * d[14] - d[13] * d[3])
+            - d[12] * (d[1] * d[11] - d[5] * d[3]);
 
-        inv[3]  = -d[1]  * (d[6]  * d[11] - d[10] * d[7])
-                  + d[5]  * (d[2]  * d[11] - d[10] * d[3])
-                  - d[9]  * (d[2]  * d[10] - d[6]  * d[3]);
+        inv[3] = -d[1] * (d[6] * d[11] - d[10] * d[7])
+            + d[5] * (d[2] * d[11] - d[10] * d[3])
+            - d[9] * (d[2] * d[10] - d[6] * d[3]);
 
-        inv[7]  = d[0]  * (d[6]  * d[11] - d[10] * d[7])
-                  - d[4]  * (d[2]  * d[11] - d[10] * d[3])
-                  + d[8]  * (d[2]  * d[10] - d[6]  * d[3]);
+        inv[7] = d[0] * (d[6] * d[11] - d[10] * d[7])
+            - d[4] * (d[2] * d[11] - d[10] * d[3])
+            + d[8] * (d[2] * d[10] - d[6] * d[3]);
 
-        inv[11] = -d[0]  * (d[5]  * d[11] - d[9]  * d[7])
-                  + d[4]  * (d[1]  * d[11] - d[9]  * d[3])
-                  - d[8]  * (d[1]  * d[10] - d[5]  * d[2]);
+        inv[11] = -d[0] * (d[5] * d[11] - d[9] * d[7])
+            + d[4] * (d[1] * d[11] - d[9] * d[3])
+            - d[8] * (d[1] * d[10] - d[5] * d[2]);
 
-        inv[15] = d[0]  * (d[5]  * d[14] - d[9]  * d[7])
-                  - d[4]  * (d[1]  * d[14] - d[9]  * d[3])
-                  + d[8]  * (d[1]  * d[10] - d[5]  * d[2]);
+        inv[15] = d[0] * (d[5] * d[14] - d[9] * d[7])
+            - d[4] * (d[1] * d[14] - d[9] * d[3])
+            + d[8] * (d[1] * d[10] - d[5] * d[2]);
 
         det = d[0] * inv[0] + d[1] * inv[4] + d[2] * inv[8] + d[3] * inv[12];
 
@@ -597,7 +597,7 @@
      * Get the inverse of this matrix.
      * @returns {Donkeycraft.Matrix4}
      */
-    Donkeycraft.Matrix4.prototype.getInverse = function() {
+    Donkeycraft.Matrix4.prototype.getInverse = function () {
         return this.invert();
     };
 
@@ -612,7 +612,7 @@
      * @param {number} [z=0]
      * @param {number} [w=1]
      */
-    Donkeycraft.Quaternion = function(x, y, z, w) {
+    Donkeycraft.Quaternion = function (x, y, z, w) {
         this.x = (x !== undefined && !isNaN(x)) ? x : 0;
         this.y = (y !== undefined && !isNaN(y)) ? y : 0;
         this.z = (z !== undefined && !isNaN(z)) ? z : 0;
@@ -623,7 +623,7 @@
      * Create identity quaternion.
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.identity = function() {
+    Donkeycraft.Quaternion.identity = function () {
         return new Donkeycraft.Quaternion(0, 0, 0, 1);
     };
 
@@ -633,7 +633,7 @@
      * @param {number} angleRadians - Rotation angle in radians.
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.fromAxisAngle = function(axis, angle) {
+    Donkeycraft.Quaternion.fromAxisAngle = function (axis, angle) {
         var half = angle / 2;
         var sin = Math.sin(half);
         // Default to Y-axis if axis is null, undefined, or zero
@@ -656,7 +656,7 @@
      * @param {number} t - Interpolation factor [0, 1].
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.slerp = function(a, b, t) {
+    Donkeycraft.Quaternion.slerp = function (a, b, t) {
         var ax = a.x, ay = a.y, az = a.z, aw = a.w;
         var bx = b.x, by = b.y, bz = b.z, bw = b.w;
 
@@ -696,7 +696,7 @@
      * Compute the conjugate of this quaternion (for unit quaternions, same as inverse).
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.prototype.conjugate = function() {
+    Donkeycraft.Quaternion.prototype.conjugate = function () {
         return new Donkeycraft.Quaternion(-this.x, -this.y, -this.z, this.w);
     };
 
@@ -704,7 +704,7 @@
      * Compute the inverse of this quaternion (assumes unit quaternion).
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.prototype.inverse = function() {
+    Donkeycraft.Quaternion.prototype.inverse = function () {
         var lenSq = this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
         if (lenSq > 0.00001) {
             return new Donkeycraft.Quaternion(
@@ -724,7 +724,7 @@
      * @param {number} [roll=0] - Z rotation (bank).
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.fromEuler = function(yaw, pitch, roll) {
+    Donkeycraft.Quaternion.fromEuler = function (yaw, pitch, roll) {
         yaw = (yaw !== undefined && !isNaN(yaw)) ? yaw : 0;
         pitch = (pitch !== undefined && !isNaN(pitch)) ? pitch : 0;
         roll = (roll !== undefined && !isNaN(roll)) ? roll : 0;
@@ -747,7 +747,7 @@
      * @param {Donkeycraft.Quaternion} q
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.prototype.multiply = function(q) {
+    Donkeycraft.Quaternion.prototype.multiply = function (q) {
         return new Donkeycraft.Quaternion(
             this.w * q.x + this.x * q.w + this.y * q.z - this.z * q.y,
             this.w * q.y - this.x * q.z + this.y * q.w + this.z * q.x,
@@ -761,7 +761,7 @@
      * @param {Donkeycraft.Vector3} v
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Quaternion.prototype.applyToVector = function(v) {
+    Donkeycraft.Quaternion.prototype.applyToVector = function (v) {
         var q = this;
         var cx = 2 * (q.y * v.z - q.z * v.y);
         var cy = 2 * (q.z * v.x - q.x * v.z);
@@ -777,7 +777,7 @@
      * Convert quaternion to Euler angles (YXZ order).
      * @returns {{yaw: number, pitch: number, roll: number}}
      */
-    Donkeycraft.Quaternion.prototype.toEuler = function() {
+    Donkeycraft.Quaternion.prototype.toEuler = function () {
         var q = this;
         var yaw = Math.atan2(
             2 * (q.w * q.z + q.x * q.y),
@@ -795,7 +795,7 @@
      * Normalize the quaternion in place and return this.
      * @returns {Donkeycraft.Quaternion} this
      */
-    Donkeycraft.Quaternion.prototype.normalize = function() {
+    Donkeycraft.Quaternion.prototype.normalize = function () {
         var len = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
         if (len > 0.00001) {
             this.x /= len;
@@ -815,7 +815,7 @@
      * Return a new normalized copy of this quaternion.
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.prototype.normalized = function() {
+    Donkeycraft.Quaternion.prototype.normalized = function () {
         return new Donkeycraft.Quaternion(this.x, this.y, this.z, this.w).normalize();
     };
 
@@ -823,7 +823,7 @@
      * Create a deep copy of this quaternion.
      * @returns {Donkeycraft.Quaternion}
      */
-    Donkeycraft.Quaternion.prototype.clone = function() {
+    Donkeycraft.Quaternion.prototype.clone = function () {
         return new Donkeycraft.Quaternion(this.x, this.y, this.z, this.w);
     };
 
@@ -834,7 +834,7 @@
     /**
      * PerlinNoise — 1D, 2D, and 3D Perlin noise.
      */
-    Donkeycraft.PerlinNoise = (function() {
+    Donkeycraft.PerlinNoise = (function () {
         var _perm = new Uint8Array(512);
         var _initialized = false;
 
@@ -920,14 +920,14 @@
             return lerp(w,
                 lerp(v,
                     lerp(u, grad(_perm[AA], x, y, z),
-                           grad(_perm[BA], x - 1, y, z)),
+                        grad(_perm[BA], x - 1, y, z)),
                     lerp(u, grad(_perm[AB], x, y - 1, z),
-                           grad(_perm[BB], x - 1, y - 1, z))),
+                        grad(_perm[BB], x - 1, y - 1, z))),
                 lerp(v,
                     lerp(u, grad(_perm[AA + 1], x, y, z - 1),
-                           grad(_perm[BA + 1], x - 1, y, z - 1)),
+                        grad(_perm[BA + 1], x - 1, y, z - 1)),
                     lerp(u, grad(_perm[AB + 1], x, y - 1, z - 1),
-                           grad(_perm[BB + 1], x - 1, y - 1, z - 1)))
+                        grad(_perm[BB + 1], x - 1, y - 1, z - 1)))
             );
         }
 
@@ -1017,7 +1017,7 @@
      * @param {number} t - Interpolation factor [0, 1].
      * @returns {number}
      */
-    Donkeycraft.lerp = function(a, b, t) {
+    Donkeycraft.lerp = function (a, b, t) {
         return a + (b - a) * t;
     };
 
@@ -1028,7 +1028,7 @@
      * @param {number} max
      * @returns {number}
      */
-    Donkeycraft.clamp = function(value, min, max) {
+    Donkeycraft.clamp = function (value, min, max) {
         return Math.min(max, Math.max(min, value));
     };
 
@@ -1041,7 +1041,7 @@
      * @param {number} outMax
      * @returns {number}
      */
-    Donkeycraft.map = function(value, inMin, inMax, outMin, outMax) {
+    Donkeycraft.map = function (value, inMin, inMax, outMin, outMax) {
         if (inMin === inMax) return outMin;
         return outMin + (outMax - outMin) * ((value - inMin) / (inMax - inMin));
     };
@@ -1051,7 +1051,7 @@
      * @param {number} n
      * @returns {number}
      */
-    Donkeycraft.round = function(n) {
+    Donkeycraft.round = function (n) {
         return Math.round(n);
     };
 
@@ -1062,7 +1062,7 @@
      * @param {number} max
      * @returns {boolean}
      */
-    Donkeycraft.inRange = function(value, min, max) {
+    Donkeycraft.inRange = function (value, min, max) {
         return value >= min && value <= max;
     };
 

@@ -1,6 +1,6 @@
 // Donkeycraft — Block Type Classification
 // Special block type classification: solid, transparent, liquid, opaque, full-block.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
     /**
      * BlockTypes — pre-computed lookup tables for block type queries.
      */
-    Donkeycraft.BlockTypes = (function() {
+    Donkeycraft.BlockTypes = (function () {
         var _solid = {};         // blockId -> true: has full collision box
         var _transparent = {};   // blockId -> true: alpha/see-through
         var _opaque = {};        // blockId -> true: fully blocks light (opacity >= 15)
@@ -39,7 +39,7 @@
 
             // Full block: solid, opaque, not a liquid, not a plant/decoration, must have a drop
             _fullBlock[id] = _solid[id] && _opaque[id] && !_liquid[id] &&
-                             b.lightOpacity >= 15 && b.dropBlockId >= 0;
+                b.lightOpacity >= 15 && b.dropBlockId >= 0;
         }
 
         // ---- Explicit overrides for edge cases ----
@@ -301,13 +301,13 @@
         function getIdsByType(type) {
             var table;
             switch (type) {
-                case 'solid':     table = _solid; break;
+                case 'solid': table = _solid; break;
                 case 'transparent': table = _transparent; break;
-                case 'opaque':    table = _opaque; break;
-                case 'liquid':    table = _liquid; break;
+                case 'opaque': table = _opaque; break;
+                case 'liquid': table = _liquid; break;
                 case 'replaceable': table = _replaceable; break;
                 case 'fullBlock': table = _fullBlock; break;
-                default:          return [];
+                default: return [];
             }
             var result = [];
             for (var key in table) {

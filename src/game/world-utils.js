@@ -1,6 +1,6 @@
 // Donkeycraft — World Utilities
 // Shared coordinate and block access utilities to reduce duplication across interaction modules.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -16,7 +16,7 @@
      * chunk state queries, and raycast step calculation. Used across interaction modules
      * to reduce duplication in block breaking/placing and portal detection.
      */
-    Donkeycraft.WorldUtils = (function() {
+    Donkeycraft.WorldUtils = (function () {
 
         /**
          * Get the block ID at global world coordinates from the current world state.

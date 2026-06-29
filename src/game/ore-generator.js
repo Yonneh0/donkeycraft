@@ -1,6 +1,6 @@
 // Donkeycraft — Ore Generator
 // Ore distribution: vein placement per biome, rarity, Y-level ranges for all ores.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -17,13 +17,13 @@
      * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
      */
     var ORE_DEFS = [
-        { blockName: 'coal_ore',      name: 'coal_ore',       minY: 0,   maxY: 160, veinSize: 8,  rarity: 12, biomes: null },
-        { blockName: 'iron_ore',      name: 'iron_ore',       minY: 0,   maxY: 164, veinSize: 6,  rarity: 10, biomes: null },
-        { blockName: 'gold_ore',      name: 'gold_ore',       minY: 0,   maxY: 64,  veinSize: 4,  rarity: 20, biomes: null },
-        { blockName: 'diamond_ore',   name: 'diamond_ore',    minY: 0,   maxY: 32,  veinSize: 3,  rarity: 28, biomes: null },
-        { blockName: 'redstone_ore',  name: 'redstone_ore',   minY: 0,   maxY: 32,  veinSize: 5,  rarity: 16, biomes: null },
-        { blockName: 'lapis_ore',     name: 'lapis_ore',      minY: 0,   maxY: 64,  veinSize: 4,  rarity: 18, biomes: null },
-        { blockName: 'emerald_ore',   name: 'emerald_ore',    minY: 0,   maxY: 32,  veinSize: 2,  rarity: 30, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
+        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 160, veinSize: 8, rarity: 12, biomes: null },
+        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 164, veinSize: 6, rarity: 10, biomes: null },
+        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 64, veinSize: 4, rarity: 20, biomes: null },
+        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 28, biomes: null },
+        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 32, veinSize: 5, rarity: 16, biomes: null },
+        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 64, veinSize: 4, rarity: 18, biomes: null },
+        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 32, veinSize: 2, rarity: 30, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
     ];
 
     // Cache for resolved block IDs to avoid repeated lookups.
@@ -78,7 +78,7 @@
     /**
      * OreGenerator — places ore veins in chunks.
      */
-    Donkeycraft.OreGenerator = (function() {
+    Donkeycraft.OreGenerator = (function () {
         /**
          * Initialize the ore generator by resolving all ore block IDs from BlockRegistry.
          * Resolves blocks by name, falling back to common aliases for robustness.

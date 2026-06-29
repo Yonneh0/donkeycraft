@@ -1,6 +1,6 @@
 // Donkeycraft — Interactable Blocks
 // Right-click interactions: doors, chests, furnaces, levers, buttons, dispensers.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -45,7 +45,7 @@
      *
      * @namespace
      */
-    Donkeycraft.InteractableBlocks = (function() {
+    Donkeycraft.InteractableBlocks = (function () {
 
         // Persistent state store for interactive blocks (doors, levers, trapdoors).
         // Format: { "x,y,z": { type: string, state: any } }

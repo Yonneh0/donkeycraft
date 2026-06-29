@@ -1,7 +1,7 @@
 // Donkeycraft — Initialization Sequence
 // Async initialization pipeline: config validation → texture-atlas → audio → indexeddb.
 // Each phase runs sequentially, emitting events for progress tracking by LoadingScreen.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
      * sequentially, emitting events at each phase boundary for LoadingScreen integration.
      * @param {Object} [config] - Donkeycraft.Config object. Defaults to window.Donkeycraft.Config if null.
      */
-    Donkeycraft.InitSequence = function(config) {
+    Donkeycraft.InitSequence = function (config) {
         this._config = config || Donkeycraft.Config;
         this._eventBus = new Donkeycraft.EventBus();
         this._currentPhase = 'none';
@@ -28,7 +28,7 @@
      * @param {string} eventName - Event name.
      * @param {Object} data - Event payload.
      */
-    Donkeycraft.InitSequence.prototype._emit = function(eventName, data) {
+    Donkeycraft.InitSequence.prototype._emit = function (eventName, data) {
         if (this._destroyed || !this._eventBus) return;
         try {
             this._eventBus.emit(eventName, data);
@@ -43,7 +43,7 @@
      * @private
      * @param {string} phase - Phase name identifier.
      */
-    Donkeycraft.InitSequence.prototype._setPhase = function(phase) {
+    Donkeycraft.InitSequence.prototype._setPhase = function (phase) {
         this._currentPhase = phase;
         this._emit('init:phase:start', { phase: phase });
     };
@@ -53,7 +53,7 @@
      * @private
      * @param {string} phase - Phase name that completed.
      */
-    Donkeycraft.InitSequence.prototype._endPhase = function(phase) {
+    Donkeycraft.InitSequence.prototype._endPhase = function (phase) {
         this._emit('init:phase:end', { phase: phase });
     };
 
@@ -63,7 +63,7 @@
      * @param {string} phaseName - Phase name to use as the map key.
      * @param {*} result - Result data to store.
      */
-    Donkeycraft.InitSequence.prototype._storePhaseResult = function(phaseName, result) {
+    Donkeycraft.InitSequence.prototype._storePhaseResult = function (phaseName, result) {
         this._phaseResults[phaseName] = result;
     };
 
@@ -73,7 +73,7 @@
      * @param {string} phaseName - Phase name to look up.
      * @returns {*} The stored result, or undefined if not found.
      */
-    Donkeycraft.InitSequence.prototype._getPhaseResult = function(phaseName) {
+    Donkeycraft.InitSequence.prototype._getPhaseResult = function (phaseName) {
         return this._phaseResults[phaseName];
     };
 
@@ -83,7 +83,7 @@
      * @private
      * @returns {boolean} True if all required config values are present and valid.
      */
-    Donkeycraft.InitSequence.prototype._validateConfig = function() {
+    Donkeycraft.InitSequence.prototype._validateConfig = function () {
         var cfg = this._config;
         if (!cfg) return false;
 
@@ -114,12 +114,12 @@
      * @private
      * @returns {Promise<Object>} Resolves with { textures, atlas } when ready.
      */
-    Donkeycraft.InitSequence.prototype._initTextureAtlas = function() {
+    Donkeycraft.InitSequence.prototype._initTextureAtlas = function () {
         var self = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             try {
                 if (Donkeycraft.AssetGenerator && typeof Donkeycraft.AssetGenerator.generateAllTextures === 'function') {
-                    Donkeycraft.AssetGenerator.generateAllTextures().then(function(textures) {
+                    Donkeycraft.AssetGenerator.generateAllTextures().then(function (textures) {
                         Donkeycraft.Logger.info('InitSequence', 'Procedural textures generated: ' + Object.keys(textures || {}).length + ' textures');
 
                         // Wire generated textures into AssetManager so game.js can read them via getAllTextures()
@@ -164,7 +164,7 @@
                         }
 
                         resolve({ textures: textures || {}, atlas: atlas });
-                    }).catch(function(err) {
+                    }).catch(function (err) {
                         Donkeycraft.Logger.error('InitSequence', 'Texture generation failed: ' + err.message);
                         resolve({ textures: {}, atlas: null });
                     });
@@ -187,9 +187,9 @@
      * @private
      * @returns {Promise<Object>} Resolves with { audioSystem } when ready.
      */
-    Donkeycraft.InitSequence.prototype._initAudio = function() {
+    Donkeycraft.InitSequence.prototype._initAudio = function () {
         var self = this;
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 // Seed the shared permutation table and PRNG for terrain generation.
                 // The noise module exposes _gen._seedRng() for this purpose.
@@ -216,12 +216,12 @@
                 // Create audio system — AudioContext may start suspended on some browsers.
                 // The game.js click handler will call resume() when the user clicks.
                 var audioSys = new Donkeycraft.AudioSystem();
-                audioSys.init().then(function() {
+                audioSys.init().then(function () {
                     // Attempt to resume if the context is in 'suspended' state.
                     // This is required on mobile browsers and some desktop browsers
                     // that defer audio context creation until a user gesture.
                     if (audioSys._context && audioSys._context.state === 'suspended') {
-                        audioSys._context.resume().catch(function(e) {
+                        audioSys._context.resume().catch(function (e) {
                             Donkeycraft.Logger.warn('InitSequence',
                                 'AudioContext could not be auto-resumed: ' + e.message +
                                 '. Audio will start after first user interaction.');
@@ -229,7 +229,7 @@
                     }
                     Donkeycraft.Logger.info('InitSequence', 'AudioSystem initialized successfully');
                     resolve({ audioSystem: audioSys, perlinNoiseReady: true });
-                }).catch(function(err) {
+                }).catch(function (err) {
                     Donkeycraft.Logger.warn('InitSequence', 'Audio init failed: ' + err.message);
                     // Still resolve with noise ready so terrain can generate
                     resolve({ perlinNoiseReady: true });
@@ -247,9 +247,9 @@
      * @private
      * @returns {Promise<Object>} Resolves with { worldStore } when ready.
      */
-    Donkeycraft.InitSequence.prototype._initWorldStore = function() {
+    Donkeycraft.InitSequence.prototype._initWorldStore = function () {
         var self = this;
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 if (typeof indexedDB === 'undefined') {
                     Donkeycraft.Logger.warn('InitSequence', 'IndexedDB not available — world persistence disabled');
@@ -260,7 +260,7 @@
                 var worldStore = new Donkeycraft.WorldStore();
                 worldStore.setEventBus(self._eventBus);
 
-                worldStore.init().then(function(ok) {
+                worldStore.init().then(function (ok) {
                     if (ok && worldStore.isReady()) {
                         Donkeycraft.Logger.info('InitSequence', 'WorldStore initialized successfully');
                         resolve({ worldStore: worldStore });
@@ -282,9 +282,9 @@
      * @private
      * @returns {Promise<Object>} Resolves with { assetCache } when ready.
      */
-    Donkeycraft.InitSequence.prototype._initAssetCache = function() {
+    Donkeycraft.InitSequence.prototype._initAssetCache = function () {
         var self = this;
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 if (typeof indexedDB === 'undefined') {
                     Donkeycraft.Logger.warn('InitSequence', 'IndexedDB not available — asset cache disabled');
@@ -294,7 +294,7 @@
 
                 var assetCache = new Donkeycraft.AssetCache();
 
-                assetCache.init().then(function(ok) {
+                assetCache.init().then(function (ok) {
                     if (ok && assetCache.isReady()) {
                         Donkeycraft.Logger.info('InitSequence', 'AssetCache initialized successfully');
                         resolve({ assetCache: assetCache });
@@ -316,14 +316,14 @@
      * @private
      * @returns {Promise<Object>} Resolves with { worldStore, assetCache } when ready.
      */
-    Donkeycraft.InitSequence.prototype._initIndexedDB = function() {
+    Donkeycraft.InitSequence.prototype._initIndexedDB = function () {
         var self = this;
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             // Run both initializers in parallel since they don't depend on each other
             var worldPromise = self._initWorldStore();
             var cachePromise = self._initAssetCache();
 
-            Promise.all([worldPromise, cachePromise]).then(function(results) {
+            Promise.all([worldPromise, cachePromise]).then(function (results) {
                 var worldResult = results[0] || {};
                 var cacheResult = results[1] || {};
                 resolve({
@@ -341,49 +341,57 @@
      * If destroy() is called mid-pipeline, the promise rejects with an error.
      * @returns {Promise<Object>} Resolves with systems object containing config and eventBus.
      */
-    Donkeycraft.InitSequence.prototype.initialize = function() {
+    Donkeycraft.InitSequence.prototype.initialize = function () {
         var self = this;
         var phases = [
-            { name: 'config', fn: function() {
-                if (!self._validateConfig()) {
-                    return Promise.reject(new Error('Invalid configuration'));
+            {
+                name: 'config', fn: function () {
+                    if (!self._validateConfig()) {
+                        return Promise.reject(new Error('Invalid configuration'));
+                    }
+                    self._setPhase('config');
+                    self._endPhase('config');
+                    return Promise.resolve();
                 }
-                self._setPhase('config');
-                self._endPhase('config');
-                return Promise.resolve();
-            }},
-            { name: 'texture-atlas', fn: function() {
-                self._setPhase('texture-atlas');
-                return self._initTextureAtlas().then(function(result) {
-                    self._endPhase('texture-atlas');
-                    return result;
-                });
-            }},
-            { name: 'audio', fn: function() {
-                self._setPhase('audio');
-                return self._initAudio().then(function(result) {
-                    self._endPhase('audio');
-                    return result;
-                });
-            }},
-            { name: 'indexeddb', fn: function() {
-                self._setPhase('indexeddb');
-                return self._initIndexedDB().then(function(result) {
-                    self._endPhase('indexeddb');
-                    return result;
-                });
-            }}
+            },
+            {
+                name: 'texture-atlas', fn: function () {
+                    self._setPhase('texture-atlas');
+                    return self._initTextureAtlas().then(function (result) {
+                        self._endPhase('texture-atlas');
+                        return result;
+                    });
+                }
+            },
+            {
+                name: 'audio', fn: function () {
+                    self._setPhase('audio');
+                    return self._initAudio().then(function (result) {
+                        self._endPhase('audio');
+                        return result;
+                    });
+                }
+            },
+            {
+                name: 'indexeddb', fn: function () {
+                    self._setPhase('indexeddb');
+                    return self._initIndexedDB().then(function (result) {
+                        self._endPhase('indexeddb');
+                        return result;
+                    });
+                }
+            }
         ];
 
         // Chain phases sequentially, checking destroy flag between each phase
         var chain = Promise.resolve();
         for (var i = 0; i < phases.length; i++) {
-            (function(idx) {
-                chain = chain.then(function(prevResult) {
+            (function (idx) {
+                chain = chain.then(function (prevResult) {
                     if (self._destroyed) {
                         return Promise.reject(new Error('InitSequence destroyed during phase: ' + phases[idx].name));
                     }
-                    return phases[idx].fn().then(function(phaseResult) {
+                    return phases[idx].fn().then(function (phaseResult) {
                         // Store phase results by named key for later retrieval
                         self._storePhaseResult(phases[idx].name, phaseResult);
                         return prevResult;
@@ -393,7 +401,7 @@
         }
 
         // Collect results on successful completion — merge all phase results
-        return chain.then(function() {
+        return chain.then(function () {
             self._systems = {
                 config: self._config,
                 eventBus: self._eventBus
@@ -431,7 +439,7 @@
             }
             self._emit('init:complete', { systems: self._systems });
             return self._systems;
-        }).catch(function(err) {
+        }).catch(function (err) {
             self._emit('init:error', { error: err, phase: self._currentPhase });
             return Promise.reject(err);
         });
@@ -441,7 +449,7 @@
      * getPhase — return the current or last completed initialization phase name.
      * @returns {string} Phase name (e.g., 'config', 'texture-atlas', 'audio', 'indexeddb', 'none').
      */
-    Donkeycraft.InitSequence.prototype.getPhase = function() {
+    Donkeycraft.InitSequence.prototype.getPhase = function () {
         return this._currentPhase;
     };
 
@@ -450,7 +458,7 @@
      * The returned object contains: config, eventBus.
      * @returns {Object|null} Systems object or null.
      */
-    Donkeycraft.InitSequence.prototype.getSystems = function() {
+    Donkeycraft.InitSequence.prototype.getSystems = function () {
         return this._systems;
     };
 
@@ -461,8 +469,8 @@
      * @param {Function} callback - Callback function receiving event data.
      * @returns {Function} Unsubscribe function that removes the listener when called.
      */
-    Donkeycraft.InitSequence.prototype.on = function(eventName, callback) {
-        if (!this._eventBus) return function() {};
+    Donkeycraft.InitSequence.prototype.on = function (eventName, callback) {
+        if (!this._eventBus) return function () { };
         return this._eventBus.on(eventName, callback);
     };
 
@@ -473,7 +481,7 @@
      * references are nulled for garbage collection, and temporary phase result maps
      * are cleaned up.
      */
-    Donkeycraft.InitSequence.prototype.destroy = function() {
+    Donkeycraft.InitSequence.prototype.destroy = function () {
         this._destroyed = true;
         if (this._eventBus) {
             this._eventBus.clear();

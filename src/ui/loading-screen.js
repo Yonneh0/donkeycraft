@@ -1,6 +1,6 @@
 // Donkeycraft — Loading Screen
 // DOM-based loading screen with progress bar, tips, and error handling.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -30,7 +30,7 @@
      * LoadingScreen — DOM-based loading screen UI.
      * @param {HTMLElement} [container] - Container element to append the loading screen to.
      */
-    Donkeycraft.LoadingScreen = function(container) {
+    Donkeycraft.LoadingScreen = function (container) {
         this._container = container || document.body;
         this._element = null;
         this._progressBar = null;
@@ -47,7 +47,7 @@
      * _create — build the loading screen DOM structure.
      * @private
      */
-    Donkeycraft.LoadingScreen.prototype._create = function() {
+    Donkeycraft.LoadingScreen.prototype._create = function () {
         var self = this;
 
         // Main overlay
@@ -102,7 +102,7 @@
      * updateProgress — set progress percentage (0-100).
      * @param {number} percent - Progress percentage (clamped 0-100).
      */
-    Donkeycraft.LoadingScreen.prototype.updateProgress = function(percent) {
+    Donkeycraft.LoadingScreen.prototype.updateProgress = function (percent) {
         if (this._disposed || !this._progressBar) return;
 
         // Clamp to 0-100
@@ -128,7 +128,7 @@
      * setMessage — set the loading message text.
      * @param {string} message - Message to display.
      */
-    Donkeycraft.LoadingScreen.prototype.setMessage = function(message) {
+    Donkeycraft.LoadingScreen.prototype.setMessage = function (message) {
         if (this._disposed || !this._messageEl) return;
         this._messageEl.textContent = message;
     };
@@ -137,7 +137,7 @@
      * showError — display error state.
      * @param {string} errorMessage - Error message to display.
      */
-    Donkeycraft.LoadingScreen.prototype.showError = function(errorMessage) {
+    Donkeycraft.LoadingScreen.prototype.showError = function (errorMessage) {
         if (this._disposed) return;
 
         // Hide progress bar and tip
@@ -158,7 +158,7 @@
     /**
      * hide — remove loading screen from DOM.
      */
-    Donkeycraft.LoadingScreen.prototype.hide = function() {
+    Donkeycraft.LoadingScreen.prototype.hide = function () {
         if (this._disposed || !this._element) return;
         if (this._element.parentNode) {
             this._element.parentNode.removeChild(this._element);
@@ -168,7 +168,7 @@
     /**
      * dispose — remove DOM elements and free references.
      */
-    Donkeycraft.LoadingScreen.prototype.dispose = function() {
+    Donkeycraft.LoadingScreen.prototype.dispose = function () {
         // Call hide() BEFORE setting _disposed — hide() checks _disposed flag,
         // so if we set it first, hide() returns early without removing the element.
         this.hide();

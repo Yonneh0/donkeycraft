@@ -1,7 +1,7 @@
 // Donkeycraft — Sky
 // Sky rendering: day/night gradient, sun, moon, stars.
 // Cloud layer is rendered via wireframe renderer debug overlay (future enhancement).
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
      * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
      * @param {ShaderManager} shaderManager - The shader manager instance.
      */
-    Donkeycraft.Sky = function(gl, shaderManager) {
+    Donkeycraft.Sky = function (gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
         this._timeOfDay = 0.5;
@@ -58,7 +58,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype._buildSkyDome = function() {
+    Donkeycraft.Sky.prototype._buildSkyDome = function () {
         var segments = 16;
         var rings = 8;
         var radius = 400;
@@ -100,7 +100,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype._buildSunDisc = function() {
+    Donkeycraft.Sky.prototype._buildSunDisc = function () {
         var segments = 12;
         var radius = 8;
         var vertices = [0, radius, 0]; // center
@@ -129,7 +129,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype._buildMoonDisc = function() {
+    Donkeycraft.Sky.prototype._buildMoonDisc = function () {
         var segments = 12;
         var radius = 5;
         var vertices = [0, radius, 0]; // center
@@ -158,7 +158,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype._buildStarField = function() {
+    Donkeycraft.Sky.prototype._buildStarField = function () {
         var starPositions = [];
         var seed = 42;
 
@@ -192,7 +192,7 @@
      * @param {boolean} visible - True to show stars.
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype.setStarsVisible = function(visible) {
+    Donkeycraft.Sky.prototype.setStarsVisible = function (visible) {
         this._starsVisible = !!visible;
     };
 
@@ -200,7 +200,7 @@
      * Check if stars are currently visible.
      * @returns {boolean} True if stars are enabled.
      */
-    Donkeycraft.Sky.prototype.getStarsVisible = function() {
+    Donkeycraft.Sky.prototype.getStarsVisible = function () {
         return this._starsVisible;
     };
 
@@ -208,7 +208,7 @@
      * Set whether sun and moon are visible in the sky.
      * @param {boolean} visible - True to show sun/moon.
      */
-    Donkeycraft.Sky.prototype.setSunMoonVisible = function(visible) {
+    Donkeycraft.Sky.prototype.setSunMoonVisible = function (visible) {
         this._sunMoonVisible = !!visible;
     };
 
@@ -216,7 +216,7 @@
      * Check if sun and moon are currently visible.
      * @returns {boolean}
      */
-    Donkeycraft.Sky.prototype.getSunMoonVisible = function() {
+    Donkeycraft.Sky.prototype.getSunMoonVisible = function () {
         return this._sunMoonVisible;
     };
 
@@ -225,7 +225,7 @@
      * @param {number} t - Time value in [0, 1).
      * @returns {void}
      */
-    Donkeycraft.Sky.prototype.setTimeOfDay = function(t) {
+    Donkeycraft.Sky.prototype.setTimeOfDay = function (t) {
         this._timeOfDay = t - Math.floor(t);
         if (this._timeOfDay < 0) this._timeOfDay += 1;
     };
@@ -234,7 +234,7 @@
      * Get the current time of day.
      * @returns {number} Time value in [0, 1).
      */
-    Donkeycraft.Sky.prototype.getTimeOfDay = function() {
+    Donkeycraft.Sky.prototype.getTimeOfDay = function () {
         return this._timeOfDay;
     };
 
@@ -244,7 +244,7 @@
      * Depth write is disabled so the sun renders on top of terrain without corrupting depth.
      * @private
      */
-    Donkeycraft.Sky.prototype._renderSunDisc = function(sunDir, sunIntensity) {
+    Donkeycraft.Sky.prototype._renderSunDisc = function (camera, sunDir, sunIntensity) {
         var gl = this._gl;
         if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return false;
 
@@ -286,7 +286,7 @@
 
         for (var i = 0; i < vertCount; i++) {
             var base = i * 9;
-            buf[base]     = verts[base];     // position x
+            buf[base] = verts[base];     // position x
             buf[base + 1] = verts[base + 1]; // position y
             buf[base + 2] = verts[base + 2]; // position z
             buf[base + 3] = 0;               // uv u (unused)
@@ -300,6 +300,18 @@
         try {
             // Disable depth write so sun renders on top of terrain without corrupting depth buffer.
             gl.depthMask(false);
+
+            // Set camera matrices — GUI shader needs uProjection/uView for proper positioning.
+            var camData = camera.getMatrices();
+            this._shaderManager.setMat4('uProjection', camData.projection);
+
+            // Zero out view translation to keep sun at world position (no camera-relative offset).
+            for (var _si = 0; _si < 16; _si++) this._skyViewTemp[_si] = camData.view.getData()[_si];
+            this._skyViewTemp[12] = 0;
+            this._skyViewTemp[13] = 0;
+            this._skyViewTemp[14] = 0;
+            var sunViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+            this._shaderManager.setMat4('uView', sunViewMatrix);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this._sunVertBuf);
             gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
@@ -339,7 +351,7 @@
      * Depth write is disabled so the moon renders on top of terrain without corrupting depth.
      * @private
      */
-    Donkeycraft.Sky.prototype._renderMoonDisc = function(moonDir) {
+    Donkeycraft.Sky.prototype._renderMoonDisc = function (camera, moonDir) {
         var gl = this._gl;
         if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return false;
 
@@ -381,7 +393,7 @@
 
         for (var i = 0; i < vertCount; i++) {
             var base = i * 9;
-            buf[base]     = verts[base];
+            buf[base] = verts[base];
             buf[base + 1] = verts[base + 1];
             buf[base + 2] = verts[base + 2];
             buf[base + 3] = 0;
@@ -395,6 +407,18 @@
         try {
             // Disable depth write so moon renders on top of terrain without corrupting depth buffer.
             gl.depthMask(false);
+
+            // Set camera matrices — GUI shader needs uProjection/uView for proper positioning.
+            var camData2 = camera.getMatrices();
+            this._shaderManager.setMat4('uProjection', camData2.projection);
+
+            // Zero out view translation to keep moon at world position (no camera-relative offset).
+            for (var _mi = 0; _mi < 16; _mi++) this._skyViewTemp[_mi] = camData2.view.getData()[_mi];
+            this._skyViewTemp[12] = 0;
+            this._skyViewTemp[13] = 0;
+            this._skyViewTemp[14] = 0;
+            var moonViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+            this._shaderManager.setMat4('uView', moonViewMatrix);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this._moonVertBuf);
             gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
@@ -431,7 +455,7 @@
      * Render the star field as point sprites.
      * @private
      */
-    Donkeycraft.Sky.prototype._renderStars = function() {
+    Donkeycraft.Sky.prototype._renderStars = function () {
         var gl = this._gl;
         if (!gl || !this._starVertBuf || !this._starGeometry) return;
 
@@ -460,7 +484,7 @@
      * @param {Camera} camera - The camera instance.
      * @param {Lighting} lighting - The lighting system instance.
      */
-    Donkeycraft.Sky.prototype.render = function(camera, lighting) {
+    Donkeycraft.Sky.prototype.render = function (camera, lighting) {
         var gl = this._gl;
         if (!gl || !this._shaderManager) return;
 
@@ -523,14 +547,14 @@
         // ---- Sun disc (visible during day) — translucent overlay, depth write disabled ----
         if (this._sunMoonVisible && sunIntensity > 0.1) {
             var sunDir = lighting.getSunDirection();
-            this._renderSunDisc(sunDir, sunIntensity);
+            this._renderSunDisc(camera, sunDir, sunIntensity);
         }
 
         // ---- Moon disc (visible at night or twilight — translucent overlay) ----
         if (this._sunMoonVisible && sunIntensity < 0.8) {
             var sunD = lighting.getSunDirection();
             var moonDir = new Donkeycraft.Vector3(-sunD.x, -sunD.y, -sunD.z).normalized();
-            this._renderMoonDisc(moonDir);
+            this._renderMoonDisc(camera, moonDir);
         }
 
         // Restore sky shader for stars rendering.
@@ -579,7 +603,7 @@
     /**
      * Create persistent vertex and index buffers for all sky elements.
      */
-    Donkeycraft.Sky.prototype._initBuffers = function() {
+    Donkeycraft.Sky.prototype._initBuffers = function () {
         var gl = this._gl;
         if (!gl) return;
 
@@ -627,7 +651,7 @@
     /**
      * Destroy sky resources and free GPU memory.
      */
-    Donkeycraft.Sky.prototype.destroy = function() {
+    Donkeycraft.Sky.prototype.destroy = function () {
         var gl = this._gl;
         if (!gl) return;
 

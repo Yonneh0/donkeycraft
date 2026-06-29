@@ -1,6 +1,6 @@
 // Donkeycraft — Terrain Generator
 // Heightmap generation: Perlin noise layers, biome height variation, shore/beach/cliff.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -16,7 +16,7 @@
      * TerrainGenerator — generates heightmaps and terrain for chunks.
      * This is a module object (IIFE), not a constructor. All methods are static.
      */
-    Donkeycraft.TerrainGenerator = (function() {
+    Donkeycraft.TerrainGenerator = (function () {
 
         /**
          * Get the module object itself as the "instance".

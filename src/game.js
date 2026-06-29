@@ -1,7 +1,7 @@
 // Donkeycraft — Main Game Class
 // Main game class: initialization, main loop (update + render), pause/resume.
 // Orchestrates all subsystems including WebGL rendering, player physics, chunk management, and GUI.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -13,7 +13,7 @@
      * @param {number} [options.renderDistance] - Override render distance (uses Config.RENDER_DISTANCE if null).
      * @param {string} [options.gameMode] - Starting game mode ('survival', 'creative', 'spectator').
      */
-    Donkeycraft.Game = function(options) {
+    Donkeycraft.Game = function (options) {
         options = options || {};
 
         this._renderDistance = options.renderDistance || Config.RENDER_DISTANCE;
@@ -117,7 +117,7 @@
      * Initialize all subsystems and prepare for the game loop.
      * @returns {boolean} True if initialization succeeded.
      */
-    Donkeycraft.Game.prototype.init = function() {
+    Donkeycraft.Game.prototype.init = function () {
         try {
             // Get canvas element
             this._canvas = document.getElementById('dk-canvas');
@@ -263,7 +263,7 @@
 
             // Set up world data access for terrain renderer
             var self = this;
-            this._terrainRenderer.setWorldData(function(wx, wy, wz) {
+            this._terrainRenderer.setWorldData(function (wx, wy, wz) {
                 return self._getBlockAt(wx, wy, wz);
             });
 
@@ -271,14 +271,14 @@
             // Do NOT overwrite onChunkLoad — dimension.js already wires terrain generation there.
             var cm = this._chunkManager;
             var existingUnload = cm.onChunkUnload;
-            cm.onChunkUnload = function(chunk) {
+            cm.onChunkUnload = function (chunk) {
                 if (existingUnload) existingUnload(chunk);
                 self._terrainRenderer.markChunkDirty(chunk.chunkX, chunk.chunkZ);
             };
 
             // Wire dirty-chunk callback to notify the terrain renderer
             var existingChanged = cm.onChunksChanged;
-            cm.onChunksChanged = function() {
+            cm.onChunksChanged = function () {
                 if (existingChanged) existingChanged();
                 var dirty = cm.getDirtyChunks();
                 for (var _i = 0; _i < dirty.length; _i++) {
@@ -333,7 +333,7 @@
      * Also wires the chunk manager reference so saveDirtyChunks() can access dirty chunks.
      * @param {Donkeycraft.WorldStore} worldStore — WorldStore instance.
      */
-    Donkeycraft.Game.prototype.setWorldStore = function(worldStore) {
+    Donkeycraft.Game.prototype.setWorldStore = function (worldStore) {
         this._worldStore = worldStore;
         // Wire chunk manager reference for saveDirtyChunks()
         if (worldStore && worldStore.setChunkManager && this._chunkManager) {
@@ -347,7 +347,7 @@
      * @param {Donkeycraft.LevelData} levelData — LevelData instance.
      * @param {string} [worldName=default] — World name for auto-save targeting.
      */
-    Donkeycraft.Game.prototype.setLevelData = function(levelData, worldName) {
+    Donkeycraft.Game.prototype.setLevelData = function (levelData, worldName) {
         this._levelData = levelData || null;
         // Activate periodic auto-save if LevelData and WorldStore are both available
         if (levelData && this._worldStore && worldName) {
@@ -366,7 +366,7 @@
      * setHotbar — set the hotbar UI reference for key-based slot selection.
      * @param {Donkeycraft.Hotbar} hotbar - Hotbar instance.
      */
-    Donkeycraft.Game.prototype.setHotbar = function(hotbar) {
+    Donkeycraft.Game.prototype.setHotbar = function (hotbar) {
         this._hotbar = hotbar || null;
     };
 
@@ -374,7 +374,7 @@
      * setGuiManager — set the GUI manager for screen management.
      * @param {Donkeycraft.GuiManager} guiManager - GuiManager instance.
      */
-    Donkeycraft.Game.prototype.setGuiManager = function(guiManager) {
+    Donkeycraft.Game.prototype.setGuiManager = function (guiManager) {
         this._guiManager = guiManager || null;
     };
 
@@ -382,7 +382,7 @@
      * toggleDebugOverlay — toggles the F3 debug overlay visibility using CSS class.
      * @returns {boolean} True if debug is now visible.
      */
-    Donkeycraft.Game.prototype.toggleDebugOverlay = function() {
+    Donkeycraft.Game.prototype.toggleDebugOverlay = function () {
         this._debugVisible = !this._debugVisible;
         var overlay = document.getElementById('dk-debug-overlay');
         if (overlay) {
@@ -395,7 +395,7 @@
      * isDebugVisible — checks if debug overlay is currently visible.
      * @returns {boolean}
      */
-    Donkeycraft.Game.prototype.isDebugVisible = function() {
+    Donkeycraft.Game.prototype.isDebugVisible = function () {
         return this._debugVisible;
     };
 
@@ -416,7 +416,7 @@
      * @param {Function} [hungerConstructor] - Hunger system constructor function (optional).
      * @returns {boolean} True if all systems were set successfully.
      */
-    Donkeycraft.Game.prototype.setSystems = function(
+    Donkeycraft.Game.prototype.setSystems = function (
         movementSystem, collisionSystem, jumpSystem, flyingSystem,
         raycastSystem, blockActionSystem, blockPlacementSystem, interactableBlocksSystem,
         redstoneEngine, hurtBoxConstructor, hungerConstructor
@@ -631,7 +631,7 @@
      * @param {string} worldName - World name identifier.
      * @returns {Promise<number>|number} Promise resolving to chunk count saved, or 0 if not available.
      */
-    Donkeycraft.Game.prototype._saveDirtyChunks = function(worldName) {
+    Donkeycraft.Game.prototype._saveDirtyChunks = function (worldName) {
         if (!this._worldStore || !this._worldStore.isReady()) {
             return 0;
         }
@@ -651,7 +651,7 @@
      * to break the render-before-tick deadlock where terrain rendering
      * would run with zero loaded chunks.
      */
-    Donkeycraft.Game.prototype.start = function() {
+    Donkeycraft.Game.prototype.start = function () {
         if (this._running) return;
 
         this._running = true;
@@ -673,11 +673,11 @@
 
         // Register tick and render callbacks
         var self = this;
-        this._unsubscribeTick = this._timer.onTick(function(dt, tickCount) {
+        this._unsubscribeTick = this._timer.onTick(function (dt, tickCount) {
             self._tick(dt, tickCount);
         });
 
-        this._unsubscribeRender = this._timer.onRender(function(dt) {
+        this._unsubscribeRender = this._timer.onRender(function (dt) {
             self._render(dt);
         });
 
@@ -699,7 +699,7 @@
     /**
      * Stop the game loop.
      */
-    Donkeycraft.Game.prototype.stop = function() {
+    Donkeycraft.Game.prototype.stop = function () {
         if (!this._running) return;
 
         this._running = false;
@@ -725,7 +725,7 @@
     /**
      * Pause the game loop.
      */
-    Donkeycraft.Game.prototype.pause = function() {
+    Donkeycraft.Game.prototype.pause = function () {
         if (!this._running || this._paused) return;
         this._paused = true;
         if (this._timer) {
@@ -737,7 +737,7 @@
     /**
      * Resume the game loop.
      */
-    Donkeycraft.Game.prototype.resume = function() {
+    Donkeycraft.Game.prototype.resume = function () {
         if (!this._running || !this._paused) return;
         this._paused = false;
         if (this._timer) {
@@ -750,7 +750,7 @@
      * isRunning — check if the game is currently running.
      * @returns {boolean}
      */
-    Donkeycraft.Game.prototype.isRunning = function() {
+    Donkeycraft.Game.prototype.isRunning = function () {
         return this._running;
     };
 
@@ -758,7 +758,7 @@
      * Check if the game is paused.
      * @returns {boolean}
      */
-    Donkeycraft.Game.prototype.isPaused = function() {
+    Donkeycraft.Game.prototype.isPaused = function () {
         return this._paused;
     };
 
@@ -766,7 +766,7 @@
      * Get the current FPS.
      * @returns {number}
      */
-    Donkeycraft.Game.prototype.getFPS = function() {
+    Donkeycraft.Game.prototype.getFPS = function () {
         if (this._timer) {
             return this._timer.getFPS();
         }
@@ -777,7 +777,7 @@
      * Get the current game tick count.
      * @returns {number}
      */
-    Donkeycraft.Game.prototype.getTickCount = function() {
+    Donkeycraft.Game.prototype.getTickCount = function () {
         if (this._timer) {
             return this._timer.getTickCount();
         }
@@ -788,7 +788,7 @@
      * Get the player entity.
      * @returns {Donkeycraft.Player}
      */
-    Donkeycraft.Game.prototype.getPlayer = function() {
+    Donkeycraft.Game.prototype.getPlayer = function () {
         return this._player;
     };
 
@@ -796,7 +796,7 @@
      * Get the camera.
      * @returns {Donkeycraft.Camera}
      */
-    Donkeycraft.Game.prototype.getCamera = function() {
+    Donkeycraft.Game.prototype.getCamera = function () {
         return this._camera;
     };
 
@@ -804,7 +804,7 @@
      * Get the chunk manager.
      * @returns {Donkeycraft.ChunkManager}
      */
-    Donkeycraft.Game.prototype.getChunkManager = function() {
+    Donkeycraft.Game.prototype.getChunkManager = function () {
         return this._chunkManager;
     };
 
@@ -812,7 +812,7 @@
      * Get the input handler.
      * @returns {Donkeycraft.Input}
      */
-    Donkeycraft.Game.prototype.getInput = function() {
+    Donkeycraft.Game.prototype.getInput = function () {
         return this._input;
     };
 
@@ -820,7 +820,7 @@
      * Get the timer.
      * @returns {Donkeycraft.Timer}
      */
-    Donkeycraft.Game.prototype.getTimer = function() {
+    Donkeycraft.Game.prototype.getTimer = function () {
         return this._timer;
     };
 
@@ -828,7 +828,7 @@
      * Get the event bus.
      * @returns {Donkeycraft.EventBus}
      */
-    Donkeycraft.Game.prototype.getEventBus = function() {
+    Donkeycraft.Game.prototype.getEventBus = function () {
         return this._eventBus;
     };
 
@@ -836,7 +836,7 @@
      * setOverlay — set the overlay DOM element used for pointer lock target.
      * @param {HTMLElement} overlayEl - The overlay container element.
      */
-    Donkeycraft.Game.prototype.setOverlay = function(overlayEl) {
+    Donkeycraft.Game.prototype.setOverlay = function (overlayEl) {
         this._overlay = overlayEl;
     };
 
@@ -844,7 +844,7 @@
      * isPointerLocked — check if pointer lock is currently active.
      * @returns {boolean} True if pointer is locked.
      */
-    Donkeycraft.Game.prototype.isPointerLocked = function() {
+    Donkeycraft.Game.prototype.isPointerLocked = function () {
         return document.pointerLockElement !== null;
     };
 
@@ -852,14 +852,14 @@
      * Enable or disable camera synchronization with player.
      * @param {boolean} enabled - Whether to sync camera to player.
      */
-    Donkeycraft.Game.prototype.setCameraSync = function(enabled) {
+    Donkeycraft.Game.prototype.setCameraSync = function (enabled) {
         this._cameraSyncEnabled = !!enabled;
     };
 
     /**
      * Request pointer lock for mouse capture.
      */
-    Donkeycraft.Game.prototype.requestPointerLock = function() {
+    Donkeycraft.Game.prototype.requestPointerLock = function () {
         if (this._overlay) {
             this._overlay.requestPointerLock();
         } else {
@@ -870,7 +870,7 @@
     /**
      * Exit pointer lock.
      */
-    Donkeycraft.Game.prototype.exitPointerLock = function() {
+    Donkeycraft.Game.prototype.exitPointerLock = function () {
         if (document.pointerLockElement) {
             document.exitPointerLock();
         }
@@ -879,7 +879,7 @@
     /**
      * Destroy the game and free all resources.
      */
-    Donkeycraft.Game.prototype.destroy = function() {
+    Donkeycraft.Game.prototype.destroy = function () {
         // Stop the game loop
         this.stop();
 
@@ -996,29 +996,29 @@
         var self = this;
         if (this._levelData && this._levelData.persistToStore) {
             try {
-                this._levelData.persistToStore().then(function() {
+                this._levelData.persistToStore().then(function () {
                     Donkeycraft.Logger.info('Game', 'Final world state saved on destroy');
                     // Now destroy WorldStore after LevelData persist completes
                     if (self._worldStore && self._worldStore.destroy) {
-                        try { self._worldStore.destroy(); } catch (e2) {}
+                        try { self._worldStore.destroy(); } catch (e2) { }
                     }
-                }).catch(function() {
+                }).catch(function () {
                     Donkeycraft.Logger.warn('Game', 'Final world save failed on destroy — destroying WorldStore anyway');
                     if (self._worldStore && self._worldStore.destroy) {
-                        try { self._worldStore.destroy(); } catch (e2) {}
+                        try { self._worldStore.destroy(); } catch (e2) { }
                     }
                 });
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Final world save error: ' + e.message);
                 if (this._worldStore && this._worldStore.destroy) {
-                    try { this._worldStore.destroy(); } catch (e2) {}
+                    try { this._worldStore.destroy(); } catch (e2) { }
                 }
             }
         } else if (this._worldStore && this._worldStore.destroy) {
             // No LevelData to persist — destroy WorldStore directly
             try {
                 this._worldStore.destroy();
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // Clean up auto-save timer
@@ -1039,7 +1039,7 @@
      * @param {string} sourceId - The id attribute of the script tag.
      * @returns {string|null} Raw text content or null.
      */
-    Donkeycraft.Game.prototype._loadShaderSource = function(sourceId) {
+    Donkeycraft.Game.prototype._loadShaderSource = function (sourceId) {
         var script = document.getElementById(sourceId);
         if (!script) return null;
         return script.textContent || script.innerText || '';
@@ -1053,7 +1053,7 @@
      * @param {string} varName - Variable name to extract (e.g., 'TERRAIN_VERTEX_SHADER').
      * @returns {string|null} The GLSL shader body (without backticks), or null.
      */
-    Donkeycraft.Game.prototype._extractVariable = function(source, varName) {
+    Donkeycraft.Game.prototype._extractVariable = function (source, varName) {
         if (!source) return null;
         // Match: var NAME = ` ... `;
         // Use non-greedy match for template literal content
@@ -1071,7 +1071,7 @@
      * @param {string} str - String to escape.
      * @returns {string} Escaped string.
      */
-    Donkeycraft.Game.prototype._escapeRegex = function(str) {
+    Donkeycraft.Game.prototype._escapeRegex = function (str) {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
 
@@ -1080,7 +1080,7 @@
      * Parses JavaScript variable declarations: var NAME = `GLSL...`;
      * @private
      */
-    Donkeycraft.Game.prototype._compileShaderPrograms = function() {
+    Donkeycraft.Game.prototype._compileShaderPrograms = function () {
         var vertSrc = this._loadShaderSource('dk-vertex-shaders');
         var fragSrc = this._loadShaderSource('dk-fragment-shaders');
 
@@ -1096,7 +1096,7 @@
 
         // Extract and compile individual shader programs with error handling
         var self2 = this;
-        var _compileShaderPair = function(name, vertName, fragName) {
+        var _compileShaderPair = function (name, vertName, fragName) {
             var vertSrc2 = self2._extractVariable(vertSrc, vertName);
             var fragSrc2 = self2._extractVariable(fragSrc, fragName);
 
@@ -1136,7 +1136,7 @@
      * Includes ALL required uniforms to prevent missing uniform warnings.
      * @private
      */
-    Donkeycraft.Game.prototype._compileFallbackShaders = function() {
+    Donkeycraft.Game.prototype._compileFallbackShaders = function () {
         // Minimal terrain shader with fog uniforms
         this._shaderManager.createProgram('terrain',
             'attribute vec3 aPosition;\n' +
@@ -1307,7 +1307,7 @@
      * Resize the canvas to fit the window.
      * @private
      */
-    Donkeycraft.Game.prototype._resizeCanvas = function() {
+    Donkeycraft.Game.prototype._resizeCanvas = function () {
         if (!this._canvas || !this._gl) return;
 
         var w = window.innerWidth;
@@ -1331,7 +1331,7 @@
      * @private
      * @returns {number} Time of day in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
      */
-    Donkeycraft.Game.prototype._getTimeOfDay = function() {
+    Donkeycraft.Game.prototype._getTimeOfDay = function () {
         var tickCount = this.getTickCount();
         var ticksPerDay = Config.WORLD_TIME_SCALE * 60; // 60-second full day cycle
         return ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay;
@@ -1345,7 +1345,7 @@
      * @param {number} wz - World Z coordinate.
      * @returns {number} Block ID at the given position.
      */
-    Donkeycraft.Game.prototype._getBlockAt = function(wx, wy, wz) {
+    Donkeycraft.Game.prototype._getBlockAt = function (wx, wy, wz) {
         // Check world bounds
         if (wy < 0 || wy >= Config.WORLD_HEIGHT) return 0;
 
@@ -1368,7 +1368,7 @@
      * @param {number} dt - Delta time in seconds.
      * @param {number} tickCount - Current game tick count.
      */
-    Donkeycraft.Game.prototype._tick = function(dt, tickCount) {
+    Donkeycraft.Game.prototype._tick = function (dt, tickCount) {
         if (!this._running || this._paused) return;
 
         // Update input key states and mouse button states (for just-pressed detection).
@@ -1427,7 +1427,7 @@
                         this._hotbar.setSlots(hotbarStacks);
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // Auto-save chunks: accumulate time and save at Config.AUTO_SAVE_INTERVAL
@@ -1442,9 +1442,9 @@
 
                 var savePromise = this._saveDirtyChunks(worldName);
                 if (savePromise && typeof savePromise.then === 'function') {
-                    savePromise.then(function(count) {
+                    savePromise.then(function (count) {
                         Donkeycraft.Logger.info('Game', 'Auto-saved ' + count + ' chunks to world: ' + worldName);
-                    }).catch(function(e) {
+                    }).catch(function (e) {
                         Donkeycraft.Logger.warn('Game', 'Auto-save failed: ' + (e && e.message ? e.message : String(e)));
                     });
                 } else if (typeof savePromise === 'number') {
@@ -1494,7 +1494,7 @@
      * @private
      * @param {number} dt - Delta time in seconds.
      */
-    Donkeycraft.Game.prototype._updatePlayer = function(dt) {
+    Donkeycraft.Game.prototype._updatePlayer = function (dt) {
         if (!this._player || !this._camera) return;
 
         // Update player rotation from camera (yaw/pitch from mouse look).
@@ -1532,7 +1532,7 @@
      * Update chunk loading/unloading based on player position.
      * @private
      */
-    Donkeycraft.Game.prototype._updateChunks = function() {
+    Donkeycraft.Game.prototype._updateChunks = function () {
         if (!this._player || !this._chunkManager || !this._terrainRenderer) return;
 
         var pos = this._player.getPosition();
@@ -1563,7 +1563,7 @@
      * Uses _chunkForceLoaded flag to run exactly once, avoiding per-frame overhead.
      * @private
      */
-    Donkeycraft.Game.prototype._forceChunkLoad = function() {
+    Donkeycraft.Game.prototype._forceChunkLoad = function () {
         // Guard: only run once per game session
         if (this._chunkForceLoaded) return;
         this._chunkForceLoaded = true;
@@ -1590,7 +1590,7 @@
      * @private
      * @returns {boolean} True if the cooldown has elapsed and interactions should be processed.
      */
-    Donkeycraft.Game.prototype._shouldProcessInteraction = function() {
+    Donkeycraft.Game.prototype._shouldProcessInteraction = function () {
         var now = performance.now();
         var elapsed = now - this._lastInteractionTime;
         if (elapsed >= this._INTERACTION_COOLDOWN_MS) {
@@ -1608,7 +1608,7 @@
      * @param {number} bz - Block Z coordinate.
      * @returns {boolean} True if the block would overlap the player.
      */
-    Donkeycraft.Game.prototype._wouldOverlapPlayer = function(bx, by, bz) {
+    Donkeycraft.Game.prototype._wouldOverlapPlayer = function (bx, by, bz) {
         var pos = this._player.getPosition();
         var halfW = this._playerWidth / 2;
         var pxMinX = pos.x - halfW;
@@ -1620,8 +1620,8 @@
 
         // Block AABB: [bx, bx+1] x [by, by+1] x [bz, bz+1]
         return (pxMaxX > bx && pxMinX < bx + 1 &&
-                pxMaxY > by && pxMinY < by + 1 &&
-                pxMaxZ > bz && pxMinZ < bz + 1);
+            pxMaxY > by && pxMinY < by + 1 &&
+            pxMaxZ > bz && pxMinZ < bz + 1);
     };
 
     /**
@@ -1629,7 +1629,7 @@
      * @private
      * @returns {number} The block ID to place, or 1 (stone) as fallback.
      */
-    Donkeycraft.Game.prototype._getSelectedBlockId = function() {
+    Donkeycraft.Game.prototype._getSelectedBlockId = function () {
         // Try to get from hotbar first
         if (this._hotbar && this._hotbar.getSelectedSlot !== undefined) {
             var slot = this._hotbar.getSelectedSlot();
@@ -1652,7 +1652,7 @@
      * Process block interactions (break/place).
      * @private
      */
-    Donkeycraft.Game.prototype._processInteractions = function() {
+    Donkeycraft.Game.prototype._processInteractions = function () {
         if (!this._raycastSystem || !this._chunkManager || !this._player) return;
 
         // Only process interactions when pointer is locked
@@ -1721,7 +1721,7 @@
      * @private
      * @param {number} dt - Delta time in seconds.
      */
-    Donkeycraft.Game.prototype._render = function(dt) {
+    Donkeycraft.Game.prototype._render = function (dt) {
         if (!this._running || !this._gl || this._paused) {
             return;
         }
@@ -1830,7 +1830,7 @@
             try {
                 var activeChunks = this._chunkManager ? this._chunkManager.getAllChunks() : [];
                 var self = this;
-                this._wireframeRenderer.render(this._camera, function(wx, wy, wz) {
+                this._wireframeRenderer.render(this._camera, function (wx, wy, wz) {
                     return self._getBlockAt(wx, wy, wz);
                 }, activeChunks);
             } catch (e) {

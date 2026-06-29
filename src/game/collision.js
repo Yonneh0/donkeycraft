@@ -1,6 +1,6 @@
 // Donkeycraft — Collision Detection
 // AABB collision detection & response against blocks, entity bounds.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
     /**
      * Collision — handles AABB collision detection and response against blocks.
      */
-    Donkeycraft.Collision = function(chunkManager, config) {
+    Donkeycraft.Collision = function (chunkManager, config) {
         this._chunkManager = chunkManager;
         this._config = config || {};
     };
@@ -26,7 +26,7 @@
      * @param {number} deltaZ - Proposed Z movement.
      * @returns {{collisionX: boolean, collisionY: boolean, collisionZ: boolean}}
      */
-    Donkeycraft.Collision.prototype.checkMovement = function(position, width, height, deltaX, deltaY, deltaZ) {
+    Donkeycraft.Collision.prototype.checkMovement = function (position, width, height, deltaX, deltaY, deltaZ) {
         var halfWidth = width / 2;
 
         // Build AABB before movement
@@ -72,7 +72,7 @@
      * @param {number} height - Player height.
      * @returns {{newX: number, newY: number, newZ: number, onGround: boolean}}
      */
-    Donkeycraft.Collision.prototype.resolveMovement = function(position, velocity, width, height) {
+    Donkeycraft.Collision.prototype.resolveMovement = function (position, velocity, width, height) {
         var halfWidth = width / 2;
         var deltaX = velocity.x;
         var deltaY = velocity.y;
@@ -147,7 +147,7 @@
      * @param {number} globalZ - Global Z coordinate.
      * @returns {boolean} True if the block is solid.
      */
-    Donkeycraft.Collision.prototype.isBlockSolid = function(globalX, globalY, globalZ) {
+    Donkeycraft.Collision.prototype.isBlockSolid = function (globalX, globalY, globalZ) {
         // Clamp Y to world bounds
         if (globalY < 0 || globalY >= WORLD_HEIGHT) {
             return globalY < 0; // Below world = solid bedrock
@@ -178,7 +178,7 @@
      * @param {number} globalZ - Global Z coordinate.
      * @returns {boolean} True if the block is replaceable.
      */
-    Donkeycraft.Collision.prototype.isBlockReplaceable = function(globalX, globalY, globalZ) {
+    Donkeycraft.Collision.prototype.isBlockReplaceable = function (globalX, globalY, globalZ) {
         if (globalY < 0 || globalY >= WORLD_HEIGHT) {
             return false;
         }
@@ -208,7 +208,7 @@
      * @param {number} globalZ - Global Z coordinate.
      * @returns {boolean} True if the block is a liquid.
      */
-    Donkeycraft.Collision.prototype.isBlockLiquid = function(globalX, globalY, globalZ) {
+    Donkeycraft.Collision.prototype.isBlockLiquid = function (globalX, globalY, globalZ) {
         if (globalY < 0 || globalY >= WORLD_HEIGHT) {
             return false;
         }
@@ -237,7 +237,7 @@
      * @param {number} maxZ - Maximum Z of AABB.
      * @returns {Array<{x: number, y: number, z: number, blockId: number}>}
      */
-    Donkeycraft.Collision.prototype.getOverlappingBlocks = function(minX, minY, minZ, maxX, maxY, maxZ) {
+    Donkeycraft.Collision.prototype.getOverlappingBlocks = function (minX, minY, minZ, maxX, maxY, maxZ) {
         var blocks = [];
 
         // Iterate over all integer block positions within the AABB
@@ -273,7 +273,7 @@
      * @returns {boolean} True if overlapping with a solid block.
      * @private
      */
-    Donkeycraft.Collision.prototype._checkAABBAgainstBlocks = function(minX, minY, minZ, maxX, maxY, maxZ) {
+    Donkeycraft.Collision.prototype._checkAABBAgainstBlocks = function (minX, minY, minZ, maxX, maxY, maxZ) {
         var startX = Math.floor(minX);
         var endX = Math.ceil(maxX);
         var startY = Math.floor(minY);
@@ -302,7 +302,7 @@
      * @returns {number} Block ID (0 = air).
      * @private
      */
-    Donkeycraft.Collision.prototype._getBlockIdAt = function(globalX, globalY, globalZ) {
+    Donkeycraft.Collision.prototype._getBlockIdAt = function (globalX, globalY, globalZ) {
         if (globalY < 0 || globalY >= WORLD_HEIGHT) {
             return 0;
         }
@@ -328,7 +328,7 @@
      * @param {Array} entities - Array of entity objects with getPosition() and getDimensions().
      * @returns {null|object} The overlapping entity, or null.
      */
-    Donkeycraft.Collision.prototype.checkEntityCollision = function(position, width, height, entities) {
+    Donkeycraft.Collision.prototype.checkEntityCollision = function (position, width, height, entities) {
         var halfWidth = width / 2;
         var playerMinX = position.x - halfWidth;
         var playerMaxX = position.x + halfWidth;
@@ -370,14 +370,14 @@
      * Get the chunk manager reference.
      * @returns {Donkeycraft.ChunkManager}
      */
-    Donkeycraft.Collision.prototype.getChunkManager = function() {
+    Donkeycraft.Collision.prototype.getChunkManager = function () {
         return this._chunkManager;
     };
 
     /**
      * Destroy the collision system and free resources.
      */
-    Donkeycraft.Collision.prototype.destroy = function() {
+    Donkeycraft.Collision.prototype.destroy = function () {
         this._chunkManager = null;
         this._config = null;
     };

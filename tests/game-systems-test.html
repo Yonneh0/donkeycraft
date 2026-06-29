@@ -1,663 +1,668 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Donkeycraft — Game Systems Test</title>
-<link rel="stylesheet" href="test.css">
+    <meta charset="UTF-8">
+    <title>Donkeycraft — Game Systems Test</title>
+    <link rel="stylesheet" href="test.css">
 </head>
+
 <body>
-<h1>Donkeycraft — Game Systems Test</h1>
-<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Comprehensive functional tests for Enchantment, Potion, and Tool modules — including cross-module integration with UI systems.</div>
+    <h1>Donkeycraft — Game Systems Test</h1>
+    <nav style="margin-bottom: 12px;"><a href="index.html"
+            style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+    <div class="subtitle">Comprehensive functional tests for Enchantment, Potion, and Tool modules — including
+        cross-module integration with UI systems.</div>
+
+    <!-- Summary is auto-created at top by TestFramework.init() -->
+    <div id="results"></div>
 
-<!-- Summary is auto-created at top by TestFramework.init() -->
-<div id="results"></div>
+    <!-- Load project scripts in dependency order -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+    <script src="../src/core/timer.js"></script>
 
-<!-- Load project scripts in dependency order -->
-<script src="../src/core/namespace.js"></script>
-<script src="../src/core/eventbus.js"></script>
-<script src="../src/core/config.js"></script>
-<script src="../src/core/logger.js"></script>
-<script src="../src/core/timer.js"></script>
+    <!-- Game Systems modules -->
+    <script src="../src/game/enchantment.js"></script>
+    <script src="../src/game/potion.js"></script>
+    <script src="../src/game/tool.js"></script>
 
-<!-- Game Systems modules -->
-<script src="../src/game/enchantment.js"></script>
-<script src="../src/game/potion.js"></script>
-<script src="../src/game/tool.js"></script>
+    <!-- Load shared test framework (MUST come before the test script) -->
+    <script src="test.js"></script>
 
-<!-- Load shared test framework (MUST come before the test script) -->
-<script src="test.js"></script>
+    <!-- Your test script -->
+    <script>
+        (function () {
+            'use strict';
 
-<!-- Your test script -->
-<script>
-(function() {
-    'use strict';
+            // Get the shared framework instance
+            var F = TestFramework;
 
-    // Get the shared framework instance
-    var F = TestFramework;
+            // Initialize: creates #test-summary at top, uses existing #results div
+            F.init('results');
 
-    // Initialize: creates #test-summary at top, uses existing #results div
-    F.init('results');
+            // ============================================================
+            // Section 1: Enchantment System
+            // ============================================================
+            F.section('1. Enchantment System');
 
-    // ============================================================
-    // Section 1: Enchantment System
-    // ============================================================
-    F.section('1. Enchantment System');
+            // --- 1a. EnchantmentRegistry Registration ---
+            F.section('1a. EnchantmentRegistry Registration');
 
-    // --- 1a. EnchantmentRegistry Registration ---
-    F.section('1a. EnchantmentRegistry Registration');
+            F.assertType(Donkeycraft.Enchantment, 'function', 'Donkeycraft.Enchantment constructor exists');
+            F.assertType(Donkeycraft.EnchantmentRegistry, 'object', 'Donkeycraft.EnchantmentRegistry exists');
+            F.assertType(Donkeycraft.EnchantmentRegistry.getEnchantmentCount, 'function', 'getEnchantmentCount is a function');
 
-    F.assertType(Donkeycraft.Enchantment, 'function', 'Donkeycraft.Enchantment constructor exists');
-    F.assertType(Donkeycraft.EnchantmentRegistry, 'object', 'Donkeycraft.EnchantmentRegistry exists');
-    F.assertType(Donkeycraft.EnchantmentRegistry.getEnchantmentCount, 'function', 'getEnchantmentCount is a function');
+            var enchantCount = Donkeycraft.EnchantmentRegistry.getEnchantmentCount();
+            F.assert(enchantCount >= 26, 'At least 26 enchantments registered (got ' + enchantCount + ')');
 
-    var enchantCount = Donkeycraft.EnchantmentRegistry.getEnchantmentCount();
-    F.assert(enchantCount >= 26, 'At least 26 enchantments registered (got ' + enchantCount + ')');
+            // --- 1b. Enchantment Lookup by ID ---
+            F.section('1b. Enchantment Lookup by ID');
 
-    // --- 1b. Enchantment Lookup by ID ---
-    F.section('1b. Enchantment Lookup by ID');
+            var sharpness = Donkeycraft.EnchantmentRegistry.getEnchantment(1);
+            F.assertType(sharpness, 'object', 'Sharpness (ID 1) lookup returns object');
+            F.assertEq(sharpness.name, 'Sharpness', 'Sharpness name is correct');
+            F.assertEq(sharpness.maxLevel, 5, 'Sharpness max level is 5');
+            F.assertEq(sharpness.weight, 10, 'Sharpness weight is 10');
 
-    var sharpness = Donkeycraft.EnchantmentRegistry.getEnchantment(1);
-    F.assertType(sharpness, 'object', 'Sharpness (ID 1) lookup returns object');
-    F.assertEq(sharpness.name, 'Sharpness', 'Sharpness name is correct');
-    F.assertEq(sharpness.maxLevel, 5, 'Sharpness max level is 5');
-    F.assertEq(sharpness.weight, 10, 'Sharpness weight is 10');
+            var smite = Donkeycraft.EnchantmentRegistry.getEnchantment(2);
+            F.assertType(smite, 'object', 'Smite (ID 2) lookup returns object');
+            F.assertEq(smite.name, 'Smite', 'Smite name is correct');
 
-    var smite = Donkeycraft.EnchantmentRegistry.getEnchantment(2);
-    F.assertType(smite, 'object', 'Smite (ID 2) lookup returns object');
-    F.assertEq(smite.name, 'Smite', 'Smite name is correct');
+            var nonexistent = Donkeycraft.EnchantmentRegistry.getEnchantment(999);
+            F.assert(nonexistent === null, 'Non-existent enchantment ID returns null');
 
-    var nonexistent = Donkeycraft.EnchantmentRegistry.getEnchantment(999);
-    F.assert(nonexistent === null, 'Non-existent enchantment ID returns null');
+            // --- 1c. Enchantment Lookup by Name ---
+            F.section('1c. Enchantment Lookup by Name');
 
-    // --- 1c. Enchantment Lookup by Name ---
-    F.section('1c. Enchantment Lookup by Name');
+            var byName = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('protection');
+            F.assertType(byName, 'object', 'getEnchantmentByName returns object for "protection"');
+            F.assertEq(byName.id, 4, 'Protection ID is 4 (case-insensitive lookup)');
 
-    var byName = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('protection');
-    F.assertType(byName, 'object', 'getEnchantmentByName returns object for "protection"');
-    F.assertEq(byName.id, 4, 'Protection ID is 4 (case-insensitive lookup)');
+            var byNameUpper = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('MENDING');
+            F.assertType(byNameUpper, 'object', 'getEnchantmentByName works with uppercase');
+            F.assertEq(byNameUpper.id, 16, 'Mending ID is 16 (case-insensitive)');
 
-    var byNameUpper = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('MENDING');
-    F.assertType(byNameUpper, 'object', 'getEnchantmentByName works with uppercase');
-    F.assertEq(byNameUpper.id, 16, 'Mending ID is 16 (case-insensitive)');
+            var byNameNull = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('NonExistent');
+            F.assert(byNameNull === null, 'Non-existent name returns null');
 
-    var byNameNull = Donkeycraft.EnchantmentRegistry.getEnchantmentByName('NonExistent');
-    F.assert(byNameNull === null, 'Non-existent name returns null');
+            // --- 1d. Compatibility Checks ---
+            F.section('1d. Enchantment Compatibility');
 
-    // --- 1d. Compatibility Checks ---
-    F.section('1d. Enchantment Compatibility');
+            F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 2), 'Sharpness and Smite are incompatible');
+            F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 3), 'Sharpness and BaneOfArthropods are incompatible');
+            F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(2, 3), 'Smite and BaneOfArthropods are incompatible');
 
-    F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 2), 'Sharpness and Smite are incompatible');
-    F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 3), 'Sharpness and BaneOfArthropods are incompatible');
-    F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(2, 3), 'Smite and BaneOfArthropods are incompatible');
+            F.assert(Donkeycraft.EnchantmentRegistry.areCompatible(1, 10), 'Sharpness and Efficiency are compatible');
+            F.assert(Donkeycraft.EnchantmentRegistry.areCompatible(1, 11), 'Sharpness and Unbreaking are compatible');
+            // Protection and FireProtection ARE incompatible (both general protection enchantments)
+            F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(4, 5), 'Protection and FireProtection are incompatible');
 
-    F.assert(Donkeycraft.EnchantmentRegistry.areCompatible(1, 10), 'Sharpness and Efficiency are compatible');
-    F.assert(Donkeycraft.EnchantmentRegistry.areCompatible(1, 11), 'Sharpness and Unbreaking are compatible');
-    // Protection and FireProtection ARE incompatible (both general protection enchantments)
-    F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(4, 5), 'Protection and FireProtection are incompatible');
+            // Test with non-existent enchantment
+            F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 999), 'Incompatible with non-existent enchantment returns false');
 
-    // Test with non-existent enchantment
-    F.assert(!Donkeycraft.EnchantmentRegistry.areCompatible(1, 999), 'Incompatible with non-existent enchantment returns false');
+            // --- 1e. Item Slot Application ---
+            F.section('1e. Item Slot Application');
 
-    // --- 1e. Item Slot Application ---
-    F.section('1e. Item Slot Application');
+            // Sword block ID (iron sword = 260)
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(260, 1), 'Sharpness can apply to sword');
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(260, 10), 'Efficiency can apply to sword');
 
-    // Sword block ID (iron sword = 260)
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(260, 1), 'Sharpness can apply to sword');
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(260, 10), 'Efficiency can apply to sword');
+            // Armor block ID (iron chestplate = 305)
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(305, 4), 'Protection can apply to armor');
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(305, 11), 'Unbreaking can apply to armor');
 
-    // Armor block ID (iron chestplate = 305)
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(305, 4), 'Protection can apply to armor');
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(305, 11), 'Unbreaking can apply to armor');
+            // Book (225) — should accept both weapon and armor enchantments
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(225, 1), 'Sharpness can apply to book');
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(225, 4), 'Protection can apply to book');
 
-    // Book (225) — should accept both weapon and armor enchantments
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(225, 1), 'Sharpness can apply to book');
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(225, 4), 'Protection can apply to book');
+            // Non-enchantable item (stone = 1)
+            F.assert(!Donkeycraft.EnchantmentRegistry.canApplyToItem(1, 1), 'Sharpness cannot apply to stone block');
 
-    // Non-enchantable item (stone = 1)
-    F.assert(!Donkeycraft.EnchantmentRegistry.canApplyToItem(1, 1), 'Sharpness cannot apply to stone block');
+            // --- 1f. Level Cost Calculation ---
+            F.section('1f. Level Cost Calculation');
 
-    // --- 1f. Level Cost Calculation ---
-    F.section('1f. Level Cost Calculation');
+            var cost1 = Donkeycraft.EnchantmentRegistry.calculateLevelCost(1, 1);
+            F.assert(cost1 >= 1, 'Sharpness level 1 costs at least 1 XP');
 
-    var cost1 = Donkeycraft.EnchantmentRegistry.calculateLevelCost(1, 1);
-    F.assert(cost1 >= 1, 'Sharpness level 1 costs at least 1 XP');
+            var cost5 = Donkeycraft.EnchantmentRegistry.calculateLevelCost(1, 5);
+            F.assert(cost5 > cost1, 'Sharpness level 5 costs more than level 1');
 
-    var cost5 = Donkeycraft.EnchantmentRegistry.calculateLevelCost(1, 5);
-    F.assert(cost5 > cost1, 'Sharpness level 5 costs more than level 1');
+            var costInvalid = Donkeycraft.EnchantmentRegistry.calculateLevelCost(999, 1);
+            F.assertEq(costInvalid, 1, 'Non-existent enchantment costs 1 XP');
 
-    var costInvalid = Donkeycraft.EnchantmentRegistry.calculateLevelCost(999, 1);
-    F.assertEq(costInvalid, 1, 'Non-existent enchantment costs 1 XP');
+            // --- 1g. Max Level ---
+            F.section('1g. Max Level');
 
-    // --- 1g. Max Level ---
-    F.section('1g. Max Level');
+            F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(1), 5, 'Sharpness max level is 5');
+            F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(9), 1, 'SilkTouch max level is 1');
+            F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(999), 1, 'Non-existent enchantment max level is 1');
 
-    F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(1), 5, 'Sharpness max level is 5');
-    F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(9), 1, 'SilkTouch max level is 1');
-    F.assertEq(Donkeycraft.EnchantmentRegistry.getMaxLevel(999), 1, 'Non-existent enchantment max level is 1');
+            // --- 1h. Get Enchantments for Slot ---
+            F.section('1h. Get Enchantments for Slot');
 
-    // --- 1h. Get Enchantments for Slot ---
-    F.section('1h. Get Enchantments for Slot');
+            var weaponEnchants = Donkeycraft.EnchantmentRegistry.getEnchantmentsForSlot('weapon');
+            F.assertType(weaponEnchants, 'object', 'getEnchantmentsForSlot returns array for "weapon"');
+            F.assert(weaponEnchants.length > 0, 'Weapon slot has enchantments');
 
-    var weaponEnchants = Donkeycraft.EnchantmentRegistry.getEnchantmentsForSlot('weapon');
-    F.assertType(weaponEnchants, 'object', 'getEnchantmentsForSlot returns array for "weapon"');
-    F.assert(weaponEnchants.length > 0, 'Weapon slot has enchantments');
+            var armorEnchants = Donkeycraft.EnchantmentRegistry.getEnchantmentsForSlot('armor');
+            F.assertType(armorEnchants, 'object', 'getEnchantmentsForSlot returns array for "armor"');
+            F.assert(armorEnchants.length > 0, 'Armor slot has enchantments');
 
-    var armorEnchants = Donkeycraft.EnchantmentRegistry.getEnchantmentsForSlot('armor');
-    F.assertType(armorEnchants, 'object', 'getEnchantmentsForSlot returns array for "armor"');
-    F.assert(armorEnchants.length > 0, 'Armor slot has enchantments');
+            // --- 1i. getAllEnchantments ---
+            F.section('1i. Get All Enchantments');
 
-    // --- 1i. getAllEnchantments ---
-    F.section('1i. Get All Enchantments');
+            var all = Donkeycraft.EnchantmentRegistry.getAllEnchantments();
+            F.assert(all.length >= 26, 'getAllEnchantments returns at least 26 enchantments (got ' + all.length + ')');
+            for (var ai = 0; ai < all.length; ai++) {
+                F.assertType(all[ai].id, 'number', 'Each enchantment has numeric ID');
+                F.assertType(all[ai].name, 'string', 'Each enchantment has string name');
+            }
 
-    var all = Donkeycraft.EnchantmentRegistry.getAllEnchantments();
-    F.assert(all.length >= 26, 'getAllEnchantments returns at least 26 enchantments (got ' + all.length + ')');
-    for (var ai = 0; ai < all.length; ai++) {
-        F.assertType(all[ai].id, 'number', 'Each enchantment has numeric ID');
-        F.assertType(all[ai].name, 'string', 'Each enchantment has string name');
-    }
+            // ============================================================
+            // Section 2: Potion System
+            // ============================================================
+            F.section('2. Potion System');
 
-    // ============================================================
-    // Section 2: Potion System
-    // ============================================================
-    F.section('2. Potion System');
+            // --- 2a. PotionEffect Registration ---
+            F.section('2a. PotionEffect Registration');
 
-    // --- 2a. PotionEffect Registration ---
-    F.section('2a. PotionEffect Registration');
+            F.assertType(Donkeycraft.PotionEffect, 'function', 'Donkeycraft.PotionEffect constructor exists');
+            F.assertType(Donkeycraft.PotionRegistry, 'object', 'Donkeycraft.PotionRegistry exists');
 
-    F.assertType(Donkeycraft.PotionEffect, 'function', 'Donkeycraft.PotionEffect constructor exists');
-    F.assertType(Donkeycraft.PotionRegistry, 'object', 'Donkeycraft.PotionRegistry exists');
+            var effectCount = Donkeycraft.PotionRegistry.getEffectCount();
+            F.assert(effectCount >= 18, 'At least 18 potion effects registered (got ' + effectCount + ')');
 
-    var effectCount = Donkeycraft.PotionRegistry.getEffectCount();
-    F.assert(effectCount >= 18, 'At least 18 potion effects registered (got ' + effectCount + ')');
+            var regenEffect = Donkeycraft.PotionRegistry.getEffect(1);
+            F.assertType(regenEffect, 'object', 'Regeneration effect (ID 1) exists');
+            F.assertEq(regenEffect.name, 'Regeneration', 'Regeneration name is correct');
+            F.assertEq(regenEffect.r, 255, 'Regeneration color R is 255');
+            F.assertEq(regenEffect.g, 70, 'Regeneration color G is 70');
+            F.assertEq(regenEffect.b, 70, 'Regeneration color B is 70');
 
-    var regenEffect = Donkeycraft.PotionRegistry.getEffect(1);
-    F.assertType(regenEffect, 'object', 'Regeneration effect (ID 1) exists');
-    F.assertEq(regenEffect.name, 'Regeneration', 'Regeneration name is correct');
-    F.assertEq(regenEffect.r, 255, 'Regeneration color R is 255');
-    F.assertEq(regenEffect.g, 70, 'Regeneration color G is 70');
-    F.assertEq(regenEffect.b, 70, 'Regeneration color B is 70');
+            var nullEffect = Donkeycraft.PotionRegistry.getEffect(999);
+            F.assert(nullEffect === null, 'Non-existent effect ID returns null');
 
-    var nullEffect = Donkeycraft.PotionRegistry.getEffect(999);
-    F.assert(nullEffect === null, 'Non-existent effect ID returns null');
+            // --- 2b. Potion Registration ---
+            F.section('2b. Potion Registration');
 
-    // --- 2b. Potion Registration ---
-    F.section('2b. Potion Registration');
+            var potionCount = Donkeycraft.PotionRegistry.getPotionCount();
+            F.assert(potionCount >= 35, 'At least 35 potions registered (got ' + potionCount + ')');
 
-    var potionCount = Donkeycraft.PotionRegistry.getPotionCount();
-    F.assert(potionCount >= 35, 'At least 35 potions registered (got ' + potionCount + ')');
+            var waterBottle = Donkeycraft.PotionRegistry.getPotion(1);
+            F.assertType(waterBottle, 'object', 'Water Bottle (ID 1) exists');
+            F.assertEq(waterBottle.name, 'Water Bottle', 'Water Bottle name is correct');
+            F.assert(waterBottle.effects.length === 0, 'Water Bottle has no effects');
 
-    var waterBottle = Donkeycraft.PotionRegistry.getPotion(1);
-    F.assertType(waterBottle, 'object', 'Water Bottle (ID 1) exists');
-    F.assertEq(waterBottle.name, 'Water Bottle', 'Water Bottle name is correct');
-    F.assert(waterBottle.effects.length === 0, 'Water Bottle has no effects');
+            var awkward = Donkeycraft.PotionRegistry.getPotion(2);
+            F.assertType(awkward, 'object', 'Awkward Potion (ID 2) exists');
+            F.assertEq(awkward.ingredientId, 241, 'Awkward Potion ingredient is Nether Wart (241)');
 
-    var awkward = Donkeycraft.PotionRegistry.getPotion(2);
-    F.assertType(awkward, 'object', 'Awkward Potion (ID 2) exists');
-    F.assertEq(awkward.ingredientId, 241, 'Awkward Potion ingredient is Nether Wart (241)');
+            var regenPotion = Donkeycraft.PotionRegistry.getPotion(10);
+            F.assertType(regenPotion, 'object', 'Potion of Regeneration (ID 10) exists');
+            F.assertEq(regenPotion.name, 'Potion of Regeneration', 'Regeneration potion name is correct');
+            F.assertEq(regenPotion.effects.length, 1, 'Regeneration potion has 1 effect');
+            F.assertEq(regenPotion.effects[0].effectId, 1, 'Regeneration potion applies effect ID 1');
 
-    var regenPotion = Donkeycraft.PotionRegistry.getPotion(10);
-    F.assertType(regenPotion, 'object', 'Potion of Regeneration (ID 10) exists');
-    F.assertEq(regenPotion.name, 'Potion of Regeneration', 'Regeneration potion name is correct');
-    F.assertEq(regenPotion.effects.length, 1, 'Regeneration potion has 1 effect');
-    F.assertEq(regenPotion.effects[0].effectId, 1, 'Regeneration potion applies effect ID 1');
+            var nullPotion = Donkeycraft.PotionRegistry.getPotion(999);
+            F.assert(nullPotion === null, 'Non-existent potion ID returns null');
 
-    var nullPotion = Donkeycraft.PotionRegistry.getPotion(999);
-    F.assert(nullPotion === null, 'Non-existent potion ID returns null');
+            // --- 2c. Potion Lookup by Name ---
+            F.section('2c. Potion Lookup by Name');
 
-    // --- 2c. Potion Lookup by Name ---
-    F.section('2c. Potion Lookup by Name');
+            var byName = Donkeycraft.PotionRegistry.getPotionByName('water bottle');
+            F.assertType(byName, 'object', 'getPotionByName returns object for "water bottle"');
+            F.assertEq(byName.id, 1, 'Water Bottle ID is 1 (case-insensitive)');
 
-    var byName = Donkeycraft.PotionRegistry.getPotionByName('water bottle');
-    F.assertType(byName, 'object', 'getPotionByName returns object for "water bottle"');
-    F.assertEq(byName.id, 1, 'Water Bottle ID is 1 (case-insensitive)');
+            var byNameNull = Donkeycraft.PotionRegistry.getPotionByName('NonExistent');
+            F.assert(byNameNull === null, 'Non-existent potion name returns null');
 
-    var byNameNull = Donkeycraft.PotionRegistry.getPotionByName('NonExistent');
-    F.assert(byNameNull === null, 'Non-existent potion name returns null');
+            // --- 2d. Brewing Recipe Matching ---
+            F.section('2d. Brewing Recipe Matching');
 
-    // --- 2d. Brewing Recipe Matching ---
-    F.section('2d. Brewing Recipe Matching');
+            var result1 = Donkeycraft.PotionRegistry.matchBrewingRecipe(241, 1);
+            F.assertType(result1, 'object', 'Nether Wart + Water Bottle → Awkward Potion');
+            F.assertEq(result1.id, 2, 'Result is Awkward Potion (ID 2)');
 
-    var result1 = Donkeycraft.PotionRegistry.matchBrewingRecipe(241, 1);
-    F.assertType(result1, 'object', 'Nether Wart + Water Bottle → Awkward Potion');
-    F.assertEq(result1.id, 2, 'Result is Awkward Potion (ID 2)');
+            var result2 = Donkeycraft.PotionRegistry.matchBrewingRecipe(237, 2);
+            F.assertType(result2, 'object', 'Ghast Tear + Awkward → Regeneration Potion');
+            F.assertEq(result2.id, 10, 'Result is Potion of Regeneration (ID 10)');
 
-    var result2 = Donkeycraft.PotionRegistry.matchBrewingRecipe(237, 2);
-    F.assertType(result2, 'object', 'Ghast Tear + Awkward → Regeneration Potion');
-    F.assertEq(result2.id, 10, 'Result is Potion of Regeneration (ID 10)');
+            var result3 = Donkeycraft.PotionRegistry.matchBrewingRecipe(236, 10);
+            F.assertType(result3, 'object', 'Magma Cream + Regeneration → Regeneration II');
+            F.assertEq(result3.id, 11, 'Result is Potion of Regeneration II (ID 11)');
 
-    var result3 = Donkeycraft.PotionRegistry.matchBrewingRecipe(236, 10);
-    F.assertType(result3, 'object', 'Magma Cream + Regeneration → Regeneration II');
-    F.assertEq(result3.id, 11, 'Result is Potion of Regeneration II (ID 11)');
+            var noMatch = Donkeycraft.PotionRegistry.matchBrewingRecipe(999, 1);
+            F.assert(noMatch === null, 'Non-existent ingredient returns null');
 
-    var noMatch = Donkeycraft.PotionRegistry.matchBrewingRecipe(999, 1);
-    F.assert(noMatch === null, 'Non-existent ingredient returns null');
+            // --- 2e. Potion Bucket Color ---
+            F.section('2e. Potion Bucket Color');
 
-    // --- 2e. Potion Bucket Color ---
-    F.section('2e. Potion Bucket Color');
+            var color = Donkeycraft.PotionRegistry.getPotionBucketColor(10);
+            F.assertType(color, 'string', 'Potion of Regeneration has bucket color');
+            F.assertEq(color, 'C73850', 'Regeneration bucket color is C73850');
 
-    var color = Donkeycraft.PotionRegistry.getPotionBucketColor(10);
-    F.assertType(color, 'string', 'Potion of Regeneration has bucket color');
-    F.assertEq(color, 'C73850', 'Regeneration bucket color is C73850');
+            var nullColor = Donkeycraft.PotionRegistry.getPotionBucketColor(1);
+            F.assert(nullColor === null, 'Water Bottle has no custom bucket color (null)');
 
-    var nullColor = Donkeycraft.PotionRegistry.getPotionBucketColor(1);
-    F.assert(nullColor === null, 'Water Bottle has no custom bucket color (null)');
+            // --- 2f. Instant Potion Check ---
+            F.section('2f. Instant Potion Check');
 
-    // --- 2f. Instant Potion Check ---
-    F.section('2f. Instant Potion Check');
+            F.assert(Donkeycraft.PotionRegistry.isInstant(21), 'Potion of Instant Health is instant');
+            F.assert(!Donkeycraft.PotionRegistry.isInstant(10), 'Potion of Regeneration is NOT instant');
+            F.assert(!Donkeycraft.PotionRegistry.isInstant(999), 'Non-existent potion returns false for isInstant');
 
-    F.assert(Donkeycraft.PotionRegistry.isInstant(21), 'Potion of Instant Health is instant');
-    F.assert(!Donkeycraft.PotionRegistry.isInstant(10), 'Potion of Regeneration is NOT instant');
-    F.assert(!Donkeycraft.PotionRegistry.isInstant(999), 'Non-existent potion returns false for isInstant');
+            // --- 2g. Get Effects ---
+            F.section('2g. Get Potion Effects');
 
-    // --- 2g. Get Effects ---
-    F.section('2g. Get Potion Effects');
+            var effects = Donkeycraft.PotionRegistry.getEffects(10);
+            F.assertType(effects, 'object', 'getEffects returns array');
+            F.assertEq(effects.length, 1, 'Regeneration potion has 1 effect');
+            F.assertEq(effects[0].effectId, 1, 'Effect ID is 1');
 
-    var effects = Donkeycraft.PotionRegistry.getEffects(10);
-    F.assertType(effects, 'object', 'getEffects returns array');
-    F.assertEq(effects.length, 1, 'Regeneration potion has 1 effect');
-    F.assertEq(effects[0].effectId, 1, 'Effect ID is 1');
+            var emptyEffects = Donkeycraft.PotionRegistry.getEffects(999);
+            F.assert(emptyEffects.length === 0, 'Non-existent potion returns empty effects array');
 
-    var emptyEffects = Donkeycraft.PotionRegistry.getEffects(999);
-    F.assert(emptyEffects.length === 0, 'Non-existent potion returns empty effects array');
+            // --- 2h. Brewing Recipes List ---
+            F.section('2h. Brewing Recipes List');
 
-    // --- 2h. Brewing Recipes List ---
-    F.section('2h. Brewing Recipes List');
+            var recipes = Donkeycraft.PotionRegistry.getBrewingRecipes();
+            F.assert(recipes.length >= 33, 'At least 33 brewing recipes registered (got ' + recipes.length + ')');
+            for (var ri = 0; ri < recipes.length; ri++) {
+                F.assertType(recipes[ri].ingredientId, 'number', 'Recipe has numeric ingredientId');
+                F.assertType(recipes[ri].basePotionId, 'number', 'Recipe has numeric basePotionId');
+                F.assertType(recipes[ri].resultPotionId, 'number', 'Recipe has numeric resultPotionId');
+            }
 
-    var recipes = Donkeycraft.PotionRegistry.getBrewingRecipes();
-    F.assert(recipes.length >= 33, 'At least 33 brewing recipes registered (got ' + recipes.length + ')');
-    for (var ri = 0; ri < recipes.length; ri++) {
-        F.assertType(recipes[ri].ingredientId, 'number', 'Recipe has numeric ingredientId');
-        F.assertType(recipes[ri].basePotionId, 'number', 'Recipe has numeric basePotionId');
-        F.assertType(recipes[ri].resultPotionId, 'number', 'Recipe has numeric resultPotionId');
-    }
+            // ============================================================
+            // Section 3: Active Potion Manager
+            // ============================================================
+            F.section('3. ActivePotionManager');
 
-    // ============================================================
-    // Section 3: Active Potion Manager
-    // ============================================================
-    F.section('3. ActivePotionManager');
+            // --- 3a. Add Potion ---
+            F.section('3a. Add Potion to Entity');
 
-    // --- 3a. Add Potion ---
-    F.section('3a. Add Potion to Entity');
+            var testEntity = { _name: 'TestMob' };
+            var added = Donkeycraft.ActivePotionManager.addPotion(testEntity, 10, 600, 0); // Regeneration
+            F.assertType(added, 'object', 'addPotion returns array');
+            F.assert(added.length > 0, 'Added at least one active potion');
 
-    var testEntity = { _name: 'TestMob' };
-    var added = Donkeycraft.ActivePotionManager.addPotion(testEntity, 10, 600, 0); // Regeneration
-    F.assertType(added, 'object', 'addPotion returns array');
-    F.assert(added.length > 0, 'Added at least one active potion');
+            var ap = added[0];
+            F.assertType(ap.effectId, 'number', 'ActivePotion has numeric effectId');
+            F.assertEq(ap.amplifier, 0, 'Amplifier is 0');
+            F.assertEq(ap.remainingTicks, 600, 'Remaining ticks is 600');
 
-    var ap = added[0];
-    F.assertType(ap.effectId, 'number', 'ActivePotion has numeric effectId');
-    F.assertEq(ap.amplifier, 0, 'Amplifier is 0');
-    F.assertEq(ap.remainingTicks, 600, 'Remaining ticks is 600');
+            // --- 3b. Get Active Effects ---
+            F.section('3b. Get Active Effects');
 
-    // --- 3b. Get Active Effects ---
-    F.section('3b. Get Active Effects');
+            var activeEffects = Donkeycraft.ActivePotionManager.getActiveEffects(testEntity);
+            F.assert(activeEffects.length >= 1, 'Entity has at least 1 active effect');
 
-    var activeEffects = Donkeycraft.ActivePotionManager.getActiveEffects(testEntity);
-    F.assert(activeEffects.length >= 1, 'Entity has at least 1 active effect');
+            var hasRegen = Donkeycraft.ActivePotionManager.hasActiveEffect(testEntity, 1);
+            F.assert(hasRegen, 'Entity has Regeneration effect (ID 1)');
 
-    var hasRegen = Donkeycraft.ActivePotionManager.hasActiveEffect(testEntity, 1);
-    F.assert(hasRegen, 'Entity has Regeneration effect (ID 1)');
+            var hasNoEffect = Donkeycraft.ActivePotionManager.hasActiveEffect(testEntity, 2);
+            F.assert(!hasNoEffect, 'Entity does NOT have Speed effect (ID 2)');
 
-    var hasNoEffect = Donkeycraft.ActivePotionManager.hasActiveEffect(testEntity, 2);
-    F.assert(!hasNoEffect, 'Entity does NOT have Speed effect (ID 2)');
+            // Null entity checks
+            F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(null).length === 0, 'Null entity returns empty effects');
+            F.assert(!Donkeycraft.ActivePotionManager.hasActiveEffect(null, 1), 'Null entity has no active effects');
 
-    // Null entity checks
-    F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(null).length === 0, 'Null entity returns empty effects');
-    F.assert(!Donkeycraft.ActivePotionManager.hasActiveEffect(null, 1), 'Null entity has no active effects');
+            // --- 3c. Tick Active Potions ---
+            F.section('3c. Tick Active Potions');
 
-    // --- 3c. Tick Active Potions ---
-    F.section('3c. Tick Active Potions');
+            var tickEntity = { _name: 'TickTest' };
+            Donkeycraft.ActivePotionManager.addPotion(tickEntity, 10, 100, 0); // 100 ticks
 
-    var tickEntity = { _name: 'TickTest' };
-    Donkeycraft.ActivePotionManager.addPotion(tickEntity, 10, 100, 0); // 100 ticks
+            var remaining = Donkeycraft.ActivePotionManager.getActiveEffects(tickEntity);
+            F.assertEq(remaining.length, 1, 'Entity has 1 active effect before tick');
 
-    var remaining = Donkeycraft.ActivePotionManager.getActiveEffects(tickEntity);
-    F.assertEq(remaining.length, 1, 'Entity has 1 active effect before tick');
+            // Tick with 5 seconds of game time (100 ticks at 20 TPS)
+            remaining = Donkeycraft.ActivePotionManager.tick(tickEntity, 5.0);
+            F.assertEq(remaining.length, 0, 'Effect expired after ticking past duration');
 
-    // Tick with 5 seconds of game time (100 ticks at 20 TPS)
-    remaining = Donkeycraft.ActivePotionManager.tick(tickEntity, 5.0);
-    F.assertEq(remaining.length, 0, 'Effect expired after ticking past duration');
+            // Tick with small delta — effect should remain
+            var tickEntity2 = { _name: 'TickTest2' };
+            Donkeycraft.ActivePotionManager.addPotion(tickEntity2, 10, 200, 0);
+            remaining = Donkeycraft.ActivePotionManager.tick(tickEntity2, 1.0); // 20 ticks passed
+            F.assert(remaining.length > 0, 'Effect still active after small tick');
+            F.assertEq(remaining[0].remainingTicks < 200, true, 'Remaining ticks decreased');
 
-    // Tick with small delta — effect should remain
-    var tickEntity2 = { _name: 'TickTest2' };
-    Donkeycraft.ActivePotionManager.addPotion(tickEntity2, 10, 200, 0);
-    remaining = Donkeycraft.ActivePotionManager.tick(tickEntity2, 1.0); // 20 ticks passed
-    F.assert(remaining.length > 0, 'Effect still active after small tick');
-    F.assertEq(remaining[0].remainingTicks < 200, true, 'Remaining ticks decreased');
+            // --- 3d. Remove Potion ---
+            F.section('3d. Remove Potion');
 
-    // --- 3d. Remove Potion ---
-    F.section('3d. Remove Potion');
+            var removeEntity = { _name: 'RemoveTest' };
+            Donkeycraft.ActivePotionManager.addPotion(removeEntity, 10, 600, 0); // Regeneration (Potion ID 10 → effect ID 1)
+            Donkeycraft.ActivePotionManager.addPotion(removeEntity, 12, 600, 0); // Swiftness (Potion ID 12 → effect ID 2)
 
-    var removeEntity = { _name: 'RemoveTest' };
-    Donkeycraft.ActivePotionManager.addPotion(removeEntity, 10, 600, 0); // Regeneration (Potion ID 10 → effect ID 1)
-    Donkeycraft.ActivePotionManager.addPotion(removeEntity, 12, 600, 0); // Swiftness (Potion ID 12 → effect ID 2)
+            var removed = Donkeycraft.ActivePotionManager.removePotion(removeEntity, 1);
+            F.assert(removed, 'removePotion returns true for existing effect');
 
-    var removed = Donkeycraft.ActivePotionManager.removePotion(removeEntity, 1);
-    F.assert(removed, 'removePotion returns true for existing effect');
+            var stillActive = Donkeycraft.ActivePotionManager.hasActiveEffect(removeEntity, 1);
+            F.assert(!stillActive, 'Regeneration effect removed');
 
-    var stillActive = Donkeycraft.ActivePotionManager.hasActiveEffect(removeEntity, 1);
-    F.assert(!stillActive, 'Regeneration effect removed');
+            var speedStillThere = Donkeycraft.ActivePotionManager.hasActiveEffect(removeEntity, 2);
+            F.assert(speedStillThere, 'Speed effect still present after removing Regeneration');
 
-    var speedStillThere = Donkeycraft.ActivePotionManager.hasActiveEffect(removeEntity, 2);
-    F.assert(speedStillThere, 'Speed effect still present after removing Regeneration');
+            // Remove non-existent
+            var removedNone = Donkeycraft.ActivePotionManager.removePotion(removeEntity, 999);
+            F.assert(!removedNone, 'removePotion returns false for non-existent effect');
 
-    // Remove non-existent
-    var removedNone = Donkeycraft.ActivePotionManager.removePotion(removeEntity, 999);
-    F.assert(!removedNone, 'removePotion returns false for non-existent effect');
+            // --- 3e. Clear All ---
+            F.section('3e. Clear All Effects');
 
-    // --- 3e. Clear All ---
-    F.section('3e. Clear All Effects');
+            var clearEntity = { _name: 'ClearTest' };
+            Donkeycraft.ActivePotionManager.addPotion(clearEntity, 10, 600, 0); // Regeneration
+            Donkeycraft.ActivePotionManager.addPotion(clearEntity, 12, 600, 0); // Swiftness
+            F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(clearEntity).length >= 2, 'Entity has 2+ effects before clear');
 
-    var clearEntity = { _name: 'ClearTest' };
-    Donkeycraft.ActivePotionManager.addPotion(clearEntity, 10, 600, 0); // Regeneration
-    Donkeycraft.ActivePotionManager.addPotion(clearEntity, 12, 600, 0); // Swiftness
-    F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(clearEntity).length >= 2, 'Entity has 2+ effects before clear');
+            Donkeycraft.ActivePotionManager.clearAll(clearEntity);
+            F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(clearEntity).length === 0, 'All effects cleared');
 
-    Donkeycraft.ActivePotionManager.clearAll(clearEntity);
-    F.assert(Donkeycraft.ActivePotionManager.getActiveEffects(clearEntity).length === 0, 'All effects cleared');
+            // Clear null entity
+            Donkeycraft.ActivePotionManager.clearAll(null); // Should not throw
 
-    // Clear null entity
-    Donkeycraft.ActivePotionManager.clearAll(null); // Should not throw
+            // --- 3f. Add Multiple Effects ---
+            F.section('3f. Add Multiple Effects');
 
-    // --- 3f. Add Multiple Effects ---
-    F.section('3f. Add Multiple Effects');
+            var multiEntity = { _name: 'MultiTest' };
+            Donkeycraft.ActivePotionManager.addPotion(multiEntity, 10, 600, 0); // Regeneration
+            Donkeycraft.ActivePotionManager.addPotion(multiEntity, 12, 600, 0); // Speed
+            Donkeycraft.ActivePotionManager.addPotion(multiEntity, 19, 600, 0); // Strength
 
-    var multiEntity = { _name: 'MultiTest' };
-    Donkeycraft.ActivePotionManager.addPotion(multiEntity, 10, 600, 0); // Regeneration
-    Donkeycraft.ActivePotionManager.addPotion(multiEntity, 12, 600, 0); // Speed
-    Donkeycraft.ActivePotionManager.addPotion(multiEntity, 19, 600, 0); // Strength
+            var multiEffects = Donkeycraft.ActivePotionManager.getActiveEffects(multiEntity);
+            F.assert(multiEffects.length >= 2, 'Entity has at least 2 active effects (got ' + multiEffects.length + ')');
 
-    var multiEffects = Donkeycraft.ActivePotionManager.getActiveEffects(multiEntity);
-    F.assert(multiEffects.length >= 2, 'Entity has at least 2 active effects (got ' + multiEffects.length + ')');
+            // ============================================================
+            // Section 4: Tool System
+            // ============================================================
+            F.section('4. Tool System');
 
-    // ============================================================
-    // Section 4: Tool System
-    // ============================================================
-    F.section('4. Tool System');
+            // --- 4a. ToolMaterial Registration ---
+            F.section('4a. ToolMaterial Registration');
 
-    // --- 4a. ToolMaterial Registration ---
-    F.section('4a. ToolMaterial Registration');
+            F.assertType(Donkeycraft.ToolMaterial, 'function', 'Donkeycraft.ToolMaterial constructor exists');
+            F.assertType(Donkeycraft.ToolRegistry, 'object', 'Donkeycraft.ToolRegistry exists');
 
-    F.assertType(Donkeycraft.ToolMaterial, 'function', 'Donkeycraft.ToolMaterial constructor exists');
-    F.assertType(Donkeycraft.ToolRegistry, 'object', 'Donkeycraft.ToolRegistry exists');
+            var matCount = Donkeycraft.ToolRegistry.getMaterialCount();
+            F.assert(matCount >= 7, 'At least 7 tool materials registered (got ' + matCount + ')');
 
-    var matCount = Donkeycraft.ToolRegistry.getMaterialCount();
-    F.assert(matCount >= 7, 'At least 7 tool materials registered (got ' + matCount + ')');
+            var woodMat = Donkeycraft.ToolRegistry.getToolMaterial(1);
+            F.assertType(woodMat, 'object', 'Wood material (ID 1) exists');
+            F.assertEq(woodMat.name, 'Wood', 'Wood name is correct');
+            F.assertEq(woodMat.durabilityCount, 60, 'Wood durability is 60');
+            F.assertEq(woodMat.speedMultiplier, 2.0, 'Wood speed multiplier is 2.0');
+            F.assertEq(woodMat.enchantability, 15, 'Wood enchantability is 15');
 
-    var woodMat = Donkeycraft.ToolRegistry.getToolMaterial(1);
-    F.assertType(woodMat, 'object', 'Wood material (ID 1) exists');
-    F.assertEq(woodMat.name, 'Wood', 'Wood name is correct');
-    F.assertEq(woodMat.durabilityCount, 60, 'Wood durability is 60');
-    F.assertEq(woodMat.speedMultiplier, 2.0, 'Wood speed multiplier is 2.0');
-    F.assertEq(woodMat.enchantability, 15, 'Wood enchantability is 15');
+            var diamondMat = Donkeycraft.ToolRegistry.getToolMaterial(4);
+            F.assertType(diamondMat, 'object', 'Diamond material (ID 4) exists');
+            F.assertEq(diamondMat.name, 'Diamond', 'Diamond name is correct');
+            F.assertEq(diamondMat.durabilityCount, 1562, 'Diamond durability is 1562');
+            F.assertEq(diamondMat.speedMultiplier, 8.0, 'Diamond speed multiplier is 8.0');
 
-    var diamondMat = Donkeycraft.ToolRegistry.getToolMaterial(4);
-    F.assertType(diamondMat, 'object', 'Diamond material (ID 4) exists');
-    F.assertEq(diamondMat.name, 'Diamond', 'Diamond name is correct');
-    F.assertEq(diamondMat.durabilityCount, 1562, 'Diamond durability is 1562');
-    F.assertEq(diamondMat.speedMultiplier, 8.0, 'Diamond speed multiplier is 8.0');
+            var nullMat = Donkeycraft.ToolRegistry.getToolMaterial(999);
+            F.assert(nullMat === null, 'Non-existent material ID returns null');
 
-    var nullMat = Donkeycraft.ToolRegistry.getToolMaterial(999);
-    F.assert(nullMat === null, 'Non-existent material ID returns null');
+            // --- 4b. Material Lookup by Name ---
+            F.section('4b. Material Lookup by Name');
 
-    // --- 4b. Material Lookup by Name ---
-    F.section('4b. Material Lookup by Name');
+            var byName = Donkeycraft.ToolRegistry.getToolMaterialByName('diamond');
+            F.assertType(byName, 'object', 'getToolMaterialByName returns object for "diamond"');
+            F.assertEq(byName.id, 4, 'Diamond ID is 4 (case-insensitive)');
 
-    var byName = Donkeycraft.ToolRegistry.getToolMaterialByName('diamond');
-    F.assertType(byName, 'object', 'getToolMaterialByName returns object for "diamond"');
-    F.assertEq(byName.id, 4, 'Diamond ID is 4 (case-insensitive)');
+            var byNameUpper = Donkeycraft.ToolRegistry.getToolMaterialByName('IRON');
+            F.assertType(byNameUpper, 'object', 'getToolMaterialByName works with uppercase');
+            F.assertEq(byNameUpper.id, 3, 'Iron ID is 3 (case-insensitive)');
 
-    var byNameUpper = Donkeycraft.ToolRegistry.getToolMaterialByName('IRON');
-    F.assertType(byNameUpper, 'object', 'getToolMaterialByName works with uppercase');
-    F.assertEq(byNameUpper.id, 3, 'Iron ID is 3 (case-insensitive)');
+            var byNameNull = Donkeycraft.ToolRegistry.getToolMaterialByName('NonExistent');
+            F.assert(byNameNull === null, 'Non-existent material name returns null');
 
-    var byNameNull = Donkeycraft.ToolRegistry.getToolMaterialByName('NonExistent');
-    F.assert(byNameNull === null, 'Non-existent material name returns null');
+            // --- 4c. Material Property Accessors ---
+            F.section('4c. Material Property Accessors');
 
-    // --- 4c. Material Property Accessors ---
-    F.section('4c. Material Property Accessors');
+            F.assertEq(Donkeycraft.ToolRegistry.getDurability(0), 0, 'None material durability is 0');
+            F.assertEq(Donkeycraft.ToolRegistry.getDurability(1), 60, 'Wood durability is 60');
+            F.assertEq(Donkeycraft.ToolRegistry.getDurability(4), 1562, 'Diamond durability is 1562');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getDurability(0), 0, 'None material durability is 0');
-    F.assertEq(Donkeycraft.ToolRegistry.getDurability(1), 60, 'Wood durability is 60');
-    F.assertEq(Donkeycraft.ToolRegistry.getDurability(4), 1562, 'Diamond durability is 1562');
+            F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(0), 1.0, 'None speed multiplier is 1.0');
+            F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(1), 2.0, 'Wood speed multiplier is 2.0');
+            F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(5), 12.0, 'Gold speed multiplier is 12.0');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(0), 1.0, 'None speed multiplier is 1.0');
-    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(1), 2.0, 'Wood speed multiplier is 2.0');
-    F.assertEq(Donkeycraft.ToolRegistry.getSpeedMultiplier(5), 12.0, 'Gold speed multiplier is 12.0');
+            F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(0), 0, 'None enchantability is 0');
+            F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(5), 22, 'Gold enchantability is 22');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(0), 0, 'None enchantability is 0');
-    F.assertEq(Donkeycraft.ToolRegistry.getEnchantability(5), 22, 'Gold enchantability is 22');
+            F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(1), 5, 'Wood repair item is oak plank (5)');
+            F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(3), 221, 'Iron repair item is iron ingot (221)');
+            F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(4), 227, 'Diamond repair item is diamond (227)');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(1), 5, 'Wood repair item is oak plank (5)');
-    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(3), 221, 'Iron repair item is iron ingot (221)');
-    F.assertEq(Donkeycraft.ToolRegistry.getRepairItemBlockId(4), 227, 'Diamond repair item is diamond (227)');
+            // --- 4d. Break Time Calculation ---
+            F.section('4d. Break Time Calculation');
 
-    // --- 4d. Break Time Calculation ---
-    F.section('4d. Break Time Calculation');
+            var breakTime1 = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 0, 'none'); // Bare hands on stone-like
+            F.assert(breakTime1 > 0, 'Bare hands have positive break time');
 
-    var breakTime1 = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 0, 'none'); // Bare hands on stone-like
-    F.assert(breakTime1 > 0, 'Bare hands have positive break time');
+            var breakTime2 = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 4, 'pickaxe'); // Diamond pickaxe
+            F.assert(breakTime2 < breakTime1, 'Diamond pickaxe is faster than bare hands');
 
-    var breakTime2 = Donkeycraft.ToolRegistry.calculateBreakTime(1.5, 4, 'pickaxe'); // Diamond pickaxe
-    F.assert(breakTime2 < breakTime1, 'Diamond pickaxe is faster than bare hands');
+            var breakTimeNone = Donkeycraft.ToolRegistry.calculateBreakTime(0, 4, 'pickaxe'); // Hardness 0
+            F.assertEq(breakTimeNone, 0, 'Zero hardness block has zero break time');
 
-    var breakTimeNone = Donkeycraft.ToolRegistry.calculateBreakTime(0, 4, 'pickaxe'); // Hardness 0
-    F.assertEq(breakTimeNone, 0, 'Zero hardness block has zero break time');
+            // --- 4e. Correct-for-Drop Validation ---
+            F.section('4e. Correct-for-Drop Validation');
 
-    // --- 4e. Correct-for-Drop Validation ---
-    F.section('4e. Correct-for-Drop Validation');
+            F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 4), 'Diamond pickaxe is correct for pickaxe tool type');
+            F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('shovel', 3), 'Iron shovel is correct for shovel tool type');
+            F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('axe', 2), 'Stone axe is correct for axe tool type');
+            F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('hoe', 1), 'Wood hoe is correct for hoe tool type');
 
-    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 4), 'Diamond pickaxe is correct for pickaxe tool type');
-    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('shovel', 3), 'Iron shovel is correct for shovel tool type');
-    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('axe', 2), 'Stone axe is correct for axe tool type');
-    F.assert(Donkeycraft.ToolRegistry.isCorrectForDrop('hoe', 1), 'Wood hoe is correct for hoe tool type');
+            F.assert(!Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 0), 'Bare hands are never correct for any block');
+            F.assert(!Donkeycraft.ToolRegistry.isCorrectForDrop('invalid', 4), 'Invalid tool type returns false');
 
-    F.assert(!Donkeycraft.ToolRegistry.isCorrectForDrop('pickaxe', 0), 'Bare hands are never correct for any block');
-    F.assert(!Donkeycraft.ToolRegistry.isCorrectForDrop('invalid', 4), 'Invalid tool type returns false');
+            // --- 4f. Block Type Checks ---
+            F.section('4f. Block Type Checks');
 
-    // --- 4f. Block Type Checks ---
-    F.section('4f. Block Type Checks');
+            // Pickaxe blocks
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(1), 'Stone requires pickaxe');
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(15), 'Iron ore requires pickaxe');
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(17), 'Diamond ore requires pickaxe');
+            F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(7), 'Dirt does not require pickaxe');
 
-    // Pickaxe blocks
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(1), 'Stone requires pickaxe');
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(15), 'Iron ore requires pickaxe');
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(17), 'Diamond ore requires pickaxe');
-    F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByPickaxe(7), 'Dirt does not require pickaxe');
+            // Shovel blocks
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(7), 'Dirt requires shovel');
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(9), 'Gravel requires shovel');
+            F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByShovel(1), 'Stone does not require shovel');
 
-    // Shovel blocks
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(7), 'Dirt requires shovel');
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByShovel(9), 'Gravel requires shovel');
-    F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByShovel(1), 'Stone does not require shovel');
+            // Axe blocks
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(96), 'Oak planks require axe');
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(99), 'Oak log requires axe');
+            F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByAxe(1), 'Stone does not require axe');
 
-    // Axe blocks
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(96), 'Oak planks require axe');
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByAxe(99), 'Oak log requires axe');
-    F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByAxe(1), 'Stone does not require axe');
+            // Hoe blocks
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByHoe(59), 'Wheat crop is mined by hoe');
+            F.assert(Donkeycraft.ToolRegistry.isBlockMinedByHoe(60), 'Carrot is mined by hoe');
+            F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByHoe(1), 'Stone is not mined by hoe');
 
-    // Hoe blocks
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByHoe(59), 'Wheat crop is mined by hoe');
-    F.assert(Donkeycraft.ToolRegistry.isBlockMinedByHoe(60), 'Carrot is mined by hoe');
-    F.assert(!Donkeycraft.ToolRegistry.isBlockMinedByHoe(1), 'Stone is not mined by hoe');
+            // --- 4g. Get Correct Tool for Block ---
+            F.section('4g. Get Correct Tool for Block');
 
-    // --- 4g. Get Correct Tool for Block ---
-    F.section('4g. Get Correct Tool for Block');
+            F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(1), 'pickaxe', 'Stone → pickaxe');
+            F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(7), 'shovel', 'Dirt → shovel');
+            F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(96), 'axe', 'Oak planks → axe');
+            F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(59), 'hoe', 'Wheat → hoe');
+            F.assert(Donkeycraft.ToolRegistry.getCorrectToolForBlock(225) === null, 'Book has no specific tool (null)');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(1), 'pickaxe', 'Stone → pickaxe');
-    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(7), 'shovel', 'Dirt → shovel');
-    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(96), 'axe', 'Oak planks → axe');
-    F.assertEq(Donkeycraft.ToolRegistry.getCorrectToolForBlock(59), 'hoe', 'Wheat → hoe');
-    F.assert(Donkeycraft.ToolRegistry.getCorrectToolForBlock(225) === null, 'Book has no specific tool (null)');
+            // --- 4h. Get Tool Type from Block ID ---
+            F.section('4h. Get Tool Type from Block ID');
 
-    // --- 4h. Get Tool Type from Block ID ---
-    F.section('4h. Get Tool Type from Block ID');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(250), 'pickaxe', 'Wooden pickaxe (250) → pickaxe');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(253), 'pickaxe', 'Iron pickaxe (253) → pickaxe');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(244), 'shovel', 'Wooden shovel (244) → shovel');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(273), 'axe', 'Wooden axe (273) → axe');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(238), 'hoe', 'Wooden hoe (238) → hoe');
+            F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(257), 'sword', 'Wooden sword (257) → sword');
+            F.assert(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(1) === null, 'Stone block returns null');
 
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(250), 'pickaxe', 'Wooden pickaxe (250) → pickaxe');
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(253), 'pickaxe', 'Iron pickaxe (253) → pickaxe');
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(244), 'shovel', 'Wooden shovel (244) → shovel');
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(273), 'axe', 'Wooden axe (273) → axe');
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(238), 'hoe', 'Wooden hoe (238) → hoe');
-    F.assertEq(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(257), 'sword', 'Wooden sword (257) → sword');
-    F.assert(Donkeycraft.ToolRegistry.getToolTypeFromBlockId(1) === null, 'Stone block returns null');
+            // --- 4i. Tool Instance — Creation ---
+            F.section('4i. Tool Instance Creation');
 
-    // --- 4i. Tool Instance — Creation ---
-    F.section('4i. Tool Instance Creation');
+            var diamondTool = new Donkeycraft.Tool(4, 253); // Diamond pickaxe
+            F.assertType(diamondTool, 'object', 'Tool instance created');
+            F.assertEq(diamondTool.getMaterialId(), 4, 'Material ID is 4 (Diamond)');
+            F.assertEq(diamondTool.getToolBlockId(), 253, 'Tool block ID is 253');
+            F.assertEq(diamondTool.getMaxDurability(), 1562, 'Max durability is 1562');
+            F.assertEq(diamondTool.getRemainingDurability(), 1562, 'Starting durability is full');
+            F.assert(!diamondTool.isBroken(), 'New tool is not broken');
 
-    var diamondTool = new Donkeycraft.Tool(4, 253); // Diamond pickaxe
-    F.assertType(diamondTool, 'object', 'Tool instance created');
-    F.assertEq(diamondTool.getMaterialId(), 4, 'Material ID is 4 (Diamond)');
-    F.assertEq(diamondTool.getToolBlockId(), 253, 'Tool block ID is 253');
-    F.assertEq(diamondTool.getMaxDurability(), 1562, 'Max durability is 1562');
-    F.assertEq(diamondTool.getRemainingDurability(), 1562, 'Starting durability is full');
-    F.assert(!diamondTool.isBroken(), 'New tool is not broken');
+            var nullTool = new Donkeycraft.Tool(0, 0); // None material
+            F.assertEq(nullTool.getMaxDurability(), 0, 'None material has 0 max durability');
+            F.assert(nullTool.isBroken(), 'None material tool is broken immediately');
 
-    var nullTool = new Donkeycraft.Tool(0, 0); // None material
-    F.assertEq(nullTool.getMaxDurability(), 0, 'None material has 0 max durability');
-    F.assert(nullTool.isBroken(), 'None material tool is broken immediately');
+            // --- 4j. Tool Durability — Take Damage ---
+            F.section('4j. Tool Durability — Take Damage');
 
-    // --- 4j. Tool Durability — Take Damage ---
-    F.section('4j. Tool Durability — Take Damage');
+            var dmgTool = new Donkeycraft.Tool(2, 252); // Stone pickaxe (132 durability)
+            var broken = dmgTool.takeDamage(50);
+            F.assert(!broken, 'Taking 50 damage does not break stone pickaxe');
+            F.assertEq(dmgTool.getRemainingDurability(), 82, 'Remaining durability is 82 after 50 damage');
 
-    var dmgTool = new Donkeycraft.Tool(2, 252); // Stone pickaxe (132 durability)
-    var broken = dmgTool.takeDamage(50);
-    F.assert(!broken, 'Taking 50 damage does not break stone pickaxe');
-    F.assertEq(dmgTool.getRemainingDurability(), 82, 'Remaining durability is 82 after 50 damage');
+            broken = dmgTool.takeDamage(82);
+            F.assert(broken, 'Taking remaining damage breaks the tool');
+            F.assertEq(dmgTool.getRemainingDurability(), 0, 'Remaining durability is 0');
+            F.assert(dmgTool.isBroken(), 'Tool is broken');
 
-    broken = dmgTool.takeDamage(82);
-    F.assert(broken, 'Taking remaining damage breaks the tool');
-    F.assertEq(dmgTool.getRemainingDurability(), 0, 'Remaining durability is 0');
-    F.assert(dmgTool.isBroken(), 'Tool is broken');
+            // Take damage on already broken tool
+            var extraDamage = dmgTool.takeDamage(1);
+            F.assert(!extraDamage, 'Taking damage on broken tool returns false');
 
-    // Take damage on already broken tool
-    var extraDamage = dmgTool.takeDamage(1);
-    F.assert(!extraDamage, 'Taking damage on broken tool returns false');
+            // Zero/negative damage
+            var newTool = new Donkeycraft.Tool(3, 254); // Iron pickaxe
+            newTool.takeDamage(0);
+            F.assertEq(newTool.getRemainingDurability(), 251, 'Zero damage does not reduce durability');
 
-    // Zero/negative damage
-    var newTool = new Donkeycraft.Tool(3, 254); // Iron pickaxe
-    newTool.takeDamage(0);
-    F.assertEq(newTool.getRemainingDurability(), 251, 'Zero damage does not reduce durability');
+            // --- 4k. Tool Durability Fraction ---
+            F.section('4k. Tool Durability Fraction');
 
-    // --- 4k. Tool Durability Fraction ---
-    F.section('4k. Tool Durability Fraction');
+            var fracTool = new Donkeycraft.Tool(1, 250); // Wood pickaxe (60 durability)
+            F.assertNear(fracTool.getDurabilityFraction(), 1.0, 0.01, 'Full durability fraction is ~1.0');
 
-    var fracTool = new Donkeycraft.Tool(1, 250); // Wood pickaxe (60 durability)
-    F.assertNear(fracTool.getDurabilityFraction(), 1.0, 0.01, 'Full durability fraction is ~1.0');
+            fracTool.takeDamage(30);
+            F.assertNear(fracTool.getDurabilityFraction(), 0.5, 0.01, 'Half durability fraction is ~0.5');
 
-    fracTool.takeDamage(30);
-    F.assertNear(fracTool.getDurabilityFraction(), 0.5, 0.01, 'Half durability fraction is ~0.5');
+            // --- 4l. Tool Repair ---
+            F.section('4l. Tool Repair');
 
-    // --- 4l. Tool Repair ---
-    F.section('4l. Tool Repair');
+            var repairTool = new Donkeycraft.Tool(3, 254); // Iron pickaxe
+            repairTool.takeDamage(100);
+            F.assertEq(repairTool.getRemainingDurability(), 151, 'After damage: 151 remaining');
 
-    var repairTool = new Donkeycraft.Tool(3, 254); // Iron pickaxe
-    repairTool.takeDamage(100);
-    F.assertEq(repairTool.getRemainingDurability(), 151, 'After damage: 151 remaining');
+            var repaired = repairTool.repairWithItem(221); // Iron ingot
+            F.assert(repaired > 0, 'Repair restores some durability');
+            F.assert(repairTool.getRemainingDurability() <= repairTool.getMaxDurability(), 'Durability does not exceed max after repair');
 
-    var repaired = repairTool.repairWithItem(221); // Iron ingot
-    F.assert(repaired > 0, 'Repair restores some durability');
-    F.assert(repairTool.getRemainingDurability() <= repairTool.getMaxDurability(), 'Durability does not exceed max after repair');
+            var wrongRepair = repairTool.repairWithItem(227); // Diamond (wrong material)
+            F.assertEq(wrongRepair, 0, 'Wrong repair material restores 0 durability');
 
-    var wrongRepair = repairTool.repairWithItem(227); // Diamond (wrong material)
-    F.assertEq(wrongRepair, 0, 'Wrong repair material restores 0 durability');
+            // --- 4m. Tool Serialization ---
+            F.section('4m. Tool Serialization');
 
-    // --- 4m. Tool Serialization ---
-    F.section('4m. Tool Serialization');
+            var serTool = new Donkeycraft.Tool(4, 253); // Diamond pickaxe
+            serTool.takeDamage(500);
+            var serialized = serTool.serialize();
+            F.assertType(serialized, 'object', 'serialize returns object');
+            F.assertEq(serialized.materialId, 4, 'Serialized materialId is 4');
+            F.assertEq(serialized.toolBlockId, 253, 'Serialized toolBlockId is 253');
+            F.assertEq(serialized.currentDurability, serTool.getRemainingDurability(), 'Serialized durability matches');
 
-    var serTool = new Donkeycraft.Tool(4, 253); // Diamond pickaxe
-    serTool.takeDamage(500);
-    var serialized = serTool.serialize();
-    F.assertType(serialized, 'object', 'serialize returns object');
-    F.assertEq(serialized.materialId, 4, 'Serialized materialId is 4');
-    F.assertEq(serialized.toolBlockId, 253, 'Serialized toolBlockId is 253');
-    F.assertEq(serialized.currentDurability, serTool.getRemainingDurability(), 'Serialized durability matches');
+            var deserialized = Donkeycraft.Tool.deserialize(serialized);
+            F.assertType(deserialized, 'object', 'deserialize returns object');
+            F.assertEq(deserialized.getMaterialId(), 4, 'Deserialized material ID is 4');
+            F.assertEq(deserialized.getRemainingDurability(), serialized.currentDurability, 'Deserialized durability matches');
 
-    var deserialized = Donkeycraft.Tool.deserialize(serialized);
-    F.assertType(deserialized, 'object', 'deserialize returns object');
-    F.assertEq(deserialized.getMaterialId(), 4, 'Deserialized material ID is 4');
-    F.assertEq(deserialized.getRemainingDurability(), serialized.currentDurability, 'Deserialized durability matches');
+            // Deserialize invalid data
+            var nullDeser = Donkeycraft.Tool.deserialize(null);
+            F.assertType(nullDeser, 'object', 'Null deserialize returns default tool');
+            F.assertEq(nullDeser.getMaxDurability(), 0, 'Null deserialize has 0 max durability');
 
-    // Deserialize invalid data
-    var nullDeser = Donkeycraft.Tool.deserialize(null);
-    F.assertType(nullDeser, 'object', 'Null deserialize returns default tool');
-    F.assertEq(nullDeser.getMaxDurability(), 0, 'Null deserialize has 0 max durability');
+            // --- 4n. Tool toString ---
+            F.section('4n. Tool toString');
 
-    // --- 4n. Tool toString ---
-    F.section('4n. Tool toString');
+            var strTool = new Donkeycraft.Tool(4, 253);
+            var str = strTool.toString();
+            F.assertType(str, 'string', 'toString returns string');
+            F.assert(str.indexOf('Diamond') >= 0, 'toString contains material name "Diamond"');
+            F.assert(str.indexOf('durability=') >= 0, 'toString contains durability info');
 
-    var strTool = new Donkeycraft.Tool(4, 253);
-    var str = strTool.toString();
-    F.assertType(str, 'string', 'toString returns string');
-    F.assert(str.indexOf('Diamond') >= 0, 'toString contains material name "Diamond"');
-    F.assert(str.indexOf('durability=') >= 0, 'toString contains durability info');
+            // --- 4o. Tool Destroy ---
+            F.section('4o. Tool Destroy');
 
-    // --- 4o. Tool Destroy ---
-    F.section('4o. Tool Destroy');
+            var destroyTool = new Donkeycraft.Tool(4, 253);
+            destroyTool.destroy();
+            F.assertEq(destroyTool.getMaterialId(), 0, 'Destroyed tool material ID is 0');
+            F.assertEq(destroyTool.getMaxDurability(), 0, 'Destroyed tool max durability is 0');
 
-    var destroyTool = new Donkeycraft.Tool(4, 253);
-    destroyTool.destroy();
-    F.assertEq(destroyTool.getMaterialId(), 0, 'Destroyed tool material ID is 0');
-    F.assertEq(destroyTool.getMaxDurability(), 0, 'Destroyed tool max durability is 0');
+            // ============================================================
+            // Section 5: Cross-Module Integration
+            // ============================================================
+            F.section('5. Cross-Module Integration');
 
-    // ============================================================
-    // Section 5: Cross-Module Integration
-    // ============================================================
-    F.section('5. Cross-Module Integration');
+            // --- 5a. Enchantment + Tool Integration ---
+            F.section('5a. Enchantment + Tool Integration');
 
-    // --- 5a. Enchantment + Tool Integration ---
-    F.section('5a. Enchantment + Tool Integration');
+            // Check that enchantments compatible with weapons can apply to tool materials
+            var ironSwordId = 260;
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(ironSwordId, 1), 'Sharpness applies to iron sword');
+            F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(ironSwordId, 11), 'Unbreaking applies to iron sword');
 
-    // Check that enchantments compatible with weapons can apply to tool materials
-    var ironSwordId = 260;
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(ironSwordId, 1), 'Sharpness applies to iron sword');
-    F.assert(Donkeycraft.EnchantmentRegistry.canApplyToItem(ironSwordId, 11), 'Unbreaking applies to iron sword');
+            // Check tool material enchantability affects enchanting
+            var ironEnchantability = Donkeycraft.ToolRegistry.getEnchantability(3);
+            F.assertEq(ironEnchantability, 14, 'Iron enchantability is 14');
 
-    // Check tool material enchantability affects enchanting
-    var ironEnchantability = Donkeycraft.ToolRegistry.getEnchantability(3);
-    F.assertEq(ironEnchantability, 14, 'Iron enchantability is 14');
+            var diamondEnchantability = Donkeycraft.ToolRegistry.getEnchantability(4);
+            // In Minecraft, Diamond (10) has lower enchantability than Iron (14).
+            // Gold has the highest enchantability (22).
+            F.assert(diamondEnchantability < ironEnchantability, 'Diamond enchantability (10) < Iron enchantability (14)');
 
-    var diamondEnchantability = Donkeycraft.ToolRegistry.getEnchantability(4);
-    // In Minecraft, Diamond (10) has lower enchantability than Iron (14).
-    // Gold has the highest enchantability (22).
-    F.assert(diamondEnchantability < ironEnchantability, 'Diamond enchantability (10) < Iron enchantability (14)');
+            // --- 5b. Potion + Tool Integration ---
+            F.section('5b. Potion + Tool Integration');
 
-    // --- 5b. Potion + Tool Integration ---
-    F.section('5b. Potion + Tool Integration');
+            // Mining Fatigue (effect ID 5) should reduce tool speed
+            var miningFatigueEffect = Donkeycraft.PotionRegistry.getEffect(5);
+            F.assertType(miningFatigueEffect, 'object', 'Mining Fatigue effect exists');
+            F.assertEq(miningFatigueEffect.name, 'MiningFatigue', 'Mining Fatigue name is correct');
 
-    // Mining Fatigue (effect ID 5) should reduce tool speed
-    var miningFatigueEffect = Donkeycraft.PotionRegistry.getEffect(5);
-    F.assertType(miningFatigueEffect, 'object', 'Mining Fatigue effect exists');
-    F.assertEq(miningFatigueEffect.name, 'MiningFatigue', 'Mining Fatigue name is correct');
+            // Speed (effect ID 2) should increase movement speed (not tool speed directly)
+            var speedEffect = Donkeycraft.PotionRegistry.getEffect(2);
+            F.assertType(speedEffect, 'object', 'Speed effect exists');
+            F.assertEq(speedEffect.name, 'Speed', 'Speed name is correct');
 
-    // Speed (effect ID 2) should increase movement speed (not tool speed directly)
-    var speedEffect = Donkeycraft.PotionRegistry.getEffect(2);
-    F.assertType(speedEffect, 'object', 'Speed effect exists');
-    F.assertEq(speedEffect.name, 'Speed', 'Speed name is correct');
+            // --- 5c. All Systems Working Together ---
+            F.section('5c. All Systems Working Together');
 
-    // --- 5c. All Systems Working Together ---
-    F.section('5c. All Systems Working Together');
+            // Simulate a full workflow: enchant a diamond pickaxe with Sharpness V
+            var pickaxeId = 253; // Iron pickaxe (proxy for tool item)
+            var sharpnessCompat = Donkeycraft.EnchantmentRegistry.canApplyToItem(pickaxeId, 1);
 
-    // Simulate a full workflow: enchant a diamond pickaxe with Sharpness V
-    var pickaxeId = 253; // Iron pickaxe (proxy for tool item)
-    var sharpnessCompat = Donkeycraft.EnchantmentRegistry.canApplyToItem(pickaxeId, 1);
+            // Note: Tool block IDs 250-255 are pickaxes. The enchanting UI checks weapon slot for these.
+            // Since pickaxes are not in the canApplyToItem sword list, they may not directly apply.
+            // This test verifies the system is accessible and functional.
+            F.assertType(Donkeycraft.EnchantmentRegistry.areCompatible, 'function', 'Enchantment compatibility check is callable');
+            F.assertType(Donkeycraft.PotionRegistry.matchBrewingRecipe, 'function', 'Brewing recipe matching is callable');
+            F.assertType(Donkeycraft.ToolRegistry.calculateBreakTime, 'function', 'Break time calculation is callable');
 
-    // Note: Tool block IDs 250-255 are pickaxes. The enchanting UI checks weapon slot for these.
-    // Since pickaxes are not in the canApplyToItem sword list, they may not directly apply.
-    // This test verifies the system is accessible and functional.
-    F.assertType(Donkeycraft.EnchantmentRegistry.areCompatible, 'function', 'Enchantment compatibility check is callable');
-    F.assertType(Donkeycraft.PotionRegistry.matchBrewingRecipe, 'function', 'Brewing recipe matching is callable');
-    F.assertType(Donkeycraft.ToolRegistry.calculateBreakTime, 'function', 'Break time calculation is callable');
+            // Verify all registries are populated
+            F.assert(Donkeycraft.EnchantmentRegistry.getEnchantmentCount() > 0, 'Enchantment registry has entries');
+            F.assert(Donkeycraft.PotionRegistry.getPotionCount() > 0, 'Potion registry has entries');
+            F.assert(Donkeycraft.ToolRegistry.getMaterialCount() > 0, 'Tool registry has entries');
 
-    // Verify all registries are populated
-    F.assert(Donkeycraft.EnchantmentRegistry.getEnchantmentCount() > 0, 'Enchantment registry has entries');
-    F.assert(Donkeycraft.PotionRegistry.getPotionCount() > 0, 'Potion registry has entries');
-    F.assert(Donkeycraft.ToolRegistry.getMaterialCount() > 0, 'Tool registry has entries');
+            // ============================================================
+            // Finish: renders summary at top of page
+            // ============================================================
+            F.finishTests();
 
-    // ============================================================
-    // Finish: renders summary at top of page
-    // ============================================================
-    F.finishTests();
-
-})();
-</script>
+        })();
+    </script>
 </body>
+
 </html>

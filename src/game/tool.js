@@ -1,6 +1,6 @@
 // Donkeycraft — Tool System
 // Tool material tiers, speed multipliers, correct-for-drop detection, and durability management.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -19,7 +19,7 @@
      * @param {number} enchantability — Enchantability bonus value.
      * @param {number} repairItemBlockId - Block/item ID used for repairing this tool.
      */
-    Donkeycraft.ToolMaterial = function(id, name, durabilityCount, speedMultiplier, hardnessLevel, enchantability, repairItemBlockId) {
+    Donkeycraft.ToolMaterial = function (id, name, durabilityCount, speedMultiplier, hardnessLevel, enchantability, repairItemBlockId) {
         this.id = id;
         this.name = name;
         this.durabilityCount = durabilityCount || 0;
@@ -36,7 +36,7 @@
     /**
      * ToolRegistry — static class managing tool material definitions, correct-for-drop logic, and break time calculations.
      */
-    Donkeycraft.ToolRegistry = (function() {
+    Donkeycraft.ToolRegistry = (function () {
         var _materials = {};          // id -> ToolMaterial
         var _byName = {};             // name -> ToolMaterial
 
@@ -443,7 +443,7 @@
      * @param {number} materialId - The material ID of this tool.
      * @param {number} [toolBlockId=0] - The block/item ID of the tool.
      */
-    Donkeycraft.Tool = function(materialId, toolBlockId) {
+    Donkeycraft.Tool = function (materialId, toolBlockId) {
         this._materialId = materialId || 0;
         this._toolBlockId = toolBlockId || 0;
 
@@ -457,7 +457,7 @@
      * @param {number} [amount=1] - Amount of damage to apply.
      * @returns {boolean} True if the tool was broken by this damage.
      */
-    Donkeycraft.Tool.prototype.takeDamage = function(amount) {
+    Donkeycraft.Tool.prototype.takeDamage = function (amount) {
         // Handle zero/negative amounts: no damage applied
         if (amount === undefined || amount <= 0) {
             amount = 0;
@@ -476,7 +476,7 @@
      * getRemainingDurability — gets the remaining durability count.
      * @returns {number}
      */
-    Donkeycraft.Tool.prototype.getRemainingDurability = function() {
+    Donkeycraft.Tool.prototype.getRemainingDurability = function () {
         return Math.max(0, this._currentDurability);
     };
 
@@ -484,7 +484,7 @@
      * getMaxDurability — gets the maximum durability of this tool.
      * @returns {number}
      */
-    Donkeycraft.Tool.prototype.getMaxDurability = function() {
+    Donkeycraft.Tool.prototype.getMaxDurability = function () {
         return this._maxDurability;
     };
 
@@ -492,7 +492,7 @@
      * getDurabilityFraction — gets the ratio of remaining/max durability (0-1).
      * @returns {number}
      */
-    Donkeycraft.Tool.prototype.getDurabilityFraction = function() {
+    Donkeycraft.Tool.prototype.getDurabilityFraction = function () {
         if (this._maxDurability <= 0) return 0;
         return this._currentDurability / this._maxDurability;
     };
@@ -501,7 +501,7 @@
      * isBroken — checks if the tool has no remaining durability.
      * @returns {boolean}
      */
-    Donkeycraft.Tool.prototype.isBroken = function() {
+    Donkeycraft.Tool.prototype.isBroken = function () {
         return this._currentDurability <= 0;
     };
 
@@ -511,7 +511,7 @@
      * @param {number} repairItemBlockId - Block/item ID being used to repair.
      * @returns {number} Amount of durability restored.
      */
-    Donkeycraft.Tool.prototype.repairWithItem = function(repairItemBlockId) {
+    Donkeycraft.Tool.prototype.repairWithItem = function (repairItemBlockId) {
         var expectedRepairId = Donkeycraft.ToolRegistry.getRepairItemBlockId(this._materialId);
         if (expectedRepairId === 0 || repairItemBlockId !== expectedRepairId) {
             return 0; // Wrong material
@@ -532,7 +532,7 @@
      * getMaterialId — gets the material ID of this tool.
      * @returns {number}
      */
-    Donkeycraft.Tool.prototype.getMaterialId = function() {
+    Donkeycraft.Tool.prototype.getMaterialId = function () {
         return this._materialId;
     };
 
@@ -540,7 +540,7 @@
      * getToolBlockId — gets the block/item ID of this tool.
      * @returns {number}
      */
-    Donkeycraft.Tool.prototype.getToolBlockId = function() {
+    Donkeycraft.Tool.prototype.getToolBlockId = function () {
         return this._toolBlockId;
     };
 
@@ -548,7 +548,7 @@
      * serialize — serializes the tool state to a plain object for persistence/network transfer.
      * @returns {Object} Serialized tool data.
      */
-    Donkeycraft.Tool.prototype.serialize = function() {
+    Donkeycraft.Tool.prototype.serialize = function () {
         return {
             materialId: this._materialId,
             toolBlockId: this._toolBlockId,
@@ -562,7 +562,7 @@
      * @param {Object} data - Serialized tool data.
      * @returns {Donkeycraft.Tool} The deserialized Tool instance.
      */
-    Donkeycraft.Tool.deserialize = function(data) {
+    Donkeycraft.Tool.deserialize = function (data) {
         if (!data || typeof data !== 'object') {
             return new Donkeycraft.Tool(0, 0);
         }
@@ -576,7 +576,7 @@
      * toString — returns a human-readable string representation of the tool.
      * @returns {string}
      */
-    Donkeycraft.Tool.prototype.toString = function() {
+    Donkeycraft.Tool.prototype.toString = function () {
         var mat = Donkeycraft.ToolRegistry.getToolMaterial(this._materialId);
         var matName = mat ? mat.name : 'Unknown';
         return 'Tool[' + matName + ', durability=' + this._currentDurability + '/' + this._maxDurability + ']';
@@ -585,7 +585,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.Tool.prototype.destroy = function() {
+    Donkeycraft.Tool.prototype.destroy = function () {
         this._materialId = 0;
         this._toolBlockId = 0;
         this._maxDurability = 0;

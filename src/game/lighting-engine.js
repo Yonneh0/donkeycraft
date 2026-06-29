@@ -1,6 +1,6 @@
 // Donkeycraft — Lighting Engine
 // Sky light and block light propagation: BFS flood fill, light updates on block change.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * LightingEngine — manages light propagation in chunks.
      */
-    Donkeycraft.LightingEngine = (function() {
+    Donkeycraft.LightingEngine = (function () {
         // Light opacity cache: Uint8Array for IDs 0-255, with lazy-loaded entries beyond that.
         var _lightOpacityCache = new Uint8Array(256);
         var _extendedCache = {}; // For IDs > 255

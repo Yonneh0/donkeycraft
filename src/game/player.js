@@ -1,6 +1,6 @@
 // Donkeycraft — Player Entity
 // Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
      * @param {number} [config.z=0] - Initial Z position.
      * @param {string} [config.gameMode='survival'] - Game mode: 'survival', 'creative', or 'spectator'.
      */
-    Donkeycraft.Player = function(config) {
+    Donkeycraft.Player = function (config) {
         config = config || {};
 
         /**
@@ -110,7 +110,7 @@
      * Get the player's current position.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getPosition = function() {
+    Donkeycraft.Player.prototype.getPosition = function () {
         return this._position;
     };
 
@@ -120,7 +120,7 @@
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
      */
-    Donkeycraft.Player.prototype.setPosition = function(x, y, z) {
+    Donkeycraft.Player.prototype.setPosition = function (x, y, z) {
         this._position.x = x;
         this._position.y = y;
         this._position.z = z;
@@ -130,7 +130,7 @@
      * Get the player's current velocity.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getVelocity = function() {
+    Donkeycraft.Player.prototype.getVelocity = function () {
         return this._velocity;
     };
 
@@ -140,7 +140,7 @@
      * @param {number} vy - Y velocity (blocks/s).
      * @param {number} vz - Z velocity (blocks/s).
      */
-    Donkeycraft.Player.prototype.setVelocity = function(vx, vy, vz) {
+    Donkeycraft.Player.prototype.setVelocity = function (vx, vy, vz) {
         this._velocity.x = vx;
         this._velocity.y = vy;
         this._velocity.z = vz;
@@ -150,7 +150,7 @@
      * Get the player's current rotation.
      * @returns {{yaw: number, pitch: number}} Rotation in radians.
      */
-    Donkeycraft.Player.prototype.getRotation = function() {
+    Donkeycraft.Player.prototype.getRotation = function () {
         return this._rotation;
     };
 
@@ -159,7 +159,7 @@
      * @param {number} yaw - Yaw angle in radians [0, 2π).
      * @param {number} pitch - Pitch angle in radians [-π/2, π/2].
      */
-    Donkeycraft.Player.prototype.setRotation = function(yaw, pitch) {
+    Donkeycraft.Player.prototype.setRotation = function (yaw, pitch) {
         // Normalize yaw to [0, 2π) using modulo arithmetic (O(1) vs O(n) while loops)
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
@@ -172,7 +172,7 @@
      * Adjust yaw by a delta amount.
      * @param {number} deltaYaw - Yaw change in radians.
      */
-    Donkeycraft.Player.prototype.adjustYaw = function(deltaYaw) {
+    Donkeycraft.Player.prototype.adjustYaw = function (deltaYaw) {
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((this._rotation.yaw + deltaYaw) % twoPi + twoPi) % twoPi;
     };
@@ -181,7 +181,7 @@
      * Adjust pitch by a delta amount.
      * @param {number} deltaPitch - Pitch change in radians.
      */
-    Donkeycraft.Player.prototype.adjustPitch = function(deltaPitch) {
+    Donkeycraft.Player.prototype.adjustPitch = function (deltaPitch) {
         this._rotation.pitch = Donkeycraft.clamp(
             this._rotation.pitch + deltaPitch,
             -Math.PI / 2,
@@ -193,7 +193,7 @@
      * Get the player's dimensions.
      * @returns {{height: number, width: number}}
      */
-    Donkeycraft.Player.prototype.getDimensions = function() {
+    Donkeycraft.Player.prototype.getDimensions = function () {
         return {
             height: this.height,
             width: this.width
@@ -204,7 +204,7 @@
      * Get the player's current game mode.
      * @returns {string} 'survival', 'creative', or 'spectator'.
      */
-    Donkeycraft.Player.prototype.getGameMode = function() {
+    Donkeycraft.Player.prototype.getGameMode = function () {
         return this.gameMode;
     };
 
@@ -212,7 +212,7 @@
      * Set the player's game mode.
      * @param {string} mode - 'survival', 'creative', or 'spectator'.
      */
-    Donkeycraft.Player.prototype.setGameMode = function(mode) {
+    Donkeycraft.Player.prototype.setGameMode = function (mode) {
         var validModes = ['survival', 'creative', 'spectator'];
         if (validModes.indexOf(mode) === -1) {
             return; // Invalid mode — ignore
@@ -229,7 +229,7 @@
      * Check if the player is alive.
      * @returns {boolean}
      */
-    Donkeycraft.Player.prototype.isAlive = function() {
+    Donkeycraft.Player.prototype.isAlive = function () {
         return this.alive;
     };
 
@@ -237,7 +237,7 @@
      * Set whether the player is alive or dead.
      * @param {boolean} alive - True if alive, false if dead.
      */
-    Donkeycraft.Player.prototype.setAlive = function(alive) {
+    Donkeycraft.Player.prototype.setAlive = function (alive) {
         this.alive = !!alive;
     };
 
@@ -245,7 +245,7 @@
      * Get the player's eye position (for raycasting and camera).
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getEyePosition = function() {
+    Donkeycraft.Player.prototype.getEyePosition = function () {
         var eyeHeight = Config.PLAYER_EYE_HEIGHT;
         return new Donkeycraft.Vector3(
             this._position.x,
@@ -258,7 +258,7 @@
      * Get the player's bounding box (AABB).
      * @returns {{minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number}}
      */
-    Donkeycraft.Player.prototype.getHurtBox = function() {
+    Donkeycraft.Player.prototype.getHurtBox = function () {
         var halfWidth = this.width / 2;
         return {
             minX: this._position.x - halfWidth,
@@ -274,7 +274,7 @@
      * Get the forward direction vector based on player rotation.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getForwardDirection = function() {
+    Donkeycraft.Player.prototype.getForwardDirection = function () {
         var yaw = this._rotation.yaw;
         return new Donkeycraft.Vector3(
             -Math.sin(yaw),
@@ -287,7 +287,7 @@
      * Get the right direction vector (90° clockwise from forward).
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getRightDirection = function() {
+    Donkeycraft.Player.prototype.getRightDirection = function () {
         var yaw = this._rotation.yaw;
         return new Donkeycraft.Vector3(
             -Math.sin(yaw + Math.PI / 2),
@@ -300,7 +300,7 @@
      * Get the current knockback velocity.
      * @returns {Donkeycraft.Vector3}
      */
-    Donkeycraft.Player.prototype.getKnockback = function() {
+    Donkeycraft.Player.prototype.getKnockback = function () {
         return this._knockback;
     };
 
@@ -310,7 +310,7 @@
      * @param {number} strength - Knockback strength (blocks/s).
      * @param {number} [upwardForce=0] - Upward component of knockback.
      */
-    Donkeycraft.Player.prototype.applyKnockback = function(direction, strength, upwardForce) {
+    Donkeycraft.Player.prototype.applyKnockback = function (direction, strength, upwardForce) {
         upwardForce = upwardForce || 0;
         var normalized = direction.normalized();
         this._knockback.x = normalized.x * strength;
@@ -321,7 +321,7 @@
     /**
      * Clear the current knockback velocity.
      */
-    Donkeycraft.Player.prototype.clearKnockback = function() {
+    Donkeycraft.Player.prototype.clearKnockback = function () {
         this._knockback.set(0, 0, 0);
     };
 
@@ -330,7 +330,7 @@
      * Call with negative deltaY values (downward movement) to accumulate.
      * @param {number} deltaY - Downward displacement in blocks (positive value = falling down).
      */
-    Donkeycraft.Player.prototype.trackFallDistance = function(deltaY) {
+    Donkeycraft.Player.prototype.trackFallDistance = function (deltaY) {
         if (deltaY > 0) {
             this.maxFallDistance += deltaY;
         } else if (this.onGround && this.maxFallDistance > 0) {
@@ -343,7 +343,7 @@
      * Get the current fall distance for damage calculation.
      * @returns {number}
      */
-    Donkeycraft.Player.prototype.getFallDistance = function() {
+    Donkeycraft.Player.prototype.getFallDistance = function () {
         return this.maxFallDistance;
     };
 
@@ -352,9 +352,9 @@
      * @param {Function} callback - Function called with (deltaTime) each tick.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.Player.prototype.onTick = function(callback) {
+    Donkeycraft.Player.prototype.onTick = function (callback) {
         this._subscribers.push(callback);
-        return function() {
+        return function () {
             var idx = this._subscribers.indexOf(callback);
             if (idx !== -1) {
                 this._subscribers.splice(idx, 1);
@@ -367,7 +367,7 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      * @private
      */
-    Donkeycraft.Player.prototype._notifyTick = function(deltaTime) {
+    Donkeycraft.Player.prototype._notifyTick = function (deltaTime) {
         for (var i = 0; i < this._subscribers.length; i++) {
             try {
                 this._subscribers[i](deltaTime);
@@ -383,7 +383,7 @@
     /**
      * Destroy the player and free resources.
      */
-    Donkeycraft.Player.prototype.destroy = function() {
+    Donkeycraft.Player.prototype.destroy = function () {
         this._position = null;
         this._velocity = null;
         this._knockback = null;

@@ -1,7 +1,7 @@
 // Donkeycraft — Level Data
 // Level data: spawn position, game mode, time, seed, player data.
 // Includes periodic auto-save to WorldStore for persistent game state.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -22,7 +22,7 @@
      * LevelData — Manages world-level data: spawn, game mode, time, seed, player state.
      * Supports periodic auto-save to WorldStore for persistent game state.
      */
-    Donkeycraft.LevelData = function() {
+    Donkeycraft.LevelData = function () {
         this._spawnX = Donkeycraft.DEFAULT_SPAWN_X;
         this._spawnY = Donkeycraft.DEFAULT_SPAWN_Y;
         this._spawnZ = Donkeycraft.DEFAULT_SPAWN_Z;
@@ -45,7 +45,7 @@
      * _ensurePlayerData — ensure player data object exists, initializing defaults if needed.
      * @private
      */
-    Donkeycraft.LevelData.prototype._ensurePlayerData = function() {
+    Donkeycraft.LevelData.prototype._ensurePlayerData = function () {
         if (!this._playerData) {
             this._playerData = {
                 position: { x: 0, y: 64, z: 0 },
@@ -69,7 +69,7 @@
      * @param {number} y — Spawn Y coordinate.
      * @param {number} z — Spawn Z coordinate.
      */
-    Donkeycraft.LevelData.prototype.setSpawn = function(x, y, z) {
+    Donkeycraft.LevelData.prototype.setSpawn = function (x, y, z) {
         this._spawnX = Math.round(x || 0);
         this._spawnY = Math.round(y || Donkeycraft.DEFAULT_SPAWN_Y);
         this._spawnZ = Math.round(z || 0);
@@ -79,7 +79,7 @@
      * Get the spawn position.
      * @returns {{x: number, y: number, z: number}} Spawn coordinates.
      */
-    Donkeycraft.LevelData.prototype.getSpawn = function() {
+    Donkeycraft.LevelData.prototype.getSpawn = function () {
         return {
             x: this._spawnX,
             y: this._spawnY,
@@ -91,7 +91,7 @@
      * Get the spawn X coordinate.
      * @returns {number} Spawn X.
      */
-    Donkeycraft.LevelData.prototype.getSpawnX = function() {
+    Donkeycraft.LevelData.prototype.getSpawnX = function () {
         return this._spawnX;
     };
 
@@ -99,7 +99,7 @@
      * Get the spawn Y coordinate.
      * @returns {number} Spawn Y.
      */
-    Donkeycraft.LevelData.prototype.getSpawnY = function() {
+    Donkeycraft.LevelData.prototype.getSpawnY = function () {
         return this._spawnY;
     };
 
@@ -107,7 +107,7 @@
      * Get the spawn Z coordinate.
      * @returns {number} Spawn Z.
      */
-    Donkeycraft.LevelData.prototype.getSpawnZ = function() {
+    Donkeycraft.LevelData.prototype.getSpawnZ = function () {
         return this._spawnZ;
     };
 
@@ -115,7 +115,7 @@
      * Set the game mode.
      * @param {string} mode — Game mode ('survival', 'creative', 'spectator').
      */
-    Donkeycraft.LevelData.prototype.setGameMode = function(mode) {
+    Donkeycraft.LevelData.prototype.setGameMode = function (mode) {
         var validModes = ['survival', 'creative', 'spectator'];
         this._gameMode = (validModes.indexOf(mode) !== -1) ? mode : 'survival';
     };
@@ -124,7 +124,7 @@
      * Get the current game mode.
      * @returns {string} Game mode string.
      */
-    Donkeycraft.LevelData.prototype.getGameMode = function() {
+    Donkeycraft.LevelData.prototype.getGameMode = function () {
         return this._gameMode;
     };
 
@@ -132,7 +132,7 @@
      * Set the world time (total ticks).
      * @param {number} ticks — Total tick count.
      */
-    Donkeycraft.LevelData.prototype.setTime = function(ticks) {
+    Donkeycraft.LevelData.prototype.setTime = function (ticks) {
         this._worldTime = ticks < 0 ? 0 : Math.floor(ticks);
     };
 
@@ -140,7 +140,7 @@
      * Get the current world time (total ticks).
      * @returns {number} Total tick count.
      */
-    Donkeycraft.LevelData.prototype.getTime = function() {
+    Donkeycraft.LevelData.prototype.getTime = function () {
         return this._worldTime;
     };
 
@@ -148,7 +148,7 @@
      * Set the world seed.
      * @param {number} seed — World seed value.
      */
-    Donkeycraft.LevelData.prototype.setSeed = function(seed) {
+    Donkeycraft.LevelData.prototype.setSeed = function (seed) {
         this._seed = seed || 42;
     };
 
@@ -156,7 +156,7 @@
      * Get the world seed.
      * @returns {number} World seed value.
      */
-    Donkeycraft.LevelData.prototype.getSeed = function() {
+    Donkeycraft.LevelData.prototype.getSeed = function () {
         return this._seed;
     };
 
@@ -164,7 +164,7 @@
      * Set the world name.
      * @param {string} name — World name.
      */
-    Donkeycraft.LevelData.prototype.setWorldName = function(name) {
+    Donkeycraft.LevelData.prototype.setWorldName = function (name) {
         this._worldName = name || 'DefaultWorld';
     };
 
@@ -172,7 +172,7 @@
      * Get the world name.
      * @returns {string} World name.
      */
-    Donkeycraft.LevelData.prototype.getWorldName = function() {
+    Donkeycraft.LevelData.prototype.getWorldName = function () {
         return this._worldName;
     };
 
@@ -180,7 +180,7 @@
      * Set player data (position, health, inventory, etc.).
      * @param {Object} data — Player data object.
      */
-    Donkeycraft.LevelData.prototype.setPlayerData = function(data) {
+    Donkeycraft.LevelData.prototype.setPlayerData = function (data) {
         if (data && typeof data === 'object') {
             this._playerData = {
                 position: data.position || { x: 0, y: 64, z: 0 },
@@ -202,7 +202,7 @@
      * Get the current player data.
      * @returns {Object|null} Player data object or null if not set.
      */
-    Donkeycraft.LevelData.prototype.getPlayerData = function() {
+    Donkeycraft.LevelData.prototype.getPlayerData = function () {
         if (!this._playerData) {
             return null;
         }
@@ -228,7 +228,7 @@
      * @param {number} y — Y coordinate.
      * @param {number} z — Z coordinate.
      */
-    Donkeycraft.LevelData.prototype.setPlayerPosition = function(x, y, z) {
+    Donkeycraft.LevelData.prototype.setPlayerPosition = function (x, y, z) {
         this._ensurePlayerData();
         this._playerData.position.x = x;
         this._playerData.position.y = y;
@@ -240,7 +240,7 @@
      * @param {number} yaw — Yaw angle in radians.
      * @param {number} pitch — Pitch angle in radians.
      */
-    Donkeycraft.LevelData.prototype.setPlayerRotation = function(yaw, pitch) {
+    Donkeycraft.LevelData.prototype.setPlayerRotation = function (yaw, pitch) {
         this._ensurePlayerData();
         this._playerData.rotation.yaw = yaw || 0;
         this._playerData.rotation.pitch = pitch || 0;
@@ -250,7 +250,7 @@
      * Update player health.
      * @param {number} health — Current health (0-20).
      */
-    Donkeycraft.LevelData.prototype.setPlayerHealth = function(health) {
+    Donkeycraft.LevelData.prototype.setPlayerHealth = function (health) {
         this._ensurePlayerData();
         this._playerData.health = Donkeycraft.clamp(Math.round(health || 0), 0, this._playerData.maxHealth);
         this._playerData.alive = this._playerData.health > 0;
@@ -260,7 +260,7 @@
      * Check if the player is alive.
      * @returns {boolean} True if player is alive.
      */
-    Donkeycraft.LevelData.prototype.isPlayerAlive = function() {
+    Donkeycraft.LevelData.prototype.isPlayerAlive = function () {
         return this._playerData ? this._playerData.alive : true;
     };
 
@@ -268,7 +268,7 @@
      * Update fall distance (for fall damage calculation).
      * @param {number} distance — Fall distance in blocks.
      */
-    Donkeycraft.LevelData.prototype.setFallDistance = function(distance) {
+    Donkeycraft.LevelData.prototype.setFallDistance = function (distance) {
         this._ensurePlayerData();
         this._playerData.fallDistance = Math.max(0, distance || 0);
     };
@@ -277,7 +277,7 @@
      * Get fall distance.
      * @returns {number} Fall distance in blocks.
      */
-    Donkeycraft.LevelData.prototype.getFallDistance = function() {
+    Donkeycraft.LevelData.prototype.getFallDistance = function () {
         return this._playerData ? this._playerData.fallDistance : 0;
     };
 
@@ -285,7 +285,7 @@
      * Update hunger level.
      * @param {number} hunger — Hunger value (0-20).
      */
-    Donkeycraft.LevelData.prototype.setHunger = function(hunger) {
+    Donkeycraft.LevelData.prototype.setHunger = function (hunger) {
         this._ensurePlayerData();
         this._playerData.hunger = Donkeycraft.clamp(Math.round(hunger || 0), 0, 20);
     };
@@ -294,7 +294,7 @@
      * Get hunger level.
      * @returns {number} Hunger value (0-20).
      */
-    Donkeycraft.LevelData.prototype.getHunger = function() {
+    Donkeycraft.LevelData.prototype.getHunger = function () {
         return this._playerData ? this._playerData.hunger : 20;
     };
 
@@ -302,7 +302,7 @@
      * Update saturation level.
      * @param {number} saturation — Saturation value (0-hunger).
      */
-    Donkeycraft.LevelData.prototype.setSaturation = function(saturation) {
+    Donkeycraft.LevelData.prototype.setSaturation = function (saturation) {
         this._ensurePlayerData();
         this._playerData.saturation = Donkeycraft.clamp(saturation || 0, 0, this._playerData.hunger);
     };
@@ -311,7 +311,7 @@
      * Get saturation level.
      * @returns {number} Saturation value.
      */
-    Donkeycraft.LevelData.prototype.getSaturation = function() {
+    Donkeycraft.LevelData.prototype.getSaturation = function () {
         return this._playerData ? this._playerData.saturation : 0;
     };
 
@@ -319,7 +319,7 @@
      * Update XP levels.
      * @param {number} levels — XP level count.
      */
-    Donkeycraft.LevelData.prototype.setXpLevels = function(levels) {
+    Donkeycraft.LevelData.prototype.setXpLevels = function (levels) {
         this._ensurePlayerData();
         this._playerData.experience.levels = Math.max(0, Math.round(levels || 0));
     };
@@ -328,7 +328,7 @@
      * Update XP points (experience progress toward next level).
      * @param {number} points — XP points (0-7 per level at current level).
      */
-    Donkeycraft.LevelData.prototype.setXpPoints = function(points) {
+    Donkeycraft.LevelData.prototype.setXpPoints = function (points) {
         this._ensurePlayerData();
         this._playerData.experience.points = Math.max(0, Math.round(points || 0));
     };
@@ -337,7 +337,7 @@
      * Get XP levels.
      * @returns {number} XP level count.
      */
-    Donkeycraft.LevelData.prototype.getXpLevels = function() {
+    Donkeycraft.LevelData.prototype.getXpLevels = function () {
         return this._playerData ? this._playerData.experience.levels : 0;
     };
 
@@ -345,7 +345,7 @@
      * Get XP points.
      * @returns {number} XP points.
      */
-    Donkeycraft.LevelData.prototype.getXpPoints = function() {
+    Donkeycraft.LevelData.prototype.getXpPoints = function () {
         return this._playerData ? this._playerData.experience.points : 0;
     };
 
@@ -353,7 +353,7 @@
      * Update player inventory.
      * @param {Array} inventory — Array of item stack objects.
      */
-    Donkeycraft.LevelData.prototype.setInventory = function(inventory) {
+    Donkeycraft.LevelData.prototype.setInventory = function (inventory) {
         this._ensurePlayerData();
         if (Array.isArray(inventory)) {
             this._playerData.inventory = inventory.slice();
@@ -364,7 +364,7 @@
      * Get player inventory.
      * @returns {Array} Array of item stack objects.
      */
-    Donkeycraft.LevelData.prototype.getInventory = function() {
+    Donkeycraft.LevelData.prototype.getInventory = function () {
         return this._playerData ? (this._playerData.inventory ? this._playerData.inventory.slice() : []) : [];
     };
 
@@ -372,7 +372,7 @@
      * Serialize level data to a plain object for storage.
      * @returns {{worldName: string, spawn: {x:number, y:number, z:number}, gameMode: string, worldTime: number, seed: number, playerData: Object|null, lastSaved: number}} Serialized state.
      */
-    Donkeycraft.LevelData.prototype.serialize = function() {
+    Donkeycraft.LevelData.prototype.serialize = function () {
         return {
             worldName: this._worldName,
             spawn: { x: this._spawnX, y: this._spawnY, z: this._spawnZ },
@@ -389,7 +389,7 @@
      * @param {Object} data — Serialized level data.
      * @returns {Donkeycraft.LevelData} This instance for chaining.
      */
-    Donkeycraft.LevelData.prototype.deserialize = function(data) {
+    Donkeycraft.LevelData.prototype.deserialize = function (data) {
         if (!data || typeof data !== 'object') {
             return this;
         }
@@ -446,7 +446,7 @@
      * Validate that required fields are present and valid.
      * @returns {boolean} True if level data is valid.
      */
-    Donkeycraft.LevelData.prototype.isValid = function() {
+    Donkeycraft.LevelData.prototype.isValid = function () {
         if (typeof this._worldName !== 'string' || this._worldName.length === 0) {
             return false;
         }
@@ -471,7 +471,7 @@
     /**
      * Reset level data to defaults.
      */
-    Donkeycraft.LevelData.prototype.reset = function() {
+    Donkeycraft.LevelData.prototype.reset = function () {
         this._spawnX = Donkeycraft.DEFAULT_SPAWN_X;
         this._spawnY = Donkeycraft.DEFAULT_SPAWN_Y;
         this._spawnZ = Donkeycraft.DEFAULT_SPAWN_Z;
@@ -492,7 +492,7 @@
     /**
      * Mark the current time as last saved.
      */
-    Donkeycraft.LevelData.prototype.markSaved = function() {
+    Donkeycraft.LevelData.prototype.markSaved = function () {
         this._lastSaved = Date.now();
     };
 
@@ -500,7 +500,7 @@
      * Get the timestamp of last save.
      * @returns {number} Unix timestamp in ms.
      */
-    Donkeycraft.LevelData.prototype.getLastSaved = function() {
+    Donkeycraft.LevelData.prototype.getLastSaved = function () {
         return this._lastSaved;
     };
 
@@ -514,7 +514,7 @@
      * @param {string} worldName — World name identifier.
      * @param {number} [intervalMs] — Auto-save interval in milliseconds. Defaults to Config.LEVEL_DATA_AUTO_SAVE_INTERVAL or Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL.
      */
-    Donkeycraft.LevelData.prototype.startAutoSave = function(worldStore, worldName, intervalMs) {
+    Donkeycraft.LevelData.prototype.startAutoSave = function (worldStore, worldName, intervalMs) {
         if (!worldStore || !worldName) {
             return;
         }
@@ -534,7 +534,7 @@
     /**
      * Stop periodic auto-save.
      */
-    Donkeycraft.LevelData.prototype.stopAutoSave = function() {
+    Donkeycraft.LevelData.prototype.stopAutoSave = function () {
         this._autoSaveEnabled = false;
         this._autoSaveTimer = 0;
         this._worldStore = null;
@@ -545,7 +545,7 @@
      * Check if auto-save is enabled.
      * @returns {boolean} True if auto-save is active.
      */
-    Donkeycraft.LevelData.prototype.isAutoSaveEnabled = function() {
+    Donkeycraft.LevelData.prototype.isAutoSaveEnabled = function () {
         return this._autoSaveEnabled;
     };
 
@@ -554,7 +554,7 @@
      * Triggers a save when the interval elapses.
      * @param {number} dt — Delta time in seconds.
      */
-    Donkeycraft.LevelData.prototype.tickAutoSave = function(dt) {
+    Donkeycraft.LevelData.prototype.tickAutoSave = function (dt) {
         if (!this._autoSaveEnabled || !this._worldStore || !this._worldNameRef) {
             return;
         }
@@ -563,7 +563,7 @@
 
         if (this._autoSaveTimer >= this._autoSaveInterval) {
             this._autoSaveTimer = 0;
-            this.persistToStore().catch(function() {
+            this.persistToStore().catch(function () {
                 // Silently ignore auto-save failures during gameplay
             });
         }
@@ -575,7 +575,7 @@
      * Also triggers dirty chunk save via WorldStore.saveDirtyChunks().
      * @returns {Promise<boolean>} True if persistence succeeded.
      */
-    Donkeycraft.LevelData.prototype.persistToStore = function() {
+    Donkeycraft.LevelData.prototype.persistToStore = function () {
         var self = this;
         if (!this._worldStore || !this._worldNameRef) {
             return Promise.resolve(false);
@@ -584,7 +584,7 @@
         this.markSaved();
 
         // Load existing world data to preserve chunks before overwriting
-        return this._worldStore.loadWorld(this._worldNameRef).then(function(worldData) {
+        return this._worldStore.loadWorld(this._worldNameRef).then(function (worldData) {
             var levelData = self.serialize();
             var existingChunks = [];
 
@@ -594,15 +594,15 @@
             }
 
             // Save merged data: updated level + preserved chunks
-            return self._worldStore.saveWorld(self._worldNameRef, levelData, existingChunks).then(function(saveSuccess) {
+            return self._worldStore.saveWorld(self._worldNameRef, levelData, existingChunks).then(function (saveSuccess) {
                 if (!saveSuccess) {
                     return false;
                 }
                 // Also save dirty chunks if available
                 if (self._worldStore.saveDirtyChunks) {
-                    return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function() {
+                    return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function () {
                         return true;
-                    }).catch(function() {
+                    }).catch(function () {
                         return true; // Level data saved even if chunks failed
                     });
                 }
@@ -614,7 +614,7 @@
     /**
      * Destroy the LevelData instance and free resources.
      */
-    Donkeycraft.LevelData.prototype.destroy = function() {
+    Donkeycraft.LevelData.prototype.destroy = function () {
         this.stopAutoSave();
         this._playerData = null;
     };

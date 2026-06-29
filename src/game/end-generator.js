@@ -1,6 +1,6 @@
 // Donkeycraft — End Terrain Generator
 // End terrain: obsidian platform, floating islands, end midlands/highlands, end cities.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * EndGenerator — generates terrain for the End dimension.
      */
-    Donkeycraft.EndGenerator = (function() {
+    Donkeycraft.EndGenerator = (function () {
         var _chunkManager = null;
         var _endStoneId = 0;
         var _chorusPlantId = 0;

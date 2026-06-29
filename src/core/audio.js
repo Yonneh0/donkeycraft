@@ -1,6 +1,6 @@
 // Donkeycraft — Audio System
 // Web Audio API wrapper: sound playback, music, ambient sounds, positional audio.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -8,7 +8,7 @@
     /**
      * AudioSystem — manages Web Audio API for game sounds.
      */
-    Donkeycraft.AudioSystem = function() {
+    Donkeycraft.AudioSystem = function () {
         this._context = null;
         this._masterGain = null;
         this._soundCache = {};
@@ -20,9 +20,9 @@
      * Initialize the audio system. Must be called from a user gesture context.
      * @returns {Promise}
      */
-    Donkeycraft.AudioSystem.prototype.init = function() {
+    Donkeycraft.AudioSystem.prototype.init = function () {
         var self = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             try {
                 var AudioContext = window.AudioContext || window.webkitAudioContext;
                 self._context = new AudioContext();
@@ -43,7 +43,7 @@
      * Set master volume (0.0 to 1.0).
      * @param {number} volume
      */
-    Donkeycraft.AudioSystem.prototype.setVolume = function(volume) {
+    Donkeycraft.AudioSystem.prototype.setVolume = function (volume) {
         this._volume = Donkeycraft.clamp(volume, 0, 1);
         if (this._masterGain) {
             this._masterGain.gain.value = this._volume;
@@ -54,7 +54,7 @@
      * Get master volume.
      * @returns {number}
      */
-    Donkeycraft.AudioSystem.prototype.getVolume = function() {
+    Donkeycraft.AudioSystem.prototype.getVolume = function () {
         return this._volume;
     };
 
@@ -62,7 +62,7 @@
      * Enable/disable audio.
      * @param {boolean} enabled
      */
-    Donkeycraft.AudioSystem.prototype.setEnabled = function(enabled) {
+    Donkeycraft.AudioSystem.prototype.setEnabled = function (enabled) {
         this._enabled = enabled;
     };
 
@@ -72,22 +72,22 @@
      * @param {string|ArrayBuffer} source - URL path or ArrayBuffer of audio data.
      * @returns {Promise}
      */
-    Donkeycraft.AudioSystem.prototype.loadSound = function(name, source) {
+    Donkeycraft.AudioSystem.prototype.loadSound = function (name, source) {
         var self = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             if (typeof source === 'string') {
                 // Load from URL — use XHR for file:/// compatibility
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', source, true);
                 xhr.responseType = 'arraybuffer';
-                xhr.onload = function() {
+                xhr.onload = function () {
                     if (xhr.status === 200 || xhr.status === 0) {
                         self._decodeAudio(name, xhr.response, resolve, reject);
                     } else {
                         reject(new Error('Failed to load audio: ' + source + ' (status ' + xhr.status + ')'));
                     }
                 };
-                xhr.onerror = function() {
+                xhr.onerror = function () {
                     reject(new Error('Failed to load audio: ' + source));
                 };
                 xhr.send();
@@ -106,16 +106,16 @@
      * @param {Function} reject - Promise reject callback.
      * @private
      */
-    Donkeycraft.AudioSystem.prototype._decodeAudio = function(name, buffer, resolve, reject) {
+    Donkeycraft.AudioSystem.prototype._decodeAudio = function (name, buffer, resolve, reject) {
         var self = this;
         if (!this._context) {
             reject(new Error('Audio context not initialized'));
             return;
         }
-        this._context.decodeAudioData(buffer, function(audioBuffer) {
+        this._context.decodeAudioData(buffer, function (audioBuffer) {
             self._soundCache[name] = audioBuffer;
             resolve();
-        }, function(e) {
+        }, function (e) {
             if (Donkeycraft.Logger) {
                 Donkeycraft.Logger.error('Failed to decode audio:', name);
             }
@@ -133,7 +133,7 @@
      * @param {number} [options.maxDistance=16] - Max distance for positional audio.
      * @param {Donkeycraft.Vector3} [options.position] - Sound position for spatial audio.
      */
-    Donkeycraft.AudioSystem.prototype.play = function(name, options) {
+    Donkeycraft.AudioSystem.prototype.play = function (name, options) {
         options = options || {};
         if (!this._enabled || !this._context) return;
         if (!this._soundCache[name]) return;
@@ -210,7 +210,7 @@
      * Stop a playing sound source.
      * @param {AudioBufferSourceNode} source
      */
-    Donkeycraft.AudioSystem.prototype.stop = function(source) {
+    Donkeycraft.AudioSystem.prototype.stop = function (source) {
         if (!source) return;
         try {
             if (source.stop) {
@@ -228,7 +228,7 @@
      * @param {{name: string, url: string}[]} sounds
      * @returns {Promise}
      */
-    Donkeycraft.AudioSystem.prototype.preload = function(sounds) {
+    Donkeycraft.AudioSystem.prototype.preload = function (sounds) {
         var self = this;
         var promises = [];
         for (var i = 0; i < sounds.length; i++) {
@@ -242,15 +242,15 @@
      * Returns a Promise that resolves when the AudioContext is fully closed.
      * @returns {Promise}
      */
-    Donkeycraft.AudioSystem.prototype.destroy = function() {
+    Donkeycraft.AudioSystem.prototype.destroy = function () {
         var self = this;
         if (this._context) {
             // AudioContext.close() returns a Promise in modern browsers
-            return this._context.close().then(function() {
+            return this._context.close().then(function () {
                 self._context = null;
                 self._soundCache = {};
                 self._masterGain = null;
-            }).catch(function(e) {
+            }).catch(function (e) {
                 // If close() fails, clean up manually anyway
                 if (Donkeycraft.Logger) {
                     Donkeycraft.Logger.warn('AudioSystem', 'Failed to close AudioContext:', e);

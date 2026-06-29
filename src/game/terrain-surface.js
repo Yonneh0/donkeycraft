@@ -1,6 +1,6 @@
 // Donkeycraft — Terrain Surface
 // Surface layer per biome: grass, dirt, sand, snow, stone, clay placement.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -15,7 +15,7 @@
      * TerrainSurface — applies biome-specific surface layers (grass, sand, snow, stone, clay)
      * to chunks by replacing top blocks based on the chunk's biome ID and heightmap.
      */
-    Donkeycraft.TerrainSurface = (function() {
+    Donkeycraft.TerrainSurface = (function () {
         // Cached block references
         var _blocks = {};
 

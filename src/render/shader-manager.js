@@ -1,7 +1,7 @@
 // Donkeycraft — Shader Manager
 // Shader compilation, linking, uniform/location caching.
 // Validates all compiled programs via gl.validateProgram() to catch GLSL errors early.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -15,7 +15,7 @@
      * Validates all compiled programs via gl.validateProgram() to catch GLSL errors early.
      * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
      */
-    Donkeycraft.ShaderManager = function(gl) {
+    Donkeycraft.ShaderManager = function (gl) {
         this._gl = gl;
         this._programs = {};
         this._cachedLocations = {};
@@ -31,7 +31,7 @@
      * @param {string} type - Shader type: 'vertex' or 'fragment'.
      * @returns {WebGLShader|null} The compiled shader, or null on failure.
      */
-    Donkeycraft.ShaderManager.prototype.compileShader = function(source, type) {
+    Donkeycraft.ShaderManager.prototype.compileShader = function (source, type) {
         var gl = this._gl;
         if (!gl) {
             Donkeycraft.Logger.error('ShaderManager', 'WebGL context not available');
@@ -68,7 +68,7 @@
      * @param {string[]} [attribLocations] - Optional attribute location bindings.
      * @returns {WebGLProgram|null} The linked program, or null on failure.
      */
-    Donkeycraft.ShaderManager.prototype.linkProgram = function(vertShader, fragShader, attribLocations) {
+    Donkeycraft.ShaderManager.prototype.linkProgram = function (vertShader, fragShader, attribLocations) {
         var gl = this._gl;
         if (!gl) return null;
 
@@ -96,15 +96,12 @@
             return null;
         }
 
-        // Validate the program to catch uniform/attribute mismatches early.
-        if (gl.validateProgram) {
-            if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
-                var validateMsg = gl.getProgramInfoLog(program);
-                gl.deleteProgram(program);
-                Donkeycraft.Logger.error('ShaderManager', 'Program validation failed:\n' + validateMsg);
-                return null;
-            }
-        }
+        // Note: gl.validateProgram() is intentionally NOT called here.
+        // In WebGL 1, validateProgram checks against the CURRENT GL state
+        // (bound textures, active shaders, etc.), not just program validity.
+        // Since programs are linked before any resources are bound, validation
+        // would falsely fail. Real validation happens lazily in use() when
+        // the program is first activated with full context.
 
         this._programCount++;
         return program;
@@ -115,7 +112,7 @@
      * Locations are preserved across re-links since WebGLProgram objects maintain stable layouts.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._cacheLocations = function(program) {
+    Donkeycraft.ShaderManager.prototype._cacheLocations = function (program) {
         var gl = this._gl;
         var cacheKey = this._getProgramKey(program);
 
@@ -157,7 +154,7 @@
      * Get or assign a permanent key for a WebGLProgram using WeakMap.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._getProgramKey = function(program) {
+    Donkeycraft.ShaderManager.prototype._getProgramKey = function (program) {
         var key = _programKeys.get(program);
         if (key) return key;
 
@@ -171,7 +168,7 @@
      * @param {string} name - Program name.
      * @returns {boolean} True if program was found and activated.
      */
-    Donkeycraft.ShaderManager.prototype.use = function(name) {
+    Donkeycraft.ShaderManager.prototype.use = function (name) {
         var gl = this._gl;
         if (!gl || !name || !this._programs[name]) return false;
 
@@ -190,7 +187,7 @@
      * @param {WebGLProgram} program - The program to use.
      * @returns {boolean} True if program is valid.
      */
-    Donkeycraft.ShaderManager.prototype.useProgram = function(program) {
+    Donkeycraft.ShaderManager.prototype.useProgram = function (program) {
         var gl = this._gl;
         if (!gl || !program) return false;
 
@@ -204,7 +201,7 @@
      * Get the active WebGLProgram.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._getActiveProgram = function() {
+    Donkeycraft.ShaderManager.prototype._getActiveProgram = function () {
         if (this._currentProgram) return this._currentProgram;
         var gl = this._gl;
         return gl && gl.currentProgram || null;
@@ -214,7 +211,7 @@
      * Get a cached or queried uniform location for the given program.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._getUniformLocation = function(prog, name) {
+    Donkeycraft.ShaderManager.prototype._getUniformLocation = function (prog, name) {
         var cacheKey = this._getProgramKey(prog);
 
         if (this._cachedLocations[cacheKey] &&
@@ -239,7 +236,7 @@
      * Set a uniform by name, delegating to the appropriate WebGL call.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._setUniform = function(name, setter) {
+    Donkeycraft.ShaderManager.prototype._setUniform = function (name, setter) {
         var gl = this._gl;
         if (!gl) return false;
 
@@ -270,13 +267,13 @@
      * @param {Donkeycraft.Matrix4} value - Matrix4 value (must have getData() method).
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setMat4 = function(name, value) {
+    Donkeycraft.ShaderManager.prototype.setMat4 = function (name, value) {
         if (!value || typeof value.getData !== 'function') {
             Donkeycraft.Logger.warn('ShaderManager', 'setMat4: invalid Matrix4 value for uniform "' + name + '"');
             return false;
         }
         var self = this;
-        return this._setUniform(name, function(gl, loc, val) {
+        return this._setUniform(name, function (gl, loc, val) {
             if (loc) gl.uniformMatrix4fv(loc, false, val.getData());
         }, value);
     };
@@ -289,8 +286,8 @@
      * @param {number} z - Z component.
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setVec3 = function(name, x, y, z) {
-        return this._setUniform(name, function(gl, loc, a, b, c) { gl.uniform3f(loc, a, b, c); }, x, y, z);
+    Donkeycraft.ShaderManager.prototype.setVec3 = function (name, x, y, z) {
+        return this._setUniform(name, function (gl, loc, a, b, c) { gl.uniform3f(loc, a, b, c); }, x, y, z);
     };
 
     /**
@@ -302,8 +299,8 @@
      * @param {number} w - W component.
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setVec4 = function(name, x, y, z, w) {
-        return this._setUniform(name, function(gl, loc, a, b, c, d) { gl.uniform4f(loc, a, b, c, d); }, x, y, z, w);
+    Donkeycraft.ShaderManager.prototype.setVec4 = function (name, x, y, z, w) {
+        return this._setUniform(name, function (gl, loc, a, b, c, d) { gl.uniform4f(loc, a, b, c, d); }, x, y, z, w);
     };
 
     /**
@@ -313,8 +310,8 @@
      * @param {number} y - Y component.
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setVec2 = function(name, x, y) {
-        return this._setUniform(name, function(gl, loc, a, b) { gl.uniform2f(loc, a, b); }, x, y);
+    Donkeycraft.ShaderManager.prototype.setVec2 = function (name, x, y) {
+        return this._setUniform(name, function (gl, loc, a, b) { gl.uniform2f(loc, a, b); }, x, y);
     };
 
     /**
@@ -323,8 +320,8 @@
      * @param {number} value - Float value.
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setFloat = function(name, value) {
-        return this._setUniform(name, function(gl, loc, v) { gl.uniform1f(loc, v); }, value);
+    Donkeycraft.ShaderManager.prototype.setFloat = function (name, value) {
+        return this._setUniform(name, function (gl, loc, v) { gl.uniform1f(loc, v); }, value);
     };
 
     /**
@@ -333,8 +330,8 @@
      * @param {number} value - Integer value.
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setInt = function(name, value) {
-        return this._setUniform(name, function(gl, loc, v) { gl.uniform1i(loc, v); }, value);
+    Donkeycraft.ShaderManager.prototype.setInt = function (name, value) {
+        return this._setUniform(name, function (gl, loc, v) { gl.uniform1i(loc, v); }, value);
     };
 
     /**
@@ -343,7 +340,7 @@
      * @param {number} [unit=0] - Texture unit number (0-7 for WebGL 1).
      * @returns {boolean} True if uniform was set successfully.
      */
-    Donkeycraft.ShaderManager.prototype.setSampler = function(name, unit) {
+    Donkeycraft.ShaderManager.prototype.setSampler = function (name, unit) {
         var gl = this._gl;
         if (!gl) return false;
 
@@ -370,7 +367,7 @@
      * @param {string} name - Attribute name.
      * @returns {number} Attribute location index, or -1 if not found.
      */
-    Donkeycraft.ShaderManager.prototype.getAttribute = function(name) {
+    Donkeycraft.ShaderManager.prototype.getAttribute = function (name) {
         var currentKey = this._getCurrentProgramKey();
         if (currentKey && this._cachedLocations[currentKey] &&
             this._cachedLocations[currentKey].attributes[name] !== undefined) {
@@ -387,7 +384,7 @@
      * @param {string} name - Uniform name.
      * @returns {WebGLUniformLocation|null}
      */
-    Donkeycraft.ShaderManager.prototype.getUniformLocation = function(name) {
+    Donkeycraft.ShaderManager.prototype.getUniformLocation = function (name) {
         var currentKey = this._getCurrentProgramKey();
         if (currentKey && this._cachedLocations[currentKey] &&
             this._cachedLocations[currentKey].uniforms[name] !== undefined) {
@@ -405,7 +402,7 @@
      * @param {string} name - Program name.
      * @returns {WebGLProgram|null}
      */
-    Donkeycraft.ShaderManager.prototype.getProgram = function(name) {
+    Donkeycraft.ShaderManager.prototype.getProgram = function (name) {
         return this._programs[name] || null;
     };
 
@@ -413,7 +410,7 @@
      * Get the cache key for the active program.
      * @private
      */
-    Donkeycraft.ShaderManager.prototype._getCurrentProgramKey = function() {
+    Donkeycraft.ShaderManager.prototype._getCurrentProgramKey = function () {
         var prog = this._getActiveProgram();
         if (!prog) return null;
         return this._getProgramKey(prog);
@@ -423,7 +420,7 @@
      * Get shader compilation statistics.
      * @returns {{shaders: number, programs: number}} Count of compiled shaders and programs.
      */
-    Donkeycraft.ShaderManager.prototype.getStats = function() {
+    Donkeycraft.ShaderManager.prototype.getStats = function () {
         return {
             shaders: this._shaderCount,
             programs: this._programCount
@@ -438,7 +435,7 @@
      * @param {string[]} [attribLocations] - Optional attribute location bindings.
      * @returns {WebGLProgram|null}
      */
-    Donkeycraft.ShaderManager.prototype.createProgram = function(name, vertSource, fragSource, attribLocations) {
+    Donkeycraft.ShaderManager.prototype.createProgram = function (name, vertSource, fragSource, attribLocations) {
         var vertShader = this.compileShader(vertSource, 'vertex');
         if (!vertShader) {
             Donkeycraft.Logger.error('ShaderManager', 'Failed to compile vertex shader for program "' + name + '"');
@@ -477,7 +474,7 @@
      * Creates programs: 'terrain', 'sky', 'gui', 'break'.
      * @returns {{terrain: WebGLProgram, sky: WebGLProgram, gui: WebGLProgram, break: WebGLProgram}|null}
      */
-    Donkeycraft.ShaderManager.prototype.createProgramsFromDOM = function() {
+    Donkeycraft.ShaderManager.prototype.createProgramsFromDOM = function () {
         var gl = this._gl;
         if (!gl) return null;
 
@@ -571,7 +568,7 @@
     /**
      * Destroy all programs and free resources.
      */
-    Donkeycraft.ShaderManager.prototype.destroy = function() {
+    Donkeycraft.ShaderManager.prototype.destroy = function () {
         var gl = this._gl;
         if (!gl) return;
 

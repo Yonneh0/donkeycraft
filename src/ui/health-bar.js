@@ -1,7 +1,7 @@
 // Donkeycraft — Health Bar UI
 // Heart-based health display: 10 heart containers with half-heart granularity.
 // Listens to health:changed events and updates DOM with animations.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
      * @param {HTMLElement} container - Parent container for health bar DOM.
      * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance to observe.
      */
-    Donkeycraft.HealthBar = function(container, hurtBox) {
+    Donkeycraft.HealthBar = function (container, hurtBox) {
         this._hurtBox = hurtBox;
         this._container = container;
 
@@ -28,7 +28,7 @@
 
         // Bind + build
         var self = this;
-        this._onHealthChanged = function(data) { self.updateFromHealth(data); };
+        this._onHealthChanged = function (data) { self.updateFromHealth(data); };
 
         this._buildDOM();
         this._createOverlay();
@@ -50,7 +50,7 @@
      * _subscribeToEvents — listen for health:changed events.
      * @private
      */
-    Donkeycraft.HealthBar.prototype._subscribeToEvents = function() {
+    Donkeycraft.HealthBar.prototype._subscribeToEvents = function () {
         var globalBus = Donkeycraft.EventBus && Donkeycraft.EventBus._global;
         if (globalBus) {
             try {
@@ -67,7 +67,7 @@
      * _buildDOM — create all health bar elements inside the container.
      * @private
      */
-    Donkeycraft.HealthBar.prototype._buildDOM = function() {
+    Donkeycraft.HealthBar.prototype._buildDOM = function () {
         var container = this._container;
         if (!container) return;
 
@@ -99,7 +99,7 @@
      * @param {number} index - Heart container index (0-9).
      * @returns {string} 'full', 'half', or 'empty'.
      */
-    Donkeycraft.HealthBar.prototype._getHeartState = function(hp, index) {
+    Donkeycraft.HealthBar.prototype._getHeartState = function (hp, index) {
         hp = Math.max(0, Math.round(hp));
         var remaining = hp - (index * 2); // HP remaining after filling hearts before this one
         if (remaining >= 2) return 'full';
@@ -113,7 +113,7 @@
      * @param {string} state - 'full', 'half', or 'empty'.
      * @returns {string} SVG markup string.
      */
-    Donkeycraft.HealthBar.prototype._getHeartSVG = function(state) {
+    Donkeycraft.HealthBar.prototype._getHeartSVG = function (state) {
         if (state === 'half') {
             // Full heart outline with bottom half filled red, top half dark
             return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-half">' +
@@ -145,7 +145,7 @@
      * Clamps values to valid range, recalculates actual delta after clamping, then updates DOM.
      * @param {Object} data - { health, maxHealth, delta }.
      */
-    Donkeycraft.HealthBar.prototype.updateFromHealth = function(data) {
+    Donkeycraft.HealthBar.prototype.updateFromHealth = function (data) {
         var maxHealth = data.maxHealth || 20;
         var oldHealth = this._prevHealth;
 
@@ -177,7 +177,7 @@
      * @param {number} health - Current health points (0-20).
      * @param {number} maxHealth - Maximum health points.
      */
-    Donkeycraft.HealthBar.prototype._renderHearts = function(health, maxHealth) {
+    Donkeycraft.HealthBar.prototype._renderHearts = function (health, maxHealth) {
         for (var i = 0; i < 10; i++) {
             var container = this._heartContainers[i];
             if (!container) continue;
@@ -197,7 +197,7 @@
      * @param {number} oldHealth - Health before the change.
      * @param {number} newHealth - Health after the change.
      */
-    Donkeycraft.HealthBar.prototype._animateOnHealthChange = function(delta, oldHealth, newHealth) {
+    Donkeycraft.HealthBar.prototype._animateOnHealthChange = function (delta, oldHealth, newHealth) {
         if (delta < 0) {
             // Damage taken — shake the health bar and flash damaged hearts
             this._triggerShake();
@@ -217,7 +217,7 @@
      * _triggerShake — shake the health bar container for 0.5s.
      * @private
      */
-    Donkeycraft.HealthBar.prototype._triggerShake = function() {
+    Donkeycraft.HealthBar.prototype._triggerShake = function () {
         if (!this._container) return;
 
         // Clear any existing shake
@@ -228,7 +228,7 @@
         this._container.style.animation = 'health-shake 500ms ease-out';
 
         var self = this;
-        this._shakeTimeout = setTimeout(function() {
+        this._shakeTimeout = setTimeout(function () {
             if (self._container) {
                 self._container.style.animation = 'none';
                 void self._container.offsetWidth; // force reflow
@@ -240,14 +240,14 @@
      * _triggerScreenShake — shake the entire game canvas area.
      * @private
      */
-    Donkeycraft.HealthBar.prototype._triggerScreenShake = function() {
+    Donkeycraft.HealthBar.prototype._triggerScreenShake = function () {
         var canvasContainer = document.getElementById('dk-canvas-container');
         if (!canvasContainer) return;
 
         canvasContainer.style.animation = 'screen-shake-health 400ms ease-out';
 
         var self = this;
-        setTimeout(function() {
+        setTimeout(function () {
             if (canvasContainer) {
                 canvasContainer.style.animation = 'none';
                 void canvasContainer.offsetWidth;
@@ -262,7 +262,7 @@
      * @param {number} oldHealth - Health before the damage.
      * @param {number} newHealth - Health after the damage.
      */
-    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(delta, oldHealth, newHealth) {
+    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function (delta, oldHealth, newHealth) {
         if (!this._row) return;
 
         // Hearts change from oldHealth down to newHealth.
@@ -281,7 +281,7 @@
             if (!container) continue;
             container.classList.add('dk-heart-flash');
             var self = this;
-            setTimeout((function(el) {
+            setTimeout((function (el) {
                 el.classList.remove('dk-heart-flash');
             }).bind(this, container), 200);
         }
@@ -298,7 +298,7 @@
      * @param {number} oldHealth - Health before healing.
      * @param {number} newHealth - Health after healing.
      */
-    Donkeycraft.HealthBar.prototype._flashHealedHearts = function(delta, oldHealth, newHealth) {
+    Donkeycraft.HealthBar.prototype._flashHealedHearts = function (delta, oldHealth, newHealth) {
         if (!this._row) return;
 
         // Hearts change from oldHealth up to newHealth.
@@ -316,7 +316,7 @@
             if (!container) continue;
             container.classList.add('dk-heart-heal-flash');
             var self = this;
-            setTimeout((function(el) {
+            setTimeout((function (el) {
                 el.classList.remove('dk-heart-heal-flash');
             }).bind(this, container), 300);
         }
@@ -332,7 +332,7 @@
      * @param {number} delta - Health change (positive = heal, negative = damage).
      * @param {number} heartIndex - Index of the affected heart (0-9).
      */
-    Donkeycraft.HealthBar.prototype._spawnHealthTextAt = function(delta, heartIndex) {
+    Donkeycraft.HealthBar.prototype._spawnHealthTextAt = function (delta, heartIndex) {
         if (!this._row || !this._heartContainers[heartIndex]) return;
 
         var textEl = document.createElement('div');
@@ -350,7 +350,7 @@
         heartContainer.appendChild(textEl);
 
         // Remove after animation completes
-        setTimeout((function(el) {
+        setTimeout((function (el) {
             if (el && el.parentNode) {
                 el.parentNode.removeChild(el);
             }
@@ -363,7 +363,7 @@
      * @param {number} health - Current health (0-20).
      * @param {number} maxHealth - Maximum health (20).
      */
-    Donkeycraft.HealthBar.prototype._updateRedOverlay = function(health, maxHealth) {
+    Donkeycraft.HealthBar.prototype._updateRedOverlay = function (health, maxHealth) {
         if (!this._overlay) return;
 
         var h = Math.max(0, Math.min(maxHealth || 20, health));
@@ -379,7 +379,7 @@
      * _createOverlay — create the full-screen red overlay element.
      * @private
      */
-    Donkeycraft.HealthBar.prototype._createOverlay = function() {
+    Donkeycraft.HealthBar.prototype._createOverlay = function () {
         var overlay = document.createElement('div');
         overlay.className = 'dk-health-overlay';
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
@@ -393,7 +393,7 @@
     /**
      * resetUI — clear all animations and effects.
      */
-    Donkeycraft.HealthBar.prototype.resetUI = function() {
+    Donkeycraft.HealthBar.prototype.resetUI = function () {
         // Clear shake timeout
         if (this._shakeTimeout) clearTimeout(this._shakeTimeout);
 
@@ -419,7 +419,7 @@
     /**
      * destroy — clean up all DOM and event listeners.
      */
-    Donkeycraft.HealthBar.prototype.destroy = function() {
+    Donkeycraft.HealthBar.prototype.destroy = function () {
         this.resetUI();
 
         // Unsubscribe from events
@@ -427,7 +427,7 @@
         if (globalBus && this._onHealthChanged) {
             try {
                 globalBus.off('health:changed', this._onHealthChanged);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // Remove overlay from DOM

@@ -1,6 +1,6 @@
 // Donkeycraft — World Store
 // IndexedDB world storage: save chunks, load chunks, world info.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -16,7 +16,7 @@
      * WorldStore — IndexedDB-based world storage for saving and loading worlds.
      * @param {string} [dbName=donkeycraft-worlds] — IndexedDB database name.
      */
-    Donkeycraft.WorldStore = function(dbName) {
+    Donkeycraft.WorldStore = function (dbName) {
         this._dbName = dbName || Donkeycraft.WORLD_STORE_DB_NAME;
         this._db = null;
         this._ready = false;
@@ -28,7 +28,7 @@
      * Set the chunk manager reference for automatic chunk saving.
      * @param {Donkeycraft.ChunkManager} chunkManager — Chunk manager instance.
      */
-    Donkeycraft.WorldStore.prototype.setChunkManager = function(chunkManager) {
+    Donkeycraft.WorldStore.prototype.setChunkManager = function (chunkManager) {
         this._chunkManager = chunkManager;
     };
 
@@ -36,7 +36,7 @@
      * Set the event bus for storage events.
      * @param {Donkeycraft.EventBus} eventBus — Event bus instance.
      */
-    Donkeycraft.WorldStore.prototype.setEventBus = function(eventBus) {
+    Donkeycraft.WorldStore.prototype.setEventBus = function (eventBus) {
         this._eventBus = eventBus;
     };
 
@@ -46,7 +46,7 @@
      * @param {string} eventName - Event name.
      * @param {Object} data - Event payload.
      */
-    Donkeycraft.WorldStore.prototype._emit = function(eventName, data) {
+    Donkeycraft.WorldStore.prototype._emit = function (eventName, data) {
         if (this._eventBus) {
             try {
                 this._eventBus.emit(eventName, data);
@@ -60,26 +60,26 @@
      * Initialize the IndexedDB database and create object stores.
      * @returns {Promise<boolean>} Resolves true when DB is ready.
      */
-    Donkeycraft.WorldStore.prototype.init = function() {
+    Donkeycraft.WorldStore.prototype.init = function () {
         var self = this;
-        return new Promise(function(resolve, reject) {
+        return new Promise(function (resolve, reject) {
             try {
                 var request = indexedDB.open(self._dbName, Donkeycraft.WORLD_STORE_VERSION);
 
-                request.onerror = function() {
+                request.onerror = function () {
                     self._ready = false;
                     self._emit('storage:error', { error: new Error('Failed to open world database') });
                     resolve(false); // Graceful fallback
                 };
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     self._db = request.result;
                     self._ready = true;
                     self._emit('storage:ready', {});
                     resolve(true);
                 };
 
-                request.onupgradeneeded = function(event) {
+                request.onupgradeneeded = function (event) {
                     var db = event.target.result;
                     // Create object store for worlds if it doesn't exist
                     if (!db.objectStoreNames.contains(Donkeycraft.WORLD_STORE_STORE_NAME)) {
@@ -98,7 +98,7 @@
      * Check if the store is ready (database opened successfully).
      * @returns {boolean} True if ready.
      */
-    Donkeycraft.WorldStore.prototype.isReady = function() {
+    Donkeycraft.WorldStore.prototype.isReady = function () {
         return this._ready && !!this._db;
     };
 
@@ -110,7 +110,7 @@
      * @param {Array} chunks — Raw chunk array from storage.
      * @returns {Array} Normalized chunk array.
      */
-    Donkeycraft.WorldStore.prototype._normalizeChunks = function(chunks) {
+    Donkeycraft.WorldStore.prototype._normalizeChunks = function (chunks) {
         if (!chunks || !Array.isArray(chunks)) {
             return [];
         }
@@ -147,19 +147,19 @@
      * @param {Array} chunks — Array of {cx, cz, blockData, skyLight, blockLight} or {cx, cz, data: {...}} objects.
      * @returns {Promise<boolean>} Resolves true on success.
      */
-    Donkeycraft.WorldStore.prototype.saveWorld = function(worldName, levelData, chunks) {
+    Donkeycraft.WorldStore.prototype.saveWorld = function (worldName, levelData, chunks) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.WORLD_STORE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.WORLD_STORE_STORE_NAME);
 
                 // Handle quota exceeded errors (IndexedDB storage limits)
-                transaction.onerror = function() {
+                transaction.onerror = function () {
                     if (transaction.error && transaction.error.name === 'QuotaExceededError') {
                         self._emit('storage:quota-exceeded', { worldName: worldName });
                     }
@@ -174,12 +174,12 @@
 
                 var request = store.put(data);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     self._emit('world:saved', { worldName: worldName });
                     resolve(true);
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     if (request.error && request.error.name === 'QuotaExceededError') {
                         self._emit('storage:quota-exceeded', { worldName: worldName });
                     }
@@ -198,19 +198,19 @@
      * @param {string} worldName — World name/identifier.
      * @returns {Promise<Object|null>} Resolves with {levelData, chunks, savedAt} or null if not found.
      */
-    Donkeycraft.WorldStore.prototype.loadWorld = function(worldName) {
+    Donkeycraft.WorldStore.prototype.loadWorld = function (worldName) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(null);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.WORLD_STORE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.WORLD_STORE_STORE_NAME);
                 var request = store.get(worldName);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     if (request.result) {
                         self._emit('world:loaded', { worldName: worldName });
                         resolve({
@@ -223,7 +223,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     self._emit('world:load-error', { worldName: worldName, error: 'Load failed' });
                     resolve(null);
                 };
@@ -238,24 +238,24 @@
      * @param {string} worldName — World name/identifier.
      * @returns {Promise<boolean>} Resolves true if deleted.
      */
-    Donkeycraft.WorldStore.prototype.deleteWorld = function(worldName) {
+    Donkeycraft.WorldStore.prototype.deleteWorld = function (worldName) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.WORLD_STORE_STORE_NAME], 'readwrite');
                 var store = transaction.objectStore(Donkeycraft.WORLD_STORE_STORE_NAME);
                 var request = store.delete(worldName);
 
-                request.onsuccess = function() {
+                request.onsuccess = function () {
                     self._emit('world:deleted', { worldName: worldName });
                     resolve(true);
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     self._emit('world:delete-error', { worldName: worldName, error: 'Delete failed' });
                     resolve(false);
                 };
@@ -269,20 +269,20 @@
      * List all saved world names.
      * @returns {Promise<Array<string>>} Array of world name strings.
      */
-    Donkeycraft.WorldStore.prototype.listWorlds = function() {
+    Donkeycraft.WorldStore.prototype.listWorlds = function () {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve([]);
         }
 
-        return new Promise(function(resolve) {
+        return new Promise(function (resolve) {
             try {
                 var transaction = self._db.transaction([Donkeycraft.WORLD_STORE_STORE_NAME], 'readonly');
                 var store = transaction.objectStore(Donkeycraft.WORLD_STORE_STORE_NAME);
                 var request = store.openCursor();
                 var worlds = [];
 
-                request.onsuccess = function(event) {
+                request.onsuccess = function (event) {
                     var cursor = event.target.result;
                     if (cursor) {
                         worlds.push(cursor.value.worldName);
@@ -293,7 +293,7 @@
                     }
                 };
 
-                request.onerror = function() {
+                request.onerror = function () {
                     resolve(worlds);
                 };
             } catch (e) {
@@ -310,14 +310,14 @@
      * @param {Object} chunkData — Chunk data {blockData, skyLight, blockLight}.
      * @returns {Promise<boolean>} Resolves true on success.
      */
-    Donkeycraft.WorldStore.prototype.saveChunk = function(worldName, cx, cz, chunkData) {
+    Donkeycraft.WorldStore.prototype.saveChunk = function (worldName, cx, cz, chunkData) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
         // Load existing world data, add chunk, save back
-        return self.loadWorld(worldName).then(function(worldData) {
+        return self.loadWorld(worldName).then(function (worldData) {
             if (!worldData) {
                 // Create new world entry
                 worldData = { levelData: {}, chunks: [], savedAt: 0 };
@@ -347,13 +347,13 @@
      * @param {number} cz — Chunk Z coordinate.
      * @returns {Promise<Object|null>} Resolves with chunk data or null.
      */
-    Donkeycraft.WorldStore.prototype.loadChunk = function(worldName, cx, cz) {
+    Donkeycraft.WorldStore.prototype.loadChunk = function (worldName, cx, cz) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(null);
         }
 
-        return self.loadWorld(worldName).then(function(worldData) {
+        return self.loadWorld(worldName).then(function (worldData) {
             if (!worldData || !worldData.chunks) {
                 return null;
             }
@@ -372,13 +372,13 @@
      * @param {string} worldName — World name.
      * @returns {Promise<Object|null>} Resolves with level data or null.
      */
-    Donkeycraft.WorldStore.prototype.getLevelData = function(worldName) {
+    Donkeycraft.WorldStore.prototype.getLevelData = function (worldName) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(null);
         }
 
-        return self.loadWorld(worldName).then(function(worldData) {
+        return self.loadWorld(worldName).then(function (worldData) {
             if (worldData && worldData.levelData) {
                 return worldData.levelData;
             }
@@ -392,13 +392,13 @@
      * @param {Object} levelData — Level data object.
      * @returns {Promise<boolean>} Resolves true on success.
      */
-    Donkeycraft.WorldStore.prototype.setLevelData = function(worldName, levelData) {
+    Donkeycraft.WorldStore.prototype.setLevelData = function (worldName, levelData) {
         var self = this;
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
-        return self.loadWorld(worldName).then(function(worldData) {
+        return self.loadWorld(worldName).then(function (worldData) {
             if (!worldData) {
                 worldData = { levelData: {}, chunks: [] };
             }
@@ -414,7 +414,7 @@
      * @param {string} worldName — World name.
      * @returns {Promise<number>} Number of chunks saved.
      */
-    Donkeycraft.WorldStore.prototype.saveDirtyChunks = function(worldName) {
+    Donkeycraft.WorldStore.prototype.saveDirtyChunks = function (worldName) {
         var self = this;
         if (!this._chunkManager || !this.isReady()) {
             return Promise.resolve(0);
@@ -450,7 +450,7 @@
          * @param {Donkeycraft.Chunk} chunk — Chunk instance.
          * @returns {{blockData: number[], skyLight: number[], blockLight: number[]}} Serialized chunk data.
          */
-        var serializeChunkData = function(chunk) {
+        var serializeChunkData = function (chunk) {
             var blockDataArr = null;
             var skyLightArr = null;
             var blockLightArr = null;
@@ -479,7 +479,7 @@
             };
         };
 
-        var saveNextBatch = function() {
+        var saveNextBatch = function () {
             if (batchIndex >= dirtyList.length) {
                 self._emit('chunks:saved', { worldName: worldName, count: totalSaved });
                 return Promise.resolve(totalSaved);
@@ -498,14 +498,14 @@
                 var chunkData = serializeChunkData(chunk);
 
                 batchSavePromises.push(
-                    self.saveChunk(worldName, cx, cz, chunkData).then(function(success) {
+                    self.saveChunk(worldName, cx, cz, chunkData).then(function (success) {
                         if (success) {
                             totalSaved++;
                             if (chunk && chunk.markClean) {
                                 chunk.markClean();
                             }
                         }
-                    }).catch(function(err) {
+                    }).catch(function (err) {
                         Donkeycraft.Logger.warn('WorldStore', 'Failed to save chunk [' + cx + ',' + cz + ']: ' + (err && err.message ? err.message : String(err)));
                     })
                 );
@@ -513,10 +513,10 @@
 
             batchIndex += batchSize;
 
-            return Promise.all(batchSavePromises).then(function() {
+            return Promise.all(batchSavePromises).then(function () {
                 // Small delay between batches to avoid blocking the main thread
                 if (batchIndex < dirtyList.length) {
-                    return new Promise(function(resolve) {
+                    return new Promise(function (resolve) {
                         setTimeout(resolve, 10);
                     }).then(saveNextBatch);
                 }
@@ -530,7 +530,7 @@
     /**
      * Close the IndexedDB connection.
      */
-    Donkeycraft.WorldStore.prototype.destroy = function() {
+    Donkeycraft.WorldStore.prototype.destroy = function () {
         if (this._db) {
             this._db.close();
             this._db = null;

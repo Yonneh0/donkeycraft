@@ -1,6 +1,6 @@
 // Donkeycraft — Chunk Mesh
 // Per-chunk mesh object: buffer management, update methods, draw calls.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -8,7 +8,7 @@
     /**
      * ChunkMesh — Manages WebGL buffers and draw calls for a single chunk's geometry.
      */
-    Donkeycraft.ChunkMesh = function(gl, shaderManager) {
+    Donkeycraft.ChunkMesh = function (gl, shaderManager) {
         this._gl = gl;
         this._shaderManager = shaderManager;
 
@@ -46,13 +46,13 @@
         // Listen for context loss/restore on the source canvas
         if (gl && gl.canvas) {
             var self = this;
-            gl.canvas.addEventListener('webglcontextlost', function(e) {
+            gl.canvas.addEventListener('webglcontextlost', function (e) {
                 e.preventDefault();
                 self._contextLost = true;
                 self._vertexBuffer = null;
                 self._indexBuffer = null;
             });
-            gl.canvas.addEventListener('webglcontextrestored', function() {
+            gl.canvas.addEventListener('webglcontextrestored', function () {
                 self._contextLost = false;
                 self._vertexBuffer = null;
                 self._indexBuffer = null;
@@ -65,7 +65,7 @@
      * Update the mesh with new geometry data.
      * @param {Object} geometry - Geometry with vertices (Float32Array) and indices (Uint16Array or Uint32Array).
      */
-    Donkeycraft.ChunkMesh.prototype.update = function(geometry) {
+    Donkeycraft.ChunkMesh.prototype.update = function (geometry) {
         this._geometry = geometry;
         this._vertexCount = geometry.vertexCount || 0;
         this._indexCount = geometry.indexCount || 0;
@@ -79,7 +79,7 @@
      * Sets _dirty to false after successful upload.
      * @returns {boolean} True if buffers were uploaded successfully.
      */
-    Donkeycraft.ChunkMesh.prototype.uploadBuffers = function() {
+    Donkeycraft.ChunkMesh.prototype.uploadBuffers = function () {
         var gl = this._gl;
         if (!gl || !this._geometry) return false;
 
@@ -109,7 +109,7 @@
      * Binds attributes: aPosition, aUV, aNormal, aLight.
      * @returns {boolean} True if the mesh was drawn successfully.
      */
-    Donkeycraft.ChunkMesh.prototype.draw = function() {
+    Donkeycraft.ChunkMesh.prototype.draw = function () {
         var gl = this._gl;
         if (!gl || !this._indexBuffer || this._indexCount === 0) return false;
 
@@ -180,21 +180,21 @@
      * Check if the mesh is dirty (needs buffer upload).
      * @returns {boolean}
      */
-    Donkeycraft.ChunkMesh.prototype.isDirty = function() {
+    Donkeycraft.ChunkMesh.prototype.isDirty = function () {
         return this._dirty;
     };
 
     /**
      * Mark the mesh as clean (buffers are up to date).
      */
-    Donkeycraft.ChunkMesh.prototype.markClean = function() {
+    Donkeycraft.ChunkMesh.prototype.markClean = function () {
         this._dirty = false;
     };
 
     /**
      * Mark the mesh as dirty (buffers need updating).
      */
-    Donkeycraft.ChunkMesh.prototype.markDirty = function() {
+    Donkeycraft.ChunkMesh.prototype.markDirty = function () {
         this._dirty = true;
     };
 
@@ -202,7 +202,7 @@
      * Get the number of indices in this mesh.
      * @returns {number}
      */
-    Donkeycraft.ChunkMesh.prototype.getIndexCount = function() {
+    Donkeycraft.ChunkMesh.prototype.getIndexCount = function () {
         return this._indexCount;
     };
 
@@ -210,14 +210,14 @@
      * Get the number of vertices in this mesh.
      * @returns {number}
      */
-    Donkeycraft.ChunkMesh.prototype.getVertexCount = function() {
+    Donkeycraft.ChunkMesh.prototype.getVertexCount = function () {
         return this._vertexCount;
     };
 
     /**
      * Destroy buffers and free GPU resources.
      */
-    Donkeycraft.ChunkMesh.prototype.destroy = function() {
+    Donkeycraft.ChunkMesh.prototype.destroy = function () {
         var gl = this._gl;
         if (!gl) return;
 

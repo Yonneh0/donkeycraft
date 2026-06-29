@@ -1,6 +1,6 @@
 // Donkeycraft — Chunk Data Structure
 // Chunk data: 16×256×16 block array, lighting arrays, dirty flags.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -17,7 +17,7 @@
      * @param {number} chunkX - X coordinate of this chunk (in chunk units).
      * @param {number} chunkZ - Z coordinate of this chunk (in chunk units).
      */
-    Donkeycraft.Chunk = function(chunkX, chunkZ) {
+    Donkeycraft.Chunk = function (chunkX, chunkZ) {
         /**
          * Chunk X coordinate.
          * @type {number}
@@ -95,7 +95,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @returns {number} Block ID (0 = air).
      */
-    Donkeycraft.Chunk.prototype.getBlock = function(x, y, z) {
+    Donkeycraft.Chunk.prototype.getBlock = function (x, y, z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 0; // Out of bounds = air
         }
@@ -111,7 +111,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @param {number} blockId - Block ID to set.
      */
-    Donkeycraft.Chunk.prototype.setBlock = function(x, y, z, blockId) {
+    Donkeycraft.Chunk.prototype.setBlock = function (x, y, z, blockId) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return; // Out of bounds — ignore
         }
@@ -130,7 +130,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @returns {number} Sky light value (0-15).
      */
-    Donkeycraft.Chunk.prototype.getSkyLight = function(x, y, z) {
+    Donkeycraft.Chunk.prototype.getSkyLight = function (x, y, z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 15; // Outside chunk = full sky light
         }
@@ -145,7 +145,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @param {number} light - Light value (0-15).
      */
-    Donkeycraft.Chunk.prototype.setSkyLight = function(x, y, z, light) {
+    Donkeycraft.Chunk.prototype.setSkyLight = function (x, y, z, light) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return;
         }
@@ -160,7 +160,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @returns {number} Block light value (0-15).
      */
-    Donkeycraft.Chunk.prototype.getBlockLight = function(x, y, z) {
+    Donkeycraft.Chunk.prototype.getBlockLight = function (x, y, z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 0;
         }
@@ -175,7 +175,7 @@
      * @param {number} z - Z coordinate [0, 15].
      * @param {number} light - Light value (0-15).
      */
-    Donkeycraft.Chunk.prototype.setBlockLight = function(x, y, z, light) {
+    Donkeycraft.Chunk.prototype.setBlockLight = function (x, y, z, light) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return;
         }
@@ -186,7 +186,7 @@
      * Get the global X coordinate for this chunk's left edge.
      * @returns {number} Global X = chunkX * CHUNK_SIZE.
      */
-    Donkeycraft.Chunk.prototype.globalX = function() {
+    Donkeycraft.Chunk.prototype.globalX = function () {
         return this.chunkX * CHUNK_SIZE;
     };
 
@@ -194,7 +194,7 @@
      * Get the global Z coordinate for this chunk's front edge.
      * @returns {number} Global Z = chunkZ * CHUNK_SIZE.
      */
-    Donkeycraft.Chunk.prototype.globalZ = function() {
+    Donkeycraft.Chunk.prototype.globalZ = function () {
         return this.chunkZ * CHUNK_SIZE;
     };
 
@@ -204,7 +204,7 @@
      * @param {number} gz - Global Z coordinate.
      * @returns {{lx: number, lz: number}} Object with local x and z in [0, 15].
      */
-    Donkeycraft.Chunk.prototype.globalToLocal = function(gx, gz) {
+    Donkeycraft.Chunk.prototype.globalToLocal = function (gx, gz) {
         return {
             lx: gx - this.chunkX * CHUNK_SIZE,
             lz: gz - this.chunkZ * CHUNK_SIZE
@@ -215,28 +215,28 @@
      * Check if this chunk has unapplied changes that need mesh regeneration.
      * @returns {boolean} True if the chunk is dirty.
      */
-    Donkeycraft.Chunk.prototype.isDirty = function() {
+    Donkeycraft.Chunk.prototype.isDirty = function () {
         return this._dirty;
     };
 
     /**
      * Mark this chunk as clean — changes have been applied to the mesh.
      */
-    Donkeycraft.Chunk.prototype.markClean = function() {
+    Donkeycraft.Chunk.prototype.markClean = function () {
         this._dirty = false;
     };
 
     /**
      * Mark this chunk as dirty — signals that the mesh needs regeneration.
      */
-    Donkeycraft.Chunk.prototype.markDirty = function() {
+    Donkeycraft.Chunk.prototype.markDirty = function () {
         this._dirty = true;
     };
 
     /**
      * Clear all sky and block light data in this chunk (sets to zero).
      */
-    Donkeycraft.Chunk.prototype.clearLight = function() {
+    Donkeycraft.Chunk.prototype.clearLight = function () {
         this.skyLight.fill(0);
         this.blockLight.fill(0);
     };
@@ -246,7 +246,7 @@
      * Marks the chunk as dirty.
      * @param {number} blockId - Block ID to fill with (0 = air).
      */
-    Donkeycraft.Chunk.prototype.fill = function(blockId) {
+    Donkeycraft.Chunk.prototype.fill = function (blockId) {
         this.blocks.fill(blockId);
         this._dirty = true;
     };
@@ -255,7 +255,7 @@
      * Get a view of the block data as a Uint16Array (for bulk WebGL buffer uploads).
      * @returns {Uint16Array} View of block data.
      */
-    Donkeycraft.Chunk.prototype.getBlockData = function() {
+    Donkeycraft.Chunk.prototype.getBlockData = function () {
         return this.blocks;
     };
 
@@ -266,7 +266,7 @@
      * @param {number} z - Local Z [0, 15].
      * @returns {Object|null} Block entity data, or null.
      */
-    Donkeycraft.Chunk.prototype.getBlockEntity = function(x, y, z) {
+    Donkeycraft.Chunk.prototype.getBlockEntity = function (x, y, z) {
         var key = x + ',' + y + ',' + z;
         return this._blockEntities.get(key) || null;
     };
@@ -278,7 +278,7 @@
      * @param {number} z - Local Z [0, 15].
      * @param {Object} entity - Entity data with { type: string, data: Object }.
      */
-    Donkeycraft.Chunk.prototype.setBlockEntity = function(x, y, z, entity) {
+    Donkeycraft.Chunk.prototype.setBlockEntity = function (x, y, z, entity) {
         var key = x + ',' + y + ',' + z;
         this._blockEntities.set(key, entity);
     };
@@ -290,7 +290,7 @@
      * @param {number} z - Local Z [0, 15].
      * @returns {boolean} True if an entity was removed.
      */
-    Donkeycraft.Chunk.prototype.removeBlockEntity = function(x, y, z) {
+    Donkeycraft.Chunk.prototype.removeBlockEntity = function (x, y, z) {
         var key = x + ',' + y + ',' + z;
         return this._blockEntities.delete(key);
     };
@@ -299,10 +299,10 @@
      * Get all block entities in this chunk as an array.
      * @returns {Object[]} Array of { x, y, z, entity } objects.
      */
-    Donkeycraft.Chunk.prototype.getAllBlockEntities = function() {
+    Donkeycraft.Chunk.prototype.getAllBlockEntities = function () {
         var result = [];
         var self = this;
-        this._blockEntities.forEach(function(entity, key) {
+        this._blockEntities.forEach(function (entity, key) {
             var parts = key.split(',');
             result.push({ x: parseInt(parts[0], 10), y: parseInt(parts[1], 10), z: parseInt(parts[2], 10), entity: entity });
         });
@@ -312,7 +312,7 @@
     /**
      * Clear all block entities in this chunk.
      */
-    Donkeycraft.Chunk.prototype.clearBlockEntities = function() {
+    Donkeycraft.Chunk.prototype.clearBlockEntities = function () {
         this._blockEntities.clear();
     };
 
@@ -320,10 +320,10 @@
      * Serialize block entities for storage (array of { x, y, z, type, data }).
      * @returns {Array.<Object>}
      */
-    Donkeycraft.Chunk.prototype.serializeBlockEntities = function() {
+    Donkeycraft.Chunk.prototype.serializeBlockEntities = function () {
         var result = [];
         var self = this;
-        this._blockEntities.forEach(function(entity, key) {
+        this._blockEntities.forEach(function (entity, key) {
             var parts = key.split(',');
             result.push({
                 x: parseInt(parts[0], 10),
@@ -340,7 +340,7 @@
      * Deserialize and restore block entities from an array.
      * @param {Array.<Object>} entities - Array of { x, y, z, type, data }.
      */
-    Donkeycraft.Chunk.prototype.deserializeBlockEntities = function(entities) {
+    Donkeycraft.Chunk.prototype.deserializeBlockEntities = function (entities) {
         var self = this;
         for (var i = 0; i < entities.length; i++) {
             var e = entities[i];
@@ -352,7 +352,7 @@
      * Destroy and free chunk resources — nulls internal arrays.
      * Call this when the chunk is no longer needed.
      */
-    Donkeycraft.Chunk.prototype.destroy = function() {
+    Donkeycraft.Chunk.prototype.destroy = function () {
         this.blocks = null;
         this.skyLight = null;
         this.blockLight = null;
@@ -369,7 +369,7 @@
      * @param {number} globalX - Global X coordinate.
      * @returns {number} Chunk X coordinate.
      */
-    Donkeycraft.Chunk.chunkCoordX = function(globalX) {
+    Donkeycraft.Chunk.chunkCoordX = function (globalX) {
         return Math.floor(globalX / CHUNK_SIZE);
     };
 
@@ -378,7 +378,7 @@
      * @param {number} globalZ - Global Z coordinate.
      * @returns {number} Chunk Z coordinate.
      */
-    Donkeycraft.Chunk.chunkCoordZ = function(globalZ) {
+    Donkeycraft.Chunk.chunkCoordZ = function (globalZ) {
         return Math.floor(globalZ / CHUNK_SIZE);
     };
 
@@ -388,7 +388,7 @@
      * @param {number} globalX - Global X coordinate.
      * @returns {number} Local X in [0, 15].
      */
-    Donkeycraft.Chunk.localCoordX = function(globalX) {
+    Donkeycraft.Chunk.localCoordX = function (globalX) {
         return ((globalX % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
     };
 
@@ -398,7 +398,7 @@
      * @param {number} globalZ - Global Z coordinate.
      * @returns {number} Local Z in [0, 15].
      */
-    Donkeycraft.Chunk.localCoordZ = function(globalZ) {
+    Donkeycraft.Chunk.localCoordZ = function (globalZ) {
         return ((globalZ % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
     };
 

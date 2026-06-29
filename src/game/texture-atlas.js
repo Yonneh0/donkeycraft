@@ -1,6 +1,6 @@
 // Donkeycraft — Texture Atlas
 // Atlas generation: compiles all block textures into single WebGL texture, UV mapping.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -19,7 +19,7 @@
      * TextureAtlas — compiles all block textures into a single WebGL 2D texture.
      * @param {WebGLRenderingContext} gl - The WebGL 1 rendering context.
      */
-    Donkeycraft.TextureAtlas = function(gl) {
+    Donkeycraft.TextureAtlas = function (gl) {
         this._gl = gl;
         this._texture = null;
         this._images = {};         // blockId -> HTMLImageElement
@@ -34,7 +34,7 @@
      * @param {number} blockId - Block ID.
      * @param {HTMLImageElement} image - The image element containing the 16×16 texture.
      */
-    Donkeycraft.TextureAtlas.prototype.registerBlockTexture = function(blockId, image) {
+    Donkeycraft.TextureAtlas.prototype.registerBlockTexture = function (blockId, image) {
         this._images[blockId] = image;
     };
 
@@ -44,14 +44,14 @@
      * @param {string} imagePath - Path to the 16×16 texture PNG.
      * @param {Function} [onReady] — Callback when atlas is fully loaded.
      */
-    Donkeycraft.TextureAtlas.prototype.registerTexturePath = function(blockId, imagePath, onReady) {
+    Donkeycraft.TextureAtlas.prototype.registerTexturePath = function (blockId, imagePath, onReady) {
         var img = new Image();
-        img.onload = (function(id) {
-            return function() {
+        img.onload = (function (id) {
+            return function () {
                 this._images[id] = img;
             };
         })(blockId);
-        img.onerror = function() {
+        img.onerror = function () {
             Donkeycraft.Logger.warn('TextureAtlas', 'Failed to load texture: ' + imagePath);
         };
         img.src = imagePath;
@@ -68,7 +68,7 @@
      * to its correct position in the grid.
      * @returns {boolean} True if atlas generation succeeded.
      */
-    Donkeycraft.TextureAtlas.prototype.generate = function() {
+    Donkeycraft.TextureAtlas.prototype.generate = function () {
         var gl = this._gl;
         if (!gl) {
             Donkeycraft.Logger.error('TextureAtlas', 'No WebGL context available');
@@ -93,7 +93,7 @@
             placeholder[i + 3] = 255; // A
         }
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, ATLAS_SIZE, ATLAS_SIZE, 0,
-                      gl.RGBA, gl.UNSIGNED_BYTE, placeholder);
+            gl.RGBA, gl.UNSIGNED_BYTE, placeholder);
 
         // Build UV map and upload each block texture
         var tempCanvas = document.createElement('canvas');
@@ -165,7 +165,7 @@
      * @param {number} blockId - Block ID.
      * @returns {{u: number, v: number, uSize: number, vSize: number}|null} UV coords normalized to 0-1, or null if not found.
      */
-    Donkeycraft.TextureAtlas.prototype.getUVs = function(blockId) {
+    Donkeycraft.TextureAtlas.prototype.getUVs = function (blockId) {
         return this._uvMap[blockId] || null;
     };
 
@@ -174,7 +174,7 @@
      * @param {number} blockId - Block ID.
      * @returns {{pixelU: number, pixelV: number, pixelUSize: number, pixelVSize: number}|null}
      */
-    Donkeycraft.TextureAtlas.prototype.getPixelUVs = function(blockId) {
+    Donkeycraft.TextureAtlas.prototype.getPixelUVs = function (blockId) {
         var uv = this._uvMap[blockId];
         if (!uv) return null;
         return {
@@ -188,7 +188,7 @@
     /**
      * Bind the atlas as the active texture unit 0.
      */
-    Donkeycraft.TextureAtlas.prototype.bind = function() {
+    Donkeycraft.TextureAtlas.prototype.bind = function () {
         var gl = this._gl;
         if (!this._texture) return;
         gl.activeTexture(gl.TEXTURE0);
@@ -199,7 +199,7 @@
      * Get the WebGL texture object.
      * @returns {WebGLTexture}
      */
-    Donkeycraft.TextureAtlas.prototype.getTexture = function() {
+    Donkeycraft.TextureAtlas.prototype.getTexture = function () {
         return this._texture;
     };
 
@@ -207,7 +207,7 @@
      * Check if the atlas has been generated.
      * @returns {boolean}
      */
-    Donkeycraft.TextureAtlas.prototype.isReady = function() {
+    Donkeycraft.TextureAtlas.prototype.isReady = function () {
         return this._texture !== null;
     };
 
@@ -215,14 +215,14 @@
      * Get the number of registered textures.
      * @returns {number}
      */
-    Donkeycraft.TextureAtlas.prototype.getTextureCount = function() {
+    Donkeycraft.TextureAtlas.prototype.getTextureCount = function () {
         return Object.keys(this._images).length;
     };
 
     /**
      * Destroy the atlas and free WebGL resources.
      */
-    Donkeycraft.TextureAtlas.prototype.destroy = function() {
+    Donkeycraft.TextureAtlas.prototype.destroy = function () {
         var gl = this._gl;
         if (this._texture && gl) {
             gl.deleteTexture(this._texture);
@@ -240,7 +240,7 @@
     /**
      * TextureAtlasBuilder — utility for building an atlas from texture path mappings.
      */
-    Donkeycraft.TextureAtlasBuilder = (function() {
+    Donkeycraft.TextureAtlasBuilder = (function () {
         /**
          * Build a texture atlas by loading images from a base path pattern.
          * @param {WebGLRenderingContext} gl - WebGL context.

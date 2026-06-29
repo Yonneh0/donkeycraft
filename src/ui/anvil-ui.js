@@ -1,6 +1,6 @@
 // Donkeycraft — Anvil UI
 // Anvil GUI for renaming items and combining enchanted items.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * Supports renaming items, repairing damaged items of the same type, and merging enchantments.
      * @param {HTMLElement} container - DOM container for the anvil UI panel.
      */
-    Donkeycraft.AnvilUI = function(container) {
+    Donkeycraft.AnvilUI = function (container) {
         this._container = container || null;
 
         // Slots: 0=left input, 1=right input, 2=output
@@ -48,7 +48,7 @@
      * _buildDOM — creates the anvil GUI DOM structure with slot elements, arrows, rename input, and price display.
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._buildDOM = function() {
+    Donkeycraft.AnvilUI.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-anvil-ui';
         this._container.style.cssText = 'display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(35,35,45,0.95); border-radius: 6px;';
@@ -101,8 +101,8 @@
         this._renameInputEl.placeholder = 'New name...';
         this._renameInputEl.style.cssText = 'width: 160px; padding: 6px 8px; background: #222; border: 1px solid #555; color: #ccc; border-radius: 3px; font-size: 12px;';
 
-        this._renameInputEl.addEventListener('input', (function() {
-            return function() { self._onRenameChange(); };
+        this._renameInputEl.addEventListener('input', (function () {
+            return function () { self._onRenameChange(); };
         })());
 
         rightPanel.appendChild(this._renameInputEl);
@@ -120,7 +120,7 @@
      * _onRenameChange — handles rename text input changes and triggers result recalculation.
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._onRenameChange = function() {
+    Donkeycraft.AnvilUI.prototype._onRenameChange = function () {
         this._renameText = this._renameInputEl.value || '';
         this._calculateResult();
     };
@@ -132,7 +132,7 @@
      * @returns {number} Maximum durability value.
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._getMaxDurability = function(stack) {
+    Donkeycraft.AnvilUI.prototype._getMaxDurability = function (stack) {
         if (!stack || stack.isEmpty()) return 0;
 
         // Check tag for explicit maxDurability (highest priority)
@@ -156,7 +156,7 @@
                         // For proper mapping, we rely on the tag.maxDurability override
                     }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // Fallback: hardcoded max durabilities by item ID
@@ -190,7 +190,7 @@
      * @returns {number} Repaired durability value (0 if inputs are invalid).
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._calculateRepairDurability = function(leftStack, rightStack) {
+    Donkeycraft.AnvilUI.prototype._calculateRepairDurability = function (leftStack, rightStack) {
         var leftMaxDurability = this._getMaxDurability(leftStack);
         // getDurability() returns the durability value stored in tag (remaining uses)
         // If no tag exists or durability is 0, treat as fully damaged
@@ -214,7 +214,7 @@
      * @returns {string}
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._getItemDisplayChar = function(itemId) {
+    Donkeycraft.AnvilUI.prototype._getItemDisplayChar = function (itemId) {
         var displayMap = {
             1: '🪨', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
             24: '🪵', 30: '🟨', 45: '🔲', 54: '📦', 61: '🔥',
@@ -231,7 +231,7 @@
      * @returns {number} Slot index (-1 if not a valid slot).
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._getSlotIndexFromElement = function(el) {
+    Donkeycraft.AnvilUI.prototype._getSlotIndexFromElement = function (el) {
         if (!el) return -1;
         // Traverse up to find the slot element
         while (el && el !== this._container) {
@@ -248,7 +248,7 @@
      * @param {number} index - Slot index (0=left, 1=right, 2=output).
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._updateSlotDisplay = function(index) {
+    Donkeycraft.AnvilUI.prototype._updateSlotDisplay = function (index) {
         var el;
         if (index === 0) el = this._leftSlotEl;
         else if (index === 1) el = this._rightSlotEl;
@@ -274,7 +274,7 @@
      * @returns {boolean} True if compatible.
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._areEnchantmentsCompatible = function(enchantId1, enchantId2) {
+    Donkeycraft.AnvilUI.prototype._areEnchantmentsCompatible = function (enchantId1, enchantId2) {
         // Silk Touch (33) and Fortune (35) are incompatible
         if ((enchantId1 === 33 && enchantId2 === 35) || (enchantId1 === 35 && enchantId2 === 33)) {
             return false;
@@ -290,7 +290,7 @@
      * _calculateResult — calculates the output based on inputs and rename text.
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._calculateResult = function() {
+    Donkeycraft.AnvilUI.prototype._calculateResult = function () {
         var left = this._slots[0];
         var right = this._slots[1];
 
@@ -303,7 +303,7 @@
             // Emit result change event even in early-return path
             if (this._listeners.onResultChange) {
                 for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-                    try { this._listeners.onResultChange[i](null); } catch (e) {}
+                    try { this._listeners.onResultChange[i](null); } catch (e) { }
                 }
             }
             return;
@@ -407,7 +407,7 @@
         // Emit result change event
         if (this._listeners.onResultChange) {
             for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-                try { this._listeners.onResultChange[i](this._resultStack); } catch (e) {}
+                try { this._listeners.onResultChange[i](this._resultStack); } catch (e) { }
             }
         }
     };
@@ -416,7 +416,7 @@
      * getLeftSlot — gets the left input slot content.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.AnvilUI.prototype.getLeftSlot = function() {
+    Donkeycraft.AnvilUI.prototype.getLeftSlot = function () {
         return this._slots[0];
     };
 
@@ -424,7 +424,7 @@
      * getRightSlot — gets the right input slot content.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.AnvilUI.prototype.getRightSlot = function() {
+    Donkeycraft.AnvilUI.prototype.getRightSlot = function () {
         return this._slots[1];
     };
 
@@ -432,7 +432,7 @@
      * getResultSlot — gets the output/result slot content.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.AnvilUI.prototype.getResultSlot = function() {
+    Donkeycraft.AnvilUI.prototype.getResultSlot = function () {
         return this._resultStack;
     };
 
@@ -442,7 +442,7 @@
      * @returns {boolean}
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._isValidStack = function(val) {
+    Donkeycraft.AnvilUI.prototype._isValidStack = function (val) {
         return val === null || (val !== null && typeof val.isEmpty === 'function' && typeof val.getItemId === 'function');
     };
 
@@ -451,7 +451,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.AnvilUI.prototype.setLeftSlot = function(stack) {
+    Donkeycraft.AnvilUI.prototype.setLeftSlot = function (stack) {
         if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[0];
         this._slots[0] = stack;
@@ -461,7 +461,7 @@
         // Emit slot change event
         if (this._listeners.onSlotChange) {
             for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                try { this._listeners.onSlotChange[i](0, stack, oldStack); } catch (e) {}
+                try { this._listeners.onSlotChange[i](0, stack, oldStack); } catch (e) { }
             }
         }
         return true;
@@ -472,7 +472,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.AnvilUI.prototype.setRightSlot = function(stack) {
+    Donkeycraft.AnvilUI.prototype.setRightSlot = function (stack) {
         if (!this._isValidStack(stack)) return false;
         var oldStack = this._slots[1];
         this._slots[1] = stack;
@@ -482,7 +482,7 @@
         // Emit slot change event
         if (this._listeners.onSlotChange) {
             for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                try { this._listeners.onSlotChange[i](1, stack, oldStack); } catch (e) {}
+                try { this._listeners.onSlotChange[i](1, stack, oldStack); } catch (e) { }
             }
         }
         return true;
@@ -492,7 +492,7 @@
      * getRenameText — gets the current rename text.
      * @returns {string} The rename text.
      */
-    Donkeycraft.AnvilUI.prototype.getRenameText = function() {
+    Donkeycraft.AnvilUI.prototype.getRenameText = function () {
         return this._renameText;
     };
 
@@ -501,7 +501,7 @@
      * @param {string} text - The new rename text.
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.AnvilUI.prototype.setRenameText = function(text) {
+    Donkeycraft.AnvilUI.prototype.setRenameText = function (text) {
         if (typeof text !== 'string') return false;
         this._renameText = text;
         this._calculateResult();
@@ -512,7 +512,7 @@
      * getPrice — gets the XP level cost.
      * @returns {number}
      */
-    Donkeycraft.AnvilUI.prototype.getPrice = function() {
+    Donkeycraft.AnvilUI.prototype.getPrice = function () {
         return this._price;
     };
 
@@ -520,7 +520,7 @@
      * calculateResult — recalculates the output based on current inputs.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.AnvilUI.prototype.calculateResult = function() {
+    Donkeycraft.AnvilUI.prototype.calculateResult = function () {
         this._calculateResult();
         return this._resultStack;
     };
@@ -530,7 +530,7 @@
      * Deducts XP cost from player if set. Returns null if player can't afford it.
      * @returns {Donkeycraft.ItemStack|null} The result stack, or null if none/can't afford.
      */
-    Donkeycraft.AnvilUI.prototype.takeResult = function() {
+    Donkeycraft.AnvilUI.prototype.takeResult = function () {
         if (!this._resultStack || this._resultStack.isEmpty()) return null;
 
         // Check if player can afford the price
@@ -546,7 +546,7 @@
             try {
                 // addLevel with negative value removes levels
                 this._player.addLevel(-this._price);
-            } catch (e) {}
+            } catch (e) { }
         }
 
         this._updateSlotDisplay(2);
@@ -565,7 +565,7 @@
      * @param {number} y - Click Y coordinate (unused, for GUI Manager compatibility).
      * @param {number} [button=0] - Mouse button (0=left, 2=right).
      */
-    Donkeycraft.AnvilUI.prototype.handleClick = function(x, y, button) {
+    Donkeycraft.AnvilUI.prototype.handleClick = function (x, y, button) {
         button = button || 0;
 
         // Left-click on output slot takes the result
@@ -595,7 +595,7 @@
                 // Emit slot change event
                 if (this._listeners.onSlotChange) {
                     for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                        try { this._listeners.onSlotChange[i](slotIdx, null, oldStack); } catch (e) {}
+                        try { this._listeners.onSlotChange[i](slotIdx, null, oldStack); } catch (e) { }
                     }
                 }
             }
@@ -610,7 +610,7 @@
      * @returns {boolean}
      * @private
      */
-    Donkeycraft.AnvilUI.prototype._isPointInElement = function(x, y, el) {
+    Donkeycraft.AnvilUI.prototype._isPointInElement = function (x, y, el) {
         if (!el) return false;
         var rect = el.getBoundingClientRect();
         return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
@@ -622,7 +622,7 @@
      * @param {Donkeycraft.ItemStack} itemStack - The dropped item stack.
      * @param {number} slotIndex - Target slot index (-1 = auto-detect).
      */
-    Donkeycraft.AnvilUI.prototype.handleDrop = function(itemStack, slotIndex) {
+    Donkeycraft.AnvilUI.prototype.handleDrop = function (itemStack, slotIndex) {
         if (!itemStack || !this._isValidStack(itemStack)) return false;
 
         // Auto-detect slot if not specified
@@ -644,7 +644,7 @@
         // Emit slot change event
         if (this._listeners.onSlotChange) {
             for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                try { this._listeners.onSlotChange[i](slotIndex, itemStack, null); } catch (e) {}
+                try { this._listeners.onSlotChange[i](slotIndex, itemStack, null); } catch (e) { }
             }
         }
 
@@ -657,7 +657,7 @@
      * @param {string} key - Key identifier (e.g., 'Escape', 'Enter').
      * @returns {boolean} True if the key was consumed.
      */
-    Donkeycraft.AnvilUI.prototype.handleKeyPress = function(key) {
+    Donkeycraft.AnvilUI.prototype.handleKeyPress = function (key) {
         // Escape always closes the anvil GUI
         if (key === 'Escape') return false; // Let GuiManager handle it
 
@@ -677,10 +677,10 @@
      * @param {Function} callback - Called with (resultStack) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.AnvilUI.prototype.onResultChange = function(callback) {
+    Donkeycraft.AnvilUI.prototype.onResultChange = function (callback) {
         this._listeners.onResultChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onResultChange.indexOf(callback);
             if (idx >= 0) self._listeners.onResultChange.splice(idx, 1);
         };
@@ -691,10 +691,10 @@
      * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.AnvilUI.prototype.onSlotChange = function(callback) {
+    Donkeycraft.AnvilUI.prototype.onSlotChange = function (callback) {
         this._listeners.onSlotChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onSlotChange.indexOf(callback);
             if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
         };
@@ -704,7 +704,7 @@
      * setPlayer — sets an optional player reference for XP cost validation.
      * @param {Donkeycraft.Player} player - Player instance with levels property.
      */
-    Donkeycraft.AnvilUI.prototype.setPlayer = function(player) {
+    Donkeycraft.AnvilUI.prototype.setPlayer = function (player) {
         this._player = player || null;
     };
 
@@ -712,7 +712,7 @@
      * getPlayer — gets the player reference if set.
      * @returns {Donkeycraft.Player|null}
      */
-    Donkeycraft.AnvilUI.prototype.getPlayer = function() {
+    Donkeycraft.AnvilUI.prototype.getPlayer = function () {
         return this._player || null;
     };
 
@@ -720,7 +720,7 @@
      * canAffordPrice — checks if the player has enough XP levels to afford the result.
      * @returns {boolean} True if player has sufficient levels (or no player is set).
      */
-    Donkeycraft.AnvilUI.prototype.canAffordPrice = function() {
+    Donkeycraft.AnvilUI.prototype.canAffordPrice = function () {
         if (!this._player || !this._player.getLevel) return true; // No player or no level method
         try {
             return this._player.getLevel() >= this._price;
@@ -732,7 +732,7 @@
     /**
      * destroy — cleans up resources and removes all event listeners.
      */
-    Donkeycraft.AnvilUI.prototype.destroy = function() {
+    Donkeycraft.AnvilUI.prototype.destroy = function () {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);

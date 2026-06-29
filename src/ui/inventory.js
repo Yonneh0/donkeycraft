@@ -1,6 +1,6 @@
 // Donkeycraft — Inventory
 // Generic inventory data structure with slot management, drag/drop, and shift-click logic.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * @param {number} slotCount - Number of slots in this inventory.
      * @param {string} [title=null] - Optional inventory title for GUI display.
      */
-    Donkeycraft.Inventory = function(slotCount, title) {
+    Donkeycraft.Inventory = function (slotCount, title) {
         this._slotCount = slotCount || 9;
         this._slots = [];
         for (var i = 0; i < this._slotCount; i++) {
@@ -33,7 +33,7 @@
      * @param {number} index - Slot index.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.Inventory.prototype.getSlot = function(index) {
+    Donkeycraft.Inventory.prototype.getSlot = function (index) {
         if (index < 0 || index >= this._slotCount) return null;
         return this._slots[index];
     };
@@ -44,7 +44,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set (null to clear).
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.Inventory.prototype.setSlot = function(index, stack) {
+    Donkeycraft.Inventory.prototype.setSlot = function (index, stack) {
         if (index < 0 || index >= this._slotCount) return false;
         var oldStack = this._slots[index];
         if (stack && stack.isEmpty()) {
@@ -56,7 +56,7 @@
         if (oldStack !== this._slots[index]) {
             if (this._listeners.onSlotChange) {
                 for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-                    try { this._listeners.onSlotChange[i](index, this._slots[index], oldStack); } catch (e) {}
+                    try { this._listeners.onSlotChange[i](index, this._slots[index], oldStack); } catch (e) { }
                 }
             }
         }
@@ -67,7 +67,7 @@
      * clearSlot — clears a specific slot.
      * @param {number} index - Slot index.
      */
-    Donkeycraft.Inventory.prototype.clearSlot = function(index) {
+    Donkeycraft.Inventory.prototype.clearSlot = function (index) {
         if (index < 0 || index >= this._slotCount) return;
         this._slots[index] = null;
     };
@@ -76,7 +76,7 @@
      * getAllSlots — gets all slot stacks as an array.
      * @returns {Array} Array of ItemStack|null.
      */
-    Donkeycraft.Inventory.prototype.getAllSlots = function() {
+    Donkeycraft.Inventory.prototype.getAllSlots = function () {
         return this._slots.slice();
     };
 
@@ -84,7 +84,7 @@
      * getSlotCount — gets the total number of slots.
      * @returns {number}
      */
-    Donkeycraft.Inventory.prototype.getSlotCount = function() {
+    Donkeycraft.Inventory.prototype.getSlotCount = function () {
         return this._slotCount;
     };
 
@@ -92,7 +92,7 @@
      * getTitle — gets the inventory title.
      * @returns {string|null}
      */
-    Donkeycraft.Inventory.prototype.getTitle = function() {
+    Donkeycraft.Inventory.prototype.getTitle = function () {
         return this._title;
     };
 
@@ -100,7 +100,7 @@
      * findEmptySlot — finds the first empty (null) slot index.
      * @returns {number} -1 if no empty slot found.
      */
-    Donkeycraft.Inventory.prototype.findEmptySlot = function() {
+    Donkeycraft.Inventory.prototype.findEmptySlot = function () {
         for (var i = 0; i < this._slotCount; i++) {
             if (this._slots[i] === null) return i;
         }
@@ -113,7 +113,7 @@
      * @param {Donkeycraft.ItemStack} stack - Stack to add.
      * @returns {number} Number of items successfully added.
      */
-    Donkeycraft.Inventory.prototype.addItem = function(stack) {
+    Donkeycraft.Inventory.prototype.addItem = function (stack) {
         if (!stack || stack.isEmpty()) return 0;
 
         var added = 0;
@@ -153,7 +153,7 @@
      * @param {Donkeycraft.ItemStack} stack - The stack to match (checks itemId).
      * @returns {Donkeycraft.ItemStack|null} Removed stack, or null if not found.
      */
-    Donkeycraft.Inventory.prototype.removeItem = function(stack) {
+    Donkeycraft.Inventory.prototype.removeItem = function (stack) {
         if (!stack) return null;
 
         var needed = stack.getCount();
@@ -185,7 +185,7 @@
      * @param {number} [count=1] - Minimum count required.
      * @returns {boolean}
      */
-    Donkeycraft.Inventory.prototype.contains = function(itemId, count) {
+    Donkeycraft.Inventory.prototype.contains = function (itemId, count) {
         count = count || 1;
         var total = this.getItemCount(itemId);
         return total >= count;
@@ -196,7 +196,7 @@
      * @param {number} itemId - Item ID to count.
      * @returns {number}
      */
-    Donkeycraft.Inventory.prototype.getItemCount = function(itemId) {
+    Donkeycraft.Inventory.prototype.getItemCount = function (itemId) {
         var total = 0;
         for (var i = 0; i < this._slotCount; i++) {
             var slot = this._slots[i];
@@ -212,7 +212,7 @@
      * @param {number} slotIndex - Source slot index.
      * @returns {Object|null} Drag state object, or null if slot is empty.
      */
-    Donkeycraft.Inventory.prototype.beginDrag = function(slotIndex) {
+    Donkeycraft.Inventory.prototype.beginDrag = function (slotIndex) {
         if (slotIndex < 0 || slotIndex >= this._slotCount) return null;
         var stack = this._slots[slotIndex];
         if (!stack || stack.isEmpty()) return null;
@@ -233,7 +233,7 @@
      * endDrag — ends a drag operation and restores the source slot.
      * @param {Object} dragState - The drag state to end.
      */
-    Donkeycraft.Inventory.prototype.endDrag = function(dragState) {
+    Donkeycraft.Inventory.prototype.endDrag = function (dragState) {
         if (!this._dragState) return;
 
         // Restore the original item to its source slot (safe cancellation)
@@ -251,7 +251,7 @@
      * @param {number} targetSlot - Target slot index (where drop lands).
      * @returns {Donkeycraft.ItemStack|null} Remaining stack if partially placed, or null if fully placed/cancelled.
      */
-    Donkeycraft.Inventory.prototype.processDrop = function(sourceSlot, targetSlot) {
+    Donkeycraft.Inventory.prototype.processDrop = function (sourceSlot, targetSlot) {
         if (targetSlot < 0 || targetSlot >= this._slotCount) return null;
         if (!this._dragState) return null;
 
@@ -315,7 +315,7 @@
      * @param {number} slotIndex - Source slot index.
      * @returns {Donkeycraft.ItemStack} Empty stack on success, or remaining items if no move was possible.
      */
-    Donkeycraft.Inventory.prototype.shiftClick = function(slotIndex) {
+    Donkeycraft.Inventory.prototype.shiftClick = function (slotIndex) {
         if (slotIndex < 0 || slotIndex >= this._slotCount) {
             return new Donkeycraft.ItemStack(0, 0);
         }
@@ -374,9 +374,9 @@
             try {
                 var srcStack = this._slots[slotIndex];
                 for (var _i = 0; _i < this._listeners.onSlotChange.length; _i++) {
-                    try { this._listeners.onSlotChange[_i](slotIndex, srcStack, null); } catch (e) {}
+                    try { this._listeners.onSlotChange[_i](slotIndex, srcStack, null); } catch (e) { }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return new Donkeycraft.ItemStack(0, 0);
@@ -387,7 +387,7 @@
      * Returns an array of 9 ItemStack|null values suitable for Hotbar.setSlots().
      * @returns {Array} Array of 9 ItemStack|null values.
      */
-    Donkeycraft.Inventory.prototype.getHotbarStacks = function() {
+    Donkeycraft.Inventory.prototype.getHotbarStacks = function () {
         var hotbar = [];
         for (var i = 0; i < 9 && i < this._slotCount; i++) {
             var slot = this._slots[i];
@@ -408,7 +408,7 @@
      * isDragActive — checks if a drag operation is in progress.
      * @returns {boolean}
      */
-    Donkeycraft.Inventory.prototype.isDragActive = function() {
+    Donkeycraft.Inventory.prototype.isDragActive = function () {
         return this._dragState !== null;
     };
 
@@ -416,7 +416,7 @@
      * getDragState — gets the current drag state.
      * @returns {Object|null}
      */
-    Donkeycraft.Inventory.prototype.getDragState = function() {
+    Donkeycraft.Inventory.prototype.getDragState = function () {
         return this._dragState;
     };
 
@@ -424,7 +424,7 @@
      * serialize — serializes the inventory state to a JSON-safe object.
      * @returns {Object}
      */
-    Donkeycraft.Inventory.prototype.serialize = function() {
+    Donkeycraft.Inventory.prototype.serialize = function () {
         var slotsData = [];
         for (var i = 0; i < this._slotCount; i++) {
             var slot = this._slots[i];
@@ -445,10 +445,10 @@
      * @param {Function} callback - Called with (slotIndex, newStack, oldStack) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.Inventory.prototype.onSlotChange = function(callback) {
+    Donkeycraft.Inventory.prototype.onSlotChange = function (callback) {
         this._listeners.onSlotChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onSlotChange.indexOf(callback);
             if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
         };
@@ -458,7 +458,7 @@
      * deserialize — restores the inventory from a serialized object.
      * @param {Object} data - Serialized inventory data.
      */
-    Donkeycraft.Inventory.prototype.deserialize = function(data) {
+    Donkeycraft.Inventory.prototype.deserialize = function (data) {
         if (!data || !data.slots) return;
 
         // Clear all slots
@@ -482,7 +482,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.Inventory.prototype.destroy = function() {
+    Donkeycraft.Inventory.prototype.destroy = function () {
         this._slots = [];
         this._dragState = null;
         this._listeners = {};

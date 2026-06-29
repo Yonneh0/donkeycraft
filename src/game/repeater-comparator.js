@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone Repeater & Comparator
 // Redstone repeater (delay 1-4 ticks, max output 15), comparator (block compare, difference mode).
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -29,7 +29,7 @@
      * RedstoneRepeaterComparator — manages redstone repeater delays, comparator modes,
      * signal boosting, and block compare logic.
      */
-    Donkeycraft.RedstoneRepeaterComparator = (function() {
+    Donkeycraft.RedstoneRepeaterComparator = (function () {
 
         // Repeater states: Map<"x,y,z", { delay: 1-4, locked: boolean, outputStrength: number, targetTick: number, facing: number }}
         var _repeaterStates = {};
@@ -162,8 +162,8 @@
             switch (facing) {
                 case FACING_SOUTH: return { x: x, y: y, z: z + 1 };
                 case FACING_NORTH: return { x: x, y: y, z: z - 1 };
-                case FACING_WEST:  return { x: x + 1, y: y, z: z };
-                case FACING_EAST:  return { x: x - 1, y: y, z: z };
+                case FACING_WEST: return { x: x + 1, y: y, z: z };
+                case FACING_EAST: return { x: x - 1, y: y, z: z };
             }
             return null;
         }
@@ -181,8 +181,8 @@
             switch (facing) {
                 case FACING_SOUTH: return { x: x, y: y, z: z - 1 };
                 case FACING_NORTH: return { x: x, y: y, z: z + 1 };
-                case FACING_WEST:  return { x: x - 1, y: y, z: z };
-                case FACING_EAST:  return { x: x + 1, y: y, z: z };
+                case FACING_WEST: return { x: x - 1, y: y, z: z };
+                case FACING_EAST: return { x: x + 1, y: y, z: z };
             }
             return null;
         }

@@ -1,6 +1,6 @@
 // Donkeycraft — Mob Spawning System
 // Chunk checks, light levels, biome rates, mob caps.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -20,7 +20,7 @@
      * MobSpawnDefinition — spawn configuration for a mob type.
      * @param {object} config - Spawn definition.
      */
-    Donkeycraft.MobSpawnDefinition = function(config) {
+    Donkeycraft.MobSpawnDefinition = function (config) {
         config = config || {};
 
         /**
@@ -99,7 +99,7 @@
     /**
      * MobSpawner — manages mob spawning across the world.
      */
-    Donkeycraft.MobSpawner = function() {
+    Donkeycraft.MobSpawner = function () {
         /**
          * Spawn definitions registered for this spawner.
          * @type {Donkeycraft.MobSpawnDefinition[]}
@@ -168,7 +168,7 @@
      * Register a mob spawn definition.
      * @param {Donkeycraft.MobSpawnDefinition} definition - Spawn definition to register.
      */
-    Donkeycraft.MobSpawner.prototype.registerSpawn = function(definition) {
+    Donkeycraft.MobSpawner.prototype.registerSpawn = function (definition) {
         if (!definition || !definition.type) {
             return;
         }
@@ -183,7 +183,7 @@
      * Get all registered spawn definitions.
      * @returns {Donkeycraft.MobSpawnDefinition[]}
      */
-    Donkeycraft.MobSpawner.prototype.getDefinitions = function() {
+    Donkeycraft.MobSpawner.prototype.getDefinitions = function () {
         return this._definitions.slice();
     };
 
@@ -192,7 +192,7 @@
      * @param {string} type - Mob type.
      * @returns {number}
      */
-    Donkeycraft.MobSpawner.prototype.getCurrentCount = function(type) {
+    Donkeycraft.MobSpawner.prototype.getCurrentCount = function (type) {
         return this._currentCounts[type] || 0;
     };
 
@@ -200,7 +200,7 @@
      * Get the total active mob count.
      * @returns {number}
      */
-    Donkeycraft.MobSpawner.prototype.getTotalCount = function() {
+    Donkeycraft.MobSpawner.prototype.getTotalCount = function () {
         var total = 0;
         for (var type in this._currentCounts) {
             if (this._currentCounts.hasOwnProperty(type)) {
@@ -215,7 +215,7 @@
      * @param {Donkeycraft.MobSpawnDefinition} definition - Spawn definition.
      * @returns {boolean} True if cap is reached.
      */
-    Donkeycraft.MobSpawner.prototype.isMobCapReached = function(definition) {
+    Donkeycraft.MobSpawner.prototype.isMobCapReached = function (definition) {
         var type = definition.type;
         var currentCount = this._currentCounts[type] || 0;
 
@@ -252,7 +252,7 @@
      * @param {Function} getChunkInfo - Callback(chunkX, chunkZ) returning {loaded, biome, getHeightAt(x, z)}.
      * @returns {boolean} True if chunk is valid for spawning.
      */
-    Donkeycraft.MobSpawner.prototype.isValidSpawnChunk = function(chunkX, chunkZ, getChunkInfo) {
+    Donkeycraft.MobSpawner.prototype.isValidSpawnChunk = function (chunkX, chunkZ, getChunkInfo) {
         var chunk = getChunkInfo(chunkX, chunkZ);
         if (!chunk || !chunk.loaded) {
             return false;
@@ -271,7 +271,7 @@
      * @param {Function} isBlockSolid - Callback(x, y, z) returning true if block is solid.
      * @returns {boolean} True if spawn position is valid.
      */
-    Donkeycraft.MobSpawner.prototype.validateSpawnPosition = function(definition, x, y, z, getBlockLight, isBlockSolid) {
+    Donkeycraft.MobSpawner.prototype.validateSpawnPosition = function (definition, x, y, z, getBlockLight, isBlockSolid) {
         // Check light level at spawn position
         var lightLevel = getBlockLight(x, y, z);
         if (lightLevel === undefined || lightLevel === null ||
@@ -305,7 +305,7 @@
      * @param {string} [biome] - Current biome name (optional filter).
      * @returns {object|null} Spawn position {x, y, z} or null if no valid position.
      */
-    Donkeycraft.MobSpawner.prototype.findSpawnPosition = function(definition, chunkX, chunkZ, getBlockLight, getHeightAt, isBlockSolid, biome) {
+    Donkeycraft.MobSpawner.prototype.findSpawnPosition = function (definition, chunkX, chunkZ, getBlockLight, getHeightAt, isBlockSolid, biome) {
         // Random position within chunk
         var localX = Math.floor(Math.random() * 16);
         var localZ = Math.floor(Math.random() * 16);
@@ -347,7 +347,7 @@
      * @param {Function} spawnEntity - Callback(entity) to add entity to world.
      * @returns {Donkeycraft.Entity|null} Spawned entity or null.
      */
-    Donkeycraft.MobSpawner.prototype.spawnMobAt = function(definition, x, y, z, createMob, spawnEntity) {
+    Donkeycraft.MobSpawner.prototype.spawnMobAt = function (definition, x, y, z, createMob, spawnEntity) {
         var mob = createMob(definition.type, x, y, z);
         if (!mob) {
             return null;
@@ -373,7 +373,7 @@
      * @param {Function} worldInfo.spawnEntity - Callback(entity).
      * @param {Function} [worldInfo.getCurrentBiome] - Callback(x, z) returning biome name.
      */
-    Donkeycraft.MobSpawner.prototype.tick = function(deltaTime, worldInfo) {
+    Donkeycraft.MobSpawner.prototype.tick = function (deltaTime, worldInfo) {
         if (!this.enabled) {
             return;
         }
@@ -463,7 +463,7 @@
     /**
      * Reset mob counts (called when world is reloaded or spawner is reset).
      */
-    Donkeycraft.MobSpawner.prototype.resetCounts = function() {
+    Donkeycraft.MobSpawner.prototype.resetCounts = function () {
         this._currentCounts = {};
         for (var i = 0; i < this._definitions.length; i++) {
             this._currentCounts[this._definitions[i].type] = 0;
@@ -473,13 +473,13 @@
     /**
      * Destroy the spawner and free resources.
      */
-    Donkeycraft.MobSpawner.prototype.destroy = function() {
+    Donkeycraft.MobSpawner.prototype.destroy = function () {
         this._definitions = [];
         this._currentCounts = {};
     };
 
     // Register default spawn definitions
-    Donkeycraft.MobSpawner.defaultDefinitions = function() {
+    Donkeycraft.MobSpawner.defaultDefinitions = function () {
         var defs = [];
 
         // Monster spawns (dark areas)

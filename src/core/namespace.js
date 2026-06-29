@@ -1,6 +1,6 @@
 // Donkeycraft — Core Namespace
 // Global namespace object for all Donkeycraft classes.
-(function() {
+(function () {
     'use strict';
 
     /**

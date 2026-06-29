@@ -1,6 +1,6 @@
 // Donkeycraft — Chunk Manager
 // Chunk loading/unloading: radius management, spawn/destroy, dirty tracking.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -17,7 +17,7 @@
      * @param {object} [options] - Configuration options.
      * @param {number} [options.renderDistance=8] - Render radius in chunks.
      */
-    Donkeycraft.ChunkManager = function(options) {
+    Donkeycraft.ChunkManager = function (options) {
         options = options || {};
 
         /**
@@ -100,7 +100,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {Donkeycraft.Chunk} The chunk (newly created or existing).
      */
-    Donkeycraft.ChunkManager.prototype.getChunk = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.getChunk = function (chunkX, chunkZ) {
         var key = chunkKey(chunkX, chunkZ);
         if (!this._chunks.has(key)) {
             var chunk = new Donkeycraft.Chunk(chunkX, chunkZ);
@@ -124,7 +124,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {boolean}
      */
-    Donkeycraft.ChunkManager.prototype.hasChunk = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.hasChunk = function (chunkX, chunkZ) {
         return this._chunks.has(chunkKey(chunkX, chunkZ));
     };
 
@@ -134,7 +134,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {Donkeycraft.Chunk|null} The chunk, or null if not loaded.
      */
-    Donkeycraft.ChunkManager.prototype.getChunkIfExists = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.getChunkIfExists = function (chunkX, chunkZ) {
         return this._chunks.get(chunkKey(chunkX, chunkZ)) || null;
     };
 
@@ -144,7 +144,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {boolean} True if the chunk was unloaded, false if it didn't exist.
      */
-    Donkeycraft.ChunkManager.prototype.unloadChunk = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.unloadChunk = function (chunkX, chunkZ) {
         var key = chunkKey(chunkX, chunkZ);
         if (!this._chunks.has(key)) {
             return false;
@@ -167,10 +167,10 @@
      * Get all currently loaded chunks as an array.
      * @returns {Donkeycraft.Chunk[]}
      */
-    Donkeycraft.ChunkManager.prototype.getAllChunks = function() {
+    Donkeycraft.ChunkManager.prototype.getAllChunks = function () {
         var result = [];
         var self = this;
-        this._chunks.forEach(function(chunk, key) {
+        this._chunks.forEach(function (chunk, key) {
             result.push(chunk);
         });
         return result;
@@ -180,7 +180,7 @@
      * Get the number of loaded chunks.
      * @returns {number}
      */
-    Donkeycraft.ChunkManager.prototype.getChunkCount = function() {
+    Donkeycraft.ChunkManager.prototype.getChunkCount = function () {
         return this._chunks.size;
     };
 
@@ -189,7 +189,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
-    Donkeycraft.ChunkManager.prototype.markChunkDirty = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.markChunkDirty = function (chunkX, chunkZ) {
         var key = chunkKey(chunkX, chunkZ);
         this._dirtyChunks.add(key);
     };
@@ -199,7 +199,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
-    Donkeycraft.ChunkManager.prototype.markChunkClean = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.markChunkClean = function (chunkX, chunkZ) {
         this._dirtyChunks.delete(chunkKey(chunkX, chunkZ));
     };
 
@@ -209,7 +209,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {boolean}
      */
-    Donkeycraft.ChunkManager.prototype.isChunkDirty = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.isChunkDirty = function (chunkX, chunkZ) {
         return this._dirtyChunks.has(chunkKey(chunkX, chunkZ));
     };
 
@@ -217,10 +217,10 @@
      * Get all dirty chunks as an array of {chunk, chunkX, chunkZ} objects.
      * @returns {{chunk: Donkeycraft.Chunk, chunkX: number, chunkZ: number}[]}
      */
-    Donkeycraft.ChunkManager.prototype.getDirtyChunks = function() {
+    Donkeycraft.ChunkManager.prototype.getDirtyChunks = function () {
         var result = [];
         var self = this;
-        this._dirtyChunks.forEach(function(key) {
+        this._dirtyChunks.forEach(function (key) {
             var coords = parseChunkKey(key);
             var chunk = self._chunks.get(key);
             if (chunk) {
@@ -234,7 +234,7 @@
      * Get the number of dirty chunks.
      * @returns {number}
      */
-    Donkeycraft.ChunkManager.prototype.getDirtyCount = function() {
+    Donkeycraft.ChunkManager.prototype.getDirtyCount = function () {
         return this._dirtyChunks.size;
     };
 
@@ -243,7 +243,7 @@
      * @param {number} playerChunkX - Player's current chunk X.
      * @param {number} playerChunkZ - Player's current chunk Z.
      */
-    Donkeycraft.ChunkManager.prototype.updatePlayerPosition = function(playerChunkX, playerChunkZ) {
+    Donkeycraft.ChunkManager.prototype.updatePlayerPosition = function (playerChunkX, playerChunkZ) {
         var radius = this.renderDistance;
         var neededChunks = new Set();
 
@@ -262,7 +262,7 @@
 
         // Unload chunks outside the radius
         var toUnload = [];
-        this._chunks.forEach(function(chunk, key) {
+        this._chunks.forEach(function (chunk, key) {
             if (!neededChunks.has(key)) {
                 toUnload.push(key);
             }
@@ -283,7 +283,7 @@
      * Update the render distance and adjust loaded chunks.
      * @param {number} newRadius - New render distance radius in chunks.
      */
-    Donkeycraft.ChunkManager.prototype.updateRenderDistance = function(newRadius) {
+    Donkeycraft.ChunkManager.prototype.updateRenderDistance = function (newRadius) {
         var oldRadius = this.renderDistance;
         this.renderDistance = newRadius;
 
@@ -297,9 +297,9 @@
     /**
      * Destroy all chunks and free resources.
      */
-    Donkeycraft.ChunkManager.prototype.destroy = function() {
+    Donkeycraft.ChunkManager.prototype.destroy = function () {
         var self = this;
-        this._chunks.forEach(function(chunk) {
+        this._chunks.forEach(function (chunk) {
             chunk.destroy();
         });
         this._chunks.clear();
@@ -312,9 +312,9 @@
     /**
      * Remove all chunks without calling destroy (for save-then-clear workflows).
      */
-    Donkeycraft.ChunkManager.prototype.clearAll = function() {
+    Donkeycraft.ChunkManager.prototype.clearAll = function () {
         var self = this;
-        this._chunks.forEach(function(chunk) {
+        this._chunks.forEach(function (chunk) {
             // Don't destroy buffers — they may have been saved
         });
         this._chunks.clear();
@@ -331,7 +331,7 @@
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {boolean} True if terrain was generated, false if skipped.
      */
-    Donkeycraft.ChunkManager.prototype.generateChunkTerrain = function(chunkX, chunkZ) {
+    Donkeycraft.ChunkManager.prototype.generateChunkTerrain = function (chunkX, chunkZ) {
         // Skip if terrain is disabled or chunk already generated
         if (!this.terrainEnabled) return false;
         var key = chunkKey(chunkX, chunkZ);
@@ -348,17 +348,17 @@
                 _generateEndChunk(this, chunk, chunkX, chunkZ);
                 break;
             default: // Overworld
-         if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
-             Donkeycraft.StructureGenerator.generateChunkFull) {
-             try {
-                 Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
-             } catch (e) {
-                 Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
-                 _generateOverworldChunk(this, chunk, chunkX, chunkZ);
-             }
-         } else {
-             _generateOverworldChunk(this, chunk, chunkX, chunkZ);
-         }
+                if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
+                    Donkeycraft.StructureGenerator.generateChunkFull) {
+                    try {
+                        Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
+                    } catch (e) {
+                        Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
+                        _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                    }
+                } else {
+                    _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                }
                 break;
         }
     };

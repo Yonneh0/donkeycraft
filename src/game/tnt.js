@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone TNT
 // TNT: fuse timer, explosion logic, block destruction, entity damage.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -23,7 +23,7 @@
      * RedstoneTNT — manages TNT fuse timers, explosion logic,
      * block destruction, and entity damage.
      */
-    Donkeycraft.RedstoneTNT = (function() {
+    Donkeycraft.RedstoneTNT = (function () {
 
         // TNT states: Map<"x,y,z", { fuseTicks: number, lit: boolean, primeTick: number }}
         var _tntStates = {};

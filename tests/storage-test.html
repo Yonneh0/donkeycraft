@@ -1,31 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Donkeycraft — Storage System Tests</title>
-<link rel="stylesheet" href="test.css">
+    <meta charset="UTF-8">
+    <title>Donkeycraft — Storage System Tests</title>
+    <link rel="stylesheet" href="test.css">
 </head>
+
 <body>
-<h1>Donkeycraft — Storage System Tests</h1>
-<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Comprehensive functional tests for WorldStore, LevelData, and AssetCache modules. All IndexedDB operations are properly sequenced with async chains.</div>
+    <h1>Donkeycraft — Storage System Tests</h1>
+    <nav style="margin-bottom: 12px;"><a href="index.html"
+            style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+    <div class="subtitle">Comprehensive functional tests for WorldStore, LevelData, and AssetCache modules. All
+        IndexedDB operations are properly sequenced with async chains.</div>
 
-<div id="results"></div>
+    <div id="results"></div>
 
-<!-- Load project scripts in dependency order -->
-<script src="../src/core/namespace.js"></script>
-<script src="../src/core/eventbus.js"></script>
-<script src="../src/core/config.js"></script>
-<script src="../src/core/logger.js"></script>
-<script src="../src/core/world-store.js"></script>
-<script src="../src/core/level-data.js"></script>
-<script src="../src/core/cache.js"></script>
+    <!-- Load project scripts in dependency order -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+    <script src="../src/core/world-store.js"></script>
+    <script src="../src/core/level-data.js"></script>
+    <script src="../src/core/cache.js"></script>
 
-<!-- Load shared test framework (MUST come before the test script) -->
-<script src="test.js"></script>
+    <!-- Load shared test framework (MUST come before the test script) -->
+    <script src="test.js"></script>
 
-<!-- Load test file (uses async promise chains to properly verify IndexedDB writes) -->
-<script src="storage-test.js"></script>
+    <!-- Load test file (uses async promise chains to properly verify IndexedDB writes) -->
+    <script src="storage-test.js"></script>
 
 </body>
+
 </html>

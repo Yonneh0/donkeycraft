@@ -1,4 +1,4 @@
-(function() {
+(function () {
     'use strict';
 
     /**
@@ -21,7 +21,7 @@
      *   </script>
      */
 
-    window.TestFramework = (function() {
+    window.TestFramework = (function () {
         var totalTests = 0;
         var passedTests = 0;
         var failedTests = 0;

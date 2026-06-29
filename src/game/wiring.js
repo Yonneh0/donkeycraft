@@ -1,6 +1,6 @@
 // Donkeycraft — Redstone Wiring
 // Redstone dust/wire: signal strength (0-15), branching, underground routing, power calculation.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -28,7 +28,7 @@
      * RedstoneWiring — manages redstone dust signal strength, branching,
      * underground routing, and power source detection.
      */
-    Donkeycraft.RedstoneWiring = (function() {
+    Donkeycraft.RedstoneWiring = (function () {
 
         // Signal strength storage: Map<chunkKey, Uint8Array(CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE)>
         var _signalStrengths = {};

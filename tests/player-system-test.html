@@ -1,956 +1,961 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Donkeycraft — Player System Test Suite</title>
-<link rel="stylesheet" href="test.css">
+    <meta charset="UTF-8">
+    <title>Donkeycraft — Player System Test Suite</title>
+    <link rel="stylesheet" href="test.css">
 </head>
+
 <body>
-<h1>Donkeycraft — Player System Test Suite</h1>
-<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Comprehensive functional tests for all 10 player system modules: Player, Movement, Collision, Jumping, Flying, HurtBox, GameMode, Stats, Hunger, Experience.</div>
+    <h1>Donkeycraft — Player System Test Suite</h1>
+    <nav style="margin-bottom: 12px;"><a href="index.html"
+            style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+    <div class="subtitle">Comprehensive functional tests for all 10 player system modules: Player, Movement, Collision,
+        Jumping, Flying, HurtBox, GameMode, Stats, Hunger, Experience.</div>
 
-<!-- Summary is auto-created at top by TestFramework.init() -->
-<div id="results"></div>
+    <!-- Summary is auto-created at top by TestFramework.init() -->
+    <div id="results"></div>
 
-<!-- Load project scripts in dependency order -->
-<script src="../src/core/namespace.js"></script>
-<script src="../src/core/eventbus.js"></script>
-<script src="../src/core/config.js"></script>
-<script src="../src/core/logger.js"></script>
-<script src="../src/core/math-utils.js"></script>
+    <!-- Load project scripts in dependency order -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+    <script src="../src/core/math-utils.js"></script>
 
-<!-- Load shared test framework -->
-<script src="test.js"></script>
+    <!-- Load shared test framework -->
+    <script src="test.js"></script>
 
-<!-- Load world modules needed by collision -->
-<script src="../src/game/chunk.js"></script>
-<script src="../src/game/block.js"></script>
+    <!-- Load world modules needed by collision -->
+    <script src="../src/game/chunk.js"></script>
+    <script src="../src/game/block.js"></script>
 
-<!-- Load player system modules in dependency order -->
-<script src="../src/game/player.js"></script>
-<script src="../src/game/collision.js"></script>
-<script src="../src/game/jumping.js"></script>
-<script src="../src/game/flying.js"></script>
-<script src="../src/game/damage.js"></script>
-<script src="../src/game/game-mode.js"></script>
-<script src="../src/game/stats.js"></script>
-<script src="../src/game/hunger.js"></script>
-<script src="../src/game/experience.js"></script>
-<!-- Movement requires Input and ChunkManager mocks -->
-<script src="../src/game/movement.js"></script>
+    <!-- Load player system modules in dependency order -->
+    <script src="../src/game/player.js"></script>
+    <script src="../src/game/collision.js"></script>
+    <script src="../src/game/jumping.js"></script>
+    <script src="../src/game/flying.js"></script>
+    <script src="../src/game/damage.js"></script>
+    <script src="../src/game/game-mode.js"></script>
+    <script src="../src/game/stats.js"></script>
+    <script src="../src/game/hunger.js"></script>
+    <script src="../src/game/experience.js"></script>
+    <!-- Movement requires Input and ChunkManager mocks -->
+    <script src="../src/game/movement.js"></script>
 
-<script>
-(function() {
-    'use strict';
+    <script>
+        (function () {
+            'use strict';
 
-    var F = TestFramework;
-    F.init('results');
+            var F = TestFramework;
+            F.init('results');
 
-    // ============================================================
-    // Helper: Create a mock chunk manager for collision tests
-    // ============================================================
-    function createMockChunkManager() {
-        return {
-            getChunkIfExists: function(cx, cz) {
-                return null; // No chunks loaded = no solid blocks
+            // ============================================================
+            // Helper: Create a mock chunk manager for collision tests
+            // ============================================================
+            function createMockChunkManager() {
+                return {
+                    getChunkIfExists: function (cx, cz) {
+                        return null; // No chunks loaded = no solid blocks
+                    }
+                };
             }
-        };
-    }
 
-    // ============================================================
-    // Helper: Create a mock input handler
-    // ============================================================
-    function createMockInput(keyStates) {
-        keyStates = keyStates || {};
-        return {
-            isKeyDown: function(key) {
-                return !!keyStates[key];
+            // ============================================================
+            // Helper: Create a mock input handler
+            // ============================================================
+            function createMockInput(keyStates) {
+                keyStates = keyStates || {};
+                return {
+                    isKeyDown: function (key) {
+                        return !!keyStates[key];
+                    }
+                };
             }
-        };
-    }
-
-    // ============================================================
-    // Section 1: Player Entity
-    // ============================================================
-    F.section('1. Player Entity');
-
-    // Constructor
-    var player = new Donkeycraft.Player({ x: 100, y: 64, z: -50, gameMode: 'survival' });
-    F.assertType(player, 'object', 'Player instance created');
-    F.assertEq(player.gameMode, 'survival', 'Default game mode is survival');
-
-    // Position
-    var pos = player.getPosition();
-    F.assertType(pos, 'object', 'getPosition returns Vector3');
-    F.assertEq(pos.x, 100, 'Initial X position is 100');
-    F.assertEq(pos.y, 64, 'Initial Y position is 64');
-    F.assertEq(pos.z, -50, 'Initial Z position is -50');
-
-    // Default Y position uses WORLD_HEIGHT / 2
-    var defaultPlayer = new Donkeycraft.Player();
-    F.assertEq(defaultPlayer.getPosition().y, Donkeycraft.Config.WORLD_HEIGHT / 2, 'Default Y = WORLD_HEIGHT / 2');
-
-    // Velocity
-    player.setVelocity(3.5, -5.0, 2.0);
-    var vel = player.getVelocity();
-    F.assertEq(vel.x, 3.5, 'X velocity set to 3.5');
-    F.assertEq(vel.y, -5.0, 'Y velocity set to -5.0');
-    F.assertEq(vel.z, 2.0, 'Z velocity set to 2.0');
-
-    // Rotation
-    player.setRotation(Math.PI, -Math.PI / 4);
-    var rot = player.getRotation();
-    F.assertNear(rot.yaw, Math.PI, 0.001, 'Yaw set to π radians');
-    F.assertNear(rot.pitch, -Math.PI / 4, 0.001, 'Pitch set to -π/4 radians');
-
-    // Yaw normalization
-    player.setRotation(-Math.PI * 3, 0);
-    F.assertNear(player.getRotation().yaw, Math.PI, 0.001, 'Negative yaw normalized to [0, 2π)');
-
-    // Pitch clamping
-    player.setRotation(0, Math.PI);
-    F.assertNear(player.getRotation().pitch, Math.PI / 2, 0.001, 'Pitch clamped to π/2');
-
-    // Dimensions
-    var dims = player.getDimensions();
-    F.assertEq(dims.height, Donkeycraft.Config.PLAYER_HEIGHT, 'Height matches config');
-    F.assertEq(dims.width, Donkeycraft.Config.PLAYER_WIDTH, 'Width matches config');
-
-    // AABB (HurtBox)
-    var aabb = player.getHurtBox();
-    F.assertNear(aabb.minX, 99.7, 0.01, 'AABB minX = x - width/2');
-    F.assertNear(aabb.maxX, 100.3, 0.01, 'AABB maxX = x + width/2');
-    F.assertEq(aabb.minY, 64, 'AABB minY = y');
-    F.assertNear(aabb.maxY, 65.8, 0.01, 'AABB maxY = y + height');
-
-    // Eye position
-    var eyePos = player.getEyePosition();
-    F.assertEq(eyePos.x, 100, 'Eye X matches player X');
-    F.assertNear(eyePos.y, 65.62, 0.01, 'Eye Y = player Y + PLAYER_EYE_HEIGHT');
-
-    // Direction vectors
-    player.setRotation(0, 0);
-    var fwd = player.getForwardDirection();
-    F.assertNear(fwd.x, 0, 0.01, 'Forward X at yaw=0 is 0');
-    F.assertNear(fwd.z, -1, 0.01, 'Forward Z at yaw=0 is -1');
-
-    var right = player.getRightDirection();
-    F.assertNear(right.x, -1, 0.01, 'Right X at yaw=0 is -1');
-    F.assertNear(right.z, 0, 0.01, 'Right Z at yaw=0 is 0');
-
-    // Game mode
-    player.setGameMode('creative');
-    F.assertEq(player.getGameMode(), 'creative', 'Game mode changed to creative');
-    player.setGameMode('spectator');
-    F.assertEq(player.getGameMode(), 'spectator', 'Game mode changed to spectator');
-    player.setGameMode('invalid');
-    F.assertEq(player.getGameMode(), 'spectator', 'Invalid game mode ignored');
-
-    // Switching to survival disables flying
-    player.setGameMode('survival');
-    F.assertEq(player.flyEnabled, false, 'Flying disabled when switching to survival');
-
-    // Alive / Dead
-    F.assert(player.isAlive(), 'Player starts alive');
-    player.setAlive(false);
-    F.assert(!player.isAlive(), 'Player is dead after setAlive(false)');
-    player.setAlive(true);
-    F.assert(player.isAlive(), 'Player is alive after setAlive(true)');
-
-    // Knockback
-    var kbDir = new Donkeycraft.Vector3(1, 0, 0);
-    player.applyKnockback(kbDir, 5.0, 2.0);
-    var kb = player.getKnockback();
-    F.assertEq(kb.x, 5.0, 'Knockback X set to 5.0');
-    F.assertEq(kb.y, 2.0, 'Knockback Y (upward) set to 2.0');
-    F.assertEq(kb.z, 0, 'Knockback Z is 0 for pure X direction');
-    player.clearKnockback();
-    F.assert(player.getKnockback().isZero(), 'Knockback cleared');
-
-    // Fall distance tracking
-    player.maxFallDistance = 0;
-    player.trackFallDistance(2.5);
-    F.assertEq(player.maxFallDistance, 2.5, 'Fall distance accumulated: 2.5');
-    player.trackFallDistance(1.3);
-    F.assertEq(player.maxFallDistance, 3.8, 'Fall distance accumulated: 3.8');
-    player.onGround = true;
-    player.trackFallDistance(0);
-    F.assertEq(player.maxFallDistance, 0, 'Fall distance reset on ground');
-
-    // getFallDistance
-    player.maxFallDistance = 10;
-    F.assertEq(player.getFallDistance(), 10, 'getFallDistance returns maxFallDistance');
-
-    // Destroy — no error thrown
-    player.destroy();
-    F.assert(true, 'Player.destroy() completes without error');
-
-    // ============================================================
-    // Section 2: Collision Detection
-    // ============================================================
-    F.section('2. Collision Detection');
-
-    var mockChunkMgr = createMockChunkManager();
-    var collision = new Donkeycraft.Collision(mockChunkMgr);
-    F.assertType(collision, 'object', 'Collision instance created');
-
-    // isBlockSolid — no chunks loaded = no solid blocks
-    F.assert(!collision.isBlockSolid(0, 64, 0), 'No solid blocks when no chunks loaded');
-
-    // isBlockReplaceable — no chunks = replaceable
-    F.assert(collision.isBlockReplaceable(0, 64, 0), 'Blocks are replaceable when no chunks loaded');
-
-    // isBlockLiquid — no chunks = not liquid
-    F.assert(!collision.isBlockLiquid(0, 64, 0), 'No liquid blocks when no chunks loaded');
-
-    // Below world = solid bedrock
-    F.assert(collision.isBlockSolid(0, -1, 0), 'Below world (Y=-1) is solid bedrock');
-
-    // Above world = not solid
-    F.assert(!collision.isBlockSolid(0, Donkeycraft.Config.WORLD_HEIGHT, 0), 'Above world is not solid');
-
-    // getOverlappingBlocks — no chunks = empty array
-    var blocks = collision.getOverlappingBlocks(0, 0, 0, 10, 10, 10);
-    F.assertArrEq(blocks, [], 'No overlapping blocks when no chunks loaded');
-
-    // _checkAABBAgainstBlocks — no chunks = no collision
-    F.assert(!collision._checkAABBAgainstBlocks(0, 0, 0, 10, 10, 10), 'No AABB collision with no chunks');
-
-    // checkMovement — empty space allows full movement
-    var testPos = new Donkeycraft.Vector3(0, 64, 0);
-    var result = collision.checkMovement(testPos, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT, 5, -10, 3);
-    F.assert(!result.collisionX, 'No X collision in empty space');
-    F.assert(!result.collisionY, 'No Y collision in empty space');
-    F.assert(!result.collisionZ, 'No Z collision in empty space');
-
-    // resolveMovement — empty space allows full movement
-    var vel = new Donkeycraft.Vector3(5, -10, 3);
-    var moveResult = collision.resolveMovement(testPos, vel, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT);
-    F.assertNear(moveResult.newX, 5, 0.01, 'X position updated after resolveMovement');
-    F.assertNear(moveResult.newY, 54, 0.01, 'Y position updated after resolveMovement');
-    F.assertNear(moveResult.newZ, 3, 0.01, 'Z position updated after resolveMovement');
-    F.assert(!moveResult.onGround, 'Not on ground in empty space');
-
-    // checkEntityCollision — no entities = null
-    var entityResult = collision.checkEntityCollision(testPos, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT, []);
-    F.assert(entityResult === null, 'No entity collision with empty entity list');
-
-    // getChunkManager
-    F.assert(collision.getChunkManager() === mockChunkMgr, 'getChunkManager returns the chunk manager');
-
-    // Destroy
-    collision.destroy();
-    F.assert(collision.getChunkManager() === null, 'Chunk manager nullified after destroy');
-
-    // ============================================================
-    // Section 3: Jump Mechanics
-    // ============================================================
-    F.section('3. Jump Mechanics');
-
-    var jumpPlayer = new Donkeycraft.Player();
-    var mockInput = createMockInput({});
-    var mockCollision = new Donkeycraft.Collision(createMockChunkManager());
-    var jumping = new Donkeycraft.Jumping(jumpPlayer, mockInput, mockCollision);
-    F.assertType(jumping, 'object', 'Jumping instance created');
-
-    // canJump — on ground and no cooldown
-    jumpPlayer.onGround = true;
-    F.assert(jumping.canJump(), 'Can jump when on ground');
-
-    // canJump — not on ground
-    jumpPlayer.onGround = false;
-    F.assert(!jumping.canJump(), 'Cannot jump when not on ground');
-
-    // performJump — on ground
-    jumpPlayer.onGround = true;
-    var jumped = jumping.performJump();
-    F.assert(jumped, 'Jump performed successfully');
-    F.assertNear(jumpPlayer.getVelocity().y, Donkeycraft.Config.PLAYER_JUMP_FORCE, 0.001, 'Vertical velocity set to JUMP_FORCE');
-
-    // Jump cooldown
-    F.assert(jumping.getCooldown() > 0, 'Jump cooldown started');
-    F.assert(!jumping.canJump(), 'Cannot jump during cooldown');
-
-    // performJump — not on ground
-    jumpPlayer.onGround = false;
-    var failedJump = jumping.performJump();
-    F.assert(!failedJump, 'Jump failed when not on ground');
-
-    // getJumpForce
-    F.assertEq(jumping.getJumpForce(), Donkeycraft.Config.PLAYER_JUMP_FORCE, 'getJumpForce returns config value');
-
-    // isSwimmingUp — no water
-    F.assert(!jumping.isSwimmingUp(), 'Not swimming in empty space');
-
-    // tick — dead player cannot jump
-    var deadPlayer = new Donkeycraft.Player();
-    var deadJumping = new Donkeycraft.Jumping(deadPlayer, mockInput, mockCollision);
-    deadPlayer.setAlive(false);
-    deadJumping.tick(0.05);
-    F.assert(!deadPlayer.isAlive(), 'Dead player state unchanged');
-
-    // Destroy
-    jumping.destroy();
-    F.assert(jumping._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 4: Flying System
-    // ============================================================
-    F.section('4. Flying System');
-
-    var flyPlayer = new Donkeycraft.Player({ gameMode: 'creative' });
-    var flyInput = createMockInput({});
-    var flying = new Donkeycraft.Flying(flyPlayer, flyInput);
-    F.assertType(flying, 'object', 'Flying instance created');
-
-    // Initial state
-    F.assert(!flying.isEnabled(), 'Flying disabled by default');
-    F.assert(!flying.isFlying(), 'isFlying returns false initially');
-
-    // enableFlyMode — creative
-    var enabled = flying.enableFlyMode();
-    F.assert(enabled, 'Fly mode enabled for creative');
-    F.assert(flying.isEnabled(), 'isEnabled returns true after enable');
-    F.assertEq(flyPlayer.flyEnabled, true, 'Player flyEnabled set to true');
-
-    // disableFlyMode
-    var disabled = flying.disableFlyMode();
-    F.assert(disabled, 'Fly mode disabled');
-    F.assert(!flying.isEnabled(), 'isEnabled returns false after disable');
-
-    // toggleFlyMode
-    flying.toggleFlyMode();
-    F.assert(flying.isEnabled(), 'Toggle enabled fly mode');
-    flying.toggleFlyMode();
-    F.assert(!flying.isEnabled(), 'Toggle disabled fly mode');
-
-    // getFlySpeed — sprinting
-    var sprintKey = Donkeycraft.Config.KEYBINDS.SPRINT;
-    var sprintInput = createMockInput({ [sprintKey]: true });
-    var sprintFlying = new Donkeycraft.Flying(flyPlayer, sprintInput);
-    F.assertEq(sprintFlying.getFlySpeed(), Donkeycraft.Config.PLAYER_FLY_SPEED_BOOST, 'Sprint fly speed = PLAYER_FLY_SPEED_BOOST');
-
-    var normalInput = createMockInput({});
-    var normalFlying = new Donkeycraft.Flying(flyPlayer, normalInput);
-    F.assertEq(normalFlying.getFlySpeed(), Donkeycraft.Config.PLAYER_FLY_SPEED, 'Normal fly speed = PLAYER_FLY_SPEED');
-
-    // canSpectate — creative mode
-    F.assert(!flying.canSpectate(), 'Creative mode cannot spectate');
-
-    // shouldClipThroughBlocks — creative mode
-    F.assert(!flying.shouldClipThroughBlocks(), 'Creative mode does not clip through blocks');
-
-    // setEnabled — survival mode (should not allow)
-    var survPlayer = new Donkeycraft.Player({ gameMode: 'survival' });
-    var survFlying = new Donkeycraft.Flying(survPlayer, normalInput);
-    survFlying.setEnabled(true);
-    F.assert(!survFlying.isEnabled(), 'Survival cannot enable flying');
-
-    // setEnabled — spectator mode
-    var specPlayer = new Donkeycraft.Player({ gameMode: 'spectator' });
-    var specFlying = new Donkeycraft.Flying(specPlayer, normalInput);
-    specFlying.setEnabled(true);
-    F.assert(specFlying.isEnabled(), 'Spectator can enable flying');
-
-    // tick — no crash
-    flying.tick(0.05);
-    F.assert(flyPlayer.isAlive(), 'Flying tick does not crash');
-
-    // Destroy
-    flying.destroy();
-    F.assertEq(flyPlayer.flyEnabled, false, 'Player flyEnabled cleared on destroy');
-
-    // ============================================================
-    // Section 5: HurtBox & Damage System
-    // ============================================================
-    F.section('5. HurtBox & Damage System');
-
-    var hurtPlayer = new Donkeycraft.Player();
-    var hurtBox = new Donkeycraft.HurtBox(hurtPlayer);
-    F.assertType(hurtBox, 'object', 'HurtBox instance created');
-
-    // Initial health
-    F.assertEq(hurtBox.getHealth(), 20, 'Initial health is 20');
-    F.assertEq(hurtBox.getMaxHealth(), 20, 'Max health is 20');
-
-    // takeDamage — basic
-    var dmg = hurtBox.takeDamage(5, 'generic');
-    F.assertEq(dmg, 5, 'Full damage dealt');
-    F.assertEq(hurtBox.getHealth(), 15, 'Health reduced to 15');
-
-    // takeDamage — creative mode (immune)
-    hurtPlayer.setGameMode('creative');
-    var creativeDmg = hurtBox.takeDamage(10, 'fire');
-    F.assertEq(creativeDmg, 0, 'Creative mode immune to damage');
-    F.assertEq(hurtBox.getHealth(), 15, 'Health unchanged in creative');
-
-    // takeDamage — already dead
-    hurtPlayer.setGameMode('survival');
-    hurtPlayer.setAlive(false);
-    hurtBox._health = 5;
-    var deadDmg = hurtBox.takeDamage(3, 'generic');
-    F.assertEq(deadDmg, 0, 'Dead player takes no damage');
-
-    // Absorption hearts — start fresh with full health
-    hurtPlayer.setAlive(true);
-    hurtBox._health = 20;
-    hurtBox.setAbsorption(5);
-    hurtBox.takeDamage(8, 'generic');
-    F.assertEq(hurtBox.getAbsorption(), 0, 'Absorption depleted first');
-    F.assertEq(hurtBox.getHealth(), 17, 'Health: 20 - 3 (8 dmg - 5 absorption) = 17');
-
-    // heal — basic
-    hurtBox.setAbsorption(0);
-    var healed = hurtBox.heal(5);
-    F.assertEq(healed, 3, 'Healed 5 HP (capped at max health)');
-    F.assertEq(hurtBox.getHealth(), 20, 'Health: 17 + 5 = 22, capped at 20 => 20');
-
-    // heal — over max (health already at 20)
-    healed = hurtBox.heal(10);
-    F.assertEq(healed, 0, 'No HP healed (already at max)');
-    F.assertEq(hurtBox.getHealth(), 20, 'Health still 20 (capped at max)');
-
-    // heal — from lower health with absorption
-    hurtBox._health = 10;
-    hurtBox.setAbsorption(3);
-    healed = hurtBox.heal(5);
-    F.assertEq(healed, 5, 'Healed 5 HP (10 + 5 = 15)');
-    F.assertEq(hurtBox.getHealth(), 15, 'Health is now 15');
-
-    // heal — dead player
-    hurtPlayer.setAlive(false);
-    healed = hurtBox.heal(5);
-    F.assertEq(healed, 0, 'Dead player cannot be healed');
-
-    // Fall damage calculation
-    hurtPlayer.setAlive(true);
-    hurtBox._health = 20;
-    var fallDmg = hurtBox.calculateFallDamage(4);
-    F.assertNear(fallDmg, 0.5, 0.01, 'Fall damage for 4 blocks: (4-3)*0.5 = 0.5');
-
-    fallDmg = hurtBox.calculateFallDamage(10);
-    F.assertNear(fallDmg, 3.5, 0.01, 'Fall damage for 10 blocks: (10-3)*0.5 = 3.5');
-
-    // No fall damage below threshold
-    fallDmg = hurtBox.calculateFallDamage(2);
-    F.assertEq(fallDmg, 0, 'No fall damage below threshold');
-
-    // applyFallDamage
-    hurtBox._health = 20;
-    hurtPlayer.maxFallDistance = 6;
-    var appliedDmg = hurtBox.applyFallDamage();
-    F.assertNear(appliedDmg, 1.5, 0.01, 'Applied fall damage for 6 blocks: (6-3)*0.5 = 1.5');
-    F.assertEq(hurtPlayer.maxFallDistance, 0, 'Fall distance reset after applying');
-
-    // getFallDistance
-    hurtPlayer.maxFallDistance = 8;
-    F.assertEq(hurtBox.getFallDistance(), 8, 'getFallDistance returns maxFallDistance');
-
-    // isCreative
-    F.assert(!hurtBox.isCreative(), 'Not in creative mode');
-    hurtPlayer.setGameMode('creative');
-    F.assert(hurtBox.isCreative(), 'Now in creative mode');
-
-    // getHurtBox (AABB)
-    var aabb2 = hurtBox.getHurtBox();
-    F.assertType(aabb2, 'object', 'getHurtBox returns AABB object');
-
-    // setOnFire / isOnFire
-    hurtPlayer.setGameMode('survival');
-    hurtBox.setOnFire(true);
-    F.assert(hurtBox.isOnFire(), 'Player is on fire');
-    hurtBox.setOnFire(false);
-    F.assert(!hurtBox.isOnFire(), 'Player extinguished');
-
-    // Death callback
-    var deathSource = null;
-    hurtBox.setOnDeath(function(source) { deathSource = source; });
-    hurtBox.setAbsorption(0); // clear leftover absorption from previous tests
-    hurtBox._health = 1;
-    hurtBox.takeDamage(1, 'lava');
-    F.assert(!hurtPlayer.isAlive(), 'Player dead after taking fatal damage');
-    F.assertEq(deathSource, 'lava', 'Death callback received source');
-
-    // Death event via EventBus (if available)
-
-    // reset
-    hurtBox.reset();
-    F.assertEq(hurtBox.getHealth(), 20, 'Health reset to max');
-    F.assertEq(hurtBox.getAbsorption(), 0, 'Absorption reset to 0');
-    F.assert(!hurtBox.isOnFire(), 'Fire cleared on reset');
-    F.assert(hurtPlayer.isAlive(), 'Player revived on reset');
-
-    // Destroy
-    hurtBox.destroy();
-    F.assert(hurtBox._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 6: Game Mode System
-    // ============================================================
-    F.section('6. Game Mode System');
-
-    var gmPlayer = new Donkeycraft.Player({ gameMode: 'survival' });
-    var gameMode = new Donkeycraft.GameMode(gmPlayer);
-    F.assertType(gameMode, 'object', 'GameMode instance created');
-
-    // getGameMode
-    F.assertEq(gameMode.getGameMode(), 'survival', 'Initial game mode is survival');
-
-    // Mode checks
-    F.assert(gameMode.isSurvival(), 'isSurvival returns true');
-    F.assert(!gameMode.isCreative(), 'isCreative returns false');
-    F.assert(!gameMode.isSpectator(), 'isSpectator returns false');
-
-    // Ability checks — survival
-    F.assert(gameMode.canTakeDamage(), 'Survival can take damage');
-    F.assert(gameMode.canPlaceBlocks(), 'Survival can place blocks');
-    F.assert(gameMode.canBreakBlocks(), 'Survival can break blocks');
-    F.assert(!gameMode.hasInfiniteItems(), 'Survival does not have infinite items');
-    F.assert(gameMode.canInteract(), 'Survival can interact');
-    F.assert(gameMode.canPickupItems(), 'Survival can pickup items');
-    F.assert(gameMode.isVulnerable(), 'Survival is vulnerable');
-
-    // Set creative mode
-    gameMode.setGameMode('creative');
-    F.assert(gameMode.isCreative(), 'isCreative returns true after switch');
-    F.assert(!gameMode.canTakeDamage(), 'Creative cannot take damage');
-    F.assert(gameMode.canPlaceBlocks(), 'Creative can place blocks');
-    F.assert(gameMode.hasInfiniteItems(), 'Creative has infinite items');
-
-    // Creative fly toggle
-    var flyToggled = gameMode.toggleCreativeFly();
-    F.assert(flyToggled, 'Creative fly toggled successfully');
-    F.assert(gameMode.isCreativeFlying(), 'Creative flying is now enabled');
-    F.assert(gmPlayer.flyEnabled, 'Player flyEnabled set to true');
-
-    flyToggled = gameMode.toggleCreativeFly();
-    F.assert(flyToggled, 'Creative fly toggled off');
-    F.assert(!gameMode.isCreativeFlying(), 'Creative flying is now disabled');
-
-    // toggleCreativeFly — survival (should fail)
-    gameMode.setGameMode('survival');
-    flyToggled = gameMode.toggleCreativeFly();
-    F.assert(!flyToggled, 'Cannot toggle fly in survival');
-
-    // enable/disableCreativeFly
-    gameMode.setGameMode('creative');
-    F.assert(gameMode.enableCreativeFly(), 'Creative fly enabled');
-    F.assert(gameMode.disableCreativeFly(), 'Creative fly disabled');
-
-    // Spectator mode
-    gameMode.setGameMode('spectator');
-    F.assert(gameMode.isSpectator(), 'isSpectator returns true');
-    F.assert(!gameMode.canPlaceBlocks(), 'Spectator cannot place blocks');
-    F.assert(!gameMode.canBreakBlocks(), 'Spectator cannot break blocks');
-    F.assert(!gameMode.canInteract(), 'Spectator cannot interact');
-    F.assert(!gameMode.canPickupItems(), 'Spectator cannot pickup items');
-
-    // Invalid mode — ignored
-    gameMode.setGameMode('invalid');
-    F.assertEq(gameMode.getGameMode(), 'spectator', 'Invalid mode ignored');
-
-    // getStackLimit
-    F.assertEq(gameMode.getStackLimit(), 64, 'Stack limit is 64');
-
-    // tick — no crash
-    gameMode.tick(0.05);
-
-    // onTick / unsubscribe
-    var tickCalled = false;
-    var unsub = gameMode.onTick(function(dt) { tickCalled = true; });
-    tickCalled = false;
-    gameMode.tick(0.05);
-    F.assert(tickCalled, 'Subscriber called on tick');
-    unsub();
-    tickCalled = false;
-    gameMode.tick(0.05);
-    F.assert(!tickCalled, 'Subscriber not called after unsubscribe');
-
-    // Destroy
-    gameMode.destroy();
-    F.assert(gameMode._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 7: Player Statistics
-    // ============================================================
-    F.section('7. Player Statistics');
-
-    var statsPlayer = new Donkeycraft.Player();
-    var stats = new Donkeycraft.PlayerStats(statsPlayer);
-    F.assertType(stats, 'object', 'PlayerStats instance created');
-
-    // Default values
-    F.assertEq(stats.getStat('distanceWalked'), 0, 'Initial distanceWalked is 0');
-    F.assertEq(stats.getStat('blockMine'), 0, 'Initial blockMine is 0');
-    F.assertEq(stats.getStat('deaths'), 0, 'Initial deaths is 0');
-
-    // increment
-    stats.increment('distanceWalked', 10.5);
-    F.assertEq(stats.getStat('distanceWalked'), 10.5, 'distanceWalked incremented to 10.5');
-
-    stats.increment('blockMine');
-    F.assertEq(stats.getStat('blockMine'), 1, 'blockMine incremented by 1');
-
-    // setStat
-    stats.setStat('deaths', 5);
-    F.assertEq(stats.getStat('deaths'), 5, 'deaths set to 5');
-
-    // getStat — unknown stat returns 0
-    F.assertEq(stats.getStat('unknownStat'), 0, 'Unknown stat returns 0');
-
-    // getAllStats
-    var all = stats.getAllStats();
-    F.assertType(all, 'object', 'getAllStats returns object');
-    F.assert(all.distanceWalked === 10.5, 'getAllStats includes distanceWalked');
-    F.assert(all.blockMine === 1, 'getAllStats includes blockMine');
-
-    // getStatsByPrefix
-    var distStats = stats.getStatsByPrefix('distance');
-    F.assertType(distStats, 'object', 'getStatsByPrefix returns object');
-    F.assert(distStats.distanceWalked === 10.5, 'Filtered by prefix works');
-
-    // recordDistance
-    stats.recordDistance(25.3, 'walked');
-    F.assertEq(stats.getStat('distanceWalked'), 35.8, 'recordDistance adds to distanceWalked');
-
-    stats.recordDistance(10, 'sprinted');
-    F.assertEq(stats.getStat('distanceSprinted'), 10, 'recordDistance adds to distanceSprinted');
-
-    // recordBlockMine
-    stats.increment('blockMine', -99); // Reset
-    stats.setStat('blockMine', 0);
-    stats.recordBlockMine(1);
-    F.assertEq(stats.getStat('blockMine'), 1, 'recordBlockMine increments blockMine');
-    F.assertEq(stats.getStat('blockBroken'), 1, 'recordBlockMine also increments blockBroken');
-
-    // recordBlockPlace
-    stats.recordBlockPlace(2);
-    F.assertEq(stats.getStat('blockPlaced'), 1, 'recordBlockPlace increments blockPlaced');
-
-    // recordDamageDealt / recordDamageTaken
-    stats.recordDamageDealt(7.5);
-    F.assertEq(stats.getStat('damageDealt'), 7.5, 'recordDamageDealt adds damage');
-    stats.recordDamageTaken(3, 'fall');
-    F.assertEq(stats.getStat('damageTaken'), 3, 'recordDamageTaken adds damage');
-
-    // recordEntityKill
-    stats.recordEntityKill('zombie');
-    F.assertEq(stats.getStat('mobsKilled'), 1, 'mobsKilled incremented');
-    // entityKilledBy is a nested object — access via getAllStats()
-    var allStats = stats.getAllStats();
-    F.assert(allStats.entityKilledBy && allStats.entityKilledBy.zombie === 1, 'entityKilledBy updated for zombie');
-
-    // recordDeath
-    stats.recordDeath('creeper');
-    F.assertEq(stats.getStat('deaths'), 6, 'deaths incremented');
-    F.assertEq(stats.getTimeSinceDeath(), 0, 'timeSinceDeath reset on death');
-
-    // tick — time tracking
-    stats.setStat('tickPlayed', 0);
-    stats.setStat('timePlayed', 0);
-    stats._timeAccumulator = 0;
-    stats.tick(2.5); // 2.5 seconds of game time
-    F.assertEq(stats.getStat('timePlayed'), 2, 'timePlayed advanced by 2 (floor)');
-    F.assert(stats.getStat('tickPlayed') >= 40, 'tickPlayed advanced (>= 2*20 ticks)');
-
-    // serialize / fromObject
-    var serialized = stats.serialize();
-    F.assertType(serialized, 'object', 'serialize returns object');
-    F.assert(serialized.stats !== undefined, 'serialize includes stats');
-
-    var stats2 = new Donkeycraft.PlayerStats(new Donkeycraft.Player());
-    stats2.fromObject(serialized);
-    F.assertEq(stats2.getStat('deaths'), 6, 'fromObject restores deaths');
-
-    // reset
-    stats.reset();
-    F.assertEq(stats.getStat('distanceWalked'), 0, 'distanceWalked reset');
-    F.assertEq(stats.getStat('deaths'), 0, 'deaths reset');
-    F.assertEq(stats.getTimeSinceDeath(), 0, 'timeSinceDeath reset');
-
-    // Destroy
-    stats.destroy();
-    F.assert(stats._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 8: Hunger System
-    // ============================================================
-    F.section('8. Hunger System');
-
-    var hungerPlayer = new Donkeycraft.Player();
-    var hunger = new Donkeycraft.Hunger(hungerPlayer);
-    F.assertType(hunger, 'object', 'Hunger instance created');
-
-    // Initial state
-    F.assertEq(hunger.getFoodLevel(), 20, 'Initial food level is 20');
-    F.assertNear(hunger.getSaturation(), 20.0, 0.01, 'Initial saturation is 20.0');
-    F.assert(!hunger.isStarving(), 'Not starving with full food');
-
-    // setFoodLevel
-    hunger.setFoodLevel(10);
-    F.assertEq(hunger.getFoodLevel(), 10, 'Food level set to 10');
-
-    // Food level clamping
-    hunger.setFoodLevel(-5);
-    F.assertEq(hunger.getFoodLevel(), 0, 'Food level clamped to 0');
-    hunger.setFoodLevel(30);
-    F.assertEq(hunger.getFoodLevel(), 20, 'Food level clamped to 20');
-
-    // setSaturation
-    hunger.setSaturation(15.5);
-    F.assertNear(hunger.getSaturation(), 15.5, 0.01, 'Saturation set to 15.5');
-
-    // isStarving
-    hunger.setFoodLevel(0);
-    F.assert(hunger.isStarving(), 'Starving when food level is 0');
-    hunger.setFoodLevel(1);
-    F.assert(!hunger.isStarving(), 'Not starving when food > 0');
-
-    // consumeFood — basic
-    hunger.setFoodLevel(10);
-    hunger.setSaturation(0);
-    var restored = hunger.consumeFood(3, 0.6);
-    F.assertEq(restored, 3, 'Consumed 3 food points');
-    F.assertEq(hunger.getFoodLevel(), 13, 'Food level is now 13');
-
-    // consumeFood — clamped at max
-    hunger.setFoodLevel(19);
-    restored = hunger.consumeFood(5, 0.6);
-    F.assertEq(restored, 1, 'Only 1 food point restored (capped at 20)');
-    F.assertEq(hunger.getFoodLevel(), 20, 'Food level capped at 20');
-
-    // consumeFood — saturation
-    hunger.setSaturation(0);
-    hunger.setFoodLevel(15);
-    hunger.consumeFood(4, 0.5);
-    F.assertNear(hunger.getSaturation(), 2.0, 0.01, 'Saturation gained = 4 * 0.5');
-
-    // hasFood
-    F.assert(hunger.hasFood(), 'Has food when level > 0');
-    hunger.setFoodLevel(0);
-    F.assert(!hunger.hasFood(), 'No food when level = 0');
-
-    // getSaturationFraction
-    hunger.setFoodLevel(20);
-    hunger.setSaturation(20);
-    F.assertNear(hunger.getSaturationFraction(), 0.5, 0.01, 'Saturation fraction at half max');
-
-    // applySprintDegradation — 1 block sprinted = ~0.4 degradation, so need 5+ blocks for 1 food drain
-    hunger.setFoodLevel(20);
-    hunger.setSaturation(0); // No saturation, directly drain food
-    hunger.applySprintDegradation(10); // ~4 degradation
-    F.assert(hunger.getFoodLevel() < 20, 'Sprint depletes food (was ' + 20 + ', now ' + hunger.getFoodLevel() + ')');
-
-    // applyWalkDegradation
-    hunger.setFoodLevel(20);
-    hunger.applyWalkDegradation(32); // ~4 degradation
-    F.assert(hunger.getFoodLevel() < 20, 'Walking depletes food');
-
-    // tick — creative mode (full food)
-    hungerPlayer.setGameMode('creative');
-    hunger.tick(1.0);
-    F.assertEq(hunger.getFoodLevel(), 20, 'Creative mode: food stays at 20');
-
-    // tick — starvation (with mock HurtBox)
-    hungerPlayer.setGameMode('survival');
-    hunger.setFoodLevel(0);
-    hunger.setSaturation(0);
-
-    // Create a minimal mock HurtBox for starvation test
-    var mockHurtBox = {
-        getHealth: function() { return 4; },
-        getMaxHealth: function() { return 20; },
-        takeDamage: function(amount, source) { this._lastDmg = { amount: amount, source: source }; }
-    };
-    hunger.setHurtBox(mockHurtBox);
-
-    // Simulate 4 seconds (starvation threshold)
-    hunger.tick(4.0);
-    F.assert(mockHurtBox._lastDmg !== undefined, 'Starvation damage dealt after 4 seconds');
-    F.assertEq(mockHurtBox._lastDmg.amount, 1, 'Starvation deals 1 HP');
-    F.assertEq(mockHurtBox._lastDmg.source, 'starvation', 'Damage source is starvation');
-
-    // tick — reset timer when food available
-    hunger.setFoodLevel(5);
-    mockHurtBox._lastDmg = null;
-    hunger.tick(10.0); // 10 seconds with food = timer resets, no damage
-    F.assert(mockHurtBox._lastDmg === null, 'No starvation damage when food available');
-
-    // reset
-    hunger.reset();
-    F.assertEq(hunger.getFoodLevel(), 20, 'Food reset to 20');
-    F.assertNear(hunger.getSaturation(), 20.0, 0.01, 'Saturation reset to 20');
-
-    // Destroy
-    hunger.destroy();
-    F.assert(hunger._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 9: Experience System
-    // ============================================================
-    F.section('9. Experience System');
-
-    var xpPlayer = new Donkeycraft.Player();
-    var exp = new Donkeycraft.Experience(xpPlayer);
-    F.assertType(exp, 'object', 'Experience instance created');
-
-    // Initial state
-    F.assertEq(exp.getLevel(), 0, 'Initial level is 0');
-    F.assertEq(exp.getPoints(), 0, 'Initial points are 0');
-    F.assertEq(exp.getTotalXP(), 0, 'Total XP starts at 0');
-
-    // setLevel / setPoints
-    exp.setLevel(5);
-    F.assertEq(exp.getLevel(), 5, 'Level set to 5');
-    exp.setPoints(10);
-    F.assertEq(exp.getPoints(), 10, 'Points set to 10');
-
-    // Level clamping
-    exp.setLevel(-3);
-    F.assertEq(exp.getLevel(), 0, 'Level clamped to 0');
-    exp.setPoints(-5);
-    F.assertEq(exp.getPoints(), 0, 'Points clamped to 0');
-
-    // getLevelThreshold — level 0: 7 points
-    exp.setLevel(0);
-    F.assertEq(exp.getLevelThreshold(), 7, 'Level 0 threshold is 7');
-
-    // getLevelThreshold — level 16: 39 points
-    exp.setLevel(16);
-    F.assertEq(exp.getLevelThreshold(), 39, 'Level 16 threshold is 39');
-
-    // getLevelThreshold — level 17: 40 points
-    exp.setLevel(17);
-    F.assertEq(exp.getLevelThreshold(), 40, 'Level 17 threshold is 40');
-
-    // getProgressToNextLevel
-    exp.setLevel(0);
-    exp.setPoints(0);
-    F.assertEq(exp.getProgressToNextLevel(), 0, 'Progress is 0 at 0 points');
-    exp.setPoints(7);
-    F.assertEq(exp.getProgressToNextLevel(), 1, 'Progress is 1 at full threshold');
-
-    // addXP — basic
-    exp.setLevel(0);
-    exp.setPoints(0);
-    exp.addXP(5);
-    F.assertEq(exp.getPoints(), 5, 'Added 5 points');
-    F.assertEq(exp.getLevel(), 0, 'Still level 0');
-    F.assertEq(exp.getTotalXP(), 5, 'Total XP is 5');
-
-    // addXP — level up
-    exp.addXP(3); // 5 + 3 = 8 >= 7 threshold
-    F.assertEq(exp.getLevel(), 1, 'Level up to 1');
-    F.assertEq(exp.getPoints(), 1, '1 point remaining (8 - 7)');
-
-    // addXP — multiple level ups
-    var exp3 = new Donkeycraft.Experience(new Donkeycraft.Player());
-    exp3.setLevel(0);
-    exp3.setPoints(0);
-    exp3.addXP(50);
-    F.assert(exp3.getLevel() > 1, 'Multiple level ups occurred');
-    F.assertEq(exp3.getTotalXP(), 50, 'Total XP is 50');
-
-    // getTotalXPValue — should match cumulative cost + points
-    var totalVal = exp3.getTotalXPValue();
-    F.assert(totalVal > 0, 'Total XP value is positive');
-    F.assert(totalVal >= 50, 'Total XP value >= raw XP (includes level costs)');
-
-    // spendXP — basic
-    var exp4 = new Donkeycraft.Experience(new Donkeycraft.Player());
-    exp4.setLevel(0);
-    exp4.setPoints(10);
-    var spent = exp4.spendXP(5);
-    F.assert(spent, 'XP spent successfully');
-    F.assertEq(exp4.getPoints(), 5, 'Points reduced to 5');
-
-    // spendXP — not enough points
-    spent = exp4.spendXP(100);
-    F.assert(!spent, 'Cannot spend more than available');
-    F.assertEq(exp4.getPoints(), 5, 'Points unchanged');
-
-    // pickupOrb — fresh instance
-    var exp5 = new Donkeycraft.Experience(new Donkeycraft.Player());
-    exp5.setLevel(0);
-    exp5.setPoints(0);
-    exp5.pickupOrb(10);
-    F.assertEq(exp5.getTotalXP(), 10, 'Total XP increased by orb value (10)');
-
-    // setLevelToZero
-    exp.setLevelToZero(10);
-    F.assertEq(exp.getLevel(), 10, 'Level set to 10');
-    F.assertEq(exp.getPoints(), 0, 'Points set to 0');
-
-    // serialize / fromObject
-    var xpData = exp.serialize();
-    F.assertType(xpData, 'object', 'serialize returns object');
-    F.assert(xpData.level !== undefined, 'serialize includes level');
-
-    var exp2 = new Donkeycraft.Experience(new Donkeycraft.Player());
-    exp2.fromObject(xpData);
-    F.assertEq(exp2.getLevel(), xpData.level, 'fromObject restores level');
-    F.assertEq(exp2.getPoints(), xpData.points, 'fromObject restores points');
-
-    // reset
-    exp.reset();
-    F.assertEq(exp.getLevel(), 0, 'Level reset to 0');
-    F.assertEq(exp.getPoints(), 0, 'Points reset to 0');
-    F.assertEq(exp.getTotalXP(), 0, 'Total XP reset to 0');
-
-    // Destroy
-    exp.destroy();
-    F.assert(exp._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Section 10: Movement Physics (with mocks)
-    // ============================================================
-    F.section('10. Movement Physics');
-
-    var movePlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0 });
-    var moveForwardKey = Donkeycraft.Config.KEYBINDS.MOVE_FORWARD;
-    var jumpKey = Donkeycraft.Config.KEYBINDS.JUMP;
-    var moveInput = createMockInput({
-        [moveForwardKey]: true,
-        [jumpKey]: false
-    });
-    var moveCollision = new Donkeycraft.Collision(createMockChunkManager());
-
-    // Movement requires a chunk manager with block data for full testing.
-    // We test that the constructor and basic methods work with mocks.
-    var movement = new Donkeycraft.Movement(moveInput, movePlayer, moveCollision, createMockChunkManager());
-    F.assertType(movement, 'object', 'Movement instance created');
-
-    // tick — dead player
-    var deadMovePlayer = new Donkeycraft.Player();
-    var deadMovement = new Donkeycraft.Movement(
-        createMockInput({}),
-        deadMovePlayer,
-        new Donkeycraft.Collision(createMockChunkManager()),
-        createMockChunkManager()
-    );
-    deadMovePlayer.setAlive(false);
-    deadMovement.tick(0.05);
-    F.assert(!deadMovePlayer.isAlive(), 'Dead player tick does not crash');
-
-    // getHorizontalSpeed — survival walking
-    F.assertEq(movement.getHorizontalSpeed(), Donkeycraft.Config.PLAYER_SPEED, 'Base walking speed = PLAYER_SPEED');
-
-    // getGameMode / setGameMode
-    F.assertEq(movement.getGameMode(), 'survival', 'Game mode is survival');
-    movement.setGameMode('creative');
-    F.assertEq(movement.getGameMode(), 'creative', 'Game mode changed to creative');
-
-    // Destroy
-    movement.destroy();
-    F.assert(movement._player === null, 'Player nullified after destroy');
-
-    // ============================================================
-    // Finish: render summary
-    // ============================================================
-    F.finishTests();
-
-})();
-</script>
+
+            // ============================================================
+            // Section 1: Player Entity
+            // ============================================================
+            F.section('1. Player Entity');
+
+            // Constructor
+            var player = new Donkeycraft.Player({ x: 100, y: 64, z: -50, gameMode: 'survival' });
+            F.assertType(player, 'object', 'Player instance created');
+            F.assertEq(player.gameMode, 'survival', 'Default game mode is survival');
+
+            // Position
+            var pos = player.getPosition();
+            F.assertType(pos, 'object', 'getPosition returns Vector3');
+            F.assertEq(pos.x, 100, 'Initial X position is 100');
+            F.assertEq(pos.y, 64, 'Initial Y position is 64');
+            F.assertEq(pos.z, -50, 'Initial Z position is -50');
+
+            // Default Y position uses WORLD_HEIGHT / 2
+            var defaultPlayer = new Donkeycraft.Player();
+            F.assertEq(defaultPlayer.getPosition().y, Donkeycraft.Config.WORLD_HEIGHT / 2, 'Default Y = WORLD_HEIGHT / 2');
+
+            // Velocity
+            player.setVelocity(3.5, -5.0, 2.0);
+            var vel = player.getVelocity();
+            F.assertEq(vel.x, 3.5, 'X velocity set to 3.5');
+            F.assertEq(vel.y, -5.0, 'Y velocity set to -5.0');
+            F.assertEq(vel.z, 2.0, 'Z velocity set to 2.0');
+
+            // Rotation
+            player.setRotation(Math.PI, -Math.PI / 4);
+            var rot = player.getRotation();
+            F.assertNear(rot.yaw, Math.PI, 0.001, 'Yaw set to π radians');
+            F.assertNear(rot.pitch, -Math.PI / 4, 0.001, 'Pitch set to -π/4 radians');
+
+            // Yaw normalization
+            player.setRotation(-Math.PI * 3, 0);
+            F.assertNear(player.getRotation().yaw, Math.PI, 0.001, 'Negative yaw normalized to [0, 2π)');
+
+            // Pitch clamping
+            player.setRotation(0, Math.PI);
+            F.assertNear(player.getRotation().pitch, Math.PI / 2, 0.001, 'Pitch clamped to π/2');
+
+            // Dimensions
+            var dims = player.getDimensions();
+            F.assertEq(dims.height, Donkeycraft.Config.PLAYER_HEIGHT, 'Height matches config');
+            F.assertEq(dims.width, Donkeycraft.Config.PLAYER_WIDTH, 'Width matches config');
+
+            // AABB (HurtBox)
+            var aabb = player.getHurtBox();
+            F.assertNear(aabb.minX, 99.7, 0.01, 'AABB minX = x - width/2');
+            F.assertNear(aabb.maxX, 100.3, 0.01, 'AABB maxX = x + width/2');
+            F.assertEq(aabb.minY, 64, 'AABB minY = y');
+            F.assertNear(aabb.maxY, 65.8, 0.01, 'AABB maxY = y + height');
+
+            // Eye position
+            var eyePos = player.getEyePosition();
+            F.assertEq(eyePos.x, 100, 'Eye X matches player X');
+            F.assertNear(eyePos.y, 65.62, 0.01, 'Eye Y = player Y + PLAYER_EYE_HEIGHT');
+
+            // Direction vectors
+            player.setRotation(0, 0);
+            var fwd = player.getForwardDirection();
+            F.assertNear(fwd.x, 0, 0.01, 'Forward X at yaw=0 is 0');
+            F.assertNear(fwd.z, -1, 0.01, 'Forward Z at yaw=0 is -1');
+
+            var right = player.getRightDirection();
+            F.assertNear(right.x, -1, 0.01, 'Right X at yaw=0 is -1');
+            F.assertNear(right.z, 0, 0.01, 'Right Z at yaw=0 is 0');
+
+            // Game mode
+            player.setGameMode('creative');
+            F.assertEq(player.getGameMode(), 'creative', 'Game mode changed to creative');
+            player.setGameMode('spectator');
+            F.assertEq(player.getGameMode(), 'spectator', 'Game mode changed to spectator');
+            player.setGameMode('invalid');
+            F.assertEq(player.getGameMode(), 'spectator', 'Invalid game mode ignored');
+
+            // Switching to survival disables flying
+            player.setGameMode('survival');
+            F.assertEq(player.flyEnabled, false, 'Flying disabled when switching to survival');
+
+            // Alive / Dead
+            F.assert(player.isAlive(), 'Player starts alive');
+            player.setAlive(false);
+            F.assert(!player.isAlive(), 'Player is dead after setAlive(false)');
+            player.setAlive(true);
+            F.assert(player.isAlive(), 'Player is alive after setAlive(true)');
+
+            // Knockback
+            var kbDir = new Donkeycraft.Vector3(1, 0, 0);
+            player.applyKnockback(kbDir, 5.0, 2.0);
+            var kb = player.getKnockback();
+            F.assertEq(kb.x, 5.0, 'Knockback X set to 5.0');
+            F.assertEq(kb.y, 2.0, 'Knockback Y (upward) set to 2.0');
+            F.assertEq(kb.z, 0, 'Knockback Z is 0 for pure X direction');
+            player.clearKnockback();
+            F.assert(player.getKnockback().isZero(), 'Knockback cleared');
+
+            // Fall distance tracking
+            player.maxFallDistance = 0;
+            player.trackFallDistance(2.5);
+            F.assertEq(player.maxFallDistance, 2.5, 'Fall distance accumulated: 2.5');
+            player.trackFallDistance(1.3);
+            F.assertEq(player.maxFallDistance, 3.8, 'Fall distance accumulated: 3.8');
+            player.onGround = true;
+            player.trackFallDistance(0);
+            F.assertEq(player.maxFallDistance, 0, 'Fall distance reset on ground');
+
+            // getFallDistance
+            player.maxFallDistance = 10;
+            F.assertEq(player.getFallDistance(), 10, 'getFallDistance returns maxFallDistance');
+
+            // Destroy — no error thrown
+            player.destroy();
+            F.assert(true, 'Player.destroy() completes without error');
+
+            // ============================================================
+            // Section 2: Collision Detection
+            // ============================================================
+            F.section('2. Collision Detection');
+
+            var mockChunkMgr = createMockChunkManager();
+            var collision = new Donkeycraft.Collision(mockChunkMgr);
+            F.assertType(collision, 'object', 'Collision instance created');
+
+            // isBlockSolid — no chunks loaded = no solid blocks
+            F.assert(!collision.isBlockSolid(0, 64, 0), 'No solid blocks when no chunks loaded');
+
+            // isBlockReplaceable — no chunks = replaceable
+            F.assert(collision.isBlockReplaceable(0, 64, 0), 'Blocks are replaceable when no chunks loaded');
+
+            // isBlockLiquid — no chunks = not liquid
+            F.assert(!collision.isBlockLiquid(0, 64, 0), 'No liquid blocks when no chunks loaded');
+
+            // Below world = solid bedrock
+            F.assert(collision.isBlockSolid(0, -1, 0), 'Below world (Y=-1) is solid bedrock');
+
+            // Above world = not solid
+            F.assert(!collision.isBlockSolid(0, Donkeycraft.Config.WORLD_HEIGHT, 0), 'Above world is not solid');
+
+            // getOverlappingBlocks — no chunks = empty array
+            var blocks = collision.getOverlappingBlocks(0, 0, 0, 10, 10, 10);
+            F.assertArrEq(blocks, [], 'No overlapping blocks when no chunks loaded');
+
+            // _checkAABBAgainstBlocks — no chunks = no collision
+            F.assert(!collision._checkAABBAgainstBlocks(0, 0, 0, 10, 10, 10), 'No AABB collision with no chunks');
+
+            // checkMovement — empty space allows full movement
+            var testPos = new Donkeycraft.Vector3(0, 64, 0);
+            var result = collision.checkMovement(testPos, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT, 5, -10, 3);
+            F.assert(!result.collisionX, 'No X collision in empty space');
+            F.assert(!result.collisionY, 'No Y collision in empty space');
+            F.assert(!result.collisionZ, 'No Z collision in empty space');
+
+            // resolveMovement — empty space allows full movement
+            var vel = new Donkeycraft.Vector3(5, -10, 3);
+            var moveResult = collision.resolveMovement(testPos, vel, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT);
+            F.assertNear(moveResult.newX, 5, 0.01, 'X position updated after resolveMovement');
+            F.assertNear(moveResult.newY, 54, 0.01, 'Y position updated after resolveMovement');
+            F.assertNear(moveResult.newZ, 3, 0.01, 'Z position updated after resolveMovement');
+            F.assert(!moveResult.onGround, 'Not on ground in empty space');
+
+            // checkEntityCollision — no entities = null
+            var entityResult = collision.checkEntityCollision(testPos, Donkeycraft.Config.PLAYER_WIDTH, Donkeycraft.Config.PLAYER_HEIGHT, []);
+            F.assert(entityResult === null, 'No entity collision with empty entity list');
+
+            // getChunkManager
+            F.assert(collision.getChunkManager() === mockChunkMgr, 'getChunkManager returns the chunk manager');
+
+            // Destroy
+            collision.destroy();
+            F.assert(collision.getChunkManager() === null, 'Chunk manager nullified after destroy');
+
+            // ============================================================
+            // Section 3: Jump Mechanics
+            // ============================================================
+            F.section('3. Jump Mechanics');
+
+            var jumpPlayer = new Donkeycraft.Player();
+            var mockInput = createMockInput({});
+            var mockCollision = new Donkeycraft.Collision(createMockChunkManager());
+            var jumping = new Donkeycraft.Jumping(jumpPlayer, mockInput, mockCollision);
+            F.assertType(jumping, 'object', 'Jumping instance created');
+
+            // canJump — on ground and no cooldown
+            jumpPlayer.onGround = true;
+            F.assert(jumping.canJump(), 'Can jump when on ground');
+
+            // canJump — not on ground
+            jumpPlayer.onGround = false;
+            F.assert(!jumping.canJump(), 'Cannot jump when not on ground');
+
+            // performJump — on ground
+            jumpPlayer.onGround = true;
+            var jumped = jumping.performJump();
+            F.assert(jumped, 'Jump performed successfully');
+            F.assertNear(jumpPlayer.getVelocity().y, Donkeycraft.Config.PLAYER_JUMP_FORCE, 0.001, 'Vertical velocity set to JUMP_FORCE');
+
+            // Jump cooldown
+            F.assert(jumping.getCooldown() > 0, 'Jump cooldown started');
+            F.assert(!jumping.canJump(), 'Cannot jump during cooldown');
+
+            // performJump — not on ground
+            jumpPlayer.onGround = false;
+            var failedJump = jumping.performJump();
+            F.assert(!failedJump, 'Jump failed when not on ground');
+
+            // getJumpForce
+            F.assertEq(jumping.getJumpForce(), Donkeycraft.Config.PLAYER_JUMP_FORCE, 'getJumpForce returns config value');
+
+            // isSwimmingUp — no water
+            F.assert(!jumping.isSwimmingUp(), 'Not swimming in empty space');
+
+            // tick — dead player cannot jump
+            var deadPlayer = new Donkeycraft.Player();
+            var deadJumping = new Donkeycraft.Jumping(deadPlayer, mockInput, mockCollision);
+            deadPlayer.setAlive(false);
+            deadJumping.tick(0.05);
+            F.assert(!deadPlayer.isAlive(), 'Dead player state unchanged');
+
+            // Destroy
+            jumping.destroy();
+            F.assert(jumping._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 4: Flying System
+            // ============================================================
+            F.section('4. Flying System');
+
+            var flyPlayer = new Donkeycraft.Player({ gameMode: 'creative' });
+            var flyInput = createMockInput({});
+            var flying = new Donkeycraft.Flying(flyPlayer, flyInput);
+            F.assertType(flying, 'object', 'Flying instance created');
+
+            // Initial state
+            F.assert(!flying.isEnabled(), 'Flying disabled by default');
+            F.assert(!flying.isFlying(), 'isFlying returns false initially');
+
+            // enableFlyMode — creative
+            var enabled = flying.enableFlyMode();
+            F.assert(enabled, 'Fly mode enabled for creative');
+            F.assert(flying.isEnabled(), 'isEnabled returns true after enable');
+            F.assertEq(flyPlayer.flyEnabled, true, 'Player flyEnabled set to true');
+
+            // disableFlyMode
+            var disabled = flying.disableFlyMode();
+            F.assert(disabled, 'Fly mode disabled');
+            F.assert(!flying.isEnabled(), 'isEnabled returns false after disable');
+
+            // toggleFlyMode
+            flying.toggleFlyMode();
+            F.assert(flying.isEnabled(), 'Toggle enabled fly mode');
+            flying.toggleFlyMode();
+            F.assert(!flying.isEnabled(), 'Toggle disabled fly mode');
+
+            // getFlySpeed — sprinting
+            var sprintKey = Donkeycraft.Config.KEYBINDS.SPRINT;
+            var sprintInput = createMockInput({ [sprintKey]: true });
+            var sprintFlying = new Donkeycraft.Flying(flyPlayer, sprintInput);
+            F.assertEq(sprintFlying.getFlySpeed(), Donkeycraft.Config.PLAYER_FLY_SPEED_BOOST, 'Sprint fly speed = PLAYER_FLY_SPEED_BOOST');
+
+            var normalInput = createMockInput({});
+            var normalFlying = new Donkeycraft.Flying(flyPlayer, normalInput);
+            F.assertEq(normalFlying.getFlySpeed(), Donkeycraft.Config.PLAYER_FLY_SPEED, 'Normal fly speed = PLAYER_FLY_SPEED');
+
+            // canSpectate — creative mode
+            F.assert(!flying.canSpectate(), 'Creative mode cannot spectate');
+
+            // shouldClipThroughBlocks — creative mode
+            F.assert(!flying.shouldClipThroughBlocks(), 'Creative mode does not clip through blocks');
+
+            // setEnabled — survival mode (should not allow)
+            var survPlayer = new Donkeycraft.Player({ gameMode: 'survival' });
+            var survFlying = new Donkeycraft.Flying(survPlayer, normalInput);
+            survFlying.setEnabled(true);
+            F.assert(!survFlying.isEnabled(), 'Survival cannot enable flying');
+
+            // setEnabled — spectator mode
+            var specPlayer = new Donkeycraft.Player({ gameMode: 'spectator' });
+            var specFlying = new Donkeycraft.Flying(specPlayer, normalInput);
+            specFlying.setEnabled(true);
+            F.assert(specFlying.isEnabled(), 'Spectator can enable flying');
+
+            // tick — no crash
+            flying.tick(0.05);
+            F.assert(flyPlayer.isAlive(), 'Flying tick does not crash');
+
+            // Destroy
+            flying.destroy();
+            F.assertEq(flyPlayer.flyEnabled, false, 'Player flyEnabled cleared on destroy');
+
+            // ============================================================
+            // Section 5: HurtBox & Damage System
+            // ============================================================
+            F.section('5. HurtBox & Damage System');
+
+            var hurtPlayer = new Donkeycraft.Player();
+            var hurtBox = new Donkeycraft.HurtBox(hurtPlayer);
+            F.assertType(hurtBox, 'object', 'HurtBox instance created');
+
+            // Initial health
+            F.assertEq(hurtBox.getHealth(), 20, 'Initial health is 20');
+            F.assertEq(hurtBox.getMaxHealth(), 20, 'Max health is 20');
+
+            // takeDamage — basic
+            var dmg = hurtBox.takeDamage(5, 'generic');
+            F.assertEq(dmg, 5, 'Full damage dealt');
+            F.assertEq(hurtBox.getHealth(), 15, 'Health reduced to 15');
+
+            // takeDamage — creative mode (immune)
+            hurtPlayer.setGameMode('creative');
+            var creativeDmg = hurtBox.takeDamage(10, 'fire');
+            F.assertEq(creativeDmg, 0, 'Creative mode immune to damage');
+            F.assertEq(hurtBox.getHealth(), 15, 'Health unchanged in creative');
+
+            // takeDamage — already dead
+            hurtPlayer.setGameMode('survival');
+            hurtPlayer.setAlive(false);
+            hurtBox._health = 5;
+            var deadDmg = hurtBox.takeDamage(3, 'generic');
+            F.assertEq(deadDmg, 0, 'Dead player takes no damage');
+
+            // Absorption hearts — start fresh with full health
+            hurtPlayer.setAlive(true);
+            hurtBox._health = 20;
+            hurtBox.setAbsorption(5);
+            hurtBox.takeDamage(8, 'generic');
+            F.assertEq(hurtBox.getAbsorption(), 0, 'Absorption depleted first');
+            F.assertEq(hurtBox.getHealth(), 17, 'Health: 20 - 3 (8 dmg - 5 absorption) = 17');
+
+            // heal — basic
+            hurtBox.setAbsorption(0);
+            var healed = hurtBox.heal(5);
+            F.assertEq(healed, 3, 'Healed 5 HP (capped at max health)');
+            F.assertEq(hurtBox.getHealth(), 20, 'Health: 17 + 5 = 22, capped at 20 => 20');
+
+            // heal — over max (health already at 20)
+            healed = hurtBox.heal(10);
+            F.assertEq(healed, 0, 'No HP healed (already at max)');
+            F.assertEq(hurtBox.getHealth(), 20, 'Health still 20 (capped at max)');
+
+            // heal — from lower health with absorption
+            hurtBox._health = 10;
+            hurtBox.setAbsorption(3);
+            healed = hurtBox.heal(5);
+            F.assertEq(healed, 5, 'Healed 5 HP (10 + 5 = 15)');
+            F.assertEq(hurtBox.getHealth(), 15, 'Health is now 15');
+
+            // heal — dead player
+            hurtPlayer.setAlive(false);
+            healed = hurtBox.heal(5);
+            F.assertEq(healed, 0, 'Dead player cannot be healed');
+
+            // Fall damage calculation
+            hurtPlayer.setAlive(true);
+            hurtBox._health = 20;
+            var fallDmg = hurtBox.calculateFallDamage(4);
+            F.assertNear(fallDmg, 0.5, 0.01, 'Fall damage for 4 blocks: (4-3)*0.5 = 0.5');
+
+            fallDmg = hurtBox.calculateFallDamage(10);
+            F.assertNear(fallDmg, 3.5, 0.01, 'Fall damage for 10 blocks: (10-3)*0.5 = 3.5');
+
+            // No fall damage below threshold
+            fallDmg = hurtBox.calculateFallDamage(2);
+            F.assertEq(fallDmg, 0, 'No fall damage below threshold');
+
+            // applyFallDamage
+            hurtBox._health = 20;
+            hurtPlayer.maxFallDistance = 6;
+            var appliedDmg = hurtBox.applyFallDamage();
+            F.assertNear(appliedDmg, 1.5, 0.01, 'Applied fall damage for 6 blocks: (6-3)*0.5 = 1.5');
+            F.assertEq(hurtPlayer.maxFallDistance, 0, 'Fall distance reset after applying');
+
+            // getFallDistance
+            hurtPlayer.maxFallDistance = 8;
+            F.assertEq(hurtBox.getFallDistance(), 8, 'getFallDistance returns maxFallDistance');
+
+            // isCreative
+            F.assert(!hurtBox.isCreative(), 'Not in creative mode');
+            hurtPlayer.setGameMode('creative');
+            F.assert(hurtBox.isCreative(), 'Now in creative mode');
+
+            // getHurtBox (AABB)
+            var aabb2 = hurtBox.getHurtBox();
+            F.assertType(aabb2, 'object', 'getHurtBox returns AABB object');
+
+            // setOnFire / isOnFire
+            hurtPlayer.setGameMode('survival');
+            hurtBox.setOnFire(true);
+            F.assert(hurtBox.isOnFire(), 'Player is on fire');
+            hurtBox.setOnFire(false);
+            F.assert(!hurtBox.isOnFire(), 'Player extinguished');
+
+            // Death callback
+            var deathSource = null;
+            hurtBox.setOnDeath(function (source) { deathSource = source; });
+            hurtBox.setAbsorption(0); // clear leftover absorption from previous tests
+            hurtBox._health = 1;
+            hurtBox.takeDamage(1, 'lava');
+            F.assert(!hurtPlayer.isAlive(), 'Player dead after taking fatal damage');
+            F.assertEq(deathSource, 'lava', 'Death callback received source');
+
+            // Death event via EventBus (if available)
+
+            // reset
+            hurtBox.reset();
+            F.assertEq(hurtBox.getHealth(), 20, 'Health reset to max');
+            F.assertEq(hurtBox.getAbsorption(), 0, 'Absorption reset to 0');
+            F.assert(!hurtBox.isOnFire(), 'Fire cleared on reset');
+            F.assert(hurtPlayer.isAlive(), 'Player revived on reset');
+
+            // Destroy
+            hurtBox.destroy();
+            F.assert(hurtBox._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 6: Game Mode System
+            // ============================================================
+            F.section('6. Game Mode System');
+
+            var gmPlayer = new Donkeycraft.Player({ gameMode: 'survival' });
+            var gameMode = new Donkeycraft.GameMode(gmPlayer);
+            F.assertType(gameMode, 'object', 'GameMode instance created');
+
+            // getGameMode
+            F.assertEq(gameMode.getGameMode(), 'survival', 'Initial game mode is survival');
+
+            // Mode checks
+            F.assert(gameMode.isSurvival(), 'isSurvival returns true');
+            F.assert(!gameMode.isCreative(), 'isCreative returns false');
+            F.assert(!gameMode.isSpectator(), 'isSpectator returns false');
+
+            // Ability checks — survival
+            F.assert(gameMode.canTakeDamage(), 'Survival can take damage');
+            F.assert(gameMode.canPlaceBlocks(), 'Survival can place blocks');
+            F.assert(gameMode.canBreakBlocks(), 'Survival can break blocks');
+            F.assert(!gameMode.hasInfiniteItems(), 'Survival does not have infinite items');
+            F.assert(gameMode.canInteract(), 'Survival can interact');
+            F.assert(gameMode.canPickupItems(), 'Survival can pickup items');
+            F.assert(gameMode.isVulnerable(), 'Survival is vulnerable');
+
+            // Set creative mode
+            gameMode.setGameMode('creative');
+            F.assert(gameMode.isCreative(), 'isCreative returns true after switch');
+            F.assert(!gameMode.canTakeDamage(), 'Creative cannot take damage');
+            F.assert(gameMode.canPlaceBlocks(), 'Creative can place blocks');
+            F.assert(gameMode.hasInfiniteItems(), 'Creative has infinite items');
+
+            // Creative fly toggle
+            var flyToggled = gameMode.toggleCreativeFly();
+            F.assert(flyToggled, 'Creative fly toggled successfully');
+            F.assert(gameMode.isCreativeFlying(), 'Creative flying is now enabled');
+            F.assert(gmPlayer.flyEnabled, 'Player flyEnabled set to true');
+
+            flyToggled = gameMode.toggleCreativeFly();
+            F.assert(flyToggled, 'Creative fly toggled off');
+            F.assert(!gameMode.isCreativeFlying(), 'Creative flying is now disabled');
+
+            // toggleCreativeFly — survival (should fail)
+            gameMode.setGameMode('survival');
+            flyToggled = gameMode.toggleCreativeFly();
+            F.assert(!flyToggled, 'Cannot toggle fly in survival');
+
+            // enable/disableCreativeFly
+            gameMode.setGameMode('creative');
+            F.assert(gameMode.enableCreativeFly(), 'Creative fly enabled');
+            F.assert(gameMode.disableCreativeFly(), 'Creative fly disabled');
+
+            // Spectator mode
+            gameMode.setGameMode('spectator');
+            F.assert(gameMode.isSpectator(), 'isSpectator returns true');
+            F.assert(!gameMode.canPlaceBlocks(), 'Spectator cannot place blocks');
+            F.assert(!gameMode.canBreakBlocks(), 'Spectator cannot break blocks');
+            F.assert(!gameMode.canInteract(), 'Spectator cannot interact');
+            F.assert(!gameMode.canPickupItems(), 'Spectator cannot pickup items');
+
+            // Invalid mode — ignored
+            gameMode.setGameMode('invalid');
+            F.assertEq(gameMode.getGameMode(), 'spectator', 'Invalid mode ignored');
+
+            // getStackLimit
+            F.assertEq(gameMode.getStackLimit(), 64, 'Stack limit is 64');
+
+            // tick — no crash
+            gameMode.tick(0.05);
+
+            // onTick / unsubscribe
+            var tickCalled = false;
+            var unsub = gameMode.onTick(function (dt) { tickCalled = true; });
+            tickCalled = false;
+            gameMode.tick(0.05);
+            F.assert(tickCalled, 'Subscriber called on tick');
+            unsub();
+            tickCalled = false;
+            gameMode.tick(0.05);
+            F.assert(!tickCalled, 'Subscriber not called after unsubscribe');
+
+            // Destroy
+            gameMode.destroy();
+            F.assert(gameMode._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 7: Player Statistics
+            // ============================================================
+            F.section('7. Player Statistics');
+
+            var statsPlayer = new Donkeycraft.Player();
+            var stats = new Donkeycraft.PlayerStats(statsPlayer);
+            F.assertType(stats, 'object', 'PlayerStats instance created');
+
+            // Default values
+            F.assertEq(stats.getStat('distanceWalked'), 0, 'Initial distanceWalked is 0');
+            F.assertEq(stats.getStat('blockMine'), 0, 'Initial blockMine is 0');
+            F.assertEq(stats.getStat('deaths'), 0, 'Initial deaths is 0');
+
+            // increment
+            stats.increment('distanceWalked', 10.5);
+            F.assertEq(stats.getStat('distanceWalked'), 10.5, 'distanceWalked incremented to 10.5');
+
+            stats.increment('blockMine');
+            F.assertEq(stats.getStat('blockMine'), 1, 'blockMine incremented by 1');
+
+            // setStat
+            stats.setStat('deaths', 5);
+            F.assertEq(stats.getStat('deaths'), 5, 'deaths set to 5');
+
+            // getStat — unknown stat returns 0
+            F.assertEq(stats.getStat('unknownStat'), 0, 'Unknown stat returns 0');
+
+            // getAllStats
+            var all = stats.getAllStats();
+            F.assertType(all, 'object', 'getAllStats returns object');
+            F.assert(all.distanceWalked === 10.5, 'getAllStats includes distanceWalked');
+            F.assert(all.blockMine === 1, 'getAllStats includes blockMine');
+
+            // getStatsByPrefix
+            var distStats = stats.getStatsByPrefix('distance');
+            F.assertType(distStats, 'object', 'getStatsByPrefix returns object');
+            F.assert(distStats.distanceWalked === 10.5, 'Filtered by prefix works');
+
+            // recordDistance
+            stats.recordDistance(25.3, 'walked');
+            F.assertEq(stats.getStat('distanceWalked'), 35.8, 'recordDistance adds to distanceWalked');
+
+            stats.recordDistance(10, 'sprinted');
+            F.assertEq(stats.getStat('distanceSprinted'), 10, 'recordDistance adds to distanceSprinted');
+
+            // recordBlockMine
+            stats.increment('blockMine', -99); // Reset
+            stats.setStat('blockMine', 0);
+            stats.recordBlockMine(1);
+            F.assertEq(stats.getStat('blockMine'), 1, 'recordBlockMine increments blockMine');
+            F.assertEq(stats.getStat('blockBroken'), 1, 'recordBlockMine also increments blockBroken');
+
+            // recordBlockPlace
+            stats.recordBlockPlace(2);
+            F.assertEq(stats.getStat('blockPlaced'), 1, 'recordBlockPlace increments blockPlaced');
+
+            // recordDamageDealt / recordDamageTaken
+            stats.recordDamageDealt(7.5);
+            F.assertEq(stats.getStat('damageDealt'), 7.5, 'recordDamageDealt adds damage');
+            stats.recordDamageTaken(3, 'fall');
+            F.assertEq(stats.getStat('damageTaken'), 3, 'recordDamageTaken adds damage');
+
+            // recordEntityKill
+            stats.recordEntityKill('zombie');
+            F.assertEq(stats.getStat('mobsKilled'), 1, 'mobsKilled incremented');
+            // entityKilledBy is a nested object — access via getAllStats()
+            var allStats = stats.getAllStats();
+            F.assert(allStats.entityKilledBy && allStats.entityKilledBy.zombie === 1, 'entityKilledBy updated for zombie');
+
+            // recordDeath
+            stats.recordDeath('creeper');
+            F.assertEq(stats.getStat('deaths'), 6, 'deaths incremented');
+            F.assertEq(stats.getTimeSinceDeath(), 0, 'timeSinceDeath reset on death');
+
+            // tick — time tracking
+            stats.setStat('tickPlayed', 0);
+            stats.setStat('timePlayed', 0);
+            stats._timeAccumulator = 0;
+            stats.tick(2.5); // 2.5 seconds of game time
+            F.assertEq(stats.getStat('timePlayed'), 2, 'timePlayed advanced by 2 (floor)');
+            F.assert(stats.getStat('tickPlayed') >= 40, 'tickPlayed advanced (>= 2*20 ticks)');
+
+            // serialize / fromObject
+            var serialized = stats.serialize();
+            F.assertType(serialized, 'object', 'serialize returns object');
+            F.assert(serialized.stats !== undefined, 'serialize includes stats');
+
+            var stats2 = new Donkeycraft.PlayerStats(new Donkeycraft.Player());
+            stats2.fromObject(serialized);
+            F.assertEq(stats2.getStat('deaths'), 6, 'fromObject restores deaths');
+
+            // reset
+            stats.reset();
+            F.assertEq(stats.getStat('distanceWalked'), 0, 'distanceWalked reset');
+            F.assertEq(stats.getStat('deaths'), 0, 'deaths reset');
+            F.assertEq(stats.getTimeSinceDeath(), 0, 'timeSinceDeath reset');
+
+            // Destroy
+            stats.destroy();
+            F.assert(stats._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 8: Hunger System
+            // ============================================================
+            F.section('8. Hunger System');
+
+            var hungerPlayer = new Donkeycraft.Player();
+            var hunger = new Donkeycraft.Hunger(hungerPlayer);
+            F.assertType(hunger, 'object', 'Hunger instance created');
+
+            // Initial state
+            F.assertEq(hunger.getFoodLevel(), 20, 'Initial food level is 20');
+            F.assertNear(hunger.getSaturation(), 20.0, 0.01, 'Initial saturation is 20.0');
+            F.assert(!hunger.isStarving(), 'Not starving with full food');
+
+            // setFoodLevel
+            hunger.setFoodLevel(10);
+            F.assertEq(hunger.getFoodLevel(), 10, 'Food level set to 10');
+
+            // Food level clamping
+            hunger.setFoodLevel(-5);
+            F.assertEq(hunger.getFoodLevel(), 0, 'Food level clamped to 0');
+            hunger.setFoodLevel(30);
+            F.assertEq(hunger.getFoodLevel(), 20, 'Food level clamped to 20');
+
+            // setSaturation
+            hunger.setSaturation(15.5);
+            F.assertNear(hunger.getSaturation(), 15.5, 0.01, 'Saturation set to 15.5');
+
+            // isStarving
+            hunger.setFoodLevel(0);
+            F.assert(hunger.isStarving(), 'Starving when food level is 0');
+            hunger.setFoodLevel(1);
+            F.assert(!hunger.isStarving(), 'Not starving when food > 0');
+
+            // consumeFood — basic
+            hunger.setFoodLevel(10);
+            hunger.setSaturation(0);
+            var restored = hunger.consumeFood(3, 0.6);
+            F.assertEq(restored, 3, 'Consumed 3 food points');
+            F.assertEq(hunger.getFoodLevel(), 13, 'Food level is now 13');
+
+            // consumeFood — clamped at max
+            hunger.setFoodLevel(19);
+            restored = hunger.consumeFood(5, 0.6);
+            F.assertEq(restored, 1, 'Only 1 food point restored (capped at 20)');
+            F.assertEq(hunger.getFoodLevel(), 20, 'Food level capped at 20');
+
+            // consumeFood — saturation
+            hunger.setSaturation(0);
+            hunger.setFoodLevel(15);
+            hunger.consumeFood(4, 0.5);
+            F.assertNear(hunger.getSaturation(), 2.0, 0.01, 'Saturation gained = 4 * 0.5');
+
+            // hasFood
+            F.assert(hunger.hasFood(), 'Has food when level > 0');
+            hunger.setFoodLevel(0);
+            F.assert(!hunger.hasFood(), 'No food when level = 0');
+
+            // getSaturationFraction
+            hunger.setFoodLevel(20);
+            hunger.setSaturation(20);
+            F.assertNear(hunger.getSaturationFraction(), 0.5, 0.01, 'Saturation fraction at half max');
+
+            // applySprintDegradation — 1 block sprinted = ~0.4 degradation, so need 5+ blocks for 1 food drain
+            hunger.setFoodLevel(20);
+            hunger.setSaturation(0); // No saturation, directly drain food
+            hunger.applySprintDegradation(10); // ~4 degradation
+            F.assert(hunger.getFoodLevel() < 20, 'Sprint depletes food (was ' + 20 + ', now ' + hunger.getFoodLevel() + ')');
+
+            // applyWalkDegradation
+            hunger.setFoodLevel(20);
+            hunger.applyWalkDegradation(32); // ~4 degradation
+            F.assert(hunger.getFoodLevel() < 20, 'Walking depletes food');
+
+            // tick — creative mode (full food)
+            hungerPlayer.setGameMode('creative');
+            hunger.tick(1.0);
+            F.assertEq(hunger.getFoodLevel(), 20, 'Creative mode: food stays at 20');
+
+            // tick — starvation (with mock HurtBox)
+            hungerPlayer.setGameMode('survival');
+            hunger.setFoodLevel(0);
+            hunger.setSaturation(0);
+
+            // Create a minimal mock HurtBox for starvation test
+            var mockHurtBox = {
+                getHealth: function () { return 4; },
+                getMaxHealth: function () { return 20; },
+                takeDamage: function (amount, source) { this._lastDmg = { amount: amount, source: source }; }
+            };
+            hunger.setHurtBox(mockHurtBox);
+
+            // Simulate 4 seconds (starvation threshold)
+            hunger.tick(4.0);
+            F.assert(mockHurtBox._lastDmg !== undefined, 'Starvation damage dealt after 4 seconds');
+            F.assertEq(mockHurtBox._lastDmg.amount, 1, 'Starvation deals 1 HP');
+            F.assertEq(mockHurtBox._lastDmg.source, 'starvation', 'Damage source is starvation');
+
+            // tick — reset timer when food available
+            hunger.setFoodLevel(5);
+            mockHurtBox._lastDmg = null;
+            hunger.tick(10.0); // 10 seconds with food = timer resets, no damage
+            F.assert(mockHurtBox._lastDmg === null, 'No starvation damage when food available');
+
+            // reset
+            hunger.reset();
+            F.assertEq(hunger.getFoodLevel(), 20, 'Food reset to 20');
+            F.assertNear(hunger.getSaturation(), 20.0, 0.01, 'Saturation reset to 20');
+
+            // Destroy
+            hunger.destroy();
+            F.assert(hunger._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 9: Experience System
+            // ============================================================
+            F.section('9. Experience System');
+
+            var xpPlayer = new Donkeycraft.Player();
+            var exp = new Donkeycraft.Experience(xpPlayer);
+            F.assertType(exp, 'object', 'Experience instance created');
+
+            // Initial state
+            F.assertEq(exp.getLevel(), 0, 'Initial level is 0');
+            F.assertEq(exp.getPoints(), 0, 'Initial points are 0');
+            F.assertEq(exp.getTotalXP(), 0, 'Total XP starts at 0');
+
+            // setLevel / setPoints
+            exp.setLevel(5);
+            F.assertEq(exp.getLevel(), 5, 'Level set to 5');
+            exp.setPoints(10);
+            F.assertEq(exp.getPoints(), 10, 'Points set to 10');
+
+            // Level clamping
+            exp.setLevel(-3);
+            F.assertEq(exp.getLevel(), 0, 'Level clamped to 0');
+            exp.setPoints(-5);
+            F.assertEq(exp.getPoints(), 0, 'Points clamped to 0');
+
+            // getLevelThreshold — level 0: 7 points
+            exp.setLevel(0);
+            F.assertEq(exp.getLevelThreshold(), 7, 'Level 0 threshold is 7');
+
+            // getLevelThreshold — level 16: 39 points
+            exp.setLevel(16);
+            F.assertEq(exp.getLevelThreshold(), 39, 'Level 16 threshold is 39');
+
+            // getLevelThreshold — level 17: 40 points
+            exp.setLevel(17);
+            F.assertEq(exp.getLevelThreshold(), 40, 'Level 17 threshold is 40');
+
+            // getProgressToNextLevel
+            exp.setLevel(0);
+            exp.setPoints(0);
+            F.assertEq(exp.getProgressToNextLevel(), 0, 'Progress is 0 at 0 points');
+            exp.setPoints(7);
+            F.assertEq(exp.getProgressToNextLevel(), 1, 'Progress is 1 at full threshold');
+
+            // addXP — basic
+            exp.setLevel(0);
+            exp.setPoints(0);
+            exp.addXP(5);
+            F.assertEq(exp.getPoints(), 5, 'Added 5 points');
+            F.assertEq(exp.getLevel(), 0, 'Still level 0');
+            F.assertEq(exp.getTotalXP(), 5, 'Total XP is 5');
+
+            // addXP — level up
+            exp.addXP(3); // 5 + 3 = 8 >= 7 threshold
+            F.assertEq(exp.getLevel(), 1, 'Level up to 1');
+            F.assertEq(exp.getPoints(), 1, '1 point remaining (8 - 7)');
+
+            // addXP — multiple level ups
+            var exp3 = new Donkeycraft.Experience(new Donkeycraft.Player());
+            exp3.setLevel(0);
+            exp3.setPoints(0);
+            exp3.addXP(50);
+            F.assert(exp3.getLevel() > 1, 'Multiple level ups occurred');
+            F.assertEq(exp3.getTotalXP(), 50, 'Total XP is 50');
+
+            // getTotalXPValue — should match cumulative cost + points
+            var totalVal = exp3.getTotalXPValue();
+            F.assert(totalVal > 0, 'Total XP value is positive');
+            F.assert(totalVal >= 50, 'Total XP value >= raw XP (includes level costs)');
+
+            // spendXP — basic
+            var exp4 = new Donkeycraft.Experience(new Donkeycraft.Player());
+            exp4.setLevel(0);
+            exp4.setPoints(10);
+            var spent = exp4.spendXP(5);
+            F.assert(spent, 'XP spent successfully');
+            F.assertEq(exp4.getPoints(), 5, 'Points reduced to 5');
+
+            // spendXP — not enough points
+            spent = exp4.spendXP(100);
+            F.assert(!spent, 'Cannot spend more than available');
+            F.assertEq(exp4.getPoints(), 5, 'Points unchanged');
+
+            // pickupOrb — fresh instance
+            var exp5 = new Donkeycraft.Experience(new Donkeycraft.Player());
+            exp5.setLevel(0);
+            exp5.setPoints(0);
+            exp5.pickupOrb(10);
+            F.assertEq(exp5.getTotalXP(), 10, 'Total XP increased by orb value (10)');
+
+            // setLevelToZero
+            exp.setLevelToZero(10);
+            F.assertEq(exp.getLevel(), 10, 'Level set to 10');
+            F.assertEq(exp.getPoints(), 0, 'Points set to 0');
+
+            // serialize / fromObject
+            var xpData = exp.serialize();
+            F.assertType(xpData, 'object', 'serialize returns object');
+            F.assert(xpData.level !== undefined, 'serialize includes level');
+
+            var exp2 = new Donkeycraft.Experience(new Donkeycraft.Player());
+            exp2.fromObject(xpData);
+            F.assertEq(exp2.getLevel(), xpData.level, 'fromObject restores level');
+            F.assertEq(exp2.getPoints(), xpData.points, 'fromObject restores points');
+
+            // reset
+            exp.reset();
+            F.assertEq(exp.getLevel(), 0, 'Level reset to 0');
+            F.assertEq(exp.getPoints(), 0, 'Points reset to 0');
+            F.assertEq(exp.getTotalXP(), 0, 'Total XP reset to 0');
+
+            // Destroy
+            exp.destroy();
+            F.assert(exp._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Section 10: Movement Physics (with mocks)
+            // ============================================================
+            F.section('10. Movement Physics');
+
+            var movePlayer = new Donkeycraft.Player({ x: 0, y: 64, z: 0 });
+            var moveForwardKey = Donkeycraft.Config.KEYBINDS.MOVE_FORWARD;
+            var jumpKey = Donkeycraft.Config.KEYBINDS.JUMP;
+            var moveInput = createMockInput({
+                [moveForwardKey]: true,
+                [jumpKey]: false
+            });
+            var moveCollision = new Donkeycraft.Collision(createMockChunkManager());
+
+            // Movement requires a chunk manager with block data for full testing.
+            // We test that the constructor and basic methods work with mocks.
+            var movement = new Donkeycraft.Movement(moveInput, movePlayer, moveCollision, createMockChunkManager());
+            F.assertType(movement, 'object', 'Movement instance created');
+
+            // tick — dead player
+            var deadMovePlayer = new Donkeycraft.Player();
+            var deadMovement = new Donkeycraft.Movement(
+                createMockInput({}),
+                deadMovePlayer,
+                new Donkeycraft.Collision(createMockChunkManager()),
+                createMockChunkManager()
+            );
+            deadMovePlayer.setAlive(false);
+            deadMovement.tick(0.05);
+            F.assert(!deadMovePlayer.isAlive(), 'Dead player tick does not crash');
+
+            // getHorizontalSpeed — survival walking
+            F.assertEq(movement.getHorizontalSpeed(), Donkeycraft.Config.PLAYER_SPEED, 'Base walking speed = PLAYER_SPEED');
+
+            // getGameMode / setGameMode
+            F.assertEq(movement.getGameMode(), 'survival', 'Game mode is survival');
+            movement.setGameMode('creative');
+            F.assertEq(movement.getGameMode(), 'creative', 'Game mode changed to creative');
+
+            // Destroy
+            movement.destroy();
+            F.assert(movement._player === null, 'Player nullified after destroy');
+
+            // ============================================================
+            // Finish: render summary
+            // ============================================================
+            F.finishTests();
+
+        })();
+    </script>
 </body>
+
 </html>

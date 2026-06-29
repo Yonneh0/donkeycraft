@@ -1,6 +1,6 @@
 // Donkeycraft — Raycasting
 // DDA raycasting through voxels: hit detection, block face normal, reach distance.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -30,7 +30,7 @@
      * @param {number} distance - Distance from ray origin to hit point.
      * @param {Donkeycraft.Vector3} hitPosition - 3D position of hit point on block face.
      */
-    Donkeycraft.RaycastResult = function(blockX, blockY, blockZ, faceNormalX, faceNormalY, faceNormalZ, distance, hitPosition) {
+    Donkeycraft.RaycastResult = function (blockX, blockY, blockZ, faceNormalX, faceNormalY, faceNormalZ, distance, hitPosition) {
         /**
          * Global X coordinate of the hit block.
          * @type {number}
@@ -91,7 +91,7 @@
      *
      * @namespace
      */
-    Donkeycraft.Raycast = (function() {
+    Donkeycraft.Raycast = (function () {
 
         /**
          * Get the block ID at global coordinates using ChunkManager.
@@ -159,8 +159,8 @@
             }
 
             // Helper: check if a block ID should be ignored
-            var _shouldIgnore = (function(set) {
-                return function(id) {
+            var _shouldIgnore = (function (set) {
+                return function (id) {
                     return set && set[id] === true;
                 };
             }(ignoreSet));

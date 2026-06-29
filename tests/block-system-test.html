@@ -1,486 +1,491 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Donkeycraft — Block System Test</title>
-<link rel="stylesheet" href="test.css">
+    <meta charset="UTF-8">
+    <title>Donkeycraft — Block System Test</title>
+    <link rel="stylesheet" href="test.css">
 </head>
+
 <body>
-<h1>Donkeycraft — Block System Test</h1>
-<nav style="margin-bottom: 12px;"><a href="index.html" style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
-<div class="subtitle">Comprehensive functional tests for all Block System modules: Block, BlockTypes, BlockState, BlockModels, RecipeRegistry.</div>
-
-<!-- Summary is auto-created at top by TestFramework.init() -->
-<div id="results"></div>
-
-<!-- Load project scripts in dependency order -->
-<script src="../src/core/namespace.js"></script>
-<script src="../src/core/eventbus.js"></script>
-<script src="../src/core/config.js"></script>
-<script src="../src/core/logger.js"></script>
-
-<!-- World modules in dependency order -->
-<script src="../src/game/block.js"></script>
-<script src="../src/game/block-types.js"></script>
-<script src="../src/game/block-state.js"></script>
-<script src="../src/game/block-models.js"></script>
-<script src="../src/game/recipe-registry.js"></script>
-
-<!-- Load shared test framework -->
-<script src="test.js"></script>
-
-<script>
-(function() {
-    'use strict';
-
-    var F = TestFramework;
-
-    // Initialize: creates #test-summary at top, uses existing #results div
-    F.init('results');
-
-    // ============================================================
-    // Section 1: Block Registry — Core
-    // ============================================================
-    F.section('1. Block Registry — Core');
-
-    F.assert(typeof Donkeycraft.Block === 'function', 'Donkeycraft.Block constructor exists');
-    F.assert(typeof Donkeycraft.BlockRegistry === 'object', 'Donkeycraft.BlockRegistry registered');
-
-    var block = Donkeycraft.BlockRegistry.getBlockById(0);
-    F.assert(block !== null, 'Block ID 0 (air) exists');
-    F.assertEq(block.name, 'air', 'Block ID 0 name is "air"');
-    F.assertEq(block.hardness, -1, 'Air hardness is -1');
-    F.assert(block.transparent === true, 'Air is transparent');
-
-    block = Donkeycraft.BlockRegistry.getBlockById(1);
-    F.assert(block !== null, 'Block ID 1 (stone) exists');
-    F.assertEq(block.name, 'stone', 'Block ID 1 name is "stone"');
-    F.assertEq(block.hardness, 1.5, 'Stone hardness is 1.5');
-    F.assertEq(block.blastResistance, 6.0, 'Stone blast resistance is 6.0');
-    F.assertEq(block.dropBlockId, 1, 'Stone drops itself');
-    F.assertEq(block.dropItemCount, 1, 'Stone drop count is 1');
-
-    block = Donkeycraft.BlockRegistry.getBlockById(1000);
-    F.assert(block !== null, 'Block ID 1000 (bedrock) exists');
-    F.assertEq(block.name, 'bedrock', 'Block ID 1000 name is "bedrock"');
-    F.assertEq(block.hardness, -1, 'Bedrock hardness is -1 (unbreakable)');
-    F.assertEq(block.blastResistance, 3600000.0, 'Bedrock blast resistance is 3600000.0');
+    <h1>Donkeycraft — Block System Test</h1>
+    <nav style="margin-bottom: 12px;"><a href="index.html"
+            style="color: #00d4ff; text-decoration: none; font-size: 0.9em;">← Back to Test Index</a></nav>
+    <div class="subtitle">Comprehensive functional tests for all Block System modules: Block, BlockTypes, BlockState,
+        BlockModels, RecipeRegistry.</div>
+
+    <!-- Summary is auto-created at top by TestFramework.init() -->
+    <div id="results"></div>
+
+    <!-- Load project scripts in dependency order -->
+    <script src="../src/core/namespace.js"></script>
+    <script src="../src/core/eventbus.js"></script>
+    <script src="../src/core/config.js"></script>
+    <script src="../src/core/logger.js"></script>
+
+    <!-- World modules in dependency order -->
+    <script src="../src/game/block.js"></script>
+    <script src="../src/game/block-types.js"></script>
+    <script src="../src/game/block-state.js"></script>
+    <script src="../src/game/block-models.js"></script>
+    <script src="../src/game/recipe-registry.js"></script>
+
+    <!-- Load shared test framework -->
+    <script src="test.js"></script>
+
+    <script>
+        (function () {
+            'use strict';
+
+            var F = TestFramework;
+
+            // Initialize: creates #test-summary at top, uses existing #results div
+            F.init('results');
+
+            // ============================================================
+            // Section 1: Block Registry — Core
+            // ============================================================
+            F.section('1. Block Registry — Core');
+
+            F.assert(typeof Donkeycraft.Block === 'function', 'Donkeycraft.Block constructor exists');
+            F.assert(typeof Donkeycraft.BlockRegistry === 'object', 'Donkeycraft.BlockRegistry registered');
+
+            var block = Donkeycraft.BlockRegistry.getBlockById(0);
+            F.assert(block !== null, 'Block ID 0 (air) exists');
+            F.assertEq(block.name, 'air', 'Block ID 0 name is "air"');
+            F.assertEq(block.hardness, -1, 'Air hardness is -1');
+            F.assert(block.transparent === true, 'Air is transparent');
+
+            block = Donkeycraft.BlockRegistry.getBlockById(1);
+            F.assert(block !== null, 'Block ID 1 (stone) exists');
+            F.assertEq(block.name, 'stone', 'Block ID 1 name is "stone"');
+            F.assertEq(block.hardness, 1.5, 'Stone hardness is 1.5');
+            F.assertEq(block.blastResistance, 6.0, 'Stone blast resistance is 6.0');
+            F.assertEq(block.dropBlockId, 1, 'Stone drops itself');
+            F.assertEq(block.dropItemCount, 1, 'Stone drop count is 1');
+
+            block = Donkeycraft.BlockRegistry.getBlockById(1000);
+            F.assert(block !== null, 'Block ID 1000 (bedrock) exists');
+            F.assertEq(block.name, 'bedrock', 'Block ID 1000 name is "bedrock"');
+            F.assertEq(block.hardness, -1, 'Bedrock hardness is -1 (unbreakable)');
+            F.assertEq(block.blastResistance, 3600000.0, 'Bedrock blast resistance is 3600000.0');
+
+            var count = Donkeycraft.BlockRegistry.getBlockCount();
+            F.assert(count > 280, 'Block count > 280 (got ' + count + ')');
 
-    var count = Donkeycraft.BlockRegistry.getBlockCount();
-    F.assert(count > 280, 'Block count > 280 (got ' + count + ')');
+            var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
+            F.assert(allBlocks.length > 0, 'getAllBlocks returns non-empty array');
 
-    var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
-    F.assert(allBlocks.length > 0, 'getAllBlocks returns non-empty array');
+            // ============================================================
+            // Section 2: Block Registry — Lookup Methods
+            // ============================================================
+            F.section('2. Block Registry — Lookup Methods');
 
-    // ============================================================
-    // Section 2: Block Registry — Lookup Methods
-    // ============================================================
-    F.section('2. Block Registry — Lookup Methods');
+            block = Donkeycraft.BlockRegistry.getBlockByName('stone');
+            F.assert(block !== null, 'getBlockByName("stone") returns block');
+            F.assertEq(block.id, 1, 'getBlockByName("stone") returns ID 1');
 
-    block = Donkeycraft.BlockRegistry.getBlockByName('stone');
-    F.assert(block !== null, 'getBlockByName("stone") returns block');
-    F.assertEq(block.id, 1, 'getBlockByName("stone") returns ID 1');
+            block = Donkeycraft.BlockRegistry.getBlockByName('nonexistent_block_xyz');
+            F.assert(block === null, 'getBlockByName("nonexistent") returns null');
 
-    block = Donkeycraft.BlockRegistry.getBlockByName('nonexistent_block_xyz');
-    F.assert(block === null, 'getBlockByName("nonexistent") returns null');
+            var dropId = Donkeycraft.BlockRegistry.getDropBlockId(1);
+            F.assertEq(dropId, 1, 'getDropBlockId(1) = 1 (stone)');
 
-    var dropId = Donkeycraft.BlockRegistry.getDropBlockId(1);
-    F.assertEq(dropId, 1, 'getDropBlockId(1) = 1 (stone)');
+            var dropCount = Donkeycraft.BlockRegistry.getDropItemCount(1);
+            F.assertEq(dropCount, 1, 'getDropItemCount(1) = 1');
 
-    var dropCount = Donkeycraft.BlockRegistry.getDropItemCount(1);
-    F.assertEq(dropCount, 1, 'getDropItemCount(1) = 1');
+            var noDrop = Donkeycraft.BlockRegistry.getDropBlockId(0);
+            F.assertEq(noDrop, -1, 'getDropBlockId(0) = -1 (air)');
 
-    var noDrop = Donkeycraft.BlockRegistry.getDropBlockId(0);
-    F.assertEq(noDrop, -1, 'getDropBlockId(0) = -1 (air)');
+            // ============================================================
+            // Section 3: Block Registry — Type Queries
+            // ============================================================
+            F.section('3. Block Registry — Type Queries');
 
-    // ============================================================
-    // Section 3: Block Registry — Type Queries
-    // ============================================================
-    F.section('3. Block Registry — Type Queries');
+            F.assert(Donkeycraft.BlockRegistry.isTransparent(45) === true, 'isTransparent(glass=45) = true');
+            F.assert(Donkeycraft.BlockRegistry.isTransparent(1) === false, 'isTransparent(stone=1) = false');
+            F.assert(Donkeycraft.BlockRegistry.isTransparent(0) === true, 'isTransparent(air=0) = true');
 
-    F.assert(Donkeycraft.BlockRegistry.isTransparent(45) === true, 'isTransparent(glass=45) = true');
-    F.assert(Donkeycraft.BlockRegistry.isTransparent(1) === false, 'isTransparent(stone=1) = false');
-    F.assert(Donkeycraft.BlockRegistry.isTransparent(0) === true, 'isTransparent(air=0) = true');
+            F.assert(Donkeycraft.BlockRegistry.isSolid(1) === true, 'isSolid(stone=1) = true');
+            F.assert(Donkeycraft.BlockRegistry.isSolid(45) === false, 'isSolid(glass=45) = false');
+            F.assert(Donkeycraft.BlockRegistry.isSolid(0) === false, 'isSolid(air=0) = false');
 
-    F.assert(Donkeycraft.BlockRegistry.isSolid(1) === true, 'isSolid(stone=1) = true');
-    F.assert(Donkeycraft.BlockRegistry.isSolid(45) === false, 'isSolid(glass=45) = false');
-    F.assert(Donkeycraft.BlockRegistry.isSolid(0) === false, 'isSolid(air=0) = false');
+            F.assert(Donkeycraft.BlockRegistry.isOpaque(1) === true, 'isOpaque(stone=1) = true');
+            F.assert(Donkeycraft.BlockRegistry.isOpaque(45) === false, 'isOpaque(glass=45) = false');
 
-    F.assert(Donkeycraft.BlockRegistry.isOpaque(1) === true, 'isOpaque(stone=1) = true');
-    F.assert(Donkeycraft.BlockRegistry.isOpaque(45) === false, 'isOpaque(glass=45) = false');
+            F.assert(Donkeycraft.BlockRegistry.isLiquid(212) === true, 'isLiquid(water=212) = true');
+            F.assert(Donkeycraft.BlockRegistry.isLiquid(213) === true, 'isLiquid(lava=213) = true');
+            F.assert(Donkeycraft.BlockRegistry.isLiquid(1) === false, 'isLiquid(stone=1) = false');
 
-    F.assert(Donkeycraft.BlockRegistry.isLiquid(212) === true, 'isLiquid(water=212) = true');
-    F.assert(Donkeycraft.BlockRegistry.isLiquid(213) === true, 'isLiquid(lava=213) = true');
-    F.assert(Donkeycraft.BlockRegistry.isLiquid(1) === false, 'isLiquid(stone=1) = false');
+            F.assert(Donkeycraft.BlockRegistry.isReplaceable(0) === true, 'isReplaceable(air=0) = true');
+            F.assert(Donkeycraft.BlockRegistry.isReplaceable(158) === true, 'isReplaceable(grass=158) = true');
+            F.assert(Donkeycraft.BlockRegistry.isReplaceable(1) === false, 'isReplaceable(stone=1) = false');
 
-    F.assert(Donkeycraft.BlockRegistry.isReplaceable(0) === true, 'isReplaceable(air=0) = true');
-    F.assert(Donkeycraft.BlockRegistry.isReplaceable(158) === true, 'isReplaceable(grass=158) = true');
-    F.assert(Donkeycraft.BlockRegistry.isReplaceable(1) === false, 'isReplaceable(stone=1) = false');
+            // ============================================================
+            // Section 4: Block Types — Classification Lookups
+            // ============================================================
+            F.section('4. Block Types — Classification Lookups');
 
-    // ============================================================
-    // Section 4: Block Types — Classification Lookups
-    // ============================================================
-    F.section('4. Block Types — Classification Lookups');
+            F.assert(typeof Donkeycraft.BlockTypes === 'object', 'Donkeycraft.BlockTypes registered');
 
-    F.assert(typeof Donkeycraft.BlockTypes === 'object', 'Donkeycraft.BlockTypes registered');
+            F.assert(Donkeycraft.BlockTypes.isSolid(1) === true, 'BlockTypes.isSolid(stone=1) = true');
+            F.assert(Donkeycraft.BlockTypes.isSolid(45) === false, 'BlockTypes.isSolid(glass=45) = false');
+            F.assert(Donkeycraft.BlockTypes.isSolid(118) === true, 'BlockTypes.isSolid(leaves=118) = true');
 
-    F.assert(Donkeycraft.BlockTypes.isSolid(1) === true, 'BlockTypes.isSolid(stone=1) = true');
-    F.assert(Donkeycraft.BlockTypes.isSolid(45) === false, 'BlockTypes.isSolid(glass=45) = false');
-    F.assert(Donkeycraft.BlockTypes.isSolid(118) === true, 'BlockTypes.isSolid(leaves=118) = true');
+            F.assert(Donkeycraft.BlockTypes.isTransparent(45) === true, 'BlockTypes.isTransparent(glass=45) = true');
+            F.assert(Donkeycraft.BlockTypes.isTransparent(1) === false, 'BlockTypes.isTransparent(stone=1) = false');
+            F.assert(Donkeycraft.BlockTypes.isTransparent(118) === true, 'BlockTypes.isTransparent(leaves=118) = true');
 
-    F.assert(Donkeycraft.BlockTypes.isTransparent(45) === true, 'BlockTypes.isTransparent(glass=45) = true');
-    F.assert(Donkeycraft.BlockTypes.isTransparent(1) === false, 'BlockTypes.isTransparent(stone=1) = false');
-    F.assert(Donkeycraft.BlockTypes.isTransparent(118) === true, 'BlockTypes.isTransparent(leaves=118) = true');
+            F.assert(Donkeycraft.BlockTypes.isOpaque(1) === true, 'BlockTypes.isOpaque(stone=1) = true');
+            F.assert(Donkeycraft.BlockTypes.isOpaque(45) === false, 'BlockTypes.isOpaque(glass=45) = false');
 
-    F.assert(Donkeycraft.BlockTypes.isOpaque(1) === true, 'BlockTypes.isOpaque(stone=1) = true');
-    F.assert(Donkeycraft.BlockTypes.isOpaque(45) === false, 'BlockTypes.isOpaque(glass=45) = false');
+            F.assert(Donkeycraft.BlockTypes.isLiquid(212) === true, 'BlockTypes.isLiquid(water=212) = true');
+            F.assert(Donkeycraft.BlockTypes.isLiquid(213) === true, 'BlockTypes.isLiquid(lava=213) = true');
+            F.assert(Donkeycraft.BlockTypes.isLiquid(1) === false, 'BlockTypes.isLiquid(stone=1) = false');
 
-    F.assert(Donkeycraft.BlockTypes.isLiquid(212) === true, 'BlockTypes.isLiquid(water=212) = true');
-    F.assert(Donkeycraft.BlockTypes.isLiquid(213) === true, 'BlockTypes.isLiquid(lava=213) = true');
-    F.assert(Donkeycraft.BlockTypes.isLiquid(1) === false, 'BlockTypes.isLiquid(stone=1) = false');
+            F.assert(Donkeycraft.BlockTypes.isReplaceable(0) === true, 'BlockTypes.isReplaceable(air=0) = true');
+            F.assert(Donkeycraft.BlockTypes.isReplaceable(158) === true, 'BlockTypes.isReplaceable(grass=158) = true');
+            F.assert(Donkeycraft.BlockTypes.isReplaceable(1) === false, 'BlockTypes.isReplaceable(stone=1) = false');
 
-    F.assert(Donkeycraft.BlockTypes.isReplaceable(0) === true, 'BlockTypes.isReplaceable(air=0) = true');
-    F.assert(Donkeycraft.BlockTypes.isReplaceable(158) === true, 'BlockTypes.isReplaceable(grass=158) = true');
-    F.assert(Donkeycraft.BlockTypes.isReplaceable(1) === false, 'BlockTypes.isReplaceable(stone=1) = false');
+            F.assert(Donkeycraft.BlockTypes.isFullBlock(1) === true, 'BlockTypes.isFullBlock(stone=1) = true');
+            F.assert(Donkeycraft.BlockTypes.isFullBlock(127) === false, 'BlockTypes.isFullBlock(slab=127) = false');
+            F.assert(Donkeycraft.BlockTypes.isFullBlock(136) === false, 'BlockTypes.isFullBlock(stairs=136) = false');
+            F.assert(Donkeycraft.BlockTypes.isFullBlock(151) === false, 'BlockTypes.isFullBlock(fence=151) = false');
 
-    F.assert(Donkeycraft.BlockTypes.isFullBlock(1) === true, 'BlockTypes.isFullBlock(stone=1) = true');
-    F.assert(Donkeycraft.BlockTypes.isFullBlock(127) === false, 'BlockTypes.isFullBlock(slab=127) = false');
-    F.assert(Donkeycraft.BlockTypes.isFullBlock(136) === false, 'BlockTypes.isFullBlock(stairs=136) = false');
-    F.assert(Donkeycraft.BlockTypes.isFullBlock(151) === false, 'BlockTypes.isFullBlock(fence=151) = false');
+            F.assert(Donkeycraft.BlockTypes.isCollidable(1) === true, 'BlockTypes.isCollidable(stone=1) = true');
+            F.assert(Donkeycraft.BlockTypes.isCollidable(212) === true, 'BlockTypes.isCollidable(water=212) = true');
+            F.assert(Donkeycraft.BlockTypes.isCollidable(45) === false, 'BlockTypes.isCollidable(glass=45) = false');
 
-    F.assert(Donkeycraft.BlockTypes.isCollidable(1) === true, 'BlockTypes.isCollidable(stone=1) = true');
-    F.assert(Donkeycraft.BlockTypes.isCollidable(212) === true, 'BlockTypes.isCollidable(water=212) = true');
-    F.assert(Donkeycraft.BlockTypes.isCollidable(45) === false, 'BlockTypes.isCollidable(glass=45) = false');
+            F.assert(Donkeycraft.BlockTypes.blocksLight(1) === true, 'BlockTypes.blocksLight(stone=1) = true');
+            F.assert(Donkeycraft.BlockTypes.blocksLight(45) === false, 'BlockTypes.blocksLight(glass=45) = false');
 
-    F.assert(Donkeycraft.BlockTypes.blocksLight(1) === true, 'BlockTypes.blocksLight(stone=1) = true');
-    F.assert(Donkeycraft.BlockTypes.blocksLight(45) === false, 'BlockTypes.blocksLight(glass=45) = false');
+            var opacity = Donkeycraft.BlockTypes.getLightOpacity(1);
+            F.assertEq(opacity, 15, 'getLightOpacity(stone=1) = 15');
 
-    var opacity = Donkeycraft.BlockTypes.getLightOpacity(1);
-    F.assertEq(opacity, 15, 'getLightOpacity(stone=1) = 15');
+            var glassOpacity = Donkeycraft.BlockTypes.getLightOpacity(45);
+            F.assertEq(glassOpacity, 0, 'getLightOpacity(glass=45) = 0');
 
-    var glassOpacity = Donkeycraft.BlockTypes.getLightOpacity(45);
-    F.assertEq(glassOpacity, 0, 'getLightOpacity(glass=45) = 0');
+            var solidIds = Donkeycraft.BlockTypes.getIdsByType('solid');
+            F.assert(solidIds.length > 0, 'getIdsByType("solid") returns non-empty array');
 
-    var solidIds = Donkeycraft.BlockTypes.getIdsByType('solid');
-    F.assert(solidIds.length > 0, 'getIdsByType("solid") returns non-empty array');
+            var liquidIds = Donkeycraft.BlockTypes.getIdsByType('liquid');
+            F.assert(liquidIds.length >= 2, 'getIdsByType("liquid") has at least water and lava');
 
-    var liquidIds = Donkeycraft.BlockTypes.getIdsByType('liquid');
-    F.assert(liquidIds.length >= 2, 'getIdsByType("liquid") has at least water and lava');
+            var transparentIds = Donkeycraft.BlockTypes.getIdsByType('transparent');
+            F.assert(transparentIds.length > 0, 'getIdsByType("transparent") returns non-empty array');
 
-    var transparentIds = Donkeycraft.BlockTypes.getIdsByType('transparent');
-    F.assert(transparentIds.length > 0, 'getIdsByType("transparent") returns non-empty array');
+            // ============================================================
+            // Section 5: Block State — Core
+            // ============================================================
+            F.section('5. Block State — Core');
 
-    // ============================================================
-    // Section 5: Block State — Core
-    // ============================================================
-    F.section('5. Block State — Core');
+            F.assert(typeof Donkeycraft.BlockState === 'function', 'Donkeycraft.BlockState constructor exists');
 
-    F.assert(typeof Donkeycraft.BlockState === 'function', 'Donkeycraft.BlockState constructor exists');
+            var state = new Donkeycraft.BlockState({ axis: 'y', color: 'red' });
+            F.assertType(state, 'object', 'BlockState instance created');
+            F.assertEq(state.get('axis'), 'y', 'state.get("axis") = "y"');
+            F.assertEq(state.get('color'), 'red', 'state.get("color") = "red"');
+            F.assertEq(state.get('missing'), null, 'state.get("missing") = null');
 
-    var state = new Donkeycraft.BlockState({ axis: 'y', color: 'red' });
-    F.assertType(state, 'object', 'BlockState instance created');
-    F.assertEq(state.get('axis'), 'y', 'state.get("axis") = "y"');
-    F.assertEq(state.get('color'), 'red', 'state.get("color") = "red"');
-    F.assertEq(state.get('missing'), null, 'state.get("missing") = null');
+            state.set('facing', 'north');
+            F.assertEq(state.get('facing'), 'north', 'state.set("facing", "north") works');
 
-    state.set('facing', 'north');
-    F.assertEq(state.get('facing'), 'north', 'state.set("facing", "north") works');
+            var names = state.getPropertyNames();
+            F.assert(names.length === 3, 'getPropertyNames() returns 3 names (axis, color, facing)');
 
-    var names = state.getPropertyNames();
-    F.assert(names.length === 3, 'getPropertyNames() returns 3 names (axis, color, facing)');
+            var emptyState = new Donkeycraft.BlockState({});
+            F.assert(emptyState.isEmpty() === true, 'empty BlockState.isEmpty() = true');
 
-    var emptyState = new Donkeycraft.BlockState({});
-    F.assert(emptyState.isEmpty() === true, 'empty BlockState.isEmpty() = true');
+            var nonEmpty = new Donkeycraft.BlockState({ axis: 'y' });
+            F.assert(nonEmpty.isEmpty() === false, 'non-empty BlockState.isEmpty() = false');
 
-    var nonEmpty = new Donkeycraft.BlockState({ axis: 'y' });
-    F.assert(nonEmpty.isEmpty() === false, 'non-empty BlockState.isEmpty() = false');
+            var clone = state.clone();
+            F.assert(clone !== state, 'clone() returns a different object');
+            F.assert(clone.matches(state) === true, 'clone matches original');
 
-    var clone = state.clone();
-    F.assert(clone !== state, 'clone() returns a different object');
-    F.assert(clone.matches(state) === true, 'clone matches original');
+            var state2 = new Donkeycraft.BlockState({ axis: 'x' });
+            F.assert(state.matches(state2) === false, 'different states do not match');
 
-    var state2 = new Donkeycraft.BlockState({ axis: 'x' });
-    F.assert(state.matches(state2) === false, 'different states do not match');
+            // ============================================================
+            // Section 6: Block State — Constants and Registry
+            // ============================================================
+            F.section('6. Block State — Constants and Registry');
 
-    // ============================================================
-    // Section 6: Block State — Constants and Registry
-    // ============================================================
-    F.section('6. Block State — Constants and Registry');
+            F.assert(typeof Donkeycraft.AxisValues === 'object', 'AxisValues exists');
+            F.assertEq(Donkeycraft.AxisValues.Y, 'y', 'AxisValues.Y = "y"');
+            F.assertEq(Donkeycraft.AxisValues.X, 'x', 'AxisValues.X = "x"');
+            F.assertEq(Donkeycraft.AxisValues.Z, 'z', 'AxisValues.Z = "z"');
 
-    F.assert(typeof Donkeycraft.AxisValues === 'object', 'AxisValues exists');
-    F.assertEq(Donkeycraft.AxisValues.Y, 'y', 'AxisValues.Y = "y"');
-    F.assertEq(Donkeycraft.AxisValues.X, 'x', 'AxisValues.X = "x"');
-    F.assertEq(Donkeycraft.AxisValues.Z, 'z', 'AxisValues.Z = "z"');
+            F.assert(typeof Donkeycraft.FacingValues === 'object', 'FacingValues exists');
+            F.assertEq(Donkeycraft.FacingValues.NORTH, 'north', 'FacingValues.NORTH = "north"');
+            F.assertEq(Donkeycraft.FacingValues.DOWN, 'down', 'FacingValues.DOWN = "down"');
 
-    F.assert(typeof Donkeycraft.FacingValues === 'object', 'FacingValues exists');
-    F.assertEq(Donkeycraft.FacingValues.NORTH, 'north', 'FacingValues.NORTH = "north"');
-    F.assertEq(Donkeycraft.FacingValues.DOWN, 'down', 'FacingValues.DOWN = "down"');
+            F.assert(typeof Donkeycraft.ColorValues === 'object', 'ColorValues exists');
+            F.assertEq(Donkeycraft.ColorValues.WHITE, 'white', 'ColorValues.WHITE = "white"');
+            F.assertEq(Donkeycraft.ColorValues.RED, 'red', 'ColorValues.RED = "red"');
 
-    F.assert(typeof Donkeycraft.ColorValues === 'object', 'ColorValues exists');
-    F.assertEq(Donkeycraft.ColorValues.WHITE, 'white', 'ColorValues.WHITE = "white"');
-    F.assertEq(Donkeycraft.ColorValues.RED, 'red', 'ColorValues.RED = "red"');
+            F.assert(typeof Donkeycraft.HalfValues === 'object', 'HalfValues exists');
+            F.assertEq(Donkeycraft.HalfValues.LOWER, 'lower', 'HalfValues.LOWER = "lower"');
 
-    F.assert(typeof Donkeycraft.HalfValues === 'object', 'HalfValues exists');
-    F.assertEq(Donkeycraft.HalfValues.LOWER, 'lower', 'HalfValues.LOWER = "lower"');
+            F.assert(typeof Donkeycraft.WaterloggedValues === 'object', 'WaterloggedValues exists');
+            F.assertEq(Donkeycraft.WaterloggedValues.TRUE, 'true', 'WaterloggedValues.TRUE = "true"');
 
-    F.assert(typeof Donkeycraft.WaterloggedValues === 'object', 'WaterloggedValues exists');
-    F.assertEq(Donkeycraft.WaterloggedValues.TRUE, 'true', 'WaterloggedValues.TRUE = "true"');
+            F.assert(typeof Donkeycraft.BlockStateRegistry === 'object', 'BlockStateRegistry registered');
 
-    F.assert(typeof Donkeycraft.BlockStateRegistry === 'object', 'BlockStateRegistry registered');
+            var logStates = Donkeycraft.BlockStateRegistry.getPossibleStates(24);
+            F.assert(logStates.length >= 3, 'Oak log has at least 3 states (axis variants)');
 
-    var logStates = Donkeycraft.BlockStateRegistry.getPossibleStates(24);
-    F.assert(logStates.length >= 3, 'Oak log has at least 3 states (axis variants)');
+            F.assert(Donkeycraft.BlockStateRegistry.hasStates(24) === true, 'hasStates(oak_log=24) = true');
+            F.assert(Donkeycraft.BlockStateRegistry.hasStates(1) === false, 'hasStates(stone=1) = false');
 
-    F.assert(Donkeycraft.BlockStateRegistry.hasStates(24) === true, 'hasStates(oak_log=24) = true');
-    F.assert(Donkeycraft.BlockStateRegistry.hasStates(1) === false, 'hasStates(stone=1) = false');
+            var defaultState = Donkeycraft.BlockStateRegistry.getDefaultState(24);
+            F.assertType(defaultState, 'object', 'getDefaultState returns BlockState');
 
-    var defaultState = Donkeycraft.BlockStateRegistry.getDefaultState(24);
-    F.assertType(defaultState, 'object', 'getDefaultState returns BlockState');
+            var matchingState = Donkeycraft.BlockStateRegistry.findMatchingState(24, { axis: 'x' });
+            F.assert(matchingState !== null, 'findMatchingState(oak_log, {axis:"x"}) found a state');
 
-    var matchingState = Donkeycraft.BlockStateRegistry.findMatchingState(24, { axis: 'x' });
-    F.assert(matchingState !== null, 'findMatchingState(oak_log, {axis:"x"}) found a state');
+            var stateStr = Donkeycraft.BlockStateRegistry.getStateString(new Donkeycraft.BlockState({ axis: 'y', color: 'red' }));
+            F.assert(stateStr.indexOf('axis=y') >= 0, 'getStateString includes "axis=y"');
+            F.assert(stateStr.indexOf('color=red') >= 0, 'getStateString includes "color=red"');
 
-    var stateStr = Donkeycraft.BlockStateRegistry.getStateString(new Donkeycraft.BlockState({ axis: 'y', color: 'red' }));
-    F.assert(stateStr.indexOf('axis=y') >= 0, 'getStateString includes "axis=y"');
-    F.assert(stateStr.indexOf('color=red') >= 0, 'getStateString includes "color=red"');
+            // ============================================================
+            // Section 7: Block Models — Core
+            // ============================================================
+            F.section('7. Block Models — Core');
 
-    // ============================================================
-    // Section 7: Block Models — Core
-    // ============================================================
-    F.section('7. Block Models — Core');
+            F.assert(typeof Donkeycraft.BlockModel === 'function', 'Donkeycraft.BlockModel constructor exists');
+            F.assert(typeof Donkeycraft.BlockModelRegistry === 'object', 'BlockModelRegistry registered');
 
-    F.assert(typeof Donkeycraft.BlockModel === 'function', 'Donkeycraft.BlockModel constructor exists');
-    F.assert(typeof Donkeycraft.BlockModelRegistry === 'object', 'BlockModelRegistry registered');
+            var model = Donkeycraft.BlockModelRegistry.getBlockModel(1);
+            F.assertType(model, 'object', 'getBlockModel returns BlockModel');
+            F.assertEq(model.blockId, 1, 'model.blockId = 1 (stone)');
 
-    var model = Donkeycraft.BlockModelRegistry.getBlockModel(1);
-    F.assertType(model, 'object', 'getBlockModel returns BlockModel');
-    F.assertEq(model.blockId, 1, 'model.blockId = 1 (stone)');
+            var texture = model.getFaceTexture('up');
+            F.assert(typeof texture === 'string', 'getFaceTexture returns a string');
 
-    var texture = model.getFaceTexture('up');
-    F.assert(typeof texture === 'string', 'getFaceTexture returns a string');
+            F.assert(model.hasAO() === true, 'stone model hasAO() = true');
 
-    F.assert(model.hasAO() === true, 'stone model hasAO() = true');
+            var aoWeights = model.getAOWeights('up');
+            F.assert(aoWeights.length === 4, 'getAOWeights returns array of 4 values');
 
-    var aoWeights = model.getAOWeights('up');
-    F.assert(aoWeights.length === 4, 'getAOWeights returns array of 4 values');
+            var corners = model.getFaceCorners('north');
+            F.assert(corners.length === 4, 'getFaceCorners returns 4 corners');
 
-    var corners = model.getFaceCorners('north');
-    F.assert(corners.length === 4, 'getFaceCorners returns 4 corners');
+            // Test model with custom faces (grass block)
+            var grassModel = Donkeycraft.BlockModelRegistry.getBlockModel(8);
+            F.assert(grassModel.hasAO() === true, 'grass_block model hasAO() = true');
+            F.assertEq(grassModel.getFaceTexture('up'), 'grass_block_top', 'grass_block up face = grass_block_top');
+            F.assertEq(grassModel.getFaceTexture('north'), 'grass_block_side', 'grass_block north face = grass_block_side');
+            F.assertEq(grassModel.getFaceTexture('down'), 'dirt', 'grass_block down face = dirt');
 
-    // Test model with custom faces (grass block)
-    var grassModel = Donkeycraft.BlockModelRegistry.getBlockModel(8);
-    F.assert(grassModel.hasAO() === true, 'grass_block model hasAO() = true');
-    F.assertEq(grassModel.getFaceTexture('up'), 'grass_block_top', 'grass_block up face = grass_block_top');
-    F.assertEq(grassModel.getFaceTexture('north'), 'grass_block_side', 'grass_block north face = grass_block_side');
-    F.assertEq(grassModel.getFaceTexture('down'), 'dirt', 'grass_block down face = dirt');
+            // Test air model (should be skipped)
+            var airModel = Donkeycraft.BlockModelRegistry.getBlockModel(0);
+            F.assertType(airModel, 'object', 'air model exists as default cube');
 
-    // Test air model (should be skipped)
-    var airModel = Donkeycraft.BlockModelRegistry.getBlockModel(0);
-    F.assertType(airModel, 'object', 'air model exists as default cube');
+            // ============================================================
+            // Section 8: Block Models — UV and AO
+            // ============================================================
+            F.section('8. Block Models — UV and AO');
 
-    // ============================================================
-    // Section 8: Block Models — UV and AO
-    // ============================================================
-    F.section('8. Block Models — UV and AO');
+            var uv = Donkeycraft.BlockModelRegistry.getFaceUV(1, 'up');
+            F.assert(uv !== null, 'getFaceUV(stone, up) returns object');
+            F.assertEq(uv.blockId, 1, 'uv.blockId = 1');
+            F.assertEq(uv.faceName, 'up', 'uv.faceName = "up"');
+            F.assert(typeof uv.textureName, 'string', 'uv.textureName is string');
+            F.assertType(uv.u, 'number', 'uv.u is number');
+            F.assertType(uv.v, 'number', 'uv.v is number');
+            F.assertType(uv.uSize, 'number', 'uv.uSize is number');
+            F.assertType(uv.vSize, 'number', 'uv.vSize is number');
 
-    var uv = Donkeycraft.BlockModelRegistry.getFaceUV(1, 'up');
-    F.assert(uv !== null, 'getFaceUV(stone, up) returns object');
-    F.assertEq(uv.blockId, 1, 'uv.blockId = 1');
-    F.assertEq(uv.faceName, 'up', 'uv.faceName = "up"');
-    F.assert(typeof uv.textureName, 'string', 'uv.textureName is string');
-    F.assertType(uv.u, 'number', 'uv.u is number');
-    F.assertType(uv.v, 'number', 'uv.v is number');
-    F.assertType(uv.uSize, 'number', 'uv.uSize is number');
-    F.assertType(uv.vSize, 'number', 'uv.vSize is number');
-
-    var uvNull = Donkeycraft.BlockModelRegistry.getFaceUV(-1, 'up');
-    F.assert(uvNull === null, 'getFaceUV(-1, up) returns null (invalid block)');
-
-    F.assert(Donkeycraft.BlockModelRegistry.hasAO(1) === true, 'hasAO(stone=1) = true');
-    F.assert(Donkeycraft.BlockModelRegistry.hasAO(45) === false, 'hasAO(glass=45) = false');
+            var uvNull = Donkeycraft.BlockModelRegistry.getFaceUV(-1, 'up');
+            F.assert(uvNull === null, 'getFaceUV(-1, up) returns null (invalid block)');
 
-    var modelCount = Donkeycraft.BlockModelRegistry.getModelCount();
-    F.assert(modelCount > 0, 'getModelCount() > 0 (got ' + modelCount + ')');
-
-    var allModels = Donkeycraft.BlockModelRegistry.getAllModels();
-    F.assert(allModels.length > 0, 'getAllModels() returns non-empty array');
-
-    // Test face constants
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_UP, 0, 'FACE_UP = 0');
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_DOWN, 1, 'FACE_DOWN = 1');
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_NORTH, 2, 'FACE_NORTH = 2');
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_SOUTH, 3, 'FACE_SOUTH = 3');
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_EAST, 4, 'FACE_EAST = 4');
-    F.assertEq(Donkeycraft.BlockModelRegistry.FACE_WEST, 5, 'FACE_WEST = 5');
-
-    // ============================================================
-    // Section 9: Recipe Registry — Core
-    // ============================================================
-    F.section('9. Recipe Registry — Core');
-
-    F.assert(typeof Donkeycraft.Recipe === 'function', 'Donkeycraft.Recipe constructor exists');
-    F.assert(typeof Donkeycraft.RecipeRegistry === 'object', 'RecipeRegistry registered');
-
-    var recipe = new Donkeycraft.Recipe(1, 'shaped', [30, 30, 30, 30], 2, 195, 1);
-    F.assertEq(recipe.id, 1, 'recipe.id = 1');
-    F.assertEq(recipe.type, 'shaped', 'recipe.type = "shaped"');
-    F.assertEq(recipe.gridSize, 2, 'recipe.gridSize = 2');
-    F.assertEq(recipe.outputBlockId, 195, 'recipe.outputBlockId = 195');
-    F.assertEq(recipe.outputCount, 1, 'recipe.outputCount = 1');
-
-    var smeltRecipe = new Donkeycraft.Recipe(200, 'smelt', [{ id: 138 }], 0, 113, 1, 200);
-    F.assertEq(smeltRecipe.cookingTime, 200, 'smelt recipe cookingTime = 200');
-
-    // ============================================================
-    // Section 10: Recipe Registry — Counts and Lookup
-    // ============================================================
-    F.section('10. Recipe Registry — Counts and Lookup');
-
-    var shapedCount = Donkeycraft.RecipeRegistry.getShapedCount();
-    F.assert(shapedCount > 50, 'getShapedCount() > 50 (got ' + shapedCount + ')');
-
-    var shapelessCount = Donkeycraft.RecipeRegistry.getShapelessCount();
-    F.assert(shapelessCount > 20, 'getShapelessCount() > 20 (got ' + shapelessCount + ')');
-
-    var smeltCount = Donkeycraft.RecipeRegistry.getSmeltCount();
-    F.assert(smeltCount > 10, 'getSmeltCount() > 10 (got ' + smeltCount + ')');
-
-    var allRecipes = Donkeycraft.RecipeRegistry.getAllRecipes();
-    F.assert(allRecipes.length === shapedCount + shapelessCount + smeltCount, 'getAllRecipes length = sum of all types');
-
-    var recipeById = Donkeycraft.RecipeRegistry.getRecipeById(1);
-    F.assert(recipeById !== null, 'getRecipeById(1) returns a recipe');
-    F.assertEq(recipeById.id, 1, 'getRecipeById(1).id = 1');
-
-    var missingRecipe = Donkeycraft.RecipeRegistry.getRecipeById(99999);
-    F.assert(missingRecipe === null, 'getRecipeById(99999) returns null');
-
-    // ============================================================
-    // Section 11: Recipe Registry — Matching
-    // ============================================================
-    F.section('11. Recipe Registry — Matching');
-
-    // Test shaped recipe matching (2×2 grid for planks from logs)
-    var inputGrid = [
-        [24, null],
-        [24, null]
-    ];
-    var match = Donkeycraft.RecipeRegistry.matchShapedRecipe(inputGrid, 2, 2);
-    F.assert(match !== null, 'matchShapedRecipe finds oak_log -> plank recipe');
-    if (match) {
-        F.assertEq(match.outputBlockId, 30, 'shaped match output = oak_planks (30)');
-    }
-
-    // Test no match
-    var emptyGrid = [
-        [null, null],
-        [null, null]
-    ];
-    var noMatch = Donkeycraft.RecipeRegistry.matchShapedRecipe(emptyGrid, 2, 2);
-    F.assert(noMatch === null, 'matchShapedRecipe returns null for empty grid');
-
-    // Test shapeless recipe matching (iron block -> 9 ingots)
-    var itemCounts = { 226: 1 };
-    var shapelessMatch = Donkeycraft.RecipeRegistry.matchShapelessRecipe(itemCounts);
-    F.assert(shapelessMatch !== null, 'matchShapelessRecipe finds iron_block recipe');
-
-    // Test smelting recipe lookup
-    var smeltRecipe = Donkeycraft.RecipeRegistry.getSmeltRecipe(138);
-    F.assert(smeltRecipe !== null, 'getSmeltRecipe(cobblestone=138) returns recipe');
-    if (smeltRecipe) {
-        F.assertEq(smeltRecipe.outputBlockId, 113, 'smelt output = smooth_stone (113)');
-    }
-
-    var smeltOutput = Donkeycraft.RecipeRegistry.getSmeltOutput(19);
-    F.assertEq(smeltOutput, 45, 'getSmeltOutput(sand=19) = glass (45)');
-
-    var smeltTime = Donkeycraft.RecipeRegistry.getSmeltTime(138);
-    F.assertEq(smeltTime, 200, 'getSmeltTime(cobblestone=138) = 200 ticks');
-
-    // ============================================================
-    // Section 12: Block System — Cross-Module Integration
-    // ============================================================
-    F.section('12. Block System — Cross-Module Integration');
-
-    // Test that BlockTypes uses data from BlockRegistry correctly
-    var stoneBlock = Donkeycraft.BlockRegistry.getBlockById(1);
-    F.assert(stoneBlock !== null, 'stone block exists in registry');
-    F.assert(Donkeycraft.BlockTypes.isSolid(1) === true, 'BlockTypes agrees stone is solid');
-    F.assert(Donkeycraft.BlockTypes.isOpaque(1) === true, 'BlockTypes agrees stone is opaque');
-
-    // Test that BlockModels uses data from BlockRegistry correctly
-    var oakLogModel = Donkeycraft.BlockModelRegistry.getBlockModel(24);
-    F.assert(oakLogModel !== null, 'oak_log model exists');
-    F.assertEq(oakLogModel.blockId, 24, 'oak_log model blockId = 24');
-
-    // Test that BlockStateRegistry knows about logs
-    var logVariantStates = Donkeycraft.BlockStateRegistry.getPossibleStates(24);
-    F.assert(logVariantStates.length >= 3, 'oak_log has axis variants (x, y, z)');
-
-    // Test consistency: all solid blocks should have a model
-    var solidIds = Donkeycraft.BlockTypes.getIdsByType('solid');
-    var allModelsHaveSolid = true;
-    for (var si = 0; si < Math.min(solidIds.length, 50); si++) {
-        var sid = solidIds[si];
-        var sm = Donkeycraft.BlockModelRegistry.getBlockModel(sid);
-        if (!sm) { allModelsHaveSolid = false; break; }
-    }
-    F.assert(allModelsHaveSolid, 'All solid blocks have models');
-
-    // Test consistency: all liquid blocks are classified correctly
-    var liquidIds = Donkeycraft.BlockTypes.getIdsByType('liquid');
-    var allLiquidCorrect = true;
-    for (var li = 0; li < liquidIds.length; li++) {
-        var lid = liquidIds[li];
-        if (!Donkeycraft.BlockRegistry.isLiquid(lid)) { allLiquidCorrect = false; break; }
-    }
-    F.assert(allLiquidCorrect, 'All BlockTypes.liquid blocks are also BlockRegistry.liquid');
-
-    // ============================================================
-    // Section 13: Edge Cases and Error Handling
-    // ============================================================
-    F.section('13. Edge Cases and Error Handling');
-
-    // Test null/undefined lookups
-    var nullBlock = Donkeycraft.BlockRegistry.getBlockById(-1);
-    F.assert(nullBlock === null, 'getBlockById(-1) returns null');
-
-    var nullByName = Donkeycraft.BlockRegistry.getBlockByName('');
-    F.assert(nullByName === null, 'getBlockByName("") returns null');
-
-    // Test BlockState with null/undefined
-    var nullState = new Donkeycraft.BlockState(null);
-    F.assert(nullState.isEmpty() === true, 'BlockState(null) is empty');
-
-    var undefState = new Donkeycraft.BlockState(undefined);
-    F.assert(undefState.isEmpty() === true, 'BlockState(undefined) is empty');
-
-    // Test matches with null
-    var s1 = new Donkeycraft.BlockState({ a: 1 });
-    F.assert(s1.matches(null) === false, 'BlockState.matches(null) = false');
-
-    // Test getFaceUV for various blocks
-    var uvStone = Donkeycraft.BlockModelRegistry.getFaceUV(1, 'down');
-    F.assert(uvStone !== null, 'getFaceUV(stone, down) works');
-    if (uvStone) {
-        F.assertEq(uvStone.faceName, 'down', 'faceName = "down"');
-    }
-
-    // Test recipe with missing ID
-    var noRecipe = Donkeycraft.RecipeRegistry.getRecipeById(0);
-    F.assert(noRecipe === null, 'getRecipeById(0) returns null (no recipe with ID 0)');
-
-    // Test getDefaultState for block without states
-    var defaultStone = Donkeycraft.BlockStateRegistry.getDefaultState(1);
-    F.assertType(defaultStone, 'object', 'getDefaultState(stone) returns BlockState');
-    F.assert(defaultStone.isEmpty() === true, 'default stone state is empty');
-
-    // ============================================================
-    // Finish: renders summary at top of page
-    // ============================================================
-    F.finishTests();
-
-})();
-</script>
+            F.assert(Donkeycraft.BlockModelRegistry.hasAO(1) === true, 'hasAO(stone=1) = true');
+            F.assert(Donkeycraft.BlockModelRegistry.hasAO(45) === false, 'hasAO(glass=45) = false');
+
+            var modelCount = Donkeycraft.BlockModelRegistry.getModelCount();
+            F.assert(modelCount > 0, 'getModelCount() > 0 (got ' + modelCount + ')');
+
+            var allModels = Donkeycraft.BlockModelRegistry.getAllModels();
+            F.assert(allModels.length > 0, 'getAllModels() returns non-empty array');
+
+            // Test face constants
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_UP, 0, 'FACE_UP = 0');
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_DOWN, 1, 'FACE_DOWN = 1');
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_NORTH, 2, 'FACE_NORTH = 2');
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_SOUTH, 3, 'FACE_SOUTH = 3');
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_EAST, 4, 'FACE_EAST = 4');
+            F.assertEq(Donkeycraft.BlockModelRegistry.FACE_WEST, 5, 'FACE_WEST = 5');
+
+            // ============================================================
+            // Section 9: Recipe Registry — Core
+            // ============================================================
+            F.section('9. Recipe Registry — Core');
+
+            F.assert(typeof Donkeycraft.Recipe === 'function', 'Donkeycraft.Recipe constructor exists');
+            F.assert(typeof Donkeycraft.RecipeRegistry === 'object', 'RecipeRegistry registered');
+
+            var recipe = new Donkeycraft.Recipe(1, 'shaped', [30, 30, 30, 30], 2, 195, 1);
+            F.assertEq(recipe.id, 1, 'recipe.id = 1');
+            F.assertEq(recipe.type, 'shaped', 'recipe.type = "shaped"');
+            F.assertEq(recipe.gridSize, 2, 'recipe.gridSize = 2');
+            F.assertEq(recipe.outputBlockId, 195, 'recipe.outputBlockId = 195');
+            F.assertEq(recipe.outputCount, 1, 'recipe.outputCount = 1');
+
+            var smeltRecipe = new Donkeycraft.Recipe(200, 'smelt', [{ id: 138 }], 0, 113, 1, 200);
+            F.assertEq(smeltRecipe.cookingTime, 200, 'smelt recipe cookingTime = 200');
+
+            // ============================================================
+            // Section 10: Recipe Registry — Counts and Lookup
+            // ============================================================
+            F.section('10. Recipe Registry — Counts and Lookup');
+
+            var shapedCount = Donkeycraft.RecipeRegistry.getShapedCount();
+            F.assert(shapedCount > 50, 'getShapedCount() > 50 (got ' + shapedCount + ')');
+
+            var shapelessCount = Donkeycraft.RecipeRegistry.getShapelessCount();
+            F.assert(shapelessCount > 20, 'getShapelessCount() > 20 (got ' + shapelessCount + ')');
+
+            var smeltCount = Donkeycraft.RecipeRegistry.getSmeltCount();
+            F.assert(smeltCount > 10, 'getSmeltCount() > 10 (got ' + smeltCount + ')');
+
+            var allRecipes = Donkeycraft.RecipeRegistry.getAllRecipes();
+            F.assert(allRecipes.length === shapedCount + shapelessCount + smeltCount, 'getAllRecipes length = sum of all types');
+
+            var recipeById = Donkeycraft.RecipeRegistry.getRecipeById(1);
+            F.assert(recipeById !== null, 'getRecipeById(1) returns a recipe');
+            F.assertEq(recipeById.id, 1, 'getRecipeById(1).id = 1');
+
+            var missingRecipe = Donkeycraft.RecipeRegistry.getRecipeById(99999);
+            F.assert(missingRecipe === null, 'getRecipeById(99999) returns null');
+
+            // ============================================================
+            // Section 11: Recipe Registry — Matching
+            // ============================================================
+            F.section('11. Recipe Registry — Matching');
+
+            // Test shaped recipe matching (2×2 grid for planks from logs)
+            var inputGrid = [
+                [24, null],
+                [24, null]
+            ];
+            var match = Donkeycraft.RecipeRegistry.matchShapedRecipe(inputGrid, 2, 2);
+            F.assert(match !== null, 'matchShapedRecipe finds oak_log -> plank recipe');
+            if (match) {
+                F.assertEq(match.outputBlockId, 30, 'shaped match output = oak_planks (30)');
+            }
+
+            // Test no match
+            var emptyGrid = [
+                [null, null],
+                [null, null]
+            ];
+            var noMatch = Donkeycraft.RecipeRegistry.matchShapedRecipe(emptyGrid, 2, 2);
+            F.assert(noMatch === null, 'matchShapedRecipe returns null for empty grid');
+
+            // Test shapeless recipe matching (iron block -> 9 ingots)
+            var itemCounts = { 226: 1 };
+            var shapelessMatch = Donkeycraft.RecipeRegistry.matchShapelessRecipe(itemCounts);
+            F.assert(shapelessMatch !== null, 'matchShapelessRecipe finds iron_block recipe');
+
+            // Test smelting recipe lookup
+            var smeltRecipe = Donkeycraft.RecipeRegistry.getSmeltRecipe(138);
+            F.assert(smeltRecipe !== null, 'getSmeltRecipe(cobblestone=138) returns recipe');
+            if (smeltRecipe) {
+                F.assertEq(smeltRecipe.outputBlockId, 113, 'smelt output = smooth_stone (113)');
+            }
+
+            var smeltOutput = Donkeycraft.RecipeRegistry.getSmeltOutput(19);
+            F.assertEq(smeltOutput, 45, 'getSmeltOutput(sand=19) = glass (45)');
+
+            var smeltTime = Donkeycraft.RecipeRegistry.getSmeltTime(138);
+            F.assertEq(smeltTime, 200, 'getSmeltTime(cobblestone=138) = 200 ticks');
+
+            // ============================================================
+            // Section 12: Block System — Cross-Module Integration
+            // ============================================================
+            F.section('12. Block System — Cross-Module Integration');
+
+            // Test that BlockTypes uses data from BlockRegistry correctly
+            var stoneBlock = Donkeycraft.BlockRegistry.getBlockById(1);
+            F.assert(stoneBlock !== null, 'stone block exists in registry');
+            F.assert(Donkeycraft.BlockTypes.isSolid(1) === true, 'BlockTypes agrees stone is solid');
+            F.assert(Donkeycraft.BlockTypes.isOpaque(1) === true, 'BlockTypes agrees stone is opaque');
+
+            // Test that BlockModels uses data from BlockRegistry correctly
+            var oakLogModel = Donkeycraft.BlockModelRegistry.getBlockModel(24);
+            F.assert(oakLogModel !== null, 'oak_log model exists');
+            F.assertEq(oakLogModel.blockId, 24, 'oak_log model blockId = 24');
+
+            // Test that BlockStateRegistry knows about logs
+            var logVariantStates = Donkeycraft.BlockStateRegistry.getPossibleStates(24);
+            F.assert(logVariantStates.length >= 3, 'oak_log has axis variants (x, y, z)');
+
+            // Test consistency: all solid blocks should have a model
+            var solidIds = Donkeycraft.BlockTypes.getIdsByType('solid');
+            var allModelsHaveSolid = true;
+            for (var si = 0; si < Math.min(solidIds.length, 50); si++) {
+                var sid = solidIds[si];
+                var sm = Donkeycraft.BlockModelRegistry.getBlockModel(sid);
+                if (!sm) { allModelsHaveSolid = false; break; }
+            }
+            F.assert(allModelsHaveSolid, 'All solid blocks have models');
+
+            // Test consistency: all liquid blocks are classified correctly
+            var liquidIds = Donkeycraft.BlockTypes.getIdsByType('liquid');
+            var allLiquidCorrect = true;
+            for (var li = 0; li < liquidIds.length; li++) {
+                var lid = liquidIds[li];
+                if (!Donkeycraft.BlockRegistry.isLiquid(lid)) { allLiquidCorrect = false; break; }
+            }
+            F.assert(allLiquidCorrect, 'All BlockTypes.liquid blocks are also BlockRegistry.liquid');
+
+            // ============================================================
+            // Section 13: Edge Cases and Error Handling
+            // ============================================================
+            F.section('13. Edge Cases and Error Handling');
+
+            // Test null/undefined lookups
+            var nullBlock = Donkeycraft.BlockRegistry.getBlockById(-1);
+            F.assert(nullBlock === null, 'getBlockById(-1) returns null');
+
+            var nullByName = Donkeycraft.BlockRegistry.getBlockByName('');
+            F.assert(nullByName === null, 'getBlockByName("") returns null');
+
+            // Test BlockState with null/undefined
+            var nullState = new Donkeycraft.BlockState(null);
+            F.assert(nullState.isEmpty() === true, 'BlockState(null) is empty');
+
+            var undefState = new Donkeycraft.BlockState(undefined);
+            F.assert(undefState.isEmpty() === true, 'BlockState(undefined) is empty');
+
+            // Test matches with null
+            var s1 = new Donkeycraft.BlockState({ a: 1 });
+            F.assert(s1.matches(null) === false, 'BlockState.matches(null) = false');
+
+            // Test getFaceUV for various blocks
+            var uvStone = Donkeycraft.BlockModelRegistry.getFaceUV(1, 'down');
+            F.assert(uvStone !== null, 'getFaceUV(stone, down) works');
+            if (uvStone) {
+                F.assertEq(uvStone.faceName, 'down', 'faceName = "down"');
+            }
+
+            // Test recipe with missing ID
+            var noRecipe = Donkeycraft.RecipeRegistry.getRecipeById(0);
+            F.assert(noRecipe === null, 'getRecipeById(0) returns null (no recipe with ID 0)');
+
+            // Test getDefaultState for block without states
+            var defaultStone = Donkeycraft.BlockStateRegistry.getDefaultState(1);
+            F.assertType(defaultStone, 'object', 'getDefaultState(stone) returns BlockState');
+            F.assert(defaultStone.isEmpty() === true, 'default stone state is empty');
+
+            // ============================================================
+            // Finish: renders summary at top of page
+            // ============================================================
+            F.finishTests();
+
+        })();
+    </script>
 </body>
+
 </html>

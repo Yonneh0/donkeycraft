@@ -1,6 +1,6 @@
 // Donkeycraft — Debug Overlay (F3)
 // Collects F3 debug data and emits via EventBus for display by the main game overlay.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * @param {Object} eventBus - The global EventBus instance.
      * @param {Object} [config=null] - Donkeycraft.Config for constants.
      */
-    Donkeycraft.DebugOverlay = function(eventBus, config) {
+    Donkeycraft.DebugOverlay = function (eventBus, config) {
         this._eventBus = eventBus;
         this._config = config || Donkeycraft.Config;
 
@@ -51,7 +51,7 @@
      * _initDOM — caches a reference to the debug overlay DOM element.
      * @private
      */
-    Donkeycraft.DebugOverlay.prototype._initDOM = function() {
+    Donkeycraft.DebugOverlay.prototype._initDOM = function () {
         this._element = document.getElementById('dk-debug-overlay');
     };
 
@@ -60,7 +60,7 @@
      * Accepts any object with a getDeltaTime() method (duck typing).
      * @param {Object} [timer=null] - Donkeycraft.Timer instance or compatible duck-typed object.
      */
-    Donkeycraft.DebugOverlay.prototype.setTimer = function(timer) {
+    Donkeycraft.DebugOverlay.prototype.setTimer = function (timer) {
         this._timer = timer;
     };
 
@@ -68,7 +68,7 @@
      * setPlayer — sets a reference to the player entity.
      * @param {Donkeycraft.Player} player - Player instance.
      */
-    Donkeycraft.DebugOverlay.prototype.setPlayer = function(player) {
+    Donkeycraft.DebugOverlay.prototype.setPlayer = function (player) {
         this._player = player;
     };
 
@@ -76,7 +76,7 @@
      * setChunkManager — sets a reference to the chunk manager.
      * @param {Object} chunkManager - ChunkManager instance.
      */
-    Donkeycraft.DebugOverlay.prototype.setChunkManager = function(chunkManager) {
+    Donkeycraft.DebugOverlay.prototype.setChunkManager = function (chunkManager) {
         this._chunkManager = chunkManager;
     };
 
@@ -84,7 +84,7 @@
      * setBiome — sets a reference to the biome definitions.
      * @param {Object} biome - Biome module with getBiomeAt(chunkX, chunkZ) method.
      */
-    Donkeycraft.DebugOverlay.prototype.setBiome = function(biome) {
+    Donkeycraft.DebugOverlay.prototype.setBiome = function (biome) {
         this._biome = biome;
     };
 
@@ -92,7 +92,7 @@
      * setGameMode — sets the current game mode string.
      * @param {string} mode - Game mode ('survival', 'creative', 'spectator').
      */
-    Donkeycraft.DebugOverlay.prototype.setGameMode = function(mode) {
+    Donkeycraft.DebugOverlay.prototype.setGameMode = function (mode) {
         this._gameMode = mode || 'survival';
     };
 
@@ -100,7 +100,7 @@
      * setTerrainRenderer — sets a reference to the terrain renderer for rendering stats.
      * @param {Object} terrainRenderer - TerrainRenderer instance with getRenderStats() method.
      */
-    Donkeycraft.DebugOverlay.prototype.setTerrainRenderer = function(terrainRenderer) {
+    Donkeycraft.DebugOverlay.prototype.setTerrainRenderer = function (terrainRenderer) {
         this._terrainRenderer = terrainRenderer || null;
     };
 
@@ -108,7 +108,7 @@
      * setWireframeRenderer — sets a reference to the wireframe renderer.
      * @param {Object} wireframeRenderer - WireframeRenderer instance.
      */
-    Donkeycraft.DebugOverlay.prototype.setWireframeRenderer = function(wireframeRenderer) {
+    Donkeycraft.DebugOverlay.prototype.setWireframeRenderer = function (wireframeRenderer) {
         this._wireframeRenderer = wireframeRenderer || null;
     };
 
@@ -116,7 +116,7 @@
      * getFPS — gets the current FPS value.
      * @returns {number}
      */
-    Donkeycraft.DebugOverlay.prototype.getFPS = function() {
+    Donkeycraft.DebugOverlay.prototype.getFPS = function () {
         return this._fps;
     };
 
@@ -124,7 +124,7 @@
      * setFPS — sets the FPS value directly.
      * @param {number} fps - FPS count.
      */
-    Donkeycraft.DebugOverlay.prototype.setFPS = function(fps) {
+    Donkeycraft.DebugOverlay.prototype.setFPS = function (fps) {
         this._fps = Math.max(0, Math.round(fps));
     };
 
@@ -132,7 +132,7 @@
      * getChunkInfo — gets chunk-related debug data.
      * @returns {Object} Chunk information.
      */
-    Donkeycraft.DebugOverlay.prototype.getChunkInfo = function() {
+    Donkeycraft.DebugOverlay.prototype.getChunkInfo = function () {
         if (!this._chunkManager) {
             return { loaded: 0, renderDistance: 8 };
         }
@@ -142,14 +142,14 @@
             if (this._config && typeof this._config.RENDER_DISTANCE === 'number') {
                 renderDist = this._config.RENDER_DISTANCE;
             }
-        } catch (e) {}
+        } catch (e) { }
 
         // Count loaded chunks
         var loaded = 0;
         try {
             var chunks = this._chunkManager.getAllChunks ? this._chunkManager.getAllChunks() : [];
             loaded = chunks.length;
-        } catch (e) {}
+        } catch (e) { }
 
         return {
             loaded: loaded,
@@ -163,7 +163,7 @@
      * Each access is independently try/catched so one failure does not suppress others.
      * @returns {{x: number, y: number, z: number, pitch: number, yaw: number, mode: string}}
      */
-    Donkeycraft.DebugOverlay.prototype.getPlayerCoords = function() {
+    Donkeycraft.DebugOverlay.prototype.getPlayerCoords = function () {
         var x = 0, y = 0, z = 0;
         var pitch = 0, yaw = 0;
         var mode = this._gameMode;
@@ -177,7 +177,7 @@
                     y = typeof pos.y === 'number' ? pos.y : 0;
                     z = typeof pos.z === 'number' ? pos.z : 0;
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             // getRotation() returns { yaw: number, pitch: number } in radians.
             try {
@@ -186,11 +186,11 @@
                     yaw = typeof rot.yaw === 'number' ? rot.yaw : 0;
                     pitch = typeof rot.pitch === 'number' ? rot.pitch : 0;
                 }
-            } catch (e) {}
+            } catch (e) { }
 
             try {
                 mode = this._player.getGameMode ? this._player.getGameMode() : 'survival';
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return {
@@ -208,7 +208,7 @@
      * Uses getPosition() to extract chunk coordinates, then calls biome.getBiomeAt(chunkX, chunkZ).
      * @returns {string} Biome name or 'Unknown' if unavailable.
      */
-    Donkeycraft.DebugOverlay.prototype.getBiomeName = function() {
+    Donkeycraft.DebugOverlay.prototype.getBiomeName = function () {
         if (!this._biome || !this._player) return 'Unknown';
 
         var px = 0, pz = 0;
@@ -240,9 +240,9 @@
      * getGameMode — gets the current game mode string.
      * @returns {string}
      */
-    Donkeycraft.DebugOverlay.prototype.getGameMode = function() {
+    Donkeycraft.DebugOverlay.prototype.getGameMode = function () {
         if (this._player && this._player.getGameMode) {
-            try { return this._player.getGameMode(); } catch (e) {}
+            try { return this._player.getGameMode(); } catch (e) { }
         }
         return this._gameMode;
     };
@@ -252,7 +252,7 @@
      * Uses getPosition() to read world coordinates, then queries the chunk for light data.
      * @returns {{sky: number, block: number}} Sky and block light values (0-15).
      */
-    Donkeycraft.DebugOverlay.prototype.getLightLevels = function() {
+    Donkeycraft.DebugOverlay.prototype.getLightLevels = function () {
         var skyLight = 15; // Default: full daylight
         var blockLight = 0;
 
@@ -277,9 +277,9 @@
                     try {
                         skyLight = chunk.getSkyLight ? chunk.getSkyLight(localX, localY, localZ) : 15;
                         blockLight = chunk.getBlockLight ? chunk.getBlockLight(localX, localY, localZ) : 0;
-                    } catch (e) {}
+                    } catch (e) { }
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
 
         return {
@@ -296,7 +296,7 @@
      * @param {Object} [chunkManager=null] - Optional chunk manager override (does not persist).
      * @returns {Object} Complete debug data object.
      */
-    Donkeycraft.DebugOverlay.prototype.collectData = function(player, chunkManager) {
+    Donkeycraft.DebugOverlay.prototype.collectData = function (player, chunkManager) {
         // Use passed arguments locally without mutating internal state
         var localPlayer = player || this._player;
         var localChunkManager = chunkManager || this._chunkManager;
@@ -330,7 +330,7 @@
                     showBedrock = this._wireframeRenderer._showBedrock !== false;
                     showClouds = this._wireframeRenderer._showClouds !== false;
                     showSolidBlocks = this._wireframeRenderer._showSolidBlocks !== false;
-                } catch (e) {}
+                } catch (e) { }
             }
 
             // Get terrain renderer stats
@@ -343,7 +343,7 @@
                         renderStats.meshesBuilt = stats.meshesBuilt || 0;
                         renderStats.drawCalls = stats.drawCalls || 0;
                     }
-                } catch (e) {}
+                } catch (e) { }
             }
 
             return {
@@ -375,14 +375,14 @@
      * @returns {number} Delta time in seconds, or 0 if unavailable.
      * @private
      */
-    Donkeycraft.DebugOverlay.prototype._getDeltaTime = function() {
+    Donkeycraft.DebugOverlay.prototype._getDeltaTime = function () {
         if (this._timer) {
             try {
                 if (typeof this._timer.getDeltaTime === 'function') {
                     var dt = this._timer.getDeltaTime();
                     return (typeof dt === 'number' && dt >= 0) ? dt : 0;
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
         return 0;
     };
@@ -393,7 +393,7 @@
      * @returns {number} Current FPS count.
      * @private
      */
-    Donkeycraft.DebugOverlay.prototype._getFPS = function() {
+    Donkeycraft.DebugOverlay.prototype._getFPS = function () {
         // Prefer Timer's FPS counter (most accurate, uses performance.now).
         if (this._timer) {
             try {
@@ -401,7 +401,7 @@
                     var fps = this._timer.getFPS();
                     return (typeof fps === 'number' && fps >= 0) ? fps : 0;
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
         // Fallback to internal FPS counter (render-frame based).
         return this._fps;
@@ -412,7 +412,7 @@
      * @private
      * @param {Object} data - Complete debug data object from collectData().
      */
-    Donkeycraft.DebugOverlay.prototype._renderDOM = function(data) {
+    Donkeycraft.DebugOverlay.prototype._renderDOM = function (data) {
         if (!this._element) return;
 
         var coords = data.coordinates;
@@ -479,7 +479,7 @@
      * @param {Donkeycraft.Player} player - Player instance.
      * @param {Object} chunkManager - ChunkManager instance.
      */
-    Donkeycraft.DebugOverlay.prototype.update = function(player, chunkManager) {
+    Donkeycraft.DebugOverlay.prototype.update = function (player, chunkManager) {
         var data = this.collectData(player, chunkManager);
 
         // Render directly to DOM
@@ -489,7 +489,7 @@
         if (this._eventBus) {
             try {
                 this._eventBus.emit('debug:update', data);
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
@@ -501,13 +501,13 @@
      * Note: The FPS value emitted in collectData() may be 1 frame behind
      * because the FPS calculation happens before data collection in the render loop.
      */
-    Donkeycraft.DebugOverlay.prototype.startListening = function() {
+    Donkeycraft.DebugOverlay.prototype.startListening = function () {
         if (this._unsubscribeRender) return;
 
         var self = this;
         if (this._timer) {
             try {
-                this._unsubscribeRender = this._timer.onRender(function(timestamp) {
+                this._unsubscribeRender = this._timer.onRender(function (timestamp) {
                     // Update FPS counter
                     self._frameCount++;
 
@@ -530,16 +530,16 @@
                         self.update(self._player, self._chunkManager);
                     }
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
     /**
      * stopListening — stops auto-updating.
      */
-    Donkeycraft.DebugOverlay.prototype.stopListening = function() {
+    Donkeycraft.DebugOverlay.prototype.stopListening = function () {
         if (this._unsubscribeRender) {
-            try { this._unsubscribeRender(); } catch (e) {}
+            try { this._unsubscribeRender(); } catch (e) { }
             this._unsubscribeRender = null;
         }
     };
@@ -547,7 +547,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.DebugOverlay.prototype.destroy = function() {
+    Donkeycraft.DebugOverlay.prototype.destroy = function () {
         this.stopListening();
         this._eventBus = null;
         this._config = null;

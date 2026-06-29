@@ -1,6 +1,6 @@
 // Donkeycraft — Portal System
 // Nether portal frame detection, portal creation, dimension travel.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -14,7 +14,7 @@
     /**
      * Portal — manages nether portal detection, creation, and dimension travel.
      */
-    Donkeycraft.Portal = (function() {
+    Donkeycraft.Portal = (function () {
         var _portalPositions = {};   // "dim,x,y,z" → portal state
         var _eventBus = null;         // EventBus for emitting events
         var _chunkManager = null;     // ChunkManager reference
@@ -364,8 +364,8 @@
             // Register portal position with correct dimension type
             var dimKey = typeof dimensionType === 'number' ? (
                 dimensionType === Donkeycraft.DimensionType.NETHER ? 'nether' :
-                dimensionType === Donkeycraft.DimensionType.END ? 'end' :
-                'overworld'
+                    dimensionType === Donkeycraft.DimensionType.END ? 'end' :
+                        'overworld'
             ) : 'overworld';
             var key = dimKey + ',' + Math.round(worldX) + ',' + Math.round(worldY) + ',' + Math.round(worldZ);
             _portalPositions[key] = {

@@ -1,6 +1,6 @@
 // Donkeycraft — Projectiles
 // Arrows, snowballs, ender pearls, dragon breath, lava buckets.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -21,11 +21,11 @@
      * ProjectileStats — projectile-specific statistics.
      */
     Donkeycraft.ProjectileStats = {
-        arrow:          { speed: 2.0, damage: 3, gravity: 0.05, lifetime: 60, pierce: false },
-        snowball:       { speed: 1.5, damage: 0, gravity: 0.1, lifetime: 20, bounce: true },
-        ender_pearl:    { speed: 2.5, damage: 0, gravity: 0.08, lifetime: 30, teleport: true },
-        dragon_breath:  { speed: 0.3, damage: 1, gravity: 0, lifetime: 300, area: true, areaRadius: 3 },
-        lava_bucket:    { speed: 1.8, damage: 5, gravity: 0.15, lifetime: 15, explode: true }
+        arrow: { speed: 2.0, damage: 3, gravity: 0.05, lifetime: 60, pierce: false },
+        snowball: { speed: 1.5, damage: 0, gravity: 0.1, lifetime: 20, bounce: true },
+        ender_pearl: { speed: 2.5, damage: 0, gravity: 0.08, lifetime: 30, teleport: true },
+        dragon_breath: { speed: 0.3, damage: 1, gravity: 0, lifetime: 300, area: true, areaRadius: 3 },
+        lava_bucket: { speed: 1.8, damage: 5, gravity: 0.15, lifetime: 15, explode: true }
     };
 
     /**
@@ -40,7 +40,7 @@
      * @param {number} config.vz - Initial Z velocity.
      * @param {Donkeycraft.Entity} [config.owner] - Entity that fired this projectile.
      */
-    Donkeycraft.Projectile = function(config) {
+    Donkeycraft.Projectile = function (config) {
         config = config || {};
 
         var stats = Donkeycraft.ProjectileStats[config.type];
@@ -154,14 +154,14 @@
      * Check if the projectile is expired or destroyed.
      * @returns {boolean}
      */
-    Donkeycraft.Projectile.prototype.isExpired = function() {
+    Donkeycraft.Projectile.prototype.isExpired = function () {
         return this._age >= this.lifetime || !this.isAlive() || this._destroyed;
     };
 
     /**
      * Destroy the projectile and free resources.
      */
-    Donkeycraft.Projectile.prototype.destroy = function() {
+    Donkeycraft.Projectile.prototype.destroy = function () {
         // Call despawn first (before _destroyed check in Entity.despawn)
         this.despawn();
         this._destroyed = true;
@@ -173,7 +173,7 @@
      * @param {number} hitY - Hit Y coordinate.
      * @param {number} hitZ - Hit Z coordinate.
      */
-    Donkeycraft.Projectile.prototype.onHit = function(hitX, hitY, hitZ) {
+    Donkeycraft.Projectile.prototype.onHit = function (hitX, hitY, hitZ) {
         this._hasHit = true;
 
         // Type-specific impact behavior
@@ -238,7 +238,7 @@
      * @param {Donkeycraft.Entity} entity - Entity to check against.
      * @returns {boolean} True if projectile hits entity.
      */
-    Donkeycraft.Projectile.prototype.hitsEntity = function(entity) {
+    Donkeycraft.Projectile.prototype.hitsEntity = function (entity) {
         if (!entity.isAlive() || entity === this.owner) {
             return false;
         }
@@ -253,15 +253,15 @@
 
         // Use inclusive comparison (>= and <=) so touching edges count as hits
         return (projBox.maxX >= entBox.minX && projBox.minX <= entBox.maxX &&
-                projBox.maxY >= entBox.minY && projBox.minY <= entBox.maxY &&
-                projBox.maxZ >= entBox.minZ && projBox.minZ <= entBox.maxZ);
+            projBox.maxY >= entBox.minY && projBox.minY <= entBox.maxY &&
+            projBox.maxZ >= entBox.minZ && projBox.minZ <= entBox.maxZ);
     };
 
     /**
      * Tick method — move projectile, apply gravity, check collisions.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Projectile.prototype.tick = function(deltaTime) {
+    Donkeycraft.Projectile.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
 
         // Call base tick (applies velocity to position)
@@ -299,7 +299,7 @@
      * @param {Donkeycraft.Entity} [owner] - Entity that fired this projectile.
      * @returns {Donkeycraft.Projectile|null}
      */
-    Donkeycraft.Projectile.create = function(type, x, y, z, vx, vy, vz, owner) {
+    Donkeycraft.Projectile.create = function (type, x, y, z, vx, vy, vz, owner) {
         if (!Donkeycraft.ProjectileStats[type]) {
             return null; // Unknown type
         }
@@ -323,7 +323,7 @@
      * @param {number} [upwardAngle=0] - Upward angle in radians.
      * @returns {{vx: number, vy: number, vz: number}}
      */
-    Donkeycraft.Projectile.calculateVelocity = function(direction, speed, upwardAngle) {
+    Donkeycraft.Projectile.calculateVelocity = function (direction, speed, upwardAngle) {
         upwardAngle = upwardAngle || 0;
 
         var normalized = direction.normalize();

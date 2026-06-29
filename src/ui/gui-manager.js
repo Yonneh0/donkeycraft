@@ -1,6 +1,6 @@
 // Donkeycraft — GUI Manager
 // Central GUI system managing open screens, modal stacking, and keyboard routing.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -10,7 +10,7 @@
      * @param {HTMLElement} [container=null] - DOM container for GUI panels.
      * @param {HTMLElement} [backdrop=null] - DOM backdrop element for modal dimming.
      */
-    Donkeycraft.GuiManager = function(container, backdrop) {
+    Donkeycraft.GuiManager = function (container, backdrop) {
         this._container = container || null;
         this._backdrop = backdrop || null;
 
@@ -32,7 +32,7 @@
      * @param {string} type - GUI type identifier.
      * @param {Function} constructor - Constructor function for the UI component.
      */
-    Donkeycraft.GuiManager.prototype.registerComponent = function(type, constructor) {
+    Donkeycraft.GuiManager.prototype.registerComponent = function (type, constructor) {
         this._uiComponents[type] = constructor;
     };
 
@@ -43,7 +43,7 @@
      * @param {Object} [data=null] - Optional data to pass to the UI component.
      * @returns {Object|null} The GUI entry object { type, data, ui, panelEl }, or null on failure.
      */
-    Donkeycraft.GuiManager.prototype.open = function(type, data) {
+    Donkeycraft.GuiManager.prototype.open = function (type, data) {
         data = data || {};
 
         // Guard: reject empty/invalid type
@@ -90,12 +90,12 @@
             if (globalBus) {
                 globalBus.emit('gui:open', { type: type, stackDepth: this._guiStack.length });
             }
-        } catch (e) {}
+        } catch (e) { }
 
         // Call internal listeners
         if (this._listeners._onOpen) {
             for (var i = 0; i < this._listeners._onOpen.length; i++) {
-                try { this._listeners._onOpen[i](type); } catch (e) {}
+                try { this._listeners._onOpen[i](type); } catch (e) { }
             }
         }
 
@@ -107,7 +107,7 @@
      * Removes panel from DOM, destroys UI component, hides backdrop if empty.
      * @returns {Object|null} The removed GUI entry object, or null if stack was empty.
      */
-    Donkeycraft.GuiManager.prototype.close = function() {
+    Donkeycraft.GuiManager.prototype.close = function () {
         if (this._guiStack.length === 0) return null;
 
         var removed = this._guiStack.pop();
@@ -119,7 +119,7 @@
 
         // Clean up UI component with null safety
         if (removed && removed.ui && typeof removed.ui.destroy === 'function') {
-            try { removed.ui.destroy(); } catch (e) {}
+            try { removed.ui.destroy(); } catch (e) { }
         }
 
         // Hide backdrop when last GUI closes
@@ -133,12 +133,12 @@
             if (globalBus) {
                 globalBus.emit('gui:close', { type: removed.type, stackDepth: this._guiStack.length });
             }
-        } catch (e) {}
+        } catch (e) { }
 
         // Call internal listeners
         if (this._listeners._onClose) {
             for (var i = 0; i < this._listeners._onClose.length; i++) {
-                try { this._listeners._onClose[i](removed.type); } catch (e) {}
+                try { this._listeners._onClose[i](removed.type); } catch (e) { }
             }
         }
 
@@ -149,7 +149,7 @@
      * isOpen — checks if any GUI is currently open.
      * @returns {boolean}
      */
-    Donkeycraft.GuiManager.prototype.isOpen = function() {
+    Donkeycraft.GuiManager.prototype.isOpen = function () {
         return this._guiStack.length > 0;
     };
 
@@ -157,7 +157,7 @@
      * hasOpenScreens — alias for isOpen (external API compatibility).
      * @returns {boolean}
      */
-    Donkeycraft.GuiManager.prototype.hasOpenScreens = function() {
+    Donkeycraft.GuiManager.prototype.hasOpenScreens = function () {
         return this.isOpen();
     };
 
@@ -165,7 +165,7 @@
      * getCurrentType — gets the type of the top GUI screen.
      * @returns {string|null}
      */
-    Donkeycraft.GuiManager.prototype.getCurrentType = function() {
+    Donkeycraft.GuiManager.prototype.getCurrentType = function () {
         if (this._guiStack.length === 0) return null;
         return this._guiStack[this._guiStack.length - 1].type;
     };
@@ -174,7 +174,7 @@
      * getStack — gets a copy of the GUI stack.
      * @returns {Array} Array of { type, data, ui, panelEl } objects.
      */
-    Donkeycraft.GuiManager.prototype.getStack = function() {
+    Donkeycraft.GuiManager.prototype.getStack = function () {
         return this._guiStack.slice();
     };
 
@@ -185,7 +185,7 @@
      * @param {string} key - Key identifier (e.g., 'Escape', 'Digit1').
      * @returns {boolean} True if the key was consumed.
      */
-    Donkeycraft.GuiManager.prototype.handleKeyPress = function(key) {
+    Donkeycraft.GuiManager.prototype.handleKeyPress = function (key) {
         // Guard: reject empty/invalid keys early
         if (!key || typeof key !== 'string') return false;
 
@@ -221,7 +221,7 @@
      * @param {number} y - Click Y coordinate (pixel value).
      * @param {number} [button=0] - Mouse button (0=left, 1=right, 2=middle).
      */
-    Donkeycraft.GuiManager.prototype.handleMouseClick = function(x, y, button) {
+    Donkeycraft.GuiManager.prototype.handleMouseClick = function (x, y, button) {
         button = button || 0;
 
         // Guard: validate coordinates are numbers
@@ -232,7 +232,7 @@
 
         var top = this._guiStack[this._guiStack.length - 1];
         if (top && top.ui && typeof top.ui.handleClick === 'function') {
-            try { top.ui.handleClick(x, y, button); } catch (e) {}
+            try { top.ui.handleClick(x, y, button); } catch (e) { }
         }
     };
 
@@ -241,7 +241,7 @@
      * @param {Donkeycraft.ItemStack|null} itemStack - The dropped item stack (null to clear).
      * @param {number} slotIndex - Target slot index.
      */
-    Donkeycraft.GuiManager.prototype.handleDrop = function(itemStack, slotIndex) {
+    Donkeycraft.GuiManager.prototype.handleDrop = function (itemStack, slotIndex) {
         // Guard: validate slotIndex is a number
         if (typeof slotIndex !== 'number') return;
 
@@ -249,14 +249,14 @@
 
         var top = this._guiStack[this._guiStack.length - 1];
         if (top && top.ui && typeof top.ui.handleDrop === 'function') {
-            try { top.ui.handleDrop(itemStack, slotIndex); } catch (e) {}
+            try { top.ui.handleDrop(itemStack, slotIndex); } catch (e) { }
         }
     };
 
     /**
      * closeTopScreen — alias for close (external API compatibility).
      */
-    Donkeycraft.GuiManager.prototype.closeTopScreen = function() {
+    Donkeycraft.GuiManager.prototype.closeTopScreen = function () {
         this.close();
     };
 
@@ -265,12 +265,12 @@
      * @param {Function} callback - Called with (type) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiManager.prototype.onOpen = function(callback) {
+    Donkeycraft.GuiManager.prototype.onOpen = function (callback) {
         if (!this._listeners._onOpen) this._listeners._onOpen = [];
         this._listeners._onOpen.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners._onOpen.indexOf(callback);
             if (idx >= 0) self._listeners._onOpen.splice(idx, 1);
         };
@@ -281,12 +281,12 @@
      * @param {Function} callback - Called with (type) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.GuiManager.prototype.onClose = function(callback) {
+    Donkeycraft.GuiManager.prototype.onClose = function (callback) {
         if (!this._listeners._onClose) this._listeners._onClose = [];
         this._listeners._onClose.push(callback);
 
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners._onClose.indexOf(callback);
             if (idx >= 0) self._listeners._onClose.splice(idx, 1);
         };
@@ -298,7 +298,7 @@
      * Used by GUI wrapper classes that need direct player access.
      * @returns {Donkeycraft.Player|null}
      */
-    Donkeycraft.GuiManager.prototype.getPlayer = function() {
+    Donkeycraft.GuiManager.prototype.getPlayer = function () {
         return this._player || null;
     };
 
@@ -306,14 +306,14 @@
      * setPlayer — sets an optional player reference for GUI interaction.
      * @param {Donkeycraft.Player|null} player - Player instance or null to clear.
      */
-    Donkeycraft.GuiManager.prototype.setPlayer = function(player) {
+    Donkeycraft.GuiManager.prototype.setPlayer = function (player) {
         this._player = player || null;
     };
 
     /**
      * clearAll — closes all open GUIs.
      */
-    Donkeycraft.GuiManager.prototype.clearAll = function() {
+    Donkeycraft.GuiManager.prototype.clearAll = function () {
         while (this._guiStack.length > 0) {
             this.close();
         }
@@ -322,7 +322,7 @@
     /**
      * destroy — cleans up all resources, DOM elements, and listeners.
      */
-    Donkeycraft.GuiManager.prototype.destroy = function() {
+    Donkeycraft.GuiManager.prototype.destroy = function () {
         this.clearAll();
 
         // Remove container content from DOM

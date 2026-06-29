@@ -1,7 +1,7 @@
 // Donkeycraft — Enchanting UI
 // Enchanting table GUI: generates random enchantment options for items, validates XP level
 // and lapis lazuli costs, applies enchantments to produce enchanted output items.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -18,7 +18,7 @@
      *
      * @param {HTMLElement} [container] - Optional DOM container for rendering the GUI.
      */
-    Donkeycraft.EnchantingUI = function(container) {
+    Donkeycraft.EnchantingUI = function (container) {
         this._container = container || null;
 
         // Input slot (item to enchant)
@@ -63,7 +63,7 @@
      * @private
      * @returns {void}
      */
-    Donkeycraft.EnchantingUI.prototype._buildDOM = function() {
+    Donkeycraft.EnchantingUI.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-enchanting-ui';
         this._container.style.cssText = 'display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(30,25,40,0.95); border-radius: 6px;';
@@ -97,8 +97,8 @@
             costSpan.textContent = 'Level 0';
             optionEl.appendChild(costSpan);
 
-            optionEl.addEventListener('click', (function(idx) {
-                return function() { self.selectEnchantment(idx); };
+            optionEl.addEventListener('click', (function (idx) {
+                return function () { self.selectEnchantment(idx); };
             })(c));
 
             this._optionEls.push(optionEl);
@@ -157,7 +157,7 @@
      * @returns {string} A single-character display string.
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._getItemDisplayChar = function(itemId) {
+    Donkeycraft.EnchantingUI.prototype._getItemDisplayChar = function (itemId) {
         // Validate itemId — return default for null, NaN, negative, or non-integer values
         if (typeof itemId !== 'number' || !Number.isInteger(itemId) || itemId <= 0 || isNaN(itemId)) {
             return '\u25A0'; // BLACK SQUARE (default placeholder)
@@ -201,7 +201,7 @@
      * @returns {void}
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._updateSlotDisplay = function(slotName) {
+    Donkeycraft.EnchantingUI.prototype._updateSlotDisplay = function (slotName) {
         if (!this._container) return;
 
         var el, stack;
@@ -250,7 +250,7 @@
      * @returns {void}
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._updateOptionDisplay = function() {
+    Donkeycraft.EnchantingUI.prototype._updateOptionDisplay = function () {
         for (var i = 0; i < 3; i++) {
             var optEl = this._optionEls[i];
             if (!optEl) continue;
@@ -292,7 +292,7 @@
      * @returns {void}
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._updateCostDisplay = function() {
+    Donkeycraft.EnchantingUI.prototype._updateCostDisplay = function () {
         // Guard: skip if DOM elements not built (no container provided)
         if (!this._levelCostEl) return;
 
@@ -309,7 +309,7 @@
      * @returns {void}
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._applyEnchantment = function() {
+    Donkeycraft.EnchantingUI.prototype._applyEnchantment = function () {
         // Clear previous result before attempting to regenerate
         var hadOutput = this._outputSlot && !this._outputSlot.isEmpty();
 
@@ -359,7 +359,7 @@
         // Emit result change event
         if (this._listeners.onResultChange) {
             for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-                try { this._listeners.onResultChange[i](this._outputSlot); } catch (e) {}
+                try { this._listeners.onResultChange[i](this._outputSlot); } catch (e) { }
             }
         }
     };
@@ -368,7 +368,7 @@
      * getInputSlot — gets the input slot content.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.EnchantingUI.prototype.getInputSlot = function() {
+    Donkeycraft.EnchantingUI.prototype.getInputSlot = function () {
         return this._inputSlot;
     };
 
@@ -379,7 +379,7 @@
      * @returns {boolean} True if the value is null or a valid ItemStack with count > 0.
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._isValidStack = function(val) {
+    Donkeycraft.EnchantingUI.prototype._isValidStack = function (val) {
         if (val === null) return true;
         if (!val || typeof val !== 'object') return false;
         // Must have all required ItemStack methods
@@ -396,7 +396,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to set.
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.EnchantingUI.prototype.setInputSlot = function(stack) {
+    Donkeycraft.EnchantingUI.prototype.setInputSlot = function (stack) {
         if (!this._isValidStack(stack)) return false;
         var oldStack = this._inputSlot;
         this._inputSlot = stack;
@@ -410,7 +410,7 @@
      * getAvailableEnchantments — gets the current enchantment options.
      * @returns {Array} Array of {id, name, level, cost, lapisCost} objects.
      */
-    Donkeycraft.EnchantingUI.prototype.getAvailableEnchantments = function() {
+    Donkeycraft.EnchantingUI.prototype.getAvailableEnchantments = function () {
         return this._enchantOptions.slice();
     };
 
@@ -419,7 +419,7 @@
      * Uses EnchantmentRegistry to dynamically select valid enchantments based on the item type.
      * @private
      */
-    Donkeycraft.EnchantingUI.prototype._generateEnchantmentOptions = function() {
+    Donkeycraft.EnchantingUI.prototype._generateEnchantmentOptions = function () {
         if (!this._inputSlot || this._inputSlot.isEmpty()) {
             this._enchantOptions = [];
             this._updateOptionDisplay();
@@ -528,7 +528,7 @@
      * @param {number} index - Option index (0, 1, or 2).
      * @returns {void}
      */
-    Donkeycraft.EnchantingUI.prototype.selectEnchantment = function(index) {
+    Donkeycraft.EnchantingUI.prototype.selectEnchantment = function (index) {
         if (index < 0 || index >= 3) return;
         this._selectedOption = index;
 
@@ -541,7 +541,7 @@
      * getLevelCost — gets the XP level cost for the currently selected enchantment.
      * @returns {number}
      */
-    Donkeycraft.EnchantingUI.prototype.getLevelCost = function() {
+    Donkeycraft.EnchantingUI.prototype.getLevelCost = function () {
         var opt = this._enchantOptions[this._selectedOption] || null;
         return opt ? opt.cost : 0;
     };
@@ -550,7 +550,7 @@
      * applyEnchantment — applies the selected enchantment to the input item.
      * @returns {Donkeycraft.ItemStack|null}
      */
-    Donkeycraft.EnchantingUI.prototype.applyEnchantment = function() {
+    Donkeycraft.EnchantingUI.prototype.applyEnchantment = function () {
         this._applyEnchantment();
         return this._outputSlot;
     };
@@ -560,7 +560,7 @@
      * Returns cost info for the game to deduct from player state (does not modify directly).
      * @returns {Object|null} Object with {item, levelCost, lapisCost}, or null if no result.
      */
-    Donkeycraft.EnchantingUI.prototype.takeResult = function() {
+    Donkeycraft.EnchantingUI.prototype.takeResult = function () {
         if (!this._outputSlot || this._outputSlot.isEmpty()) return null;
 
         var result = this._outputSlot.clone();
@@ -576,11 +576,13 @@
         // Emit result change event with cost info for external deduction
         if (this._listeners.onResultChange) {
             for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-                try { this._listeners.onResultChange[i]({
-                    item: result,
-                    levelCost: cost,
-                    lapisCost: lapisCost
-                }); } catch (e) {}
+                try {
+                    this._listeners.onResultChange[i]({
+                        item: result,
+                        levelCost: cost,
+                        lapisCost: lapisCost
+                    });
+                } catch (e) { }
             }
         }
 
@@ -595,7 +597,7 @@
      * getLapisCount — gets the current lapis lazuli count.
      * @returns {number}
      */
-    Donkeycraft.EnchantingUI.prototype.getLapisCount = function() {
+    Donkeycraft.EnchantingUI.prototype.getLapisCount = function () {
         return this._lapisCount;
     };
 
@@ -604,7 +606,7 @@
      * @param {number} n - New lapis count (must be a non-negative integer).
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.EnchantingUI.prototype.setLapisCount = function(n) {
+    Donkeycraft.EnchantingUI.prototype.setLapisCount = function (n) {
         if (typeof n !== 'number' || !Number.isInteger(n) || n < 0) return false;
         this._lapisCount = n;
         this._updateSlotDisplay('lapis');
@@ -616,7 +618,7 @@
      * @param {number} levels - Number of XP levels (must be a non-negative integer).
      * @returns {boolean} True if successful.
      */
-    Donkeycraft.EnchantingUI.prototype.setPlayerLevels = function(levels) {
+    Donkeycraft.EnchantingUI.prototype.setPlayerLevels = function (levels) {
         if (typeof levels !== 'number' || !Number.isInteger(levels) || levels < 0) return false;
         this._playerLevels = levels;
         if (this._levelsEl) {
@@ -632,10 +634,10 @@
      * @param {Function} callback - Called with (resultStack) argument.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.EnchantingUI.prototype.onResultChange = function(callback) {
+    Donkeycraft.EnchantingUI.prototype.onResultChange = function (callback) {
         this._listeners.onResultChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onResultChange.indexOf(callback);
             if (idx >= 0) self._listeners.onResultChange.splice(idx, 1);
         };
@@ -644,7 +646,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.EnchantingUI.prototype.destroy = function() {
+    Donkeycraft.EnchantingUI.prototype.destroy = function () {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);

@@ -1,6 +1,6 @@
 // Donkeycraft — Hotbar
 // Hotbar UI: slot rendering, number keys 1-9, scroll wheel selection.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -12,7 +12,7 @@
      * @param {Donkeycraft.GUIRenderer} [guiRenderer=null] - Optional WebGL GUI renderer for highlight overlay.
      * @param {HTMLCanvasElement} [canvas=null] - Canvas element for WebGL rendering context.
      */
-    Donkeycraft.Hotbar = function(container, guiRenderer, canvas) {
+    Donkeycraft.Hotbar = function (container, guiRenderer, canvas) {
         this._container = container || null;
         this._guiRenderer = guiRenderer || null;
         this._canvas = canvas || null;
@@ -38,7 +38,7 @@
      * _buildDOM — creates the hotbar slot elements in the container.
      * @private
      */
-    Donkeycraft.Hotbar.prototype._buildDOM = function() {
+    Donkeycraft.Hotbar.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-hotbar';
         this._container.style.cssText = 'display: flex; justify-content: center; gap: 2px; padding: 4px; background: rgba(0,0,0,0.5); border-radius: 4px;';
@@ -72,8 +72,8 @@
             this._container.appendChild(slotEl);
 
             // Click to select
-            slotEl.addEventListener('mousedown', (function(idx) {
-                return function() { self.setSelectedSlot(idx); };
+            slotEl.addEventListener('mousedown', (function (idx) {
+                return function () { self.setSelectedSlot(idx); };
             })(i));
         }
 
@@ -84,7 +84,7 @@
      * _updateSelectionHighlight — updates the WebGL highlight and DOM border for selected slot.
      * @private
      */
-    Donkeycraft.Hotbar.prototype._updateSelectionHighlight = function() {
+    Donkeycraft.Hotbar.prototype._updateSelectionHighlight = function () {
         // Update DOM borders
         for (var i = 0; i < this._slotElements.length; i++) {
             var el = this._slotElements[i];
@@ -101,7 +101,7 @@
         if (this._guiRenderer && this._canvas) {
             try {
                 this._guiRenderer.renderHotbar(this._selectedSlot, this._canvas.width, this._canvas.height);
-            } catch (e) {}
+            } catch (e) { }
         }
     };
 
@@ -109,7 +109,7 @@
      * setSlots — updates all 9 slot displays with item stacks.
      * @param {Array} stacks - Array of 9 ItemStack objects (null for empty slots).
      */
-    Donkeycraft.Hotbar.prototype.setSlots = function(stacks) {
+    Donkeycraft.Hotbar.prototype.setSlots = function (stacks) {
         if (!stacks || !Array.isArray(stacks)) return;
 
         for (var i = 0; i < 9 && i < stacks.length; i++) {
@@ -121,7 +121,7 @@
             if (oldStack !== stacks[i]) {
                 if (this._listeners.onSlotChange) {
                     for (var j = 0; j < this._listeners.onSlotChange.length; j++) {
-                        try { this._listeners.onSlotChange[j](i, stacks[i]); } catch (e) {}
+                        try { this._listeners.onSlotChange[j](i, stacks[i]); } catch (e) { }
                     }
                 }
             }
@@ -137,7 +137,7 @@
      * @param {Donkeycraft.ItemStack|null} stack - Stack to display.
      * @private
      */
-    Donkeycraft.Hotbar.prototype._updateSlotDOM = function(index, stack) {
+    Donkeycraft.Hotbar.prototype._updateSlotDOM = function (index, stack) {
         if (index < 0 || index >= this._slotElements.length) return;
 
         var slotEl = this._slotElements[index];
@@ -169,7 +169,7 @@
      * @returns {string}
      * @private
      */
-    Donkeycraft.Hotbar.prototype._getItemDisplayChar = function(itemId) {
+    Donkeycraft.Hotbar.prototype._getItemDisplayChar = function (itemId) {
         // Simple mapping for common items (Phase 19 will replace with textures)
         var displayMap = {
             0: '',       // air
@@ -229,7 +229,7 @@
      * getSelectedSlot — gets the currently selected hotbar slot.
      * @returns {number} Selected slot index (0-8).
      */
-    Donkeycraft.Hotbar.prototype.getSelectedSlot = function() {
+    Donkeycraft.Hotbar.prototype.getSelectedSlot = function () {
         return this._selectedSlot;
     };
 
@@ -237,7 +237,7 @@
      * setSelectedSlot — sets the selected hotbar slot and triggers highlight update.
      * @param {number} n - Slot index (0-8).
      */
-    Donkeycraft.Hotbar.prototype.setSelectedSlot = function(n) {
+    Donkeycraft.Hotbar.prototype.setSelectedSlot = function (n) {
         if (n < 0 || n >= 9) return;
         if (n === this._selectedSlot) return;
 
@@ -248,7 +248,7 @@
         // Emit selected change event
         if (this._listeners.onSelectedChange) {
             for (var i = 0; i < this._listeners.onSelectedChange.length; i++) {
-                try { this._listeners.onSelectedChange[i](n, oldSlot); } catch (e) {}
+                try { this._listeners.onSelectedChange[i](n, oldSlot); } catch (e) { }
             }
         }
     };
@@ -256,14 +256,14 @@
     /**
      * selectNext — cycles to the next hotbar slot.
      */
-    Donkeycraft.Hotbar.prototype.selectNext = function() {
+    Donkeycraft.Hotbar.prototype.selectNext = function () {
         this.setSelectedSlot((this._selectedSlot + 1) % 9);
     };
 
     /**
      * selectPrev — cycles to the previous hotbar slot.
      */
-    Donkeycraft.Hotbar.prototype.selectPrev = function() {
+    Donkeycraft.Hotbar.prototype.selectPrev = function () {
         this.setSelectedSlot((this._selectedSlot - 1 + 9) % 9);
     };
 
@@ -272,10 +272,10 @@
      * @param {Function} callback - Called with (slotIndex, stack) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.Hotbar.prototype.onSlotChange = function(callback) {
+    Donkeycraft.Hotbar.prototype.onSlotChange = function (callback) {
         this._listeners.onSlotChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onSlotChange.indexOf(callback);
             if (idx >= 0) self._listeners.onSlotChange.splice(idx, 1);
         };
@@ -286,10 +286,10 @@
      * @param {Function} callback - Called with (newSlot, oldSlot) arguments.
      * @returns {Function} Unsubscribe function.
      */
-    Donkeycraft.Hotbar.prototype.onSelectedChange = function(callback) {
+    Donkeycraft.Hotbar.prototype.onSelectedChange = function (callback) {
         this._listeners.onSelectedChange.push(callback);
         var self = this;
-        return function() {
+        return function () {
             var idx = self._listeners.onSelectedChange.indexOf(callback);
             if (idx >= 0) self._listeners.onSelectedChange.splice(idx, 1);
         };
@@ -298,7 +298,7 @@
     /**
      * destroy — cleans up resources.
      */
-    Donkeycraft.Hotbar.prototype.destroy = function() {
+    Donkeycraft.Hotbar.prototype.destroy = function () {
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);

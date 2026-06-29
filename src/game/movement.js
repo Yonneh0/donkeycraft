@@ -1,6 +1,6 @@
 // Donkeycraft — Movement Physics
 // Movement physics: walking, sprinting, swimming, flying, speed modifiers.
-(function() {
+(function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
@@ -13,7 +13,7 @@
      * @param {Donkeycraft.Collision} collision - Collision detection instance.
      * @param {Donkeycraft.ChunkManager} chunkManager - Chunk manager for block lookups.
      */
-    Donkeycraft.Movement = function(input, player, collision, chunkManager) {
+    Donkeycraft.Movement = function (input, player, collision, chunkManager) {
         this._input = input;
         this._player = player;
         this._collision = collision;
@@ -31,7 +31,7 @@
      * Set the HurtBox reference for fall damage application.
      * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance.
      */
-    Donkeycraft.Movement.prototype.setHurtBox = function(hurtBox) {
+    Donkeycraft.Movement.prototype.setHurtBox = function (hurtBox) {
         this._hurtBox = hurtBox;
     };
 
@@ -39,7 +39,7 @@
      * Set the hunger system reference for degradation tracking.
      * @param {Donkeycraft.Hunger} hungerSystem - Hunger instance.
      */
-    Donkeycraft.Movement.prototype.setHungerSystem = function(hungerSystem) {
+    Donkeycraft.Movement.prototype.setHungerSystem = function (hungerSystem) {
         this._hungerSystem = hungerSystem;
     };
 
@@ -49,7 +49,7 @@
      * updates position with collision resolution, and tracks distance for hunger degradation.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Movement.prototype.tick = function(deltaTime) {
+    Donkeycraft.Movement.prototype.tick = function (deltaTime) {
         var player = this._player;
 
         // If dead, no movement
@@ -80,7 +80,7 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      * @private
      */
-    Donkeycraft.Movement.prototype._tickSurvival = function(deltaTime) {
+    Donkeycraft.Movement.prototype._tickSurvival = function (deltaTime) {
         var player = this._player;
         var input = this._input;
         var collision = this._collision;
@@ -228,7 +228,7 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      * @private
      */
-    Donkeycraft.Movement.prototype._tickCreativeFly = function(deltaTime) {
+    Donkeycraft.Movement.prototype._tickCreativeFly = function (deltaTime) {
         var player = this._player;
         var input = this._input;
         var collision = this._collision;
@@ -306,7 +306,7 @@
      * @param {number} deltaTime - Time since last tick in seconds.
      * @private
      */
-    Donkeycraft.Movement.prototype._tickSpectator = function(deltaTime) {
+    Donkeycraft.Movement.prototype._tickSpectator = function (deltaTime) {
         var player = this._player;
         var input = this._input;
 
@@ -374,7 +374,7 @@
      * Get the current horizontal movement speed based on game mode and sprint state.
      * @returns {number} Speed in blocks per second.
      */
-    Donkeycraft.Movement.prototype.getHorizontalSpeed = function() {
+    Donkeycraft.Movement.prototype.getHorizontalSpeed = function () {
         var gameMode = this._player.getGameMode();
 
         if (gameMode === 'spectator') {
@@ -394,7 +394,7 @@
      * Check if the player is currently swimming (in water).
      * @returns {boolean}
      */
-    Donkeycraft.Movement.prototype.isSwimming = function() {
+    Donkeycraft.Movement.prototype.isSwimming = function () {
         var pos = this._player.getPosition();
         return this._collision.isBlockLiquid(pos.x, pos.y + 0.5, pos.z);
     };
@@ -403,7 +403,7 @@
      * Check if the player's eyes are in water.
      * @returns {boolean}
      */
-    Donkeycraft.Movement.prototype.isInWater = function() {
+    Donkeycraft.Movement.prototype.isInWater = function () {
         var eyePos = this._player.getEyePosition();
         return this._collision.isBlockLiquid(eyePos.x, eyePos.y, eyePos.z);
     };
@@ -412,7 +412,7 @@
      * Check if the player is in lava by sampling multiple body positions.
      * @returns {boolean}
      */
-    Donkeycraft.Movement.prototype.isInLava = function() {
+    Donkeycraft.Movement.prototype.isInLava = function () {
         var pos = this._player.getPosition();
 
         // Check at feet, mid-body, and head height
@@ -451,7 +451,7 @@
      * Get the player's current game mode.
      * @returns {string}
      */
-    Donkeycraft.Movement.prototype.getGameMode = function() {
+    Donkeycraft.Movement.prototype.getGameMode = function () {
         return this._player.getGameMode();
     };
 
@@ -459,14 +459,14 @@
      * Set the player's game mode.
      * @param {string} mode - 'survival', 'creative', or 'spectator'.
      */
-    Donkeycraft.Movement.prototype.setGameMode = function(mode) {
+    Donkeycraft.Movement.prototype.setGameMode = function (mode) {
         this._player.setGameMode(mode);
     };
 
     /**
      * Destroy the movement system and free resources.
      */
-    Donkeycraft.Movement.prototype.destroy = function() {
+    Donkeycraft.Movement.prototype.destroy = function () {
         this._input = null;
         this._player = null;
         this._collision = null;
