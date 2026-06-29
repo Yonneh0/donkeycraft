@@ -16,7 +16,7 @@
         this._hurtBox = hurtBox;
         this._container = container;
 
-        // DOM element references
+        // DOM element references (set by _buildDOM)
         this._row = null;              // .dk-health-bar-row
         this._heartContainers = [];    // Array of heart container elements
         this._overlay = null;          // .dk-health-overlay (full-screen red overlay)
@@ -33,9 +33,16 @@
         this._buildDOM();
         this._createOverlay();
         this._subscribeToEvents();
+
+        // Capture initial values BEFORE update to prevent spurious animation delta.
+        // _prevHealth is set inside updateFromHealth, so we call it without triggering animations.
+        var initHealth = hurtBox.getHealth();
+        var initMaxHealth = hurtBox.getMaxHealth();
+        this._prevHealth = initHealth;
+
         this.updateFromHealth({
-            health: hurtBox.getHealth(),
-            maxHealth: hurtBox.getMaxHealth()
+            health: initHealth,
+            maxHealth: initMaxHealth
         });
     };
 
@@ -70,6 +77,7 @@
         // Row container for 10 heart slots
         var row = document.createElement('div');
         row.className = 'dk-health-bar-row';
+        row.style.overflow = 'visible'; // Allow floating text to render outside row bounds
 
         // Create 10 heart containers
         for (var i = 0; i < 10; i++) {
@@ -82,6 +90,21 @@
 
         container.appendChild(row);
         this._row = row;
+    };
+
+    /**
+     * _getHeartState — determine the visual state for a given HP value at a specific heart index.
+     * @private
+     * @param {number} hp - Current health points (0-20).
+     * @param {number} index - Heart container index (0-9).
+     * @returns {string} 'full', 'half', or 'empty'.
+     */
+    Donkeycraft.HealthBar.prototype._getHeartState = function(hp, index) {
+        hp = Math.max(0, Math.round(hp));
+        var remaining = hp - (index * 2); // HP remaining after filling hearts before this one
+        if (remaining >= 2) return 'full';
+        if (remaining === 1) return 'half';
+        return 'empty';
     };
 
     /**
@@ -119,19 +142,25 @@
 
     /**
      * updateFromHealth — main entry point called on health:changed events.
+     * Clamps values to valid range, recalculates actual delta after clamping, then updates DOM.
      * @param {Object} data - { health, maxHealth, delta }.
      */
     Donkeycraft.HealthBar.prototype.updateFromHealth = function(data) {
-        var newHealth = Math.max(0, Math.min(data.maxHealth || 20, data.health || 0));
         var maxHealth = data.maxHealth || 20;
-        var delta = data.delta || 0;
+        var oldHealth = this._prevHealth;
+
+        // Clamp to valid range [0, maxHealth]
+        var newHealth = Math.max(0, Math.min(maxHealth, data.health || 0));
+
+        // Recalculate delta after clamping to ensure displayed +/- matches actual change
+        var delta = newHealth - oldHealth;
 
         // Update each heart container
         this._renderHearts(newHealth, maxHealth);
 
-        // Animate on change
+        // Animate on change (only if health actually changed)
         if (delta !== 0) {
-            this._animateOnHealthChange(delta);
+            this._animateOnHealthChange(delta, oldHealth, newHealth);
         }
 
         // Update red overlay based on health percentage
@@ -143,27 +172,17 @@
 
     /**
      * _renderHearts — update all 10 heart containers to reflect current health.
+     * Fills from left (index 0) to right (index 9), matching Minecraft's behavior.
      * @private
      * @param {number} health - Current health points (0-20).
      * @param {number} maxHealth - Maximum health points.
      */
     Donkeycraft.HealthBar.prototype._renderHearts = function(health, maxHealth) {
-        // Each heart represents 2 HP: full=2, half=1, empty=0
-        var totalHP = maxHealth || 20;
-        var remainingHP = Math.max(0, Math.round(health));
-
         for (var i = 0; i < 10; i++) {
             var container = this._heartContainers[i];
             if (!container) continue;
 
-            var state = 'empty';
-            if (remainingHP >= 2) {
-                state = 'full';
-                remainingHP -= 2;
-            } else if (remainingHP === 1) {
-                state = 'half';
-                remainingHP -= 1;
-            }
+            var state = this._getHeartState(health, i);
 
             // Update class and SVG
             container.className = 'dk-heart-container dk-heart-' + state;
@@ -175,25 +194,23 @@
      * _animateOnHealthChange — trigger animations based on health delta.
      * @private
      * @param {number} delta - Health change (negative = damage, positive = healing).
+     * @param {number} oldHealth - Health before the change.
+     * @param {number} newHealth - Health after the change.
      */
-    Donkeycraft.HealthBar.prototype._animateOnHealthChange = function(delta) {
+    Donkeycraft.HealthBar.prototype._animateOnHealthChange = function(delta, oldHealth, newHealth) {
         if (delta < 0) {
-            // Damage taken — shake the health bar
+            // Damage taken — shake the health bar and flash damaged hearts
             this._triggerShake();
-
-            // Flash damaged hearts red
-            this._flashDamagedHearts(Math.abs(delta), delta);
+            this._flashDamagedHearts(delta, oldHealth, newHealth);
 
             // Screen shake if health drops below 3 hearts (6 HP)
-            if (this._prevHealth < 6) {
+            if (newHealth < 6) {
                 this._triggerScreenShake();
             }
         } else if (delta > 0) {
             // Healing — flash healed hearts white
-            this._flashHealedHearts(delta, delta);
+            this._flashHealedHearts(delta, oldHealth, newHealth);
         }
-
-        // Note: +/- text is spawned inside _flashDamagedHearts/_flashHealedHearts via _spawnHealthTextAt
     };
 
     /**
@@ -239,34 +256,24 @@
     };
 
     /**
-     * _getHeartIndex — convert HP value to heart container index.
+     * _flashDamagedHearts — flash the hearts that took damage with a red pulse.
      * @private
-     * @param {number} hp - Health points (0-20).
-     * @returns {number} Heart container index (0-9).
+     * @param {number} delta - Health change (negative value representing damage taken).
+     * @param {number} oldHealth - Health before the damage.
+     * @param {number} newHealth - Health after the damage.
      */
-    Donkeycraft.HealthBar.prototype._getHeartIndex = function(hp) {
-        return Math.floor(Math.max(0, hp) / 2);
-    };
-
-    /**
-     * _flashDamagedHearts — flash the hearts that took damage.
-     * @private
-     * @param {number} damageAmount - Amount of damage taken.
-     * @param {number} delta - Health change (negative).
-     */
-    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(damageAmount, delta) {
+    Donkeycraft.HealthBar.prototype._flashDamagedHearts = function(delta, oldHealth, newHealth) {
         if (!this._row) return;
 
-        var newHealth = this._prevHealth;
-        var oldHealth = newHealth + damageAmount;
-
         // Hearts change from oldHealth down to newHealth.
-        // Heart index i covers HP range [i*2, i*2+1].
-        // A heart changes state if its state at oldHealth differs from its state at newHealth.
-        // The damaged hearts are: floor(oldHealth/2) down to floor(newHealth/2).
-        var startIdx = Math.floor(oldHealth / 2);       // e.g. oldHealth=20 → 10, cap at 9
-        var endIdx = Math.floor(newHealth / 2);          // e.g. newHealth=19 → 9
-        startIdx = Math.min(startIdx, 9);               // cap to valid range
+        // Heart i covers HP range [i*2, i*2+1].
+        // The damaged hearts are those whose index is between floor(newHealth/2) and floor((oldHealth-1)/2).
+        var startIdx = Math.min(9, Math.floor((oldHealth - 1) / 2)); // rightmost damaged heart
+        var endIdx = Math.floor(newHealth / 2);                        // leftmost damaged heart
+
+        // Ensure valid range
+        if (startIdx < 0) startIdx = 0;
+        if (endIdx > 9) endIdx = 9;
 
         // Flash each damaged heart
         for (var i = startIdx; i >= endIdx && i >= 0; i--) {
@@ -285,24 +292,26 @@
     };
 
     /**
-     * _flashHealedHearts — flash the hearts that were healed.
+     * _flashHealedHearts — flash the hearts that were healed with a white/green pulse.
      * @private
-     * @param {number} healAmount - Amount of healing.
-     * @param {number} delta - Health change (positive).
+     * @param {number} delta - Health change (positive value representing healing).
+     * @param {number} oldHealth - Health before healing.
+     * @param {number} newHealth - Health after healing.
      */
-    Donkeycraft.HealthBar.prototype._flashHealedHearts = function(healAmount, delta) {
+    Donkeycraft.HealthBar.prototype._flashHealedHearts = function(delta, oldHealth, newHealth) {
         if (!this._row) return;
 
-        var newHealth = this._prevHealth;
-        var oldHealth = newHealth - healAmount;
-
         // Hearts change from oldHealth up to newHealth.
-        // The healed hearts are: floor(oldHealth/2) up to floor(newHealth/2).
-        var startIdx = Math.floor(oldHealth / 2);       // e.g. oldHealth=5 → 2
-        var endIdx = Math.floor(newHealth / 2);         // e.g. newHealth=12 → 6
+        // The healed hearts are those whose index is between floor(oldHealth/2) and floor((newHealth-1)/2).
+        var startIdx = Math.floor(oldHealth / 2);       // leftmost healed heart
+        var endIdx = Math.min(9, Math.floor((newHealth - 1) / 2)); // rightmost healed heart
+
+        // Ensure valid range
+        if (startIdx > 9) startIdx = 9;
+        if (endIdx < 0) endIdx = 0;
 
         // Flash each healed heart
-        for (var i = startIdx; i <= endIdx && i < 10; i++) {
+        for (var i = startIdx; i <= endIdx && i >= 0; i++) {
             var container = this._heartContainers[i];
             if (!container) continue;
             container.classList.add('dk-heart-heal-flash');
@@ -321,7 +330,7 @@
      * _spawnHealthTextAt — spawn floating +/- text at a specific heart index.
      * @private
      * @param {number} delta - Health change (positive = heal, negative = damage).
-     * @param {number} heartIndex - Index of the changed heart (0-9).
+     * @param {number} heartIndex - Index of the affected heart (0-9).
      */
     Donkeycraft.HealthBar.prototype._spawnHealthTextAt = function(delta, heartIndex) {
         if (!this._row || !this._heartContainers[heartIndex]) return;
@@ -335,7 +344,7 @@
         var heartContainer = this._heartContainers[heartIndex];
         heartContainer.style.position = 'relative';
         textEl.style.left = '50%';
-        textEl.style.top = '-14px';
+        textEl.style.top = '-16px';
         textEl.style.transform = 'translateX(-50%)';
 
         heartContainer.appendChild(textEl);

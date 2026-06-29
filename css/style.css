@@ -517,9 +517,9 @@ body.dk-pointer-locked #dk-canvas-container {
 
 /* 19. Drumstick eat pulse — green glow on eaten drumsticks */
 @keyframes drumstick-eat-pulse {
-    0%   { filter: brightness(1) drop-shadow(0 0 0px transparent); transform: scale(1); }
+    0%   { filter: brightness(1); transform: scale(1); }
     30%  { filter: brightness(1.4) drop-shadow(0 0 6px rgba(46, 204, 113, 0.7)); transform: scale(1.15); }
-    100% { filter: brightness(1) drop-shadow(0 0 0px transparent); transform: scale(1); }
+    100% { filter: brightness(1); transform: scale(1); }
 }
 
 /* 20. Drumstick dim — fade to dark on depletion */
@@ -527,4 +527,15 @@ body.dk-pointer-locked #dk-canvas-container {
     0%   { filter: brightness(1) saturate(1); opacity: 1; }
     50%  { filter: brightness(0.5) saturate(0.3); opacity: 0.6; }
     100% { filter: brightness(1) saturate(1); opacity: 1; }
+}
+
+/* ============================================================
+   FLOATING +/- TEXT (shared by health and hunger bars)
+   ============================================================ */
+
+/* Ensure the float-text-up animation works for both health and hunger text */
+@keyframes float-text-up {
+    0%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    50%  { opacity: 0.85; transform: translateX(-50%) translateY(-12px) scale(1.1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-28px) scale(0.85); }
 }

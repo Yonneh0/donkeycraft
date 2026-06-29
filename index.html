@@ -1078,12 +1078,12 @@ void main() {
     healthTestButtons.style.right = '100px';
     healthTestButtons.style.top = '50%';
     healthTestButtons.innerHTML =
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-Donkeycraft._hurtBox._health})}">DEATH</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;var d=h-Donkeycraft._hurtBox._health+10;Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-10})}">-10 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.max(0,oldH-1);Donkeycraft._healthBar.updateFromHealth({health:Math.max(0,oldH-1),maxHealth:20,delta:-1})}">-1 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.min(20,oldH+1);Donkeycraft._healthBar.updateFromHealth({health:Math.min(20,oldH+1),maxHealth:20,delta:1})}">+1 HP</button>' +
+        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>' +
         '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.min(20,oldH+10);Donkeycraft._healthBar.updateFromHealth({health:Math.min(20,oldH+10),maxHealth:20,delta:10})}">+10 HP</button>' +
-        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=20;Donkeycraft._healthBar.updateFromHealth({health:20,maxHealth:20,delta:20})}">FULL</button>';
+        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.min(20,oldH+1);Donkeycraft._healthBar.updateFromHealth({health:Math.min(20,oldH+1),maxHealth:20,delta:1})}">+1 HP</button>' +
+        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var oldH=Donkeycraft._hurtBox._health;Donkeycraft._hurtBox._health=Math.max(0,oldH-1);Donkeycraft._healthBar.updateFromHealth({health:Math.max(0,oldH-1),maxHealth:20,delta:-1})}">-1 HP</button>' +
+        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){var h=Math.max(0,Donkeycraft._hurtBox._health-10);Donkeycraft._hurtBox._health=h;var d=h-Donkeycraft._hurtBox._health+10;Donkeycraft._healthBar.updateFromHealth({health:h,maxHealth:20,delta:-10})}">-10 HP</button>' +
+        '<button onclick="if(Donkeycraft._healthBar&&Donkeycraft._hurtBox){Donkeycraft._hurtBox._health=0;Donkeycraft._healthBar.updateFromHealth({health:0,maxHealth:20,delta:-Donkeycraft._hurtBox._health})}">DEATH</button>';
     document.body.appendChild(healthTestButtons);
 
     // ============================================================
@@ -1095,12 +1095,12 @@ void main() {
     hungerTestButtons.style.right = '200px';
     hungerTestButtons.style.top = '50%';
     hungerTestButtons.innerHTML =
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(0);Donkeycraft._hungerBar.updateFromFood({foodLevel:0,delta:-old})}">EMPTY</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-10);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-10})}">-10 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-1})}">-1 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.min(20,old+1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:1})}">+1 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(20);Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-old})}">FULL</button>' +
         '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.min(20,old+10);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:10})}">+10 Food</button>' +
-        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(20);Donkeycraft._hungerBar.updateFromFood({foodLevel:20,delta:20-old})}">FULL</button>';
+        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.min(20,old+1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:1})}">+1 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-1);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-1})}">-1 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();var nw=Math.max(0,old-10);Donkeycraft._hungerSystem.setFoodLevel(nw);Donkeycraft._hungerBar.updateFromFood({foodLevel:nw,delta:-10})}">-10 Food</button>' +
+        '<button onclick="if(Donkeycraft._hungerBar&&Donkeycraft._hungerSystem){var old=Donkeycraft._hungerSystem.getFoodLevel();Donkeycraft._hungerSystem.setFoodLevel(0);Donkeycraft._hungerBar.updateFromFood({foodLevel:0,delta:-old})}">EMPTY</button>';
     document.body.appendChild(hungerTestButtons);
 
     // ============================================================

@@ -721,10 +721,10 @@
 /* Outer wrapper — positioned above hotbar, centered horizontally */
 .dk-xp-bar-wrapper {
     position: absolute;
-    bottom: 60px;
+    bottom: 95px;
     left: 50%;
     transform: translateX(-50%);
-    width: 320px;
+    width: 400px;
     z-index: 25;
     pointer-events: none;
     /* Hide initially — shown only when level > 0 or points > 0 */
@@ -938,13 +938,12 @@
 /* Outer wrapper — positioned above hotbar, left-aligned with hotbar edge */
 .dk-health-bar-wrapper {
     position: absolute;
-    bottom: 52px;
-    left: calc(50% - 234px);
-    width: 216px;
+    bottom: 68px;
+    left: calc(50% - 228px);
     display: flex;
     justify-content: flex-start;
     align-items: center;
-    z-index: 27;
+    z-index: 24;
     pointer-events: none;
 }
 
@@ -954,9 +953,15 @@
     gap: 2px;
     align-items: center;
     padding: 2px 4px;
-    background: rgba(0, 0, 0, 0.35);
     border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    /* Layered shadows: outer depth + inner top highlight + subtle border glow */
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+    /* Subtle gradient background for depth */
+    background: linear-gradient(180deg, rgba(40, 30, 25, 0.45) 0%, rgba(20, 15, 12, 0.55) 100%);
+    overflow: visible; /* Allow floating +/- text to render outside row bounds */
 }
 
 /* Individual heart container — no border, subtle glow */
@@ -1018,13 +1023,12 @@
 /* Outer wrapper — positioned above hotbar, right-aligned with hotbar edge */
 .dk-hunger-bar-wrapper {
     position: absolute;
-    bottom: 52px;
-    right: calc(50% - 234px);
-    width: 216px;
+    bottom: 68px;
+    right: calc(50% - 228px);
     display: flex;
     justify-content: flex-end;
     align-items: center;
-    z-index: 27;
+    z-index: 24;
     pointer-events: none;
 }
 
@@ -1035,9 +1039,15 @@
     align-items: center;
     justify-content: flex-end;
     padding: 2px 4px;
-    background: rgba(0, 0, 0, 0.35);
     border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    /* Layered shadows: outer depth + inner top highlight + subtle border glow */
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+    /* Subtle gradient background for depth */
+    background: linear-gradient(180deg, rgba(40, 35, 25, 0.45) 0%, rgba(20, 18, 12, 0.55) 100%);
+    overflow: visible; /* Allow floating +/- text to render outside row bounds */
 }
 
 /* Individual drumstick container — no border, subtle glow */
