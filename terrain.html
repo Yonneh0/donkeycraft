@@ -16,7 +16,7 @@
             box-shadow: 0 2px 12px rgba(0,0,0,0.5); max-height: 95vh; overflow-y: auto;
         }
         #dk-terrain-ui h2 { font-size: 15px; margin-bottom: 8px; color: #4fc3f7; }
-        #dk-terrain-ui label { display: flex; align-items: center; margin: 4px 0; gap: 8px; }
+        #dk-terrain-ui label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
         #dk-terrain-ui select, #dk-terrain-ui input[type="number"], #dk-terrain-ui input[type="range"] {
             background: #333; color: #eee; border: 1px solid #555; border-radius: 4px; padding: 3px 6px;
         }
@@ -109,6 +109,7 @@
 
     <!-- Shaders (executable) -->
     <script>
+    // Terrain shader with alpha support and edge detection
     var DK_TERRAIN_VS = `
         attribute vec3 aPosition;
         attribute vec3 aColor;
@@ -119,12 +120,13 @@
         varying vec3 vColor;
         varying vec3 vNormal;
         varying float vDepth;
+        varying vec3 vWorldPos;
         void main() {
             gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
             vColor = aColor;
             vNormal = aNormal;
-            vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
-            vDepth = -viewPos.z;
+            vWorldPos = (uView * uModel * vec4(aPosition, 1.0)).xyz;
+            vDepth = -gl_Position.z;
         }
     `;
     var DK_TERRAIN_FS = `
@@ -132,18 +134,31 @@
         varying vec3 vColor;
         varying vec3 vNormal;
         varying float vDepth;
+        varying vec3 vWorldPos;
         uniform vec3 uFogColor;
         uniform float uFogDensity;
         uniform float uLightFactor;
+        uniform float uAlpha;
         void main() {
+            // Lighting
             vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
             float diff = max(dot(normalize(vNormal), lightDir), 0.0);
             float lighting = 0.45 + diff * 0.55;
             vec3 finalColor = vColor * lighting * uLightFactor;
+
+            // Fog
             float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
             fogFactor = clamp(fogFactor, 0.0, 1.0);
             finalColor = mix(finalColor, uFogColor, fogFactor);
-            gl_FragColor = vec4(finalColor, 1.0);
+
+            // Edge detection: darken block edges for visual separation
+            vec3 viewDir = normalize(-vWorldPos);
+            float fresnel = 1.0 - abs(dot(viewDir, normalize(vNormal)));
+            fresnel = pow(fresnel, 2.0);
+            vec3 edgeColor = vec3(0.15, 0.15, 0.15);
+            finalColor = mix(finalColor, edgeColor, fresnel * 0.35);
+
+            gl_FragColor = vec4(finalColor, uAlpha);
         }
     `;
     var DK_WIREFRAME_VS = `
@@ -196,7 +211,9 @@
             return;
         }
 
-        // Block color lookup
+        // ============================================================
+        // Block color lookup — purely procedural, no external textures
+        // ============================================================
         var BLOCK_COLORS = {};
         function initBlockColors() {
             var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
@@ -300,7 +317,9 @@
             return [r,g,b];
         }
 
+        // ============================================================
         // WebGL helpers
+        // ============================================================
         function createShader(gl,type,src){var s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(s));return null;}return s;}
         function createProgram(gl,vs,fs){var a=createShader(gl,gl.VERTEX_SHADER,vs),b=createShader(gl,gl.FRAGMENT_SHADER,fs);if(!a||!b)return null;var p=gl.createProgram();gl.attachShader(p,a);gl.attachShader(p,b);gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));return null;}return p;}
         function mat4Create(){var m=new Float32Array(16);m[0]=m[5]=m[10]=m[15]=1;return m;}
@@ -319,10 +338,15 @@
             o[14]=-(z0*eye[0]+z1*eye[1]+z2*eye[2]);o[15]=1;return o;
         }
         function mat4Identity(o){o.fill(0);o[0]=o[5]=o[10]=o[15]=1;return o;}
+
+        // Fixed: removed duplicate calculations from original
         function mat4Multiply(o,a,b){
-            var a00=a[0],a01=a[1],a02=a[2],a03=a[3],a10=a[4],a11=a[5],a12=a[6],a13=a[7],
-                a20=a[8],a21=a[9],a22=a[10],a23=a[11],a30=a[12],a31=a[13],a32=a[14],a33=a[15];
-            var b0=b[0],b1=b[1],b2=b[2],b3=b[3];
+            var a00=a[0],a01=a[1],a02=a[2],a03=a[3],
+                a10=a[4],a11=a[5],a12=a[6],a13=a[7],
+                a20=a[8],a21=a[9],a22=a[10],a23=a[11],
+                a30=a[12],a31=a[13],a32=a[14],a33=a[15];
+            var b0,b1,b2,b3;
+            b0=b[0];b1=b[1];b2=b[2];b3=b[3];
             o[0]=b0*a00+b1*a10+b2*a20+b3*a30;o[1]=b0*a01+b1*a11+b2*a21+b3*a31;
             o[2]=b0*a02+b1*a12+b2*a22+b3*a32;o[3]=b0*a03+b1*a13+b2*a23+b3*a33;
             b0=b[4];b1=b[5];b2=b[6];b3=b[7];
@@ -337,7 +361,9 @@
             return o;
         }
 
+        // ============================================================
         // State
+        // ============================================================
         var canvas, gl, terrainProgram, wireframeProgram, skyProgram;
         var terrainLocs={}, wireframeLocs={}, skyLocs={};
         var camera={x:0,y:100,z:0,yaw:0,pitch:0,fly:true};
@@ -346,14 +372,22 @@
         var renderDistance=4, selectedBiomeId=1, worldSeed=42;
         var options={caves:true,ores:true,water:true,surface:true};
         var wireframeEnabled=false, frameCount=0, lastFpsTime=0, currentFps=0;
-        var meshBuffers={};
 
+        // Mesh cache — only rebuild when chunks change
+        var meshBuffers={};
+        var dirtyChunks=new Set();
+
+        // ============================================================
+        // Initialization
+        // ============================================================
         function init() {
             canvas = document.getElementById('dk-terrain-canvas');
             gl = canvas.getContext('webgl', {antialias:false, alpha:false});
             if (!gl) { document.body.innerHTML='<h1 style="color:red;padding:40px;">WebGL not supported</h1>'; return; }
+
             initBlockColors();
             populateBiomeSelector();
+
             terrainProgram = createProgram(gl, DK_TERRAIN_VS, DK_TERRAIN_FS);
             wireframeProgram = createProgram(gl, DK_WIREFRAME_VS, DK_WIREFRAME_FS);
             skyProgram = createProgram(gl, DK_SKY_VS, DK_SKY_FS);
@@ -368,6 +402,7 @@
             terrainLocs.uFogColor=gl.getUniformLocation(terrainProgram,'uFogColor');
             terrainLocs.uFogDensity=gl.getUniformLocation(terrainProgram,'uFogDensity');
             terrainLocs.uLightFactor=gl.getUniformLocation(terrainProgram,'uLightFactor');
+            terrainLocs.uAlpha=gl.getUniformLocation(terrainProgram,'uAlpha');
 
             wireframeLocs.aPosition=gl.getAttribLocation(wireframeProgram,'aPosition');
             wireframeLocs.aColor=gl.getAttribLocation(wireframeProgram,'aColor');
@@ -394,6 +429,9 @@
             sel.value='1';
         }
 
+        // ============================================================
+        // UI Setup
+        // ============================================================
         function setupUI() {
             document.getElementById('ui-biome').addEventListener('change',function(){selectedBiomeId=parseInt(this.value);regenerateTerrain();});
             document.getElementById('btn-apply-seed').addEventListener('click',function(){
@@ -404,11 +442,35 @@
             document.getElementById('ui-render-dist').addEventListener('input',function(){
                 renderDistance=parseInt(this.value);document.getElementById('ui-render-dist-val').textContent=renderDistance;regenerateTerrain();
             });
-            var navBtns={'btn-n':[0,1],'btn-s':[0,-1],'btn-w':[-1,0],'btn-e':[1,0],'btn-nw':[-1,1],'btn-ne':[1,1],'btn-sw':[-1,-1],'btn-se':[1,-1],'btn-center':[0,0]};
-            for(var id in navBtns)(function(b,d){var btn=document.getElementById(b);if(btn)btn.addEventListener('click',function(){currentChunkX+=d[0];currentChunkZ+=d[1];updateCameraToChunk();regenerateTerrain();});})(id,navBtns[id]);
+
+            // Navigation buttons
+            var navMap={
+                'btn-nw':[-1,1],'btn-n':[0,1],'btn-ne':[1,1],
+                'btn-w':[-1,0],'btn-center':[0,0],'btn-e':[1,0],
+                'btn-sw':[-1,-1],'btn-s':[0,-1],'btn-se':[1,-1]
+            };
+            var ids=Object.keys(navMap);
+            for(var i=0;i<ids.length;i++){
+                (function(id,d){
+                    var btn=document.getElementById(id);
+                    if(btn) btn.addEventListener('click',function(){
+                        currentChunkX+=d[0];currentChunkZ+=d[1];
+                        updateCameraToChunk();regenerateTerrain();
+                    });
+                })(ids[i],navMap[ids[i]]);
+            }
+
             document.getElementById('btn-regen').addEventListener('click',regenerateTerrain);
-            document.getElementById('btn-toggle-wireframe').addEventListener('click',function(){wireframeEnabled=!wireframeEnabled;this.classList.toggle('active',wireframeEnabled);});
-            ['opt-caves','opt-ores','opt-water','opt-surface'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){options[id.replace('opt-','')]=this.checked;});});
+            document.getElementById('btn-toggle-wireframe').addEventListener('click',function(){
+                wireframeEnabled=!wireframeEnabled;this.classList.toggle('active',wireframeEnabled);
+            });
+
+            ['opt-caves','opt-ores','opt-water','opt-surface'].forEach(function(id){
+                document.getElementById(id).addEventListener('change',function(){
+                    options[id.replace('opt-','')]=this.checked;
+                });
+            });
+
             document.addEventListener('keydown',function(e){keys[e.code]=true;if(e.code==='KeyR')regenerateTerrain();if(e.code==='KeyF')camera.fly=!camera.fly;});
             document.addEventListener('keyup',function(e){keys[e.code]=false;});
             canvas.addEventListener('click',function(){if(!pointerLocked)canvas.requestPointerLock();});
@@ -421,23 +483,35 @@
         function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;if(gl)gl.viewport(0,0,canvas.width,canvas.height);}
         function updateCameraToChunk(){var cs=Donkeycraft.Config.CHUNK_SIZE;camera.x=currentChunkX*cs+cs/2;camera.y=120;camera.z=currentChunkZ*cs+cs/2;}
 
+        // ============================================================
+        // Terrain regeneration — clears cache and marks all dirty
+        // ============================================================
         function regenerateTerrain() {
-            chunks.clear(); meshBuffers={};
+            chunks.clear();
+            meshBuffers={};
+            dirtyChunks.clear();
+
             var halfRd=Math.floor(renderDistance/2);
             var allBiomes=Donkeycraft.BiomeRegistry?Donkeycraft.BiomeRegistry.getAllBiomes():[];
+
             for(var cx=currentChunkX-halfRd;cx<=currentChunkX+halfRd;cx++){
                 for(var cz=currentChunkZ-halfRd;cz<=currentChunkZ+halfRd;cz++){
-                    var key=cx+','+cz, chunk=new Donkeycraft.Chunk(cx,cz); chunk.fill(0);
+                    var key=cx+','+cz, chunk=new Donkeycraft.Chunk(cx,cz);
+                    chunk.fill(0);
                     var biomeId=selectedBiomeId;
+
                     if(allBiomes.length>1){
                         var bn=Donkeycraft._gen?Donkeycraft._gen._noise2D(cx*0.05,cz*0.05):0;
                         var bi=Math.floor((bn+1)/2*(allBiomes.length-1));
                         biomeId=allBiomes[Math.min(bi,allBiomes.length-1)].id;
                     }
                     chunk.biomeId=biomeId;
+
                     if(Donkeycraft.StructureGenerator) Donkeycraft.StructureGenerator.generateChunkFull(chunk,biomeId);
                     else generateChunkManual(chunk,biomeId);
+
                     chunks.set(key,chunk);
+                    dirtyChunks.add(key);
                 }
             }
             document.getElementById('ui-chunk-pos').textContent='CX='+currentChunkX+' CZ='+currentChunkZ;
@@ -445,25 +519,35 @@
             updateCameraToChunk();
         }
 
+        // ============================================================
+        // Chunk generation — procedural only, no textures
+        // ============================================================
         function generateChunkManual(chunk,biomeId) {
             var biome=Donkeycraft.BiomeRegistry?Donkeycraft.BiomeRegistry.getBiomeById(biomeId):null;
             var heightmap=Donkeycraft.TerrainGenerator?Donkeycraft.TerrainGenerator.generateHeightmap(chunk.chunkX,chunk.chunkZ,biome):null;
             var ws=Donkeycraft.Config.WORLD_HEIGHT, cs=Donkeycraft.Config.CHUNK_SIZE;
+
+            // Fill with air first
             for(var x=0;x<cs;x++) for(var z=0;z<cs;z++) chunk.setBlock(x,0,z,1000);
+
             if(heightmap){
                 for(var x=0;x<cs;x++) for(var z=0;z<cs;z++){
                     var h=Math.max(1,Math.min(heightmap[x+z*cs]||64,ws-2));
                     for(var y=1;y<h;y++){
-                        var bid=1;
-                        if(y>h-4&&h>5){if(biome&&biome.isDesert)bid=7;else bid=8;}
+                        var bid=1; // stone
+                        if(y>h-4&&h>5){if(biome&&biome.isDesert)bid=7;else bid=8;} // dirt layer
                         else if(biome&&biome.isDesert&&y>h-3)bid=19;
                         chunk.setBlock(x,y,z,bid);
                     }
-                    chunk.setBlock(x,h,z,biome&&biome.isDesert?19:8);
+                    chunk.setBlock(x,h,z,biome&&biome.isDesert?19:8); // top layer
                 }
             } else {
-                for(var x=0;x<cs;x++) for(var z=0;z<cs;z++){for(var y=1;y<64;y++)chunk.setBlock(x,y,z,1);chunk.setBlock(x,64,z,8);}
+                for(var x=0;x<cs;x++) for(var z=0;z<cs;z++){
+                    for(var y=1;y<64;y++) chunk.setBlock(x,y,z,1);
+                    chunk.setBlock(x,64,z,8);
+                }
             }
+
             if(options.caves&&Donkeycraft.CaveGenerator) Donkeycraft.CaveGenerator.generateCaves(chunk,biomeId);
             if(options.ores&&Donkeycraft.OreGenerator){Donkeycraft.OreGenerator.init();Donkeycraft.OreGenerator.placeOres(chunk,biomeId);}
             if(options.water&&Donkeycraft.WaterGenerator&&heightmap) Donkeycraft.WaterGenerator.placeWater(chunk,biomeId,heightmap);
@@ -471,11 +555,36 @@
             chunk.generated=true;
         }
 
+        // ============================================================
+        // Block lookup across chunk boundaries — fixed
+        // ============================================================
+        function getBlockAt(gx,gy,gz){
+            var cs=Donkeycraft.Config.CHUNK_SIZE, cx=Math.floor(gx/cs), cz=Math.floor(gz/cs);
+            var lx=((gx%cs)+cs)%cs, lz=((gz%cs)+cs)%cs;
+            if(gy<0||gy>=Donkeycraft.Config.WORLD_HEIGHT) return 0;
+            var ch=chunks.get(cx+','+cz);
+            if(!ch) return 0;
+            return ch.getBlock(lx,gy,lz);
+        }
+
+        function isTransparent(bid){
+            if(Donkeycraft.BlockTypes) return Donkeycraft.BlockTypes.isTransparent(bid);
+            var b=Donkeycraft.BlockRegistry?Donkeycraft.BlockRegistry.getBlockById(bid):null;
+            return b&&b.transparent;
+        }
+
+        // ============================================================
+        // Chunk mesh building — FIXED face culling + alpha
+        // ============================================================
         function buildChunkMesh(chunk) {
-            var key=chunk.chunkX+','+chunk.chunkZ; if(meshBuffers[key])return meshBuffers[key];
+            var key=chunk.chunkX+','+chunk.chunkZ;
+            if(!dirtyChunks.has(key)) return meshBuffers[key];
+            dirtyChunks.delete(key);
+
             var cs=Donkeycraft.Config.CHUNK_SIZE, ws=Donkeycraft.Config.WORLD_HEIGHT;
             var pos=[],col=[],nor=[];
-            // Face definitions: dir=direction from this block, normal=outward-facing, corners=local (x,y,z) of each corner
+
+            // Face definitions: direction, outward normal, 4 corner offsets
             var faces=[
                 {d:[0,1,0],n:[0,1,0],c:[[0,1,0],[1,1,0],[1,1,1],[0,1,1]]},  // up
                 {d:[0,-1,0],n:[0,-1,0],c:[[0,0,1],[1,0,1],[1,0,0],[0,0,0]]}, // down
@@ -484,132 +593,302 @@
                 {d:[1,0,0],n:[1,0,0],c:[[1,0,1],[1,0,0],[1,1,0],[1,1,1]]},  // east (+x)
                 {d:[-1,0,0],n:[-1,0,0],c:[[0,0,0],[0,0,1],[0,1,1],[0,1,0]]}  // west (-x)
             ];
+
             for(var x=0;x<cs;x++) for(var y=0;y<ws;y++) for(var z=0;z<cs;z++){
-                var bid=chunk.getBlock(x,y,z); if(bid===0)continue;
-                var clr=BLOCK_COLORS[bid]; if(!clr)continue;
+                var bid=chunk.getBlock(x,y,z);
+                if(bid===0) continue;
+                var clr=BLOCK_COLORS[bid];
+                if(!clr) continue;
+
                 for(var f=0;f<faces.length;f++){
                     var face=faces[f];
-                    // Neighbor local coords within same chunk, or -1/16 for outside
                     var nx=x+face.d[0], ny=y+face.d[1], nz=z+face.d[2];
-                    var nid=0, isTransparentN=true;
+                    var nid=0, neighborTransparent=true;
+
                     if(nx>=0&&nx<cs&&ny>=0&&ny<ws&&nz>=0&&nz<cs){
-                        // Neighbor is within same chunk
+                        // Neighbor within same chunk
                         nid=chunk.getBlock(nx,ny,nz);
-                        isTransparentN=isTransparent(nid);
+                        neighborTransparent=isTransparent(nid);
                     } else {
-                        // Neighbor is in a different chunk — look it up via getBlockAt
+                        // Neighbor in adjacent chunk — look it up by world coords
                         var ngx=chunk.chunkX*cs+nx, ngy=ny, ngz=chunk.chunkZ*cs+nz;
                         nid=getBlockAt(ngx,ngy,ngz);
-                        isTransparentN=isTransparent(nid);
+                        neighborTransparent=isTransparent(nid);
                     }
-                    // Show face if neighbor is air or transparent
-                    if(nid===0||isTransparentN){
-                        for(var c=0;c<4;c++){var cr=face.c[c];pos.push(x+cr[0],y+cr[1],z+cr[2]);col.push(clr[0],clr[1],clr[2]);nor.push(face.n[0],face.n[1],face.n[2]);}
+
+                    // Show face if neighbor is air OR transparent (for semi-transparent rendering)
+                    if(nid===0||neighborTransparent){
+                        for(var c=0;c<4;c++){
+                            var cr=face.c[c];
+                            pos.push(x+cr[0], y+cr[1], z+cr[2]);
+                            col.push(clr[0], clr[1], clr[2]);
+                            nor.push(face.n[0], face.n[1], face.n[2]);
+                        }
                     }
                 }
             }
-            if(pos.length===0){meshBuffers[key]={count:0};return meshBuffers[key];}
-            var vb=pos.length/3;
-            var pb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pos),gl.STATIC_DRAW);
-            var cb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(col),gl.STATIC_DRAW);
-            var nb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,nb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(nor),gl.STATIC_DRAW);
-            meshBuffers[key]={posBuf:pb,colorBuf:cb,normBuf:nb,count:vb};
+
+            if(pos.length===0){ meshBuffers[key]={count:0}; return meshBuffers[key]; }
+
+            var vertexCount=pos.length/3;
+
+            // Create buffers
+            var pb=gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,pb);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pos),gl.STATIC_DRAW);
+
+            var cb=gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,cb);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(col),gl.STATIC_DRAW);
+
+            var nb=gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,nb);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(nor),gl.STATIC_DRAW);
+
+            meshBuffers[key]={posBuf:pb,colorBuf:cb,normBuf:nb,count:vertexCount};
             return meshBuffers[key];
         }
 
-        function getBlockAt(gx,gy,gz){
-            var cs=Donkeycraft.Config.CHUNK_SIZE, cx=Math.floor(gx/cs), cz=Math.floor(gz/cs);
-            var lx=((gx%cs)+cs)%cs, lz=((gz%cs)+cs)%cs;
-            if(gy<0||gy>=Donkeycraft.Config.WORLD_HEIGHT)return 0;
-            var ch=chunks.get(cx+','+cz);if(!ch)return 0;return ch.getBlock(lx,gy,lz);
-        }
-
-        // Get neighbor chunk for mesh building (for face culling at chunk boundaries)
-        function getNeighborChunk(cx, cz){ return chunks.get(cx+','+cz); }
-        function isTransparent(bid){if(Donkeycraft.BlockTypes)return Donkeycraft.BlockTypes.isTransparent(bid);var b=Donkeycraft.BlockRegistry?Donkeycraft.BlockRegistry.getBlockById(bid):null;return b&&b.transparent;}
-
+        // ============================================================
+        // Sky rendering
+        // ============================================================
         function renderSky(proj,view){
             gl.useProgram(skyProgram);
-            var s=500, verts=[-s,-s,s,s,-s,s,s,s,s,-s,s,s,s,-s,-s,-s,-s,-s,-s,-s,-s,s,s,-s,s,-s,s,-s,-s,-s,s,-s,-s,-s,s,-s,s,s,-s,-s,s,s,-s,-s,s,s,-s,s,s,s,s,s,s,-s,-s,-s,-s,-s,s,-s,s,s,-s,s,-s];
-            var sc=[0.53,0.81,0.92,1.0,0.53,0.81,0.92,1.0,0.60,0.85,1.0,1.0,0.30,0.25,0.20,1.0,0.55,0.80,0.93,1.0,0.55,0.80,0.93,1.0];
-            var idx=[0,1,2,0,2,3,4,5,6,4,6,7,8,9,10,8,10,11,12,13,14,12,14,15,16,17,18,16,18,19,20,21,22,20,22,23];
-            var pa=[],ca=[];for(var i=0;i<idx.length;i++){var j=idx[i];pa.push(verts[j*3],verts[j*3+1],verts[j*3+2]);ca.push(sc[j*4],sc[j*4+1],sc[j*4+2],sc[j*4+3]);}
-            var pb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pa),gl.STATIC_DRAW);
-            var cb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(ca),gl.STATIC_DRAW);
-            gl.uniformMatrix4fv(skyLocs.uProjection,false,proj);gl.uniformMatrix4fv(skyLocs.uView,false,view);
-            var mdl=mat4Create();gl.uniformMatrix4fv(skyLocs.uModel,false,mdl);
-            gl.enableVertexAttribArray(skyLocs.aPosition);gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.vertexAttribPointer(skyLocs.aPosition,3,gl.FLOAT,false,0,0);
-            gl.enableVertexAttribArray(skyLocs.aColor);gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.vertexAttribPointer(skyLocs.aColor,4,gl.FLOAT,false,0,0);
-            gl.depthMask(false);gl.drawArrays(gl.TRIANGLES,0,idx.length);gl.depthMask(true);
-            gl.deleteBuffer(pb);gl.deleteBuffer(cb);
+            var s=500, verts=[
+                -s,-s,s, s,-s,s, s,s,s, -s,s,s,
+                 s,-s,-s, s,s,-s, s,s,-s, s,-s,-s,
+                -s,s,-s, -s,s,s, s,s,s, s,s,-s,
+                -s,-s,-s, s,-s,-s, s,-s,s, -s,-s,s,
+                 s,s,-s, s,s,s, -s,s,s, -s,s,-s,
+                -s,-s,s, s,-s,s, s,-s,-s, -s,-s,-s
+            ];
+            var sc=[
+                0.53,0.81,0.92,1.0, 0.53,0.81,0.92,1.0, 0.60,0.85,1.0,1.0, 0.30,0.25,0.20,1.0,
+                0.55,0.80,0.93,1.0, 0.55,0.80,0.93,1.0, 0.53,0.81,0.92,1.0, 0.53,0.81,0.92,1.0,
+                0.60,0.85,1.0,1.0, 0.53,0.81,0.92,1.0, 0.55,0.80,0.93,1.0, 0.30,0.25,0.20,1.0,
+                0.53,0.81,0.92,1.0, 0.53,0.81,0.92,1.0, 0.60,0.85,1.0,1.0, 0.30,0.25,0.20,1.0,
+                0.55,0.80,0.93,1.0, 0.55,0.80,0.93,1.0, 0.53,0.81,0.92,1.0, 0.53,0.81,0.92,1.0,
+                0.60,0.85,1.0,1.0, 0.53,0.81,0.92,1.0, 0.55,0.80,0.93,1.0, 0.30,0.25,0.20,1.0
+            ];
+            var idx=[
+                0,1,2,0,2,3, 4,5,6,4,6,7,
+                8,9,10,8,10,11, 12,13,14,12,14,15,
+                16,17,18,16,18,19, 20,21,22,20,22,23
+            ];
+
+            var pa=[],ca=[];
+            for(var i=0;i<idx.length;i++){
+                var j=idx[i];
+                pa.push(verts[j*3],verts[j*3+1],verts[j*3+2]);
+                ca.push(sc[j*4],sc[j*4+1],sc[j*4+2],sc[j*4+3]);
+            }
+
+            var pb=gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,pb);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(pa),gl.STATIC_DRAW);
+
+            var cb=gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,cb);
+            gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(ca),gl.STATIC_DRAW);
+
+            gl.uniformMatrix4fv(skyLocs.uProjection,false,proj);
+            gl.uniformMatrix4fv(skyLocs.uView,false,view);
+            var mdl=mat4Create();
+            gl.uniformMatrix4fv(skyLocs.uModel,false,mdl);
+
+            gl.enableVertexAttribArray(skyLocs.aPosition);
+            gl.bindBuffer(gl.ARRAY_BUFFER,pb);
+            gl.vertexAttribPointer(skyLocs.aPosition,3,gl.FLOAT,false,0,0);
+
+            gl.enableVertexAttribArray(skyLocs.aColor);
+            gl.bindBuffer(gl.ARRAY_BUFFER,cb);
+            gl.vertexAttribPointer(skyLocs.aColor,4,gl.FLOAT,false,0,0);
+
+            gl.depthMask(false);
+            gl.cullFace(gl.FRONT); // cull front face for inside-of-sphere effect
+            gl.enable(gl.CULL_FACE);
+            gl.drawArrays(gl.TRIANGLES,0,idx.length);
+            gl.depthMask(true);
+            gl.disable(gl.CULL_FACE);
+
+            gl.deleteBuffer(pb);
+            gl.deleteBuffer(cb);
         }
 
+        // ============================================================
+        // Render loop
+        // ============================================================
         function renderLoop(ts){
-            frameCount++;if(!lastFpsTime)lastFpsTime=ts;
-            if(ts-lastFpsTime>=1000){currentFps=frameCount;frameCount=0;lastFpsTime=ts;
-                var fe=document.getElementById('dk-fps-counter');if(fe)fe.textContent='FPS: '+currentFps;
-                var fi=document.getElementById('ui-fps');if(fi)fi.textContent='FPS: '+currentFps;}
+            frameCount++;
+            if(!lastFpsTime) lastFpsTime=ts;
+            if(ts-lastFpsTime>=1000){
+                currentFps=frameCount;frameCount=0;lastFpsTime=ts;
+                var fe=document.getElementById('dk-fps-counter');
+                if(fe) fe.textContent='FPS: '+currentFps;
+                var fi=document.getElementById('ui-fps');
+                if(fi) fi.textContent='FPS: '+currentFps;
+            }
+
+            // Camera rotation
             var sens=Donkeycraft.Config?Donkeycraft.Config.MOUSE_SENSITIVITY||0.15:0.15;
-            camera.yaw-=mouseDX*sens;camera.pitch-=mouseDY*sens;
-            camera.pitch=Math.max(-Math.PI/2+0.01,Math.min(Math.PI/2-0.01,camera.pitch));
+            camera.yaw-=mouseDX*sens;
+            camera.pitch-=mouseDY*sens;
+            camera.pitch=Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, camera.pitch));
             mouseDX=0;mouseDY=0;
+
+            // Movement
             var spd=(keys['ShiftLeft']?12:6)*0.016;
-            var fwd=[-Math.sin(camera.yaw),0,-Math.cos(camera.yaw)], rgt=[Math.cos(camera.yaw),0,-Math.sin(camera.yaw)];
+            var fwd=[-Math.sin(camera.yaw),0,-Math.cos(camera.yaw)];
+            var rgt=[Math.cos(camera.yaw),0,-Math.sin(camera.yaw)];
+
             if(keys['KeyW']){camera.x+=fwd[0]*spd;camera.z+=fwd[2]*spd;}
             if(keys['KeyS']){camera.x-=fwd[0]*spd;camera.z-=fwd[2]*spd;}
             if(keys['KeyA']){camera.x-=rgt[0]*spd;camera.z-=rgt[2]*spd;}
             if(keys['KeyD']){camera.x+=rgt[0]*spd;camera.z+=rgt[2]*spd;}
-            if(keys['Space'])camera.y+=spd;if(keys['ControlLeft'])camera.y-=spd;
-            if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight)resizeCanvas();
-            gl.clearColor(0.53,0.81,0.92,1.0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-            gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);
-            var asp=canvas.width/canvas.height, fov=(Donkeycraft.Config?(Donkeycraft.Config.FOV||70):70)*Math.PI/180;
-            var proj=mat4Create();mat4Perspective(proj,fov,asp,0.1,1000);
-            var ex=camera.x,ey=camera.y,ez=camera.z;
-            var lx=ex-Math.sin(camera.yaw)*Math.cos(camera.pitch),ly=ey+Math.sin(camera.pitch),lz=ez-Math.cos(camera.yaw)*Math.cos(camera.pitch);
-            var view=mat4Create();mat4LookAt(view,[ex,ey,ez],[lx,ly,lz],[0,1,0]);
+            if(keys['Space']) camera.y+=spd;
+            if(keys['ControlLeft']) camera.y-=spd;
+
+            // Resize check
+            if(canvas.width!==window.innerWidth||canvas.height!==window.innerHeight) resizeCanvas();
+
+            // Clear
+            gl.clearColor(0.53,0.81,0.92,1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+
+            // Enable depth test and backface culling for opaque rendering
+            gl.enable(gl.DEPTH_TEST);
+            gl.disable(gl.CULL_FACE); // Disable culling for transparent blocks
+
+            // Projection & view matrices
+            var asp=canvas.width/canvas.height;
+            var fov=(Donkeycraft.Config?(Donkeycraft.Config.FOV||70):70)*Math.PI/180;
+            var proj=mat4Create();
+            mat4Perspective(proj,fov,asp,0.1,1000);
+
+            var ex=camera.x, ey=camera.y, ez=camera.z;
+            var lx=ex-Math.sin(camera.yaw)*Math.cos(camera.pitch);
+            var ly=ey+Math.sin(camera.pitch);
+            var lz=ez-Math.cos(camera.yaw)*Math.cos(camera.pitch);
+            var view=mat4Create();
+            mat4LookAt(view,[ex,ey,ez],[lx,ly,lz],[0,1,0]);
+
+            // Render sky first (behind everything)
             renderSky(proj,view);
+
+            // Mark all chunks dirty on first frame
+            if(meshBuffers._firstFrame){
+                chunks.forEach(function(ch){dirtyChunks.add(ch.chunkX+','+ch.chunkZ);});
+                meshBuffers._firstFrame=false;
+            }
+
+            // Build meshes for dirty chunks only
             chunks.forEach(function(ch){buildChunkMesh(ch);});
+
+            // ---- Render terrain with transparency ----
+            gl.enable(gl.DEPTH_TEST);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
             gl.useProgram(terrainProgram);
-            gl.uniformMatrix4fv(terrainLocs.uProjection,false,proj);gl.uniformMatrix4fv(terrainLocs.uView,false,view);
-            gl.uniform3f(terrainLocs.uFogColor,0.53,0.81,0.92);gl.uniform1f(terrainLocs.uFogDensity,0.008);gl.uniform1f(terrainLocs.uLightFactor,1.0);
+            gl.uniformMatrix4fv(terrainLocs.uProjection,false,proj);
+            gl.uniformMatrix4fv(terrainLocs.uView,false,view);
+            gl.uniform3f(terrainLocs.uFogColor,0.53,0.81,0.92);
+            gl.uniform1f(terrainLocs.uFogDensity,0.008);
+            gl.uniform1f(terrainLocs.uLightFactor,1.0);
+            gl.uniform1f(terrainLocs.uAlpha, 0.88); // Semi-transparent blocks
+
             chunks.forEach(function(ch){
-                var buf=meshBuffers[ch.chunkX+','+ch.chunkZ];if(!buf||buf.count===0)return;
+                var buf=meshBuffers[ch.chunkX+','+ch.chunkZ];
+                if(!buf||buf.count===0) return;
+
                 // Model matrix: translate mesh from local chunk coords (0..15) to world position
-                var cm=mat4Create();mat4Identity(cm);
+                var cm=mat4Create();
+                mat4Identity(cm);
                 cm[12]=ch.chunkX*Donkeycraft.Config.CHUNK_SIZE;
                 cm[14]=ch.chunkZ*Donkeycraft.Config.CHUNK_SIZE;
                 gl.uniformMatrix4fv(terrainLocs.uModel,false,cm);
-                gl.enableVertexAttribArray(terrainLocs.aPosition);gl.bindBuffer(gl.ARRAY_BUFFER,buf.posBuf);gl.vertexAttribPointer(terrainLocs.aPosition,3,gl.FLOAT,false,0,0);
-                gl.enableVertexAttribArray(terrainLocs.aColor);gl.bindBuffer(gl.ARRAY_BUFFER,buf.colorBuf);gl.vertexAttribPointer(terrainLocs.aColor,3,gl.FLOAT,false,0,0);
-                gl.enableVertexAttribArray(terrainLocs.aNormal);gl.bindBuffer(gl.ARRAY_BUFFER,buf.normBuf);gl.vertexAttribPointer(terrainLocs.aNormal,3,gl.FLOAT,false,0,0);
+
+                gl.enableVertexAttribArray(terrainLocs.aPosition);
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.posBuf);
+                gl.vertexAttribPointer(terrainLocs.aPosition,3,gl.FLOAT,false,0,0);
+
+                gl.enableVertexAttribArray(terrainLocs.aColor);
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.colorBuf);
+                gl.vertexAttribPointer(terrainLocs.aColor,3,gl.FLOAT,false,0,0);
+
+                gl.enableVertexAttribArray(terrainLocs.aNormal);
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.normBuf);
+                gl.vertexAttribPointer(terrainLocs.aNormal,3,gl.FLOAT,false,0,0);
+
                 gl.drawArrays(gl.TRIANGLES,0,buf.count);
             });
+
+            // Disable blending after transparent pass
+            gl.disable(gl.BLEND);
+            gl.enable(gl.CULL_FACE);
+            gl.cullFace(gl.BACK);
+
+            // Wireframe debug overlay
             if(wireframeEnabled){
                 var wv=[],wc=[];
                 chunks.forEach(function(ch){
-                    var gx=ch.chunkX*Donkeycraft.Config.CHUNK_SIZE,gz=ch.chunkZ*Donkeycraft.Config.CHUNK_SIZE;
-                    var cs=Donkeycraft.Config.CHUNK_SIZE,ws=Donkeycraft.Config.WORLD_HEIGHT;
-                    var corners=[[gx,0,gz],[gx+cs,0,gz],[gx+cs,0,gz+cs],[gx,0,gz+cs],[gx,ws,gz],[gx+cs,ws,gz],[gx+cs,ws,gz+cs],[gx,ws,gz+cs]];
+                    var gx=ch.chunkX*Donkeycraft.Config.CHUNK_SIZE;
+                    var gz=ch.chunkZ*Donkeycraft.Config.CHUNK_SIZE;
+                    var cs=Donkeycraft.Config.CHUNK_SIZE;
+                    var ws=Donkeycraft.Config.WORLD_HEIGHT;
+                    var corners=[
+                        [gx,0,gz],[gx+cs,0,gz],[gx+cs,0,gz+cs],[gx,0,gz+cs],
+                        [gx,ws,gz],[gx+cs,ws,gz],[gx+cs,ws,gz+cs],[gx,ws,gz+cs]
+                    ];
                     var edges=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
-                    for(var e=0;e<edges.length;e++){var a=corners[edges[e][0]],b=corners[edges[e][1]];wv.push(a[0],a[1],a[2],b[0],b[1],b[2]);wc.push(1,1,1,1,1,1,1,1);}
+                    for(var e=0;e<edges.length;e++){
+                        var a=corners[edges[e][0]],b=corners[edges[e][1]];
+                        wv.push(a[0],a[1],a[2],b[0],b[1],b[2]);
+                        wc.push(1,1,1,1, 1,1,1,1);
+                    }
                 });
                 if(wv.length>0){
-                    gl.useProgram(wireframeProgram);gl.uniformMatrix4fv(wireframeLocs.uProjection,false,proj);gl.uniformMatrix4fv(wireframeLocs.uView,false,view);
-                    var mdl=mat4Create();gl.uniformMatrix4fv(wireframeLocs.uModel,false,mdl);
-                    gl.disable(gl.DEPTH_TEST);gl.depthMask(false);
-                    var pb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(wv),gl.STATIC_DRAW);
-                    var cb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,cb);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(wc),gl.STATIC_DRAW);
-                    gl.enableVertexAttribArray(wireframeLocs.aPosition);gl.vertexAttribPointer(wireframeLocs.aPosition,3,gl.FLOAT,false,0,0);
-                    gl.enableVertexAttribArray(wireframeLocs.aColor);gl.vertexAttribPointer(wireframeLocs.aColor,4,gl.FLOAT,false,0,0);
-                    gl.drawArrays(gl.LINES,0,wv.length/6);gl.deleteBuffer(pb);gl.deleteBuffer(cb);
-                    gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
+                    gl.useProgram(wireframeProgram);
+                    gl.uniformMatrix4fv(wireframeLocs.uProjection,false,proj);
+                    gl.uniformMatrix4fv(wireframeLocs.uView,false,view);
+                    var mdl=mat4Create();
+                    gl.uniformMatrix4fv(wireframeLocs.uModel,false,mdl);
+
+                    gl.disable(gl.DEPTH_TEST);
+                    gl.depthMask(false);
+
+                    var pb=gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER,pb);
+                    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(wv),gl.STATIC_DRAW);
+
+                    var cb=gl.createBuffer();
+                    gl.bindBuffer(gl.ARRAY_BUFFER,cb);
+                    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(wc),gl.STATIC_DRAW);
+
+                    gl.enableVertexAttribArray(wireframeLocs.aPosition);
+                    gl.vertexAttribPointer(wireframeLocs.aPosition,3,gl.FLOAT,false,0,0);
+
+                    gl.enableVertexAttribArray(wireframeLocs.aColor);
+                    gl.vertexAttribPointer(wireframeLocs.aColor,4,gl.FLOAT,false,0,0);
+
+                    gl.drawArrays(gl.LINES,0,wv.length/6);
+
+                    gl.deleteBuffer(pb);
+                    gl.deleteBuffer(cb);
+
+                    gl.enable(gl.DEPTH_TEST);
+                    gl.depthMask(true);
                 }
             }
+
             requestAnimationFrame(renderLoop);
         }
 
-        if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+        // ============================================================
+        // Start
+        // ============================================================
+        if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init);
+        else init();
     })();
     </script>
 </body>
