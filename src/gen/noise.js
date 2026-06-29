@@ -201,6 +201,7 @@
      * @private
      */
     Donkeycraft._gen = Donkeycraft._gen || {};
+    Donkeycraft._gen._ensureNoiseInit = _ensureNoiseInit;
     Donkeycraft._gen._shufflePerm = _shufflePerm;
     Donkeycraft._gen._createShuffledPerm = _createShuffledPerm;
     Donkeycraft._gen._noise2D = _noise2D;

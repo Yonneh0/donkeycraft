@@ -396,18 +396,14 @@
         }
 
         /**
-         * Simple 2D hash for deterministic randomness.
+         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
          * @param {number} x
          * @param {number} y
          * @returns {number} Positive 32-bit integer.
          * @private
          */
         function _hash2D(x, y) {
-            x = x | 0;
-            y = y | 0;
-            var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
-            h = ((h >>> 13) ^ h) * 0x5bd1e995;
-            return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
+            return Donkeycraft._gen._hash2D(x, y);
         }
 
         /**

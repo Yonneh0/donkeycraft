@@ -56,6 +56,11 @@
          * @param {number[]} heightmap - Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
          */
         function applySurfaceLayer(chunk, biomeId, heightmap) {
+            // Input validation
+            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
+            if (typeof biomeId !== 'number' || biomeId < 0) return;
+            if (!heightmap || !Array.isArray(heightmap)) return;
+
             switch (biomeId) {
                 // Plains & forest variants — grass block surface with dirt layer
                 case Donkeycraft.BiomeID.PLAINS:
@@ -112,7 +117,9 @@
             var dirtId = _getBlockId('dirt');
             var stoneId = _getBlockId('stone');
 
+            // Validate at least grass block is available
             if (!grassBlockId) return;
+            if (!dirtId) dirtId = grassBlockId; // Fallback to grass block
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
@@ -144,6 +151,7 @@
             var dirtId = _getBlockId('dirt');
             var stoneId = _getBlockId('stone');
 
+            // Validate sand block is available
             if (!sandId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -183,6 +191,7 @@
             var stoneId = _getBlockId('stone');
             var grassBlockId = _getBlockId('grass_block');
 
+            // Validate at least one snow type is available
             if (!snowLayerId && !snowBlockId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -230,6 +239,9 @@
             var snowBlockId = _getBlockId('snow_block');
             var stoneId = _getBlockId('stone');
 
+            // Fallback: if no snow block, use stone
+            if (!snowBlockId && !stoneId) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var surfaceY = heightmap[x + z * CHUNK_SIZE];
@@ -254,6 +266,7 @@
          */
         function _applyStoneSurface(chunk, heightmap) {
             var stoneId = _getBlockId('stone');
+            // Stone is a core block — if missing, skip silently
             if (!stoneId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -279,6 +292,7 @@
             var clayId = _getBlockId('clay');
             var stoneId = _getBlockId('stone');
 
+            // Validate dirt block is available (core swamp surface block)
             if (!dirtId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {

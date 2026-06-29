@@ -292,6 +292,17 @@
         }
 
         /**
+         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
+         * @param {number} x
+         * @param {number} y
+         * @returns {number} Positive 32-bit integer.
+         * @private
+         */
+        function _hash2D(x, y) {
+            return Donkeycraft._gen._hash2D(x, y);
+        }
+
+        /**
          * Generate a pseudo-random number in a range using deterministic hashing.
          * @param {number} index - Variation index for this vein placement attempt.
          * @param {number} min - Minimum Y value.
@@ -300,22 +311,10 @@
          * @private
          */
         function _randomInRange(index, min, max) {
-            var hash = Donkeycraft._gen._hash2D(index, ((min + max) | 0));
+            var hash = _hash2D(index, ((min + max) | 0));
             return min + (hash % (max - min + 1));
         }
 
-        /**
-         * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
-         * @deprecated Use Donkeycraft._gen._hash2D instead — centralized in noise.js.
-         * Kept locally for backward compatibility with any code that may call this directly.
-         * @param {number} x - X coordinate.
-         * @param {number} y - Y coordinate.
-         * @returns {number} Positive 32-bit integer.
-         * @private
-         */
-        function _hash2D(x, y) {
-            return Donkeycraft._gen._hash2D(x, y);
-        }
 
         /**
          * Validate that required parameters are of correct type and range.
