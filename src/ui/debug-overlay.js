@@ -291,7 +291,7 @@
     /**
      * collectData — collects all debug data into a single object.
      * Uses internal references only (does not mutate state from arguments).
-     * If optional player/chunkManager are passed, they are used locally without side effects.
+     * If optional game/chunkManager are passed, they are used locally without side effects.
      * @param {Donkeycraft.Player} [player=null] - Optional player override (does not persist).
      * @param {Object} [chunkManager=null] - Optional chunk manager override (does not persist).
      * @returns {Object} Complete debug data object.
@@ -301,7 +301,7 @@
         var localPlayer = player || this._player;
         var localChunkManager = chunkManager || this._chunkManager;
 
-        // Temporarily swap references for helper methods that use this._player/this._chunkManager
+        // Temporarily swap references for helper methods that use this._game/this._chunkManager
         var savedPlayer = this._player;
         var savedChunkManager = this._chunkManager;
         var swapped = false;

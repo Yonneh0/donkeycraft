@@ -89,45 +89,45 @@
 <script src="src/core/audio.js"></script>
 
 <!-- Block System -->
-<script src="src/world/block.js"></script>
-<script src="src/world/block-state.js"></script>
-<script src="src/world/block-types.js"></script>
-<script src="src/world/texture-atlas.js"></script>
-<script src="src/world/block-models.js"></script>
-<script src="src/world/recipe-registry.js"></script>
+<script src="src/game/block.js"></script>
+<script src="src/game/block-state.js"></script>
+<script src="src/game/block-types.js"></script>
+<script src="src/game/texture-atlas.js"></script>
+<script src="src/game/block-models.js"></script>
+<script src="src/game/recipe-registry.js"></script>
 
 <!-- World Generation -->
-<script src="src/world/chunk.js"></script>
-<script src="src/world/chunk-manager.js"></script>
-<script src="src/world/biome.js"></script>
-<script src="src/world/terrain-generator.js"></script>
-<script src="src/world/ore-generator.js"></script>
-<script src="src/world/cave-generator.js"></script>
-<script src="src/world/structure-generator.js"></script>
-<script src="src/world/water-generator.js"></script>
-<script src="src/world/terrain-surface.js"></script>
-<script src="src/world/lighting-engine.js"></script>
-<script src="src/world/physics.js"></script>
-<script src="src/world/world-utils.js"></script>
+<script src="src/game/chunk.js"></script>
+<script src="src/game/chunk-manager.js"></script>
+<script src="src/game/biome.js"></script>
+<script src="src/game/terrain-generator.js"></script>
+<script src="src/game/ore-generator.js"></script>
+<script src="src/game/cave-generator.js"></script>
+<script src="src/game/structure-generator.js"></script>
+<script src="src/game/water-generator.js"></script>
+<script src="src/game/terrain-surface.js"></script>
+<script src="src/game/lighting-engine.js"></script>
+<script src="src/game/physics.js"></script>
+<script src="src/game/world-utils.js"></script>
 
 
 <!-- Player & Movement -->
-<script src="src/player/player.js"></script>
-<script src="src/player/movement.js"></script>
-<script src="src/player/collision.js"></script>
-<script src="src/player/jumping.js"></script>
-<script src="src/player/flying.js"></script>
-<script src="src/player/hurt-box.js"></script>
-<script src="src/player/game-mode.js"></script>
-<script src="src/player/stats.js"></script>
-<script src="src/player/hunger.js"></script>
-<script src="src/player/experience.js"></script>
+<script src="src/game/player.js"></script>
+<script src="src/game/movement.js"></script>
+<script src="src/game/collision.js"></script>
+<script src="src/game/jumping.js"></script>
+<script src="src/game/flying.js"></script>
+<script src="src/game/damage.js"></script>
+<script src="src/game/game-mode.js"></script>
+<script src="src/game/stats.js"></script>
+<script src="src/game/hunger.js"></script>
+<script src="src/game/experience.js"></script>
 
 <!-- Interaction -->
-<script src="src/interaction/raycast.js"></script>
-<script src="src/interaction/block-action.js"></script>
-<script src="src/interaction/block-placement.js"></script>
-<script src="src/interaction/interactable-blocks.js"></script>
+<script src="src/game/raycast.js"></script>
+<script src="src/game/block-action.js"></script>
+<script src="src/game/block-placement.js"></script>
+<script src="src/game/interactable-blocks.js"></script>
 
 <!-- Asset Generation (refactored into src/gen/) -->
 <script src="src/gen/noise.js"></script>
@@ -156,38 +156,38 @@
 <script src="src/ui/debug-overlay.js"></script>
 
 <!-- Entities & Mobs -->
-<script src="src/entity/entity.js"></script>
-<script src="src/entity/entity-manager.js"></script>
-<script src="src/entity/passive-mobs.js"></script>
-<script src="src/entity/hostile-mobs.js"></script>
-<script src="src/entity/boss-mobs.js"></script>
-<script src="src/entity/mob-ai.js"></script>
-<script src="src/entity/projectiles.js"></script>
-<script src="src/entity/animals.js"></script>
-<script src="src/entity/mob-spawning.js"></script>
+<script src="src/game/entity.js"></script>
+<script src="src/game/entity-manager.js"></script>
+<script src="src/game/passive-mobs.js"></script>
+<script src="src/game/hostile-mobs.js"></script>
+<script src="src/game/boss-mobs.js"></script>
+<script src="src/game/mob-ai.js"></script>
+<script src="src/game/projectiles.js"></script>
+<script src="src/game/animals.js"></script>
+<script src="src/game/mob-spawning.js"></script>
 
 <!-- Redstone -->
-<script src="src/redstone/redstone-engine.js"></script>
-<script src="src/redstone/wiring.js"></script>
-<script src="src/redstone/repeater-comparator.js"></script>
-<script src="src/redstone/observers.js"></script>
-<script src="src/redstone/pistons.js"></script>
-<script src="src/redstone/tnt.js"></script>
+<script src="src/game/redstone-engine.js"></script>
+<script src="src/game/wiring.js"></script>
+<script src="src/game/repeater-comparator.js"></script>
+<script src="src/game/observers.js"></script>
+<script src="src/game/pistons.js"></script>
+<script src="src/game/tnt.js"></script>
 
 <!-- Dimensions -->
-<script src="src/world/dimension.js"></script>
-<script src="src/world/portal.js"></script>
-<script src="src/world/nether-generator.js"></script>
-<script src="src/world/end-generator.js"></script>
+<script src="src/game/dimension.js"></script>
+<script src="src/game/portal.js"></script>
+<script src="src/game/nether-generator.js"></script>
+<script src="src/game/end-generator.js"></script>
 
 <!-- Time & Weather -->
-<script src="src/world/time.js"></script>
+<script src="src/game/time.js"></script>
 <script src="src/render/weather.js"></script>
 
 <!-- Storage -->
-<script src="src/storage/world-store.js"></script>
-<script src="src/storage/level-data.js"></script>
-<script src="src/storage/cache.js"></script>
+<script src="src/core/world-store.js"></script>
+<script src="src/core/level-data.js"></script>
+<script src="src/core/cache.js"></script>
 
 <!-- Enchanting & Potions -->
 <script src="src/game/enchantment.js"></script>
@@ -658,7 +658,7 @@ void main() {
                 if (player && (player.gameMode === 'creative' || player.gameMode === 'spectator')) {
                     var flyingSys = game._flyingSystem;
                     if (flyingSys) {
-                        flyingSys.toggleFlyMode(player);
+                        flyingSys.toggleFlyMode();
                     }
                 }
             }
@@ -819,6 +819,11 @@ void main() {
                 var hunger = new Donkeycraft.Hunger(game2._player, hurtBox);
                 game2._hungerSystem = hunger;
                 Donkeycraft._hungerSystem = hunger;
+
+                // Wire hunger system into Movement for degradation tracking
+                if (game2._movementSystem) {
+                    try { game2._movementSystem.setHungerSystem(hunger); } catch (e3) {}
+                }
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
             }

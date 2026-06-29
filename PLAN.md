@@ -36,7 +36,7 @@ Each file is designed to be self-contained within its module group. Files only d
 - Core infrastructure — universally needed
 - Lower-numbered groups in order
 
-A file in `src/render/` should never import from `src/player/` or `src/world/`. Communication between modules happens through the `Donkeycraft` namespace and/or the event bus.
+A file in `src/render/` should never import from `src/game/` or `src/game/`. Communication between modules happens through the `Donkeycraft` namespace and/or the event bus.
 
 ---
 
@@ -109,12 +109,12 @@ Block definitions, textures, models, and recipe registry.
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 27 | `src/world/block.js` | Block definitions: IDs, names, hardness, blast resistance, drop, transparency flags, all 257 vanilla blocks + query methods | 531 |
-| 28 | `src/world/block-state.js` | Block state metadata: variants (oak log direction, wool color), property system | 369 |
-| 29 | `src/world/block-types.js` | Special block type classification: solid, transparent, liquid, opaque, full-block, replaceable | 286 |
-| 30 | `src/world/texture-atlas.js` | Atlas generation: compiles all block textures into single WebGL texture, UV mapping | 270 |
-| 31 | `src/world/block-models.js` | Baked models: face definitions for each block, AO data, BlockModelRegistry | 395 |
-| 32 | `src/world/recipe-registry.js` | Central registry for all crafting recipes, furnace recipes, shapeless recipes with matching logic | 585 |
+| 27 | `src/game/block.js` | Block definitions: IDs, names, hardness, blast resistance, drop, transparency flags, all 257 vanilla blocks + query methods | 531 |
+| 28 | `src/game/block-state.js` | Block state metadata: variants (oak log direction, wool color), property system | 369 |
+| 29 | `src/game/block-types.js` | Special block type classification: solid, transparent, liquid, opaque, full-block, replaceable | 286 |
+| 30 | `src/game/texture-atlas.js` | Atlas generation: compiles all block textures into single WebGL texture, UV mapping | 270 |
+| 31 | `src/game/block-models.js` | Baked models: face definitions for each block, AO data, BlockModelRegistry | 395 |
+| 32 | `src/game/recipe-registry.js` | Central registry for all crafting recipes, furnace recipes, shapeless recipes with matching logic | 585 |
 
 **Subtotal: 6 files, ~2,436 lines**
 
@@ -125,23 +125,23 @@ Chunks, terrain generation, biomes, structures, lighting engine, physics, dimens
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 33 | `src/world/chunk.js` | Chunk data structure: 16×256×16 array, block storage, lighting arrays, dirty flags | 263 |
-| 34 | `src/world/chunk-manager.js` | Chunk loading/unloading: radius management, spawn/destroy, dirty tracking | 381 |
-| 35 | `src/world/terrain-generator.js` | Heightmap generation: Perlin noise layers, biome height variation | 126 |
-| 36 | `src/world/biome.js` | Biome definitions: temperature, rainfall, colors, grass/leaf color, spawn rates | 264 |
-| 37 | `src/world/structure-generator.js` | Structure placement: ore veins, underground caves, surface structures | 262 |
-| 38 | `src/world/ore-generator.js` | Ore distribution: vein placement per biome, rarity, Y-level ranges | 200 |
-| 39 | `src/world/cave-generator.js` | Cave system: 3D noise-based cave generation, lava caves, mushroom caves | 159 |
-| 40 | `src/world/water-generator.js` | Water source placement: lake detection, surface water flow | 166 |
-| 41 | `src/world/terrain-surface.js` | Surface layer: top block per biome (grass→dirt→stone), sand beaches, snow | 170 |
-| 42 | `src/world/lighting-engine.js` | Sky light & block light propagation: BFS flood fill, light updates | 235 |
-| 43 | `src/world/physics.js` | Block physics: gravity blocks (sand/gravel), liquid flow, redstone signal propagation | 252 |
-| 44 | `src/world/world-utils.js` | Shared coordinate and block access utilities | 144 |
-| 45 | `src/world/dimension.js` | Dimension system: Overworld/Nether/End types, coordinate transformation, chunk isolation | 380 |
-| 46 | `src/world/portal.js` | Portal detection, creation, dimension travel with coordinate transformation | 480 |
-| 47 | `src/world/nether-generator.js` | Nether terrain: bedrock, lava sea level, netherrack, nether ores, basalt columns | 309 |
-| 48 | `src/world/end-generator.js` | End terrain: island classification, end stone platform, end cities, chorus plants | 346 |
-| 49 | `src/world/time.js` | World time: 24000 tick day cycle, moon phases, hour/minute calculations | 206 |
+| 33 | `src/game/chunk.js` | Chunk data structure: 16×256×16 array, block storage, lighting arrays, dirty flags | 263 |
+| 34 | `src/game/chunk-manager.js` | Chunk loading/unloading: radius management, spawn/destroy, dirty tracking | 381 |
+| 35 | `src/game/terrain-generator.js` | Heightmap generation: Perlin noise layers, biome height variation | 126 |
+| 36 | `src/game/biome.js` | Biome definitions: temperature, rainfall, colors, grass/leaf color, spawn rates | 264 |
+| 37 | `src/game/structure-generator.js` | Structure placement: ore veins, underground caves, surface structures | 262 |
+| 38 | `src/game/ore-generator.js` | Ore distribution: vein placement per biome, rarity, Y-level ranges | 200 |
+| 39 | `src/game/cave-generator.js` | Cave system: 3D noise-based cave generation, lava caves, mushroom caves | 159 |
+| 40 | `src/game/water-generator.js` | Water source placement: lake detection, surface water flow | 166 |
+| 41 | `src/game/terrain-surface.js` | Surface layer: top block per biome (grass→dirt→stone), sand beaches, snow | 170 |
+| 42 | `src/game/lighting-engine.js` | Sky light & block light propagation: BFS flood fill, light updates | 235 |
+| 43 | `src/game/physics.js` | Block physics: gravity blocks (sand/gravel), liquid flow, redstone signal propagation | 252 |
+| 44 | `src/game/world-utils.js` | Shared coordinate and block access utilities | 144 |
+| 45 | `src/game/dimension.js` | Dimension system: Overworld/Nether/End types, coordinate transformation, chunk isolation | 380 |
+| 46 | `src/game/portal.js` | Portal detection, creation, dimension travel with coordinate transformation | 480 |
+| 47 | `src/game/nether-generator.js` | Nether terrain: bedrock, lava sea level, netherrack, nether ores, basalt columns | 309 |
+| 48 | `src/game/end-generator.js` | End terrain: island classification, end stone platform, end cities, chorus plants | 346 |
+| 49 | `src/game/time.js` | World time: 24000 tick day cycle, moon phases, hour/minute calculations | 206 |
 
 **Subtotal: 17 files, ~4,323 lines**
 
@@ -152,16 +152,16 @@ Player entity, movement physics, collision detection, jumping, flying, game mode
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 50 | `src/player/player.js` | Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode, knockback | 346 |
-| 51 | `src/player/movement.js` | Movement physics: walking, sprinting, swimming, flying, speed modifiers | 340 |
-| 52 | `src/player/collision.js` | AABB collision detection & response against blocks, axis-separated resolution | 320 |
-| 53 | `src/player/jumping.js` | Jump mechanics: height, frequency, cooldown timer, water swimming | 121 |
-| 54 | `src/player/flying.js` | Creative/spectator flying: enable/disable, up/down, speed boost | 171 |
-| 55 | `src/player/hurt-box.js` | Hitbox management, damage reception with absorption, knockback, fall damage | 342 |
-| 56 | `src/player/game-mode.js` | Game modes: Survival (health, hunger, damage), Creative, Spectator | 239 |
-| 57 | `src/player/stats.js` | Player stats: achievements/advancements, statistics tracking | 301 |
-| 58 | `src/player/hunger.js` | Hunger system: food value, saturation, starvation damage, auto-regeneration | 244 |
-| 59 | `src/player/experience.js` | XP system: levels, XP orbs, enchanting costs | 240 |
+| 50 | `src/game/player.js` | Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode, knockback | 346 |
+| 51 | `src/game/movement.js` | Movement physics: walking, sprinting, swimming, flying, speed modifiers | 340 |
+| 52 | `src/game/collision.js` | AABB collision detection & response against blocks, axis-separated resolution | 320 |
+| 53 | `src/game/jumping.js` | Jump mechanics: height, frequency, cooldown timer, water swimming | 121 |
+| 54 | `src/game/flying.js` | Creative/spectator flying: enable/disable, up/down, speed boost | 171 |
+| 55 | `src/game/damage.js` | Hitbox management, damage reception with absorption, knockback, fall damage | 342 |
+| 56 | `src/game/game-mode.js` | Game modes: Survival (health, hunger, damage), Creative, Spectator | 239 |
+| 57 | `src/game/stats.js` | Player stats: achievements/advancements, statistics tracking | 301 |
+| 58 | `src/game/hunger.js` | Hunger system: food value, saturation, starvation damage, auto-regeneration | 244 |
+| 59 | `src/game/experience.js` | XP system: levels, XP orbs, enchanting costs | 240 |
 
 **Subtotal: 10 files, ~2,664 lines**
 
@@ -172,10 +172,10 @@ Raycasting, block mining/placing, right-click interactions with interactive bloc
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 60 | `src/interaction/raycast.js` | DDA raycasting through voxels: hit detection, block face normal, reach distance | 287 |
-| 61 | `src/interaction/block-action.js` | Block breaking: hardness timer, tool speed multipliers, drop spawning | 356 |
-| 62 | `src/interaction/block-placement.js` | Block placement: face normal handling, snap to grid, AABB player collision | 166 |
-| 63 | `src/interaction/interactable-blocks.js` | Right-click interactions: doors, chests, furnaces, levers, buttons, dispensers | 474 |
+| 60 | `src/game/raycast.js` | DDA raycasting through voxels: hit detection, block face normal, reach distance | 287 |
+| 61 | `src/game/block-action.js` | Block breaking: hardness timer, tool speed multipliers, drop spawning | 356 |
+| 62 | `src/game/block-placement.js` | Block placement: face normal handling, snap to grid, AABB player collision | 166 |
+| 63 | `src/game/interactable-blocks.js` | Right-click interactions: doors, chests, furnaces, levers, buttons, dispensers | 474 |
 
 **Subtotal: 4 files, ~1,283 lines**
 
@@ -209,15 +209,15 @@ Base entity system, passive mobs, hostile mobs, bosses, AI, projectiles, animal 
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 77 | `src/entity/entity.js` | Base entity class: position, velocity, rotation, health, bounding box, tick, serialize/deserialize | 368 |
-| 78 | `src/entity/entity-manager.js` | Entity management: spawn, despawn, tick all entities, by-type queries | 214 |
-| 79 | `src/entity/passive-mobs.js` | Passive mobs: cow, pig, sheep, chicken — wander, flee, drop items | 233 |
-| 80 | `src/entity/hostile-mobs.js` | Hostile mobs: zombie, skeleton, spider, creeper, enderman — chase, attack, explode | 329 |
-| 81 | `src/entity/boss-mobs.js` | Boss entities: Ender Dragon, Wither — phases, attacks, death animation | 348 |
-| 82 | `src/entity/mob-ai.js` | Mob AI: A* pathfinding, line-of-sight raycasting, chase/flee, wander targeting | 258 |
-| 83 | `src/entity/projectiles.js` | Projectiles: arrows, snowballs, ender pearls, dragon breath — gravity, impact behavior | 288 |
-| 84 | `src/entity/animals.js` | Animal-specific: breeding, leads, baby speed multiplier, food items | 244 |
-| 85 | `src/entity/mob-spawning.js` | Spawning system: spawn definitions, chunk/light/biome checks, mob caps | 497 |
+| 77 | `src/game/entity.js` | Base entity class: position, velocity, rotation, health, bounding box, tick, serialize/deserialize | 368 |
+| 78 | `src/game/entity-manager.js` | Entity management: spawn, despawn, tick all entities, by-type queries | 214 |
+| 79 | `src/game/passive-mobs.js` | Passive mobs: cow, pig, sheep, chicken — wander, flee, drop items | 233 |
+| 80 | `src/game/hostile-mobs.js` | Hostile mobs: zombie, skeleton, spider, creeper, enderman — chase, attack, explode | 329 |
+| 81 | `src/game/boss-mobs.js` | Boss entities: Ender Dragon, Wither — phases, attacks, death animation | 348 |
+| 82 | `src/game/mob-ai.js` | Mob AI: A* pathfinding, line-of-sight raycasting, chase/flee, wander targeting | 258 |
+| 83 | `src/game/projectiles.js` | Projectiles: arrows, snowballs, ender pearls, dragon breath — gravity, impact behavior | 288 |
+| 84 | `src/game/animals.js` | Animal-specific: breeding, leads, baby speed multiplier, food items | 244 |
+| 85 | `src/game/mob-spawning.js` | Spawning system: spawn definitions, chunk/light/biome checks, mob caps | 497 |
 
 **Subtotal: 9 files, ~2,779 lines**
 
@@ -228,12 +228,12 @@ Redstone logic engine: wiring, repeaters, comparators, observers, pistons, TNT.
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 86 | `src/redstone/redstone-engine.js` | Redstone tick system: updates at game speed, signal propagation, dirty queue | 285 |
-| 87 | `src/redstone/repeater-comparator.js` | Redstone repeater (delay 1-4 ticks), comparator (block compare/difference modes) | 439 |
-| 88 | `src/redstone/observers.js` | Observer blocks: detect block changes, emit 1-tick pulse, cooldown system | 225 |
-| 89 | `src/redstone/tnt.js` | TNT: 40-tick fuse, explosion radius 8, block destruction with blast resistance | 323 |
-| 90 | `src/redstone/pistons.js` | Pistons & sticky pistons: push up to 12 blocks, pull, crush detection | 460 |
-| 91 | `src/redstone/wiring.js` | Redstone dust/wire: signal strength (0-15), branching, torch states | 445 |
+| 86 | `src/game/redstone-engine.js` | Redstone tick system: updates at game speed, signal propagation, dirty queue | 285 |
+| 87 | `src/game/repeater-comparator.js` | Redstone repeater (delay 1-4 ticks), comparator (block compare/difference modes) | 439 |
+| 88 | `src/game/observers.js` | Observer blocks: detect block changes, emit 1-tick pulse, cooldown system | 225 |
+| 89 | `src/game/tnt.js` | TNT: 40-tick fuse, explosion radius 8, block destruction with blast resistance | 323 |
+| 90 | `src/game/pistons.js` | Pistons & sticky pistons: push up to 12 blocks, pull, crush detection | 460 |
+| 91 | `src/game/wiring.js` | Redstone dust/wire: signal strength (0-15), branching, torch states | 445 |
 
 **Subtotal: 6 files, ~2,177 lines**
 
@@ -257,9 +257,9 @@ IndexedDB world storage, level data persistence, and asset caching.
 
 | # | File | Description | Lines |
 |---|------|-------------|-------|
-| 95 | `src/storage/world-store.js` | IndexedDB world storage: save/load chunks, world info, dirty chunk batching, quota error handling, chunk format normalization | 480 |
-| 96 | `src/storage/level-data.js` | Level data: spawn position, game mode, time, seed, player data, validation, auto-save system with WorldStore integration | 590 |
-| 97 | `src/storage/cache.js` | Asset cache: IndexedDB-based persistent caching for texture atlases and sounds, quota management | 460 |
+| 95 | `src/core/world-store.js` | IndexedDB world storage: save/load chunks, world info, dirty chunk batching, quota error handling, chunk format normalization | 480 |
+| 96 | `src/core/level-data.js` | Level data: spawn position, game mode, time, seed, player data, validation, auto-save system with WorldStore integration | 590 |
+| 97 | `src/core/cache.js` | Asset cache: IndexedDB-based persistent caching for texture atlases and sounds, quota management | 460 |
 
 **Subtotal: 3 files, ~1,530 lines**
 
@@ -331,42 +331,42 @@ Scripts are loaded in this order in `index.html`:
 28.  src/render/break-particles.js
 29.  src/render/gui-renderer.js
 30.  src/render/weather.js
-31.  src/world/block.js
-32.  src/world/block-state.js
-33.  src/world/block-types.js
-34.  src/world/texture-atlas.js
-35.  src/world/block-models.js
-36.  src/world/recipe-registry.js
-37.  src/world/chunk.js
-38.  src/world/chunk-manager.js
-39.  src/world/biome.js
-40.  src/world/terrain-generator.js
-41.  src/world/ore-generator.js
-42.  src/world/cave-generator.js
-43.  src/world/water-generator.js
-44.  src/world/terrain-surface.js
-45.  src/world/lighting-engine.js
-46.  src/world/physics.js
-47.  src/world/world-utils.js
-48.  src/world/dimension.js
-49.  src/world/portal.js
-50.  src/world/nether-generator.js
-51.  src/world/end-generator.js
-52.  src/world/time.js
-53.  src/player/player.js
-54.  src/player/movement.js
-55.  src/player/collision.js
-56.  src/player/jumping.js
-57.  src/player/flying.js
-58.  src/player/hurt-box.js
-59.  src/player/game-mode.js
-60.  src/player/stats.js
-61.  src/player/hunger.js
-62.  src/player/experience.js
-63.  src/interaction/raycast.js
-64.  src/interaction/block-action.js
-65.  src/interaction/block-placement.js
-66.  src/interaction/interactable-blocks.js
+31.  src/game/block.js
+32.  src/game/block-state.js
+33.  src/game/block-types.js
+34.  src/game/texture-atlas.js
+35.  src/game/block-models.js
+36.  src/game/recipe-registry.js
+37.  src/game/chunk.js
+38.  src/game/chunk-manager.js
+39.  src/game/biome.js
+40.  src/game/terrain-generator.js
+41.  src/game/ore-generator.js
+42.  src/game/cave-generator.js
+43.  src/game/water-generator.js
+44.  src/game/terrain-surface.js
+45.  src/game/lighting-engine.js
+46.  src/game/physics.js
+47.  src/game/world-utils.js
+48.  src/game/dimension.js
+49.  src/game/portal.js
+50.  src/game/nether-generator.js
+51.  src/game/end-generator.js
+52.  src/game/time.js
+53.  src/game/player.js
+54.  src/game/movement.js
+55.  src/game/collision.js
+56.  src/game/jumping.js
+57.  src/game/flying.js
+58.  src/game/damage.js
+59.  src/game/game-mode.js
+60.  src/game/stats.js
+61.  src/game/hunger.js
+62.  src/game/experience.js
+63.  src/game/raycast.js
+64.  src/game/block-action.js
+65.  src/game/block-placement.js
+66.  src/game/interactable-blocks.js
 67.  src/ui/item-stack.js
 68.  src/ui/inventory.js
 69.  src/ui/gui-manager.js
@@ -380,27 +380,27 @@ Scripts are loaded in this order in `index.html`:
 77.  src/ui/debug-overlay.js
 78.  src/ui/gui-elements.js
 79.  src/ui/loading-screen.js
-80.  src/entity/entity.js
-81.  src/entity/entity-manager.js
-82.  src/entity/passive-mobs.js
-83.  src/entity/hostile-mobs.js
-84.  src/entity/boss-mobs.js
-85.  src/entity/mob-ai.js
-86.  src/entity/projectiles.js
-87.  src/entity/animals.js
-88.  src/entity/mob-spawning.js
-89.  src/redstone/redstone-engine.js
-90.  src/redstone/repeater-comparator.js
-91.  src/redstone/observers.js
-92.  src/redstone/tnt.js
-93.  src/redstone/pistons.js
-94.  src/redstone/wiring.js
+80.  src/game/entity.js
+81.  src/game/entity-manager.js
+82.  src/game/passive-mobs.js
+83.  src/game/hostile-mobs.js
+84.  src/game/boss-mobs.js
+85.  src/game/mob-ai.js
+86.  src/game/projectiles.js
+87.  src/game/animals.js
+88.  src/game/mob-spawning.js
+89.  src/game/redstone-engine.js
+90.  src/game/repeater-comparator.js
+91.  src/game/observers.js
+92.  src/game/tnt.js
+93.  src/game/pistons.js
+94.  src/game/wiring.js
 95.  src/game/enchantment.js
 96.  src/game/potion.js
 97.  src/game/tool.js
-98.  src/storage/world-store.js
-99.  src/storage/level-data.js
-100. src/storage/cache.js
+98.  src/core/world-store.js
+99.  src/core/level-data.js
+100. src/core/cache.js
 101. src/game.js                    ← loaded last
 ```
 

@@ -18,12 +18,27 @@
         this._player = player;
         this._collision = collision;
         this._chunkManager = chunkManager;
+
+        /**
+         * Distance accumulator for hunger degradation tracking.
+         * @type {number}
+         * @private
+         */
+        this._distanceAccumulator = 0;
+    };
+
+    /**
+     * Set the hunger system reference for degradation tracking.
+     * @param {Donkeycraft.Hunger} hungerSystem - Hunger instance.
+     */
+    Donkeycraft.Movement.prototype.setHungerSystem = function(hungerSystem) {
+        this._hungerSystem = hungerSystem;
     };
 
     /**
      * Main movement tick — called every game tick.
      * Reads input keys, computes horizontal speed, applies gravity, handles swimming,
-     * updates position with collision resolution.
+     * updates position with collision resolution, and tracks distance for hunger degradation.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Movement.prototype.tick = function(deltaTime) {
@@ -165,6 +180,23 @@
             var inputActive = forward !== 0 || strafe !== 0;
             if (!inputActive) {
                 player.setVelocity(0, player.getVelocity().y, 0);
+            }
+        }
+
+        // Track horizontal distance for hunger degradation
+        var dx = result.newX - pos.x;
+        var dz = result.newZ - pos.z;
+        this._distanceAccumulator += Math.sqrt(dx * dx + dz * dz);
+
+        // Apply hunger degradation every ~0.5 seconds worth of distance
+        if (this._hungerSystem && this._distanceAccumulator >= 0.5) {
+            var distanceSinceLastDeg = this._distanceAccumulator;
+            this._distanceAccumulator = 0;
+
+            if (isSprinting) {
+                this._hungerSystem.applySprintDegradation(distanceSinceLastDeg);
+            } else {
+                this._hungerSystem.applyWalkDegradation(distanceSinceLastDeg);
             }
         }
     };

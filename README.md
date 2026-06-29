@@ -144,7 +144,7 @@ src/
     break-particles.js    # Block breaking particles
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     weather.js            # Weather particle effects
-  world/            # Blocks, chunks, terrain generation
+  game/            # Blocks, chunks, terrain generation
     block.js              # Block definitions (257 blocks)
     block-state.js        # Block state variants
     block-types.js        # Block classification
@@ -168,18 +168,18 @@ src/
     nether-generator.js   # Nether terrain
     end-generator.js      # End terrain
     time.js               # World time cycle
-  player/           # Player entity, movement, collision, stats
+  game/           # Player entity, movement, collision, stats
     player.js             # Player entity (position, velocity, rotation)
     movement.js           # Walking, sprinting, swimming, flying speeds
     collision.js          # AABB collision detection
     jumping.js            # Jump mechanics
     flying.js             # Creative/spectator flying
-    hurt-box.js           # Hitbox, damage, knockback, fall damage
+    damage.js           # Hitbox, damage, knockback, fall damage
     game-mode.js          # Survival/Creative/Spectator modes
     stats.js              # Achievements and statistics
     hunger.js             # Food, saturation, starvation
     experience.js         # XP levels and orbs
-  interaction/      # Mining, placing, raycasting
+  game/      # Mining, placing, raycasting
     raycast.js            # DDA voxel raycasting
     block-action.js       # Block breaking with tool multipliers
     block-placement.js    # Block placement with collision checks
@@ -198,7 +198,7 @@ src/
     debug-overlay.js        # F3 debug screen
     gui-elements.js         # DOM UI components
     loading-screen.js       # Loading screen UI
-  entity/           # Mobs and entities
+  game/           # Mobs and entities
     entity.js               # Base entity class
     entity-manager.js       # Spawn/despawn/tick management
     passive-mobs.js         # Cow, pig, sheep, chicken
@@ -208,7 +208,7 @@ src/
     projectiles.js          # Arrows, snowballs, ender pearls
     animals.js              # Animal breeding logic
     mob-spawning.js         # Spawn definitions and caps
-  redstone/         # Redstone logic system
+  game/         # Redstone logic system
     redstone-engine.js      # Tick-based signal propagation
     repeater-comparator.js  # Repeaters (1-4 ticks) and comparators
     observers.js            # Observer blocks
@@ -219,7 +219,7 @@ src/
     enchantment.js          # 24 vanilla enchantments
     potion.js               # 18 effects, 40 potions
     tool.js                 # 7 material tiers
-  storage/          # World save/load
+  core/          # World save/load
     world-store.js          # IndexedDB chunk storage
     level-data.js           # Spawn, mode, time, player data
 game.js             # Main game class: loop, init, pause/resume

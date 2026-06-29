@@ -229,7 +229,7 @@
 
         // Deal damage to player through available systems
         if (this._targetPlayer.hurtBox && typeof this._targetPlayer.hurtBox.takeDamage === 'function') {
-            // Player has full hurt-box system (from hurt-box.js)
+            // Player has full damage system (from damage.js)
             this._targetPlayer.hurtBox.takeDamage(this.damage, this.type);
         } else if (typeof this._targetPlayer.takeDamage === 'function') {
             // Player has direct takeDamage method

@@ -457,6 +457,21 @@
             Donkeycraft.Logger.warn('Game', 'No movement system provided');
         }
 
+        // Wire up HurtBox reference into Hunger system for health-based regen/starvation
+        if (this._hungerSystem && this._hurtBox) {
+            try {
+                this._hungerSystem.setHurtBox(this._hurtBox);
+                Donkeycraft.Logger.info('Game', 'Hunger system wired to HurtBox');
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire Hunger to HurtBox: ' + e.message);
+            }
+        }
+
+        // Wire up Movement reference into Flying system for input-based speed queries
+        if (this._flyingSystem && this._movementSystem) {
+            // Flying already has its own input reference — no additional wiring needed
+        }
+
         // Instantiate Jumping if passed as a constructor (needs player, input, collision)
         if (jumpSystem && typeof jumpSystem === 'function') {
             try {
@@ -1346,10 +1361,16 @@
             this._blockActionSystem.tickBreakProgress(dt);
         }
 
+        // Update player rotation from camera and notify tick subscribers.
+        // Movement, collision, and physics are handled by the subsystems (Movement, Jumping, Flying).
+        this._updatePlayer(dt);
+
         // Tick player subsystems in dependency order:
         // 1. Flying — state management (toggle, speed queries)
         // 2. Movement — physics, gravity, swimming, collision resolution
         // 3. Jumping — jump input, cooldown, water swimming boost
+        // 4. Hunger — starvation, saturation drain, food-based regeneration
+        // 5. HurtBox — fire damage tick (applied after hunger to avoid double-heal)
         if (this._flyingSystem) {
             try { this._flyingSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Flying tick error: ' + e.message); }
         }
@@ -1358,6 +1379,12 @@
         }
         if (this._jumpSystem) {
             try { this._jumpSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Jump tick error: ' + e.message); }
+        }
+        if (this._hungerSystem) {
+            try { this._hungerSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Hunger tick error: ' + e.message); }
+        }
+        if (this._hurtBox) {
+            try { this._hurtBox.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'HurtBox tick error: ' + e.message); }
         }
 
         // Update chunk manager based on player position.

@@ -187,7 +187,7 @@ Each file is designed to be self-contained within its module group. Files only d
 - Core infrastructure — universally needed
 - Lower-numbered modules in order
 
-A file in `src/render/` should never import from `src/player/` or `src/world/`. Communication between modules happens through the `Donkeycraft` namespace and/or the event bus. See `PLAN.md` for the full dependency order.
+A file in `src/render/` should never import from `src/game/` or `src/game/`. Communication between modules happens through the `Donkeycraft` namespace and/or the event bus. See `PLAN.md` for the full dependency order.
 
 ---
 
