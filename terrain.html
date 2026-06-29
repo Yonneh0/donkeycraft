@@ -163,12 +163,18 @@
             <button id="btn-apply-seed">Apply</button>
         </div>
         <div class="row"><span>Render Dist:</span>
-            <input type="range" id="ui-render-dist" min="1" max="12" value="4">
+            <button id="btn-rd-minus" style="width:24px;padding:0;">−</button>
+            <input type="range" id="ui-render-dist" min="1" max="30" value="4" style="flex:1;">
+            <button id="btn-rd-plus" style="width:24px;padding:0;">+</button>
             <span id="ui-render-dist-val">4</span>
         </div>
         <div class="separator"></div>
         <div style="font-size:12px;color:#888;margin-bottom:4px;">Chunk Position</div>
         <div class="info-line" id="ui-chunk-pos">CX=0 CZ=0</div>
+        <div class="separator"></div>
+        <div style="font-size:12px;color:#888;margin-bottom:4px;">Viewer Location</div>
+        <div class="info-line" id="ui-viewer-pos">X=0 Y=0 Z=0</div>
+        <div class="info-line" id="ui-viewer-seed">Seed: 0</div>
         <div class="row"><button id="btn-nw">NW</button><button id="btn-n">N</button><button id="btn-ne">NE</button>
         </div>
         <div class="row"><button id="btn-w">W</button><button id="btn-center">C</button><button id="btn-e">E</button>
@@ -582,7 +588,72 @@
             var chunks = new Map(), currentChunkX = 0, currentChunkZ = 0;
             var renderDistance = 4, selectedBiomeId = 1, worldSeed = 42;
             var options = { caves: true, ores: true, water: true, surface: true };
-            var wireframeEnabled = false, frameCount = 0, lastFpsTime = 0, currentFps = 0;
+            var wireframeEnabled = false, frameCount = 0, lastFpsTime = 0, currentFps = 0, lastSaveTime = 0;
+
+            // ============================================================
+            // Browser storage — save/load state to localStorage
+            // ============================================================
+            var STORAGE_KEY = 'donkeycraft_terrain_state';
+            function saveState() {
+                try {
+                    var state = {
+                        renderDistance: renderDistance,
+                        selectedBiomeId: selectedBiomeId,
+                        worldSeed: worldSeed,
+                        options: options,
+                        wireframeEnabled: wireframeEnabled,
+                        camera: { x: camera.x, y: camera.y, z: camera.z, yaw: camera.yaw, pitch: camera.pitch },
+                        currentChunkX: currentChunkX,
+                        currentChunkZ: currentChunkZ
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+                } catch (e) { /* ignore storage errors */ }
+            }
+
+            function loadState() {
+                try {
+                    var raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return false;
+                    var state = JSON.parse(raw);
+                    if (!state || typeof state !== 'object') return false;
+
+                    // Restore render distance
+                    if (typeof state.renderDistance === 'number') {
+                        renderDistance = Math.max(1, Math.min(30, state.renderDistance));
+                    }
+                    // Restore biome
+                    if (typeof state.selectedBiomeId === 'number') {
+                        selectedBiomeId = state.selectedBiomeId;
+                    }
+                    // Restore seed
+                    if (typeof state.worldSeed === 'number') {
+                        worldSeed = state.worldSeed;
+                    }
+                    // Restore options
+                    if (state.options && typeof state.options === 'object') {
+                        if (typeof state.options.caves === 'boolean') options.caves = state.options.caves;
+                        if (typeof state.options.ores === 'boolean') options.ores = state.options.ores;
+                        if (typeof state.options.water === 'boolean') options.water = state.options.water;
+                        if (typeof state.options.surface === 'boolean') options.surface = state.options.surface;
+                    }
+                    // Restore wireframe
+                    if (typeof state.wireframeEnabled === 'boolean') {
+                        wireframeEnabled = state.wireframeEnabled;
+                    }
+                    // Restore camera position
+                    if (state.camera && typeof state.camera === 'object') {
+                        if (typeof state.camera.x === 'number') camera.x = state.camera.x;
+                        if (typeof state.camera.y === 'number') camera.y = state.camera.y;
+                        if (typeof state.camera.z === 'number') camera.z = state.camera.z;
+                        if (typeof state.camera.yaw === 'number') camera.yaw = state.camera.yaw;
+                        if (typeof state.camera.pitch === 'number') camera.pitch = state.camera.pitch;
+                    }
+                    // Restore chunk position
+                    if (typeof state.currentChunkX === 'number') currentChunkX = state.currentChunkX;
+                    if (typeof state.currentChunkZ === 'number') currentChunkZ = state.currentChunkZ;
+                    return true;
+                } catch (e) { return false; }
+            }
 
             // Wireframe buffer cache state (prevents per-frame buffer allocation)
             var _wireframeBuffers = { posBuf: null, colBuf: null };
@@ -670,11 +741,74 @@
                     if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
                     regenerateTerrain();
                 });
-                document.getElementById('ui-render-dist').addEventListener('input', function () {
+                // Render distance slider — update display on input, regenerate on change (lose focus)
+                var rdSlider = document.getElementById('ui-render-dist');
+                rdSlider.addEventListener('input', function () {
                     renderDistance = parseInt(this.value);
                     document.getElementById('ui-render-dist-val').textContent = renderDistance;
-                    regenerateTerrain();
                 });
+                rdSlider.addEventListener('change', function () {
+                    regenerateTerrain();
+                    saveState();
+                });
+
+                // Render distance +/- buttons
+                document.getElementById('btn-rd-minus').addEventListener('click', function () {
+                    renderDistance = Math.max(1, renderDistance - 1);
+                    rdSlider.value = renderDistance;
+                    document.getElementById('ui-render-dist-val').textContent = renderDistance;
+                    regenerateTerrain();
+                    saveState();
+                });
+                document.getElementById('btn-rd-plus').addEventListener('click', function () {
+                    renderDistance = Math.min(30, renderDistance + 1);
+                    rdSlider.value = renderDistance;
+                    document.getElementById('ui-render-dist-val').textContent = renderDistance;
+                    regenerateTerrain();
+                    saveState();
+                });
+
+                // Seed input — auto-apply on Enter or lose focus
+                var seedInput = document.getElementById('ui-seed');
+                seedInput.addEventListener('change', function () {
+                    worldSeed = parseInt(this.value) || 42;
+                    if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
+                    regenerateTerrain();
+                    saveState();
+                });
+
+                // Load saved state from localStorage
+                var hasState = loadState();
+
+                // Apply loaded values to UI elements
+                document.getElementById('ui-render-dist').value = renderDistance;
+                document.getElementById('ui-render-dist-val').textContent = renderDistance;
+                document.getElementById('ui-seed').value = worldSeed;
+                document.getElementById('opt-caves').checked = options.caves;
+                document.getElementById('opt-ores').checked = options.ores;
+                document.getElementById('opt-water').checked = options.water;
+                document.getElementById('opt-surface').checked = options.surface;
+                if (wireframeEnabled) {
+                    document.getElementById('btn-toggle-wireframe').classList.add('active');
+                }
+                // Set biome selector to loaded value
+                var biomeSel = document.getElementById('ui-biome');
+                if (biomeSel) {
+                    var foundBiome = false;
+                    for (var b = 0; b < biomeSel.options.length; b++) {
+                        if (parseInt(biomeSel.options[b].value) === selectedBiomeId) {
+                            biomeSel.selectedIndex = b;
+                            foundBiome = true;
+                            break;
+                        }
+                    }
+                    if (!foundBiome && biomeSel.options.length > 0) biomeSel.selectedIndex = 0;
+                }
+
+                // Auto-regenerate if we had a saved state with different chunk/params
+                if (hasState) {
+                    regenerateTerrain();
+                }
 
                 // Navigation buttons
                 var navMap = {
@@ -702,14 +836,18 @@
                     _wireframeBufferCount = 0;
                     regenerateTerrain();
                 });
+
+                // Wireframe toggle — save state
                 document.getElementById('btn-toggle-wireframe').addEventListener('click', function () {
                     wireframeEnabled = !wireframeEnabled;
                     this.classList.toggle('active', wireframeEnabled);
+                    saveState();
                 });
 
                 ['opt-caves', 'opt-ores', 'opt-water', 'opt-surface'].forEach(function (id) {
                     document.getElementById(id).addEventListener('change', function () {
                         options[id.replace('opt-', '')] = this.checked;
+                        saveState();
                     });
                 });
 
@@ -1124,6 +1262,22 @@
                     if (fi) fi.textContent = 'FPS: ' + currentFps;
                 }
 
+                // Periodically save camera position (every ~2 seconds)
+                if (ts - lastSaveTime > 2000) {
+                    lastSaveTime = ts;
+                    saveState();
+                }
+
+                // Update viewer location display
+                var viewerPosEl = document.getElementById('ui-viewer-pos');
+                if (viewerPosEl) {
+                    viewerPosEl.textContent = 'X=' + camera.x.toFixed(1) + ' Y=' + camera.y.toFixed(1) + ' Z=' + camera.z.toFixed(1);
+                }
+                var viewerSeedEl = document.getElementById('ui-viewer-seed');
+                if (viewerSeedEl) {
+                    viewerSeedEl.textContent = 'Seed: ' + worldSeed;
+                }
+
                 // Camera rotation
                 var sens = Donkeycraft.Config ? Donkeycraft.Config.MOUSE_SENSITIVITY || 0.15 : 0.15;
                 camera.yaw -= mouseDX * sens;
@@ -1247,24 +1401,76 @@
             }
 
             // ============================================================
-            // Wireframe debug overlay — chunk bounds (cached buffers)
+            // Wireframe debug overlay — block-level edges for all solid blocks
             // ============================================================
+            // Edge definitions: 12 edges of a unit cube (each edge = 2 vertices)
+            var _BLOCK_EDGES = [
+                // Bottom face (y=0)
+                [0, 0, 0, 1, 0, 0], [1, 0, 0, 1, 0, 1], [1, 0, 1, 0, 0, 1], [0, 0, 1, 0, 0, 0],
+                // Top face (y=1)
+                [0, 1, 0, 1, 1, 0], [1, 1, 0, 1, 1, 1], [1, 1, 1, 0, 1, 1], [0, 1, 1, 0, 1, 0],
+                // Vertical edges
+                [0, 0, 0, 0, 1, 0], [1, 0, 0, 1, 1, 0], [1, 0, 1, 1, 1, 1], [0, 0, 1, 0, 1, 1]
+            ];
+
             function _renderWireframeDebug(proj, view) {
                 var wv = [], wc = [];
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var ws = Donkeycraft.Config.WORLD_HEIGHT;
+
                 chunks.forEach(function (ch) {
-                    var gx = ch.chunkX * Donkeycraft.Config.CHUNK_SIZE;
-                    var gz = ch.chunkZ * Donkeycraft.Config.CHUNK_SIZE;
-                    var cs = Donkeycraft.Config.CHUNK_SIZE;
-                    var ws = Donkeycraft.Config.WORLD_HEIGHT;
-                    var corners = [
-                        [gx, 0, gz], [gx + cs, 0, gz], [gx + cs, 0, gz + cs], [gx, 0, gz + cs],
-                        [gx, ws, gz], [gx + cs, ws, gz], [gx + cs, ws, gz + cs], [gx, ws, gz + cs]
-                    ];
-                    var edges = [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]];
-                    for (var e = 0; e < edges.length; e++) {
-                        var a = corners[edges[e][0]], b = corners[edges[e][1]];
-                        wv.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-                        wc.push(1, 1, 1, 1, 1, 1, 1, 1);
+                    var gx = ch.chunkX * cs;
+                    var gz = ch.chunkZ * cs;
+
+                    // Iterate through all blocks in the chunk
+                    for (var x = 0; x < cs; x++) {
+                        for (var y = 0; y < ws; y++) {
+                            for (var z = 0; z < cs; z++) {
+                                var bid = ch.getBlock(x, y, z);
+                                if (bid === 0) continue; // air — skip
+
+                                // Only render edges for opaque solid blocks (alpha = 1.0)
+                                var alpha = BLOCK_ALPHAS[bid] || 1.0;
+                                if (alpha < 1.0) continue;
+
+                                // Check each of the 6 faces — only render edge if at least one adjacent face is exposed
+                                var exposed = false;
+                                var neighbors = [
+                                    [x + 1, y, z], [x - 1, y, z],
+                                    [x, y + 1, z], [x, y - 1, z],
+                                    [x, y, z + 1], [x, y, z - 1]
+                                ];
+
+                                for (var n = 0; n < 6; n++) {
+                                    var nx = neighbors[n][0], ny = neighbors[n][1], nz = neighbors[n][2];
+                                    var nid = 0, nTransparent = true;
+
+                                    if (nx >= 0 && nx < cs && ny >= 0 && ny < ws && nz >= 0 && nz < cs) {
+                                        nid = ch.getBlock(nx, ny, nz);
+                                        nTransparent = isTransparent(nid);
+                                    } else {
+                                        var ngx = gx + nx, ngy = ny, ngz = gz + nz;
+                                        nid = getBlockAt(ngx, ngy, ngz);
+                                        nTransparent = isTransparent(nid);
+                                    }
+
+                                    if (nid === 0 || nTransparent) { exposed = true; break; }
+                                }
+
+                                if (!exposed) continue;
+
+                                // Render all 12 edges of this block
+                                for (var e = 0; e < _BLOCK_EDGES.length; e++) {
+                                    var edge = _BLOCK_EDGES[e];
+                                    wv.push(
+                                        gx + x + edge[0], gy + y + edge[1], gz + z + edge[2],
+                                        gx + x + edge[3], gy + y + edge[4], gz + z + edge[5]
+                                    );
+                                    // Bright yellow-ish wireframe
+                                    wc.push(0.9, 0.85, 0.2, 1.0, 0.9, 0.85, 0.2, 1.0);
+                                }
+                            }
+                        }
                     }
                 });
 
