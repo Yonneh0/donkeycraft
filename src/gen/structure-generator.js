@@ -31,8 +31,8 @@
 
             var names = [
                 'bedrock', 'stone', 'dirt', 'grass_block', 'snow_block',
-                'oak_log', 'oak_leaves', 'rose', 'tall_grass',
-                'cactus', 'snow_layer', 'sand', 'grapevine'
+                'oak_log', 'oak_leaves', 'poppy', 'tall_grass',
+                'cactus', 'snow_layer', 'sand'
             ];
             for (var i = 0; i < names.length; i++) {
                 var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
@@ -228,30 +228,37 @@
                     }
                 }
 
-                _placeOakTree(chunk, tx, surfaceY + 1, tz, treeHeight, logId, leavesId);
+                _placeOakTree(chunk, tx, surfaceY, tz, treeHeight, logId, leavesId);
             }
         }
 
         /**
          * Place an oak-style tree at the given position.
+         * Validates that trunk space is clear before placing.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} x - X coordinate.
-         * @param {number} y - Y coordinate (top of trunk base).
+         * @param {number} y - Y coordinate (trunk base).
          * @param {number} z - Z coordinate.
          * @param {number} height - Trunk height.
          * @param {number} logId - Log block ID.
          * @param {number} leavesId - Leaves block ID.
+         * @returns {boolean} True if the tree was placed successfully.
          * @private
          */
         function _placeOakTree(chunk, x, y, z, height, logId, leavesId) {
-            // Trunk: logs from y to y+height-1
+            // Validate trunk space is clear (all air or replaceable blocks)
             for (var ty = 0; ty < height; ty++) {
-                if (y + ty < WORLD_HEIGHT) {
-                    chunk.setBlock(x, y + ty, z, logId); // oak_log (axis y)
-                }
+                if (y + ty >= WORLD_HEIGHT) return false;
+                var trunkBlock = chunk.getBlock(x, y + ty, z);
+                if (trunkBlock !== 0 && !isReplaceable(trunkBlock)) return false;
             }
 
-            // Leaves: 3×3×3 box on top, minus corners
+            // Place trunk: logs from y to y+height-1
+            for (var ty2 = 0; ty2 < height; ty2++) {
+                chunk.setBlock(x, y + ty2, z, logId);
+            }
+
+            // Leaves: 3×3×3 box on top, minus corners for rounded look
             var leafStartY = y + height - 2;
             var leafEndY = y + height + 1;
 
@@ -272,6 +279,25 @@
                     }
                 }
             }
+
+            return true;
+        }
+
+        /**
+         * Check if a block ID is replaceable (air or transparent decorative).
+         * @param {number} blockId - Block ID to check.
+         * @returns {boolean} True if the block can be overwritten.
+         * @private
+         */
+        function isReplaceable(blockId) {
+            // Air is always replaceable
+            if (blockId === 0) return true;
+
+            // Check via BlockRegistry if available
+            if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isReplaceable === 'function') {
+                return Donkeycraft.BlockRegistry.isReplaceable(blockId);
+            }
+            return false;
         }
 
         /**
@@ -284,9 +310,9 @@
          * @private
          */
         function _placeFlowers(chunk, biomeId, heightmap, seed, count) {
-            var roseId = _getBlockId('rose');
+            var poppyId = _getBlockId('poppy');
             var grassBlockId = _getBlockId('grass_block');
-            if (!roseId || !grassBlockId) return;
+            if (!poppyId || !grassBlockId) return;
 
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 53 + 100, i * 97 + 200);
@@ -299,7 +325,7 @@
                 // Place on grass block top
                 if (chunk.getBlock(fx, surfaceY, fz) === grassBlockId) {
                     if (surfaceY + 1 < WORLD_HEIGHT) {
-                        chunk.setBlock(fx, surfaceY + 1, fz, roseId);
+                        chunk.setBlock(fx, surfaceY + 1, fz, poppyId);
                     }
                 }
             }
@@ -337,7 +363,6 @@
 
         /**
          * Place cacti in a desert chunk.
-         * Uses biome constants from Donkeycraft.BiomeID for consistent checks.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number[]} heightmap - Heightmap array.
          * @param {number} seed - Random seed.
@@ -348,9 +373,6 @@
             var cactusId = _getBlockId('cactus');
             var sandId = _getBlockId('sand');
             if (!cactusId || !sandId) return;
-
-            // Biome constants for desert detection
-            var BIOME_DESERT = Donkeycraft.BiomeID ? [Donkeycraft.BiomeID.DESERT, Donkeycraft.BiomeID.DESERT_M] : [];
 
             for (var i = 0; i < count; i++) {
                 var hash = _hash2D(seed + i * 47 + 500, i * 73 + 600);

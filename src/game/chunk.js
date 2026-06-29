@@ -68,6 +68,13 @@
         this.biomeId = 0;
 
         /**
+         * Whether this chunk has been destroyed and its resources freed.
+         * @type {boolean}
+         * @private
+         */
+        this._destroyed = false;
+
+        /**
          * Block entity storage: key = "x,y,z" → value = { type: string, data: Object }.
          * Used for chunks like chests, furnaces, doors, etc.
          * @type {Map<string, Object>}
@@ -96,6 +103,7 @@
      * @returns {number} Block ID (0 = air).
      */
     Donkeycraft.Chunk.prototype.getBlock = function (x, y, z) {
+        if (this._destroyed) return 0; // Destroyed chunk returns air
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 0; // Out of bounds = air
         }
@@ -105,13 +113,14 @@
     /**
      * Set the block ID at local coordinates within this chunk.
      * Marks the chunk as dirty if the block value changes.
-     * Silently ignores out-of-bounds coordinates.
+     * Silently ignores out-of-bounds or destroyed chunks.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
      * @param {number} blockId - Block ID to set.
      */
     Donkeycraft.Chunk.prototype.setBlock = function (x, y, z, blockId) {
+        if (this._destroyed) return; // Destroyed chunk — ignore writes
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return; // Out of bounds — ignore
         }
@@ -132,6 +141,7 @@
      * @returns {number} Sky light value (0-15).
      */
     Donkeycraft.Chunk.prototype.getSkyLight = function (x, y, z) {
+        if (this._destroyed) return 0; // Destroyed chunk returns zero light
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 0; // Outside chunk = no sky light (world edge / void)
         }
@@ -162,6 +172,7 @@
      * @returns {number} Block light value (0-15).
      */
     Donkeycraft.Chunk.prototype.getBlockLight = function (x, y, z) {
+        if (this._destroyed) return 0; // Destroyed chunk returns zero light
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
             return 0; // Outside chunk = no block light
         }
@@ -218,6 +229,7 @@
      * @returns {boolean} True if the chunk is dirty.
      */
     Donkeycraft.Chunk.prototype.isDirty = function () {
+        if (this._destroyed) return false; // Destroyed chunks are clean by default
         return this._dirty;
     };
 
@@ -225,6 +237,7 @@
      * Mark this chunk as clean — changes have been applied to the mesh.
      */
     Donkeycraft.Chunk.prototype.markClean = function () {
+        if (this._destroyed) return;
         this._dirty = false;
     };
 
@@ -232,6 +245,7 @@
      * Mark this chunk as dirty — signals that the mesh needs regeneration.
      */
     Donkeycraft.Chunk.prototype.markDirty = function () {
+        if (this._destroyed) return;
         this._dirty = true;
     };
 
@@ -249,6 +263,7 @@
      * @param {number} blockId - Block ID to fill with (0 = air).
      */
     Donkeycraft.Chunk.prototype.fill = function (blockId) {
+        if (this._destroyed) return; // Destroyed chunk — ignore writes
         this.blocks.fill(blockId);
         this._dirty = true;
     };
@@ -351,10 +366,20 @@
     };
 
     /**
+     * Check if this chunk has been destroyed.
+     * @returns {boolean} True if destroy() was called.
+     */
+    Donkeycraft.Chunk.prototype.isDestroyed = function () {
+        return this._destroyed;
+    };
+
+    /**
      * Destroy and free chunk resources — nulls internal arrays.
      * Call this when the chunk is no longer needed.
      */
     Donkeycraft.Chunk.prototype.destroy = function () {
+        if (this._destroyed) return; // Prevent double-free
+        this._destroyed = true;
         this.blocks = null;
         this.skyLight = null;
         this.blockLight = null;

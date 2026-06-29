@@ -57,33 +57,44 @@
          */
         function applySurfaceLayer(chunk, biomeId, heightmap) {
             switch (biomeId) {
-                case Donkeycraft.BiomeID.PLAINS:     // 1
-                case Donkeycraft.BiomeID.FOREST:     // 3
-                case Donkeycraft.BiomeID.FLOWER_FOREST: // 10
-                case Donkeycraft.BiomeID.FOREST_HILL:   // 13
+                // Plains & forest variants — grass block surface with dirt layer
+                case Donkeycraft.BiomeID.PLAINS:
+                case Donkeycraft.BiomeID.FOREST:
+                case Donkeycraft.BiomeID.FLOWER_FOREST:
+                case Donkeycraft.BiomeID.FOREST_HILL:
+                case Donkeycraft.BiomeID.OCEAN:
+                case Donkeycraft.BiomeID.SUNFLOWER_PLAINS:
                     _applyGrassSurface(chunk, heightmap);
                     break;
-                case Donkeycraft.BiomeID.DESERT:     // 2
-                case Donkeycraft.BiomeID.DESERT_M:   // 12
+
+                // Desert — sand surface with 1-3 layers of sand below
+                case Donkeycraft.BiomeID.DESERT:
+                case Donkeycraft.BiomeID.DESERT_M:
                     _applySandSurface(chunk, heightmap);
                     break;
-                case Donkeycraft.BiomeID.TAIGA:      // 5
-                case Donkeycraft.BiomeID.TAIGA_HILL: // 14
-                case Donkeycraft.BiomeID.ICE_PLAINS: // 11
-                case Donkeycraft.BiomeID.SNOWY_TUNDRA: // 8 (handled by ID check)
+
+                // Taiga variants — grass block base with snow layer on top
+                case Donkeycraft.BiomeID.TAIGA:
+                case Donkeycraft.BiomeID.TAIGA_HILL:
                     _applySnowSurface(chunk, heightmap);
                     break;
-                case Donkeycraft.BiomeID.OCEAN:      // 6
-                case Donkeycraft.BiomeID.SUNFLOWER_PLAINS: // 9 (treated as plains-like)
-                    _applyGrassSurface(chunk, heightmap);
+
+                // Ice plains & snowy tundra — stone/snow surface (no grass)
+                case Donkeycraft.BiomeID.ICE_PLAINS:
+                case Donkeycraft.BiomeID.SNOWY_TUNDRA:
+                    _applyIceSurface(chunk, heightmap);
                     break;
-                case Donkeycraft.BiomeID.EXTREME_HILLS: // 7
-                case Donkeycraft.BiomeID.SNOWY_TUNDRA:  // 8
+
+                // Extreme hills — exposed stone surface
+                case Donkeycraft.BiomeID.EXTREME_HILLS:
                     _applyStoneSurface(chunk, heightmap);
                     break;
-                case Donkeycraft.BiomeID.SWAMP:      // 4
+
+                // Swamp — dirt on top with clay layer below
+                case Donkeycraft.BiomeID.SWAMP:
                     _applySwampSurface(chunk, heightmap);
                     break;
+
                 default:
                     _applyGrassSurface(chunk, heightmap);
                     break;
@@ -158,7 +169,8 @@
 
         /**
          * Apply snow surface: grass block as base, dirt layer below, thin snow layer on top.
-         * Uses snow_layer (ID 50, transparent) for the top decorative snow, not snow_block.
+         * Used for taiga biomes — has actual vegetation with grass blocks and snow decoration.
+         * Uses snow_layer (transparent) for the top decorative snow, not snow_block.
          * The snow layer sits ABOVE the grass_block surface.
          * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
          * @param {number[]} heightmap - Heightmap array.
@@ -201,6 +213,33 @@
                         } else if (snowBlockId) {
                             chunk.setBlock(x, surfaceY + 1, z, snowBlockId);
                         }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Apply ice/snow surface: snow_block as the top block (no grass).
+         * Used for ice plains and snowy tundra — fully frozen surfaces without vegetation.
+         * Places a thin layer of snow_layer on top if space is available.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
+         * @param {number[]} heightmap - Heightmap array.
+         * @private
+         */
+        function _applyIceSurface(chunk, heightmap) {
+            var snowBlockId = _getBlockId('snow_block');
+            var stoneId = _getBlockId('stone');
+
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
+                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+
+                    // Use snow_block as the primary surface, fall back to stone
+                    if (snowBlockId) {
+                        chunk.setBlock(x, surfaceY, z, snowBlockId);
+                    } else if (stoneId) {
+                        chunk.setBlock(x, surfaceY, z, stoneId);
                     }
                 }
             }

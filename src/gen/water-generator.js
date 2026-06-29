@@ -156,13 +156,16 @@
 
         /**
          * Place underground lakes using noise-based detection.
+         * Uses world seed for deterministic lake placement across all chunks.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @private
          */
         function _placeUndergroundLakes(chunk) {
             if (!_waterBlockId || _waterBlockId === 0) return;
 
-            var seed = chunk.chunkX * 45671 + chunk.chunkZ * 89013;
+            // Incorporate world seed for deterministic placement across chunks
+            var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+            var seed = chunk.chunkX * 45671 + chunk.chunkZ * 89013 + worldSeed * 1000000;
 
             // Try to place 1-3 underground lakes
             var lakeCount = 1 + ((seed >> 8) % 3);

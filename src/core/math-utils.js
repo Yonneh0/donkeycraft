@@ -22,60 +22,6 @@
     };
 
     /**
-     * Matrix4 — column-major 4×4 matrix (for WebGL)
-     * @param {Float32Array} [data=null]
-     */
-    Donkeycraft.Matrix4 = function (data) {
-        this._data = data || new Float32Array(16);
-    };
-
-    /**
-     * Matrix4 — column-major 4×4 matrix (for WebGL)
-     * @param {Float32Array} [data=null]
-     */
-    Donkeycraft.Matrix4.prototype.multiply = function (m) {
-        var a = this._data, b = m._data;
-        var r = new Float32Array(16);
-        // R = A × B
-        for (var i = 0; i < 4; i++) {
-            for (var j = 0; j < 4; j++) {
-                r[i * 4 + j] = a[i * 4] * b[j] +
-                    a[i * 4 + 1] * b[4 + j] +
-                    a[i * 4 + 2] * b[8 + j] +
-                    a[i * 4 + 3] * b[12 + j];
-            }
-        }
-        this._data.set(r);
-        return this;
-    };
-
-    /**
-     * Create a unit vector.
-     * @returns {Donkeycraft.Vector3}
-     */
-    Donkeycraft.Vector3.one = function () {
-        return new Donkeycraft.Vector3(1, 1, 1);
-    };
-
-    /**
-     * Copy a vector.
-     * @param {Donkeycraft.Vector3} v
-     * @returns {Donkeycraft.Vector3}
-     */
-    Donkeycraft.Vector3.copy = function (v) {
-        return new Donkeycraft.Vector3(v.x, v.y, v.z);
-    };
-
-    /**
-     * Create from array.
-     * @param {number[]} arr
-     * @returns {Donkeycraft.Vector3}
-     */
-    Donkeycraft.Vector3.fromArray = function (arr) {
-        return new Donkeycraft.Vector3(arr[0], arr[1], arr[2]);
-    };
-
-    /**
      * Set vector components.
      * @param {number} x
      * @param {number} y
@@ -270,6 +216,11 @@
         return dx * dx + dy * dy + dz * dz;
     };
 
+    // Static helpers — kept for backward compatibility with terrain.html inline code.
+    Donkeycraft.Vector3.one = function () { return new Donkeycraft.Vector3(1, 1, 1); };
+    Donkeycraft.Vector3.copy = function (v) { return new Donkeycraft.Vector3(v.x, v.y, v.z); };
+    Donkeycraft.Vector3.fromArray = function (arr) { return new Donkeycraft.Vector3(arr[0], arr[1], arr[2]); };
+
     // ============================================================
     // Matrix4 — column-major 4×4 matrix (for WebGL)
     // ============================================================
@@ -432,7 +383,7 @@
     };
 
     /**
-     * Static multiply: multiply two matrices (a × b).
+     * Static multiply: multiply two matrices (a × b). Returns a new Matrix4.
      * @param {Donkeycraft.Matrix4} a
      * @param {Donkeycraft.Matrix4} b
      * @returns {Donkeycraft.Matrix4}
@@ -452,15 +403,14 @@
     };
 
     /**
-     * Multiply by another matrix.
+     * Multiply by another matrix (mutates in place, returns this).
      * @param {Donkeycraft.Matrix4} m
-     * @returns {Donkeycraft.Matrix4}
+     * @returns {Donkeycraft.Matrix4} this
      */
     Donkeycraft.Matrix4.prototype.multiply = function (m) {
         var a = this._data, b = m._data;
         var r = new Float32Array(16);
         // Column-major multiplication: R = A × B
-        // R[i*4+j] = Σ(k=0..3) A[i*4+k] × B[k*4+j]
         for (var i = 0; i < 4; i++) {
             for (var j = 0; j < 4; j++) {
                 r[i * 4 + j] = a[i * 4] * b[j] +
@@ -469,7 +419,8 @@
                     a[i * 4 + 3] * b[12 + j];
             }
         }
-        return new Donkeycraft.Matrix4(r);
+        this._data.set(r);
+        return this;
     };
 
     /**
@@ -657,15 +608,12 @@
         var half = angle / 2;
         var sin = Math.sin(half);
         // Default to Y-axis if axis is null, undefined, or zero
-        if (!axis || axis.x === 0 && axis.y === 0 && axis.z === 0) {
+        if (!axis || (axis.x === 0 && axis.y === 0 && axis.z === 0)) {
             return new Donkeycraft.Quaternion(0, sin, 0, Math.cos(half));
         }
         var n = axis.normalized();
         return new Donkeycraft.Quaternion(
-            n.x * sin,
-            n.y * sin,
-            n.z * sin,
-            Math.cos(half)
+            n.x * sin, n.y * sin, n.z * sin, Math.cos(half)
         );
     };
 
@@ -682,7 +630,7 @@
 
         var cosTheta = ax * bx + ay * by + az * bz + aw * bw;
 
-        // If cosTheta < 0, the quaternions are opposite — flip one
+        // If cosTheta < 0, the quaternions are opposite — flip one for shortest path
         var flip = 1;
         if (cosTheta < 0) {
             flip = -1;
@@ -692,16 +640,16 @@
         // Clamp for numerical stability
         var cosClamped = Math.min(1, Math.max(-1, cosTheta));
 
-        var cosAngle, sin, scale0, scale1;
+        var cosAngle, sinAngle, scale0, scale1;
         if (cosClamped > 0.9999) {
             // Near-linear interpolation: shortest-path SLERP degenerates to LERP
             scale0 = 1 - t;
             scale1 = flip * t;
         } else {
-            var angle = Math.acos(cosClamped);
-            sin = Math.sin(angle);
-            scale0 = Math.sin((1 - t) * angle) / sin;
-            scale1 = Math.sin(t * angle) / sin;
+            cosAngle = Math.acos(cosClamped);
+            sinAngle = Math.sin(cosAngle);
+            scale0 = Math.sin((1 - t) * cosAngle) / sinAngle;
+            scale1 = Math.sin(t * cosAngle) / sinAngle;
         }
 
         return new Donkeycraft.Quaternion(
@@ -728,10 +676,7 @@
         var lenSq = this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
         if (lenSq > 0.00001) {
             return new Donkeycraft.Quaternion(
-                -this.x / lenSq,
-                -this.y / lenSq,
-                -this.z / lenSq,
-                this.w / lenSq
+                -this.x / lenSq, -this.y / lenSq, -this.z / lenSq, this.w / lenSq
             );
         }
         return Donkeycraft.Quaternion.identity();
@@ -765,7 +710,7 @@
     /**
      * Multiply by another quaternion.
      * @param {Donkeycraft.Quaternion} q
-     * @returns {Donkeycraft.Quaternion}
+     * @returns {Donkeycraft.Quaternion} new quaternion
      */
     Donkeycraft.Quaternion.prototype.multiply = function (q) {
         return new Donkeycraft.Quaternion(
@@ -818,15 +763,9 @@
     Donkeycraft.Quaternion.prototype.normalize = function () {
         var len = Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
         if (len > 0.00001) {
-            this.x /= len;
-            this.y /= len;
-            this.z /= len;
-            this.w /= len;
+            this.x /= len; this.y /= len; this.z /= len; this.w /= len;
         } else {
-            this.x = 0;
-            this.y = 0;
-            this.z = 0;
-            this.w = 1;
+            this.x = 0; this.y = 0; this.z = 0; this.w = 1;
         }
         return this;
     };
@@ -848,43 +787,30 @@
     };
 
     // ============================================================
-    // Perlin Noise
+    // Perlin Noise — canonical implementation (single source of truth)
     // ============================================================
 
     /**
-     * PerlinNoise — 1D, 2D, and 3D Perlin noise.
-     * All generators delegate to this canonical implementation to ensure
-     * spatial coherence (caves align with terrain, ores match biomes).
+     * PerlinNoise — 1D, 2D, and 3D Perlin noise with FBM support.
+     * All generators delegate to this to ensure spatial coherence across features.
      */
     Donkeycraft.PerlinNoise = (function () {
-        /**
-         * _perm — permutation table for Perlin noise. Initialized with identity mapping, shuffled deterministically by seed.
-         * @type {Uint8Array}
-         * @private
-         */
         var _perm = new Uint8Array(512);
-
-        /**
-         * _initialized — flag set to true after init() is called.
-         * Used by noise.js to check if the permutation table needs seeding.
-         * @type {boolean}
-         * @private
-         */
         var _initialized = false;
 
         /**
          * Initialize with a seed.
-         * @param {number} [seed] - Seed value (default: 42). Use any integer for a custom seed.
+         * @param {number} [seed] - Seed value (default: 42).
          */
         function init(seed) {
             _initialized = true;
             var p = new Uint8Array(256);
             for (var i = 0; i < 256; i++) p[i] = i;
 
-            // Shuffle using seed — use 42 as default, but allow any non-negative integer
-            var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed)) ? Math.floor(Math.abs(seed)) : 42;
+            // Mulberry32-compatible seed handling
+            var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed))
+                ? Math.floor(Math.abs(seed)) : 42;
             if (s <= 0 || s >= 2147483647) {
-                // Seed 0 is valid for Mulberry32 PRNG (it produces a deterministic sequence)
                 s = (seed === 0) ? 1 : 42;
             }
             for (var i = 255; i > 0; i--) {
@@ -898,123 +824,56 @@
             }
         }
 
-        /**
-         * Fade function.
-         * @param {number} t
-         * @returns {number}
-         * @private
-         */
-        function fade(t) {
-            return t * t * t * (t * (t * 6 - 15) + 10);
-        }
+        function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
 
-        /**
-         * Gradient function for 3D.
-         * @param {number} hash
-         * @param {number} x
-         * @param {number} y
-         * @param {number} z
-         * @returns {number}
-         * @private
-         */
         function grad(hash, x, y, z) {
             var h = hash & 15;
             var u = h < 8 ? x : y;
-            var v = h < 4 ? y : (h === 12 || h === 14 ? x : z);
+            var v = h < 4 ? y : ((h === 12 || h === 14) ? x : z);
             return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
         }
 
-        /**
-         * 3D Perlin noise.
-         * @param {number} x
-         * @param {number} y
-         * @param {number} z
-         * @returns {number} Value between -1 and 1.
-         */
         function noise3D(x, y, z) {
             var X = Math.floor(x) & 255;
             var Y = Math.floor(y) & 255;
             var Z = Math.floor(z) & 255;
 
-            x -= Math.floor(x);
-            y -= Math.floor(y);
-            z -= Math.floor(z);
+            x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
 
-            var u = fade(x);
-            var v = fade(y);
-            var w = fade(z);
+            var u = fade(x), v = fade(y), w = fade(z);
 
-            var A = _perm[X] + Y;
-            var AA = _perm[A] + Z;
-            var AB = _perm[A + 1] + Z;
-            var B = _perm[X + 1] + Y;
-            var BA = _perm[B] + Z;
-            var BB = _perm[B + 1] + Z;
+            var A = _perm[X] + Y, AA = _perm[A] + Z, AB = _perm[A + 1] + Z;
+            var B = _perm[X + 1] + Y, BA = _perm[B] + Z, BB = _perm[B + 1] + Z;
 
             return lerp(w,
-                lerp(v,
-                    lerp(u, grad(_perm[AA], x, y, z),
-                        grad(_perm[BA], x - 1, y, z)),
-                    lerp(u, grad(_perm[AB], x, y - 1, z),
-                        grad(_perm[BB], x - 1, y - 1, z))),
-                lerp(v,
-                    lerp(u, grad(_perm[AA + 1], x, y, z - 1),
-                        grad(_perm[BA + 1], x - 1, y, z - 1)),
-                    lerp(u, grad(_perm[AB + 1], x, y - 1, z - 1),
-                        grad(_perm[BB + 1], x - 1, y - 1, z - 1)))
+                lerp(v, lerp(u, grad(_perm[AA], x, y, z), grad(_perm[BA], x - 1, y, z)),
+                         lerp(u, grad(_perm[AB], x, y - 1, z), grad(_perm[BB], x - 1, y - 1, z))),
+                lerp(v, lerp(u, grad(_perm[AA + 1], x, y, z - 1), grad(_perm[BA + 1], x - 1, y, z - 1)),
+                         lerp(u, grad(_perm[AB + 1], x, y - 1, z - 1), grad(_perm[BB + 1], x - 1, y - 1, z - 1)))
             );
         }
 
-        /**
-         * Linear interpolation.
-         * @param {number} t
-         * @param {number} a
-         * @param {number} b
-         * @returns {number}
-         * @private
-         */
-        function lerp(t, a, b) {
-            return a + t * (b - a);
-        }
+        function lerp(t, a, b) { return a + t * (b - a); }
 
-        /**
-         * 2D Perlin noise (calls 3D with z=0).
-         * @param {number} x
-         * @param {number} y
-         * @returns {number}
-         */
-        function noise2D(x, y) {
-            return noise3D(x, y, 0);
-        }
-
-        /**
-         * 1D Perlin noise (calls 3D with y=z=0).
-         * @param {number} x
-         * @returns {number}
-         */
-        function noise1D(x) {
-            return noise3D(x, 0, 0);
-        }
+        function noise2D(x, y) { return noise3D(x, y, 0); }
+        function noise1D(x) { return noise3D(x, 0, 0); }
 
         /**
          * Fractal Brownian Motion — layered octaves of noise.
-         * @param {number} x
-         * @param {number} y
-         * @param {number} z
-         * @param {number} [octaves=4]
-         * @param {number} [persistence=0.5]
-         * @param {number} [lacunarity=2]
-         * @returns {number}
+         * @param {number} x - X coordinate.
+         * @param {number} y - Y coordinate.
+         * @param {number} z - Z coordinate (use 0 for 2D noise).
+         * @param {number} [octaves=4] — Number of octaves to layer.
+         * @param {number} [persistence=0.5] — Amplitude multiplier per octave.
+         * @param {number} [lacunarity=2] — Frequency multiplier per octave.
+         * @returns {number} Normalized result in [-1, 1].
          */
         function fbm(x, y, z, octaves, persistence, lacunarity) {
             octaves = octaves || 4;
             persistence = persistence || 0.5;
             lacunarity = lacunarity || 2;
 
-            var total = 0;
-            var amplitude = 1;
-            var frequency = 1;
-            var maxValue = 0; // For normalization
+            var total = 0, amplitude = 1, frequency = 1, maxValue = 0;
 
             for (var i = 0; i < octaves; i++) {
                 total += noise3D(x * frequency, y * frequency, z * frequency) * amplitude;
@@ -1023,9 +882,7 @@
                 frequency *= lacunarity;
             }
 
-            // Avoid division by zero when octaves is 0
-            if (maxValue === 0) return 0;
-            return total / maxValue;
+            return maxValue === 0 ? 0 : total / maxValue;
         }
 
         // Initialize with default seed
@@ -1037,20 +894,11 @@
             noise2D: noise2D,
             noise1D: noise1D,
             fbm: fbm,
-            /**
-             * Get the internal permutation table.
-             * Exposed for cross-module access by noise.js delegation.
-             * @returns {Uint8Array} The 512-entry permutation table.
-             */
-            _getPerm: function() { return _perm; },
-            /**
-             * Check if PerlinNoise has been initialized with a seed.
-             * Exposed for cross-module access by noise.js delegation.
-             * @returns {boolean} True if init() has been called.
-             */
-            _isInitialized: function() { return _initialized; }
+            _getPerm: function () { return _perm; },
+            _isInitialized: function () { return _initialized; }
         };
     })();
+
     // ============================================================
     // Utility Functions
     // ============================================================
@@ -1062,9 +910,7 @@
      * @param {number} t - Interpolation factor [0, 1].
      * @returns {number}
      */
-    Donkeycraft.lerp = function (a, b, t) {
-        return a + (b - a) * t;
-    };
+    Donkeycraft.lerp = function (a, b, t) { return a + (b - a) * t; };
 
     /**
      * Clamp a value between min and max.
@@ -1073,9 +919,7 @@
      * @param {number} max
      * @returns {number}
      */
-    Donkeycraft.clamp = function (value, min, max) {
-        return Math.min(max, Math.max(min, value));
-    };
+    Donkeycraft.clamp = function (value, min, max) { return Math.min(max, Math.max(min, value)); };
 
     /**
      * Map a value from one range to another.
@@ -1096,9 +940,7 @@
      * @param {number} n
      * @returns {number}
      */
-    Donkeycraft.round = function (n) {
-        return Math.round(n);
-    };
+    Donkeycraft.round = function (n) { return Math.round(n); };
 
     /**
      * Check if a value is within a range (inclusive).
@@ -1107,8 +949,6 @@
      * @param {number} max
      * @returns {boolean}
      */
-    Donkeycraft.inRange = function (value, min, max) {
-        return value >= min && value <= max;
-    };
+    Donkeycraft.inRange = function (value, min, max) { return value >= min && value <= max; };
 
 })();

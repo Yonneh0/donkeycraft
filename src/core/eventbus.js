@@ -73,7 +73,12 @@
 
         return function () {
             fired = true;
-            unsubscribe(); // Use the unsubscribe from on() to properly remove the listener.
+            // Immediately remove the wrapped callback without waiting for event emission.
+            if (self._listeners[key]) {
+                self._listeners[key] = self._listeners[key].filter(function (entry) {
+                    return entry.callback !== wrapped && entry._originalCallback !== callback;
+                });
+            }
         };
     };
 

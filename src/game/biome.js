@@ -179,13 +179,13 @@
         },
         {
           id: Donkeycraft.BiomeID.TAIGA, name: 'taiga', temp: 0.3, rain: 0.5,
-          ground: 0x3a5f3a, grass: 0x2d6e2d, leaf: 0x1a4a1a, waterColor: 0x4fc3f7,
+          ground: 0x6b7c4e, grass: 0x2d6e2d, leaf: 0x1a4a1a, waterColor: 0x4fc3f7,
           decor: { trees: 6, flowers: 1, grass: 4, cacti: 0 },
           spawn: { passive: 0.008, hostile: 0.03, aqua: 0.003 }
         },
         {
           id: Donkeycraft.BiomeID.OCEAN, name: 'ocean', temp: 0.5, rain: 0.5,
-          ground: 0x1a3a5c, waterColor: 0x1e5fa8,
+          ground: 0x0d1b2a, waterColor: 0x1e5fa8,
           decor: { trees: 0, flowers: 0, grass: 0, cacti: 0 },
           spawn: { passive: 0, hostile: 0.015, aqua: 0.03 }
         },

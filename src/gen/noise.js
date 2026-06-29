@@ -106,15 +106,16 @@
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate (or Z for 3D noise).
      * @param {number} octaves - Number of noise octaves to sum.
-     * @param {number} [frequency=1] - Base frequency multiplier.
-     * @param {number} [amplitude=1] - Base amplitude multiplier.
+     * @param {number} [frequency=1] - Frequency multiplier per octave (lacunarity in fbm terms).
+     * @param {number} [amplitude=1] - Amplitude multiplier per octave (persistence in fbm terms).
      * @returns {number} Normalized result in [-1, 1].
      */
     function _fbm(x, y, octaves, frequency, amplitude) {
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.fbm === 'function') {
-            // fbm in math-utils.js takes (x, y, z, octaves, persistence, lacunarity)
-            return Donkeycraft.PerlinNoise.fbm(x, y, 0, octaves || 4, frequency || 2.0, amplitude || 0.5);
+            // fbm signature: (x, y, z, octaves, persistence, lacunarity)
+            // frequency → lacunarity (how fast frequency increases per octave), amplitude → persistence (how fast amplitude decreases)
+            return Donkeycraft.PerlinNoise.fbm(x, y, 0, octaves || 4, amplitude !== undefined ? amplitude : 0.5, frequency !== undefined ? frequency : 2.0);
         }
         // Fallback: simple octave accumulation
         var total = 0;

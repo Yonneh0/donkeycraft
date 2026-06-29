@@ -141,13 +141,13 @@
         this._deltaTime = Math.min(rawDelta, 0.1);
         this._lastFrameTime = currentTime;
 
-        // FPS counter
+        // FPS counter — reset timer to zero after each update for accurate measurement
         this._frameCount++;
         this._fpsTimer += rawDelta;
         if (this._fpsTimer >= 1.0) {
             this._fps = Math.round(this._frameCount / this._fpsTimer);
             this._frameCount = 0;
-            this._fpsTimer = Math.max(0, this._fpsTimer - 1.0);
+            this._fpsTimer = 0; // Reset to zero instead of subtracting 1.0 to prevent drift
         }
 
         // Accumulate time and process game ticks
