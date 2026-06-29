@@ -181,19 +181,6 @@
         varying vec4 vColor;
         void main() { gl_FragColor = vColor; }
     `;
-    var DK_BORDER_VS = `
-        attribute vec3 aPosition;
-        uniform mat4 uProjection;
-        uniform mat4 uView;
-        uniform mat4 uModel;
-        void main() {
-            gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-        }
-    `;
-    var DK_BORDER_FS = `
-        precision mediump float;
-        void main() { gl_FragColor = vec4(0.15, 0.15, 0.15, 0.6); }
-    `;
     var DK_SKY_VS = `
         attribute vec3 aPosition;
         attribute vec4 aColor;
@@ -476,8 +463,8 @@
         // ============================================================
         // State
         // ============================================================
-        var canvas, gl, terrainProgram, wireframeProgram, skyProgram, borderProgram;
-        var terrainLocs = {}, wireframeLocs = {}, skyLocs = {}, borderLocs = {};
+        var canvas, gl, terrainProgram, wireframeProgram, skyProgram;
+        var terrainLocs = {}, wireframeLocs = {}, skyLocs = {};
         var camera = { x: 0, y: 100, z: 0, yaw: 0, pitch: 0, fly: true };
         var keys = {}, mouseDX = 0, mouseDY = 0, pointerLocked = false;
         var chunks = new Map(), currentChunkX = 0, currentChunkZ = 0;
@@ -507,8 +494,7 @@
             terrainProgram = createProgram(gl, DK_TERRAIN_VS, DK_TERRAIN_FS);
             wireframeProgram = createProgram(gl, DK_WIREFRAME_VS, DK_WIREFRAME_FS);
             skyProgram = createProgram(gl, DK_SKY_VS, DK_SKY_FS);
-            borderProgram = createProgram(gl, DK_BORDER_VS, DK_BORDER_FS);
-            if (!terrainProgram || !wireframeProgram || !skyProgram || !borderProgram) {
+            if (!terrainProgram || !wireframeProgram || !skyProgram) {
                 document.body.innerHTML = '<h1 style="color:red;padding:40px;">Shader compilation failed</h1>'; return;
             }
 
@@ -537,12 +523,6 @@
             skyLocs.uProjection = gl.getUniformLocation(skyProgram, 'uProjection');
             skyLocs.uView = gl.getUniformLocation(skyProgram, 'uView');
             skyLocs.uModel = gl.getUniformLocation(skyProgram, 'uModel');
-
-            // Border locations
-            borderLocs.aPosition = gl.getAttribLocation(borderProgram, 'aPosition');
-            borderLocs.uProjection = gl.getUniformLocation(borderProgram, 'uProjection');
-            borderLocs.uView = gl.getUniformLocation(borderProgram, 'uView');
-            borderLocs.uModel = gl.getUniformLocation(borderProgram, 'uModel');
 
             setupUI();
             if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
@@ -752,23 +732,16 @@
         }
 
         // ============================================================
-        // Chunk mesh building — FIXED face culling + alpha per block
+        // Chunk mesh building — face culling + per-block alpha
         // ============================================================
-        // Standardized face definitions with consistent CCW winding from outside
-        // All vertices ordered CCW when viewed from the outside of each face (from normal direction)
+        // Face definitions: [direction, normal, 4 vertices forming a quad]
         var _FACE_DEFS = [
-            // Up face (Y+): viewed from +Y looking down — CCW: BL→TL→TR→BR in screen space
             { d: [0, 1, 0], n: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]] },
-            // Down face (Y-): viewed from -Y looking up — CCW: BR→BL→TL→TR
-            { d: [0, -1, 0], n: [0, -1, 0], c: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]] },
-            // South face (+Z): viewed from +Z — CCW: BL→BR→TR→TL
+            { d: [0, -1, 0], n: [0, -1, 0], c: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]] },
             { d: [0, 0, 1], n: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },
-            // North face (-Z): viewed from -Z — CCW: BR→TR→TL→BL
-            { d: [0, 0, -1], n: [0, 0, -1], c: [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 0]] },
-            // East face (+X): viewed from +X — CCW: BL→BR→TR→TL
-            { d: [1, 0, 0], n: [1, 0, 0], c: [[1, 0, 0], [1, 0, 1], [1, 1, 1], [1, 1, 0]] },
-            // West face (-X): viewed from -X — CCW: BR→TR→TL→BL
-            { d: [-1, 0, 0], n: [-1, 0, 0], c: [[0, 0, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1]] }
+            { d: [0, 0, -1], n: [0, 0, -1], c: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] },
+            { d: [1, 0, 0], n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },
+            { d: [-1, 0, 0], n: [-1, 0, 0], c: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]] }
         ];
 
         function buildChunkMesh(chunk) {
@@ -792,16 +765,12 @@
                         for (var f = 0; f < _FACE_DEFS.length; f++) {
                             var face = _FACE_DEFS[f];
                             var nx = x + face.d[0], ny = y + face.d[1], nz = z + face.d[2];
-                            var nid = 0, neighborTransparent = true, neighborOpaqueSameType = false;
+                            var nid = 0, neighborTransparent = true;
 
                             if (nx >= 0 && nx < cs && ny >= 0 && ny < ws && nz >= 0 && nz < cs) {
                                 // Neighbor within same chunk
                                 nid = chunk.getBlock(nx, ny, nz);
                                 neighborTransparent = isTransparent(nid);
-                                // Skip face if neighbor is opaque and same block type (same color+alpha)
-                                if (!neighborTransparent && nid !== 0 && BLOCK_COLORS[nid] && BLOCK_COLORS[nid][0] === clr[0] && BLOCK_COLORS[nid][1] === clr[1] && BLOCK_COLORS[nid][2] === clr[2] && (BLOCK_ALPHAS[nid] || 1.0) === alpha) {
-                                    neighborOpaqueSameType = true;
-                                }
                             } else {
                                 // Neighbor in adjacent chunk — look up by world coords
                                 var ngx = chunk.chunkX * cs + nx;
@@ -809,17 +778,10 @@
                                 var ngz = chunk.chunkZ * cs + nz;
                                 nid = getBlockAt(ngx, ngy, ngz);
                                 neighborTransparent = isTransparent(nid);
-                                // Same opaque type check across chunks
-                                if (!neighborTransparent && nid !== 0) {
-                                    var nClr = BLOCK_COLORS[nid];
-                                    if (nClr && nClr[0] === clr[0] && nClr[1] === clr[1] && nClr[2] === clr[2] && (BLOCK_ALPHAS[nid] || 1.0) === alpha) {
-                                        neighborOpaqueSameType = true;
-                                    }
-                                }
                             }
 
-                            // Show face if neighbor is air, transparent, or different opaque block — but NOT same opaque type
-                            if ((nid === 0 || neighborTransparent) && !neighborOpaqueSameType) {
+                            // Show face if neighbor is air OR transparent
+                            if (nid === 0 || neighborTransparent) {
                                 for (var v = 0; v < 4; v++) {
                                     var cr = face.c[v];
                                     pos.push(x + cr[0], y + cr[1], z + cr[2]);
@@ -996,7 +958,7 @@
             // Build meshes for dirty chunks only
             chunks.forEach(function (ch) { buildChunkMesh(ch); });
 
-            // ---- Pass 2: Terrain with proper alpha sorting ----
+            // ---- Pass 2: Terrain rendering with alpha blending ----
             gl.enable(gl.DEPTH_TEST);
             gl.depthMask(true);
             gl.disable(gl.CULL_FACE);
@@ -1008,8 +970,7 @@
             gl.uniform1f(terrainLocs.uFogDensity, 0.006);
             gl.uniform1f(terrainLocs.uLightFactor, 1.0);
 
-            // Separate blocks into opaque and transparent by alpha value
-            // Then sort transparent chunks far-to-near for correct blending
+            // Sort chunks far-to-near for correct transparent rendering
             var chunkList = [];
             chunks.forEach(function (ch) {
                 var dx = ch.chunkX - Math.floor(ex / Donkeycraft.Config.CHUNK_SIZE);
@@ -1017,30 +978,26 @@
                 var dist = dx * dx + dz * dz;
                 chunkList.push({ chunk: ch, dist: dist });
             });
+            chunkList.sort(function (a, b) { return b.dist - a.dist; });
 
-            // First pass: render opaque blocks (alpha = 1.0) with depthMask true
+            // Enable blending for transparent blocks
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-            // Sort far-to-near for correct transparent rendering
-            chunkList.sort(function (a, b) { return b.dist - a.dist; });
-
-            // Two sub-passes: opaque first, then transparent
-            // Opaque pass: depthMask = true, no blending needed for depth
-            gl.depthMask(true);
-            for (var oi = 0; oi < chunkList.length; oi++) {
-                var ch = chunkList[oi].chunk;
+            // Single pass: render all chunks sorted far-to-near
+            // Per-block alpha in the shader handles transparency correctly
+            for (var i = 0; i < chunkList.length; i++) {
+                var ch = chunkList[i].chunk;
                 var buf = meshBuffers[ch.chunkX + ',' + ch.chunkZ];
                 if (!buf || buf.count === 0) continue;
 
-                // Check if this chunk has any transparent blocks by looking at its buffer
-                // We'll use a simple approach: render all with blending but opaque blocks will self-occlude correctly
                 var cm = mat4Create();
                 mat4Identity(cm);
                 cm[12] = ch.chunkX * Donkeycraft.Config.CHUNK_SIZE;
                 cm[14] = ch.chunkZ * Donkeycraft.Config.CHUNK_SIZE;
                 gl.uniformMatrix4fv(terrainLocs.uModel, false, cm);
 
+                // Each attribute buffer is separate and tightly packed (stride=0)
                 gl.enableVertexAttribArray(terrainLocs.aPosition);
                 gl.bindBuffer(gl.ARRAY_BUFFER, buf.posBuf);
                 gl.vertexAttribPointer(terrainLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
@@ -1060,151 +1017,16 @@
                 gl.drawArrays(gl.TRIANGLES, 0, buf.count);
             }
 
-            // Transparent pass: re-render only transparent faces with blending
-            // To do this efficiently, we rebuild a temporary transparent-only mesh
-            // For now, use a simpler approach: render again with depthMask off for alpha-tested blocks
-            gl.depthMask(false);
-            for (var ti = 0; ti < chunkList.length; ti++) {
-                var ch2 = chunkList[ti].chunk;
-                var buf2 = meshBuffers[ch2.chunkX + ',' + ch2.chunkZ];
-                if (!buf2 || buf2.count === 0) continue;
-
-                // Check if any blocks in this chunk are transparent
-                var hasTransparent = false;
-                var cs = Donkeycraft.Config.CHUNK_SIZE, ws = Donkeycraft.Config.WORLD_HEIGHT;
-                for (var tx = 0; tx < cs && !hasTransparent; tx++) {
-                    for (var ty = 0; ty < ws && !hasTransparent; ty++) {
-                        for (var tz = 0; tz < cs && !hasTransparent; tz++) {
-                            var bid2 = ch2.getBlock(tx, ty, tz);
-                            if (bid2 !== 0) {
-                                var a2 = BLOCK_ALPHAS[bid2] || 1.0;
-                                if (a2 < 0.99) hasTransparent = true;
-                            }
-                        }
-                    }
-                }
-
-                if (!hasTransparent) continue;
-
-                var cm2 = mat4Create();
-                mat4Identity(cm2);
-                cm2[12] = ch2.chunkX * Donkeycraft.Config.CHUNK_SIZE;
-                cm2[14] = ch2.chunkZ * Donkeycraft.Config.CHUNK_SIZE;
-                gl.uniformMatrix4fv(terrainLocs.uModel, false, cm2);
-
-                gl.drawArrays(gl.TRIANGLES, 0, buf2.count);
-            }
-
-            // Disable blending
+            // Disable blending after terrain pass
             gl.disable(gl.BLEND);
             gl.depthMask(true);
 
-            // ---- Pass 3: Permanent block borders for clear edge definition ----
-            _renderBlockBorders(proj, view);
+            // ---- Pass 3: Wireframe debug overlay (if enabled) ----
+            if (wireframeEnabled) {
+                _renderWireframeDebug(proj, view);
+            }
 
             requestAnimationFrame(renderLoop);
-        }
-
-        // ============================================================
-        // Block border rendering — subtle edges between all adjacent blocks
-        // ============================================================
-        function _renderBlockBorders(proj, view) {
-            var borderVerts = [];
-            var cs = Donkeycraft.Config.CHUNK_SIZE;
-            var ws = Donkeycraft.Config.WORLD_HEIGHT;
-            var edgeOffset = 0.003; // Slight offset to prevent z-fighting
-
-            chunks.forEach(function (ch) {
-                // Iterate through chunk and find block faces that border different blocks
-                for (var x = 0; x < cs; x++) {
-                    for (var y = 0; y < ws; y++) {
-                        for (var z = 0; z < cs; z++) {
-                            var bid = ch.getBlock(x, y, z);
-                            if (bid === 0) continue;
-
-                            // Check each neighbor — draw border edge where block types differ
-                            var neighbors = [
-                                { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
-                                { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
-                                { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
-                            ];
-
-                            for (var n = 0; n < neighbors.length; n++) {
-                                var nx = x + neighbors[n].dx;
-                                var ny = y + neighbors[n].dy;
-                                var nz = z + neighbors[n].dz;
-                                var nBid = 0;
-
-                                if (nx >= 0 && nx < cs && ny >= 0 && ny < ws && nz >= 0 && nz < cs) {
-                                    nBid = ch.getBlock(nx, ny, nz);
-                                } else {
-                                    var ngx = ch.chunkX * cs + nx;
-                                    var ngy = ny;
-                                    var ngz = ch.chunkZ * cs + nz;
-                                    nBid = getBlockAt(ngx, ngy, ngz);
-                                }
-
-                                // Only draw border if neighbor is different block type (including air)
-                                if (nBid !== bid) {
-                                    // Determine which face to draw border on
-                                    var faceCenterX = x + 0.5 + neighbors[n].dx * edgeOffset;
-                                    var faceCenterY = y + 0.5 + neighbors[n].dy * edgeOffset;
-                                    var faceCenterZ = z + 0.5 + neighbors[n].dz * edgeOffset;
-
-                                    // Draw a small quad at the block edge
-                                    // Simplified: just draw a thin line segment at each differing face
-                                    _addBorderEdge(borderVerts, faceCenterX, faceCenterY, faceCenterZ, neighbors[n].dx, neighbors[n].dy, neighbors[n].dz);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            if (borderVerts.length === 0) return;
-
-            gl.useProgram(borderProgram);
-            gl.uniformMatrix4fv(borderLocs.uProjection, false, proj);
-            gl.uniformMatrix4fv(borderLocs.uView, false, view);
-            var mdl = mat4Create();
-            gl.uniformMatrix4fv(borderLocs.uModel, false, mdl);
-
-            gl.enable(gl.DEPTH_TEST);
-            gl.depthMask(false);
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-            var pb = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, pb);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(borderVerts), gl.STATIC_DRAW);
-
-            gl.enableVertexAttribArray(borderLocs.aPosition);
-            gl.vertexAttribPointer(borderLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
-
-            gl.drawArrays(gl.LINES, 0, borderVerts.length / 3);
-
-            gl.deleteBuffer(pb);
-            gl.disable(gl.BLEND);
-            gl.depthMask(true);
-        }
-
-        // Add a small border edge line at a block face
-        function _addBorderEdge(arr, cx, cy, cz, dx, dy, dz) {
-            // Create a small perpendicular line to indicate the edge
-            var s = 0.04; // Line half-length
-            var len = 0.06; // Line length
-
-            if (dy !== 0) {
-                // Up/down face — draw cross pattern
-                arr.push(cx - s, cy, cz + s, cx + s, cy, cz - s);
-                arr.push(cx - s, cy, cz - s, cx + s, cy, cz + s);
-            } else if (dx !== 0) {
-                // Left/right face — horizontal line
-                arr.push(cx, cy - s, cz - s, cx, cy + s, cz + s);
-            } else {
-                // Front/back face — vertical line
-                arr.push(cx - s, cy - s, cz, cx + s, cy + s, cz);
-            }
         }
 
         // ============================================================
