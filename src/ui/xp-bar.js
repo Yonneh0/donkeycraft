@@ -544,8 +544,8 @@
         ring.className = 'dk-xp-badge-ambient-ring';
         var badgeSize = this._badgeBg ? parseInt(this._badgeBg.style.width) || 42 : 42;
         // Reduced offset from +16 to +8 to keep ring inside badge boundary and prevent overlap with food bar
-        ring.style.width = (badgeSize + 3) + 'px';
-        ring.style.height = (badgeSize - 3) + 'px';
+        ring.style.width = (badgeSize + 8) + 'px';
+        ring.style.height = (badgeSize - 2) + 'px';
         ring.style.borderColor = 'rgba(150, 50, 255, 0.4)';
         ring.style.animation = 'badge-ring-rotate 1.5s linear infinite';
 
