@@ -332,8 +332,10 @@
         }
 
         // Check solid block below if required by the spawn definition
+        // Note: use floor(y) - 1 to get the block directly beneath the spawn position
         if (definition.requireSolidBelow) {
-            if (!isBlockSolid(x, Math.floor(y - 1), z)) {
+            var checkY = Math.floor(y) - 1;
+            if (!isBlockSolid(x, checkY, z)) {
                 return false;
             }
         }

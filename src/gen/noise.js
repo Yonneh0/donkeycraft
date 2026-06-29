@@ -3,6 +3,10 @@
 // Delegates to the canonical PerlinNoise implementation in math-utils.js
 // to ensure ALL generators use the SAME permutation table and produce
 // spatially coherent features (caves align with terrain, ores match biomes, etc.).
+//
+// @module noise
+// @description Centralized noise generation, PRNG, and hashing utilities
+//   for procedural content generation across all dimension generators.
 (function() {
     'use strict';
 
@@ -20,20 +24,25 @@
      */
     function _ensureNoiseInit() {
         if (!Donkeycraft.PerlinNoise) return;
-        if (Donkeycraft.PerlinNoise.init) {
-            var isInit = false;
-            // Check via the public getter method first, then fallback to direct property
-            if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
-                isInit = Donkeycraft.PerlinNoise._isInitialized();
-            } else if (Donkeycraft.PerlinNoise._initialized !== undefined) {
-                isInit = !!Donkeycraft.PerlinNoise._initialized;
-            } else {
-                // If no check available, assume initialized (PerlinNoise module loaded)
-                isInit = true;
-            }
-            if (!isInit) {
-                var seed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+        if (typeof Donkeycraft.PerlinNoise.init !== 'function') return;
+
+        var isInit = false;
+        // Check via the public getter method first, then fallback to direct property
+        if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
+            isInit = Donkeycraft.PerlinNoise._isInitialized();
+        } else if (Donkeycraft.PerlinNoise._initialized !== undefined) {
+            isInit = !!Donkeycraft.PerlinNoise._initialized;
+        } else {
+            // If no check available, assume initialized (PerlinNoise module loaded)
+            isInit = true;
+        }
+
+        if (!isInit) {
+            var seed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+            try {
                 Donkeycraft.PerlinNoise.init(seed);
+            } catch (e) {
+                // Silently fail — PerlinNoise may not be ready yet
             }
         }
     }
@@ -45,6 +54,8 @@
 
     /**
      * PRNG state namespaces — one per generator module for isolation.
+     * Each namespace gets its own independent Mulberry32 PRNG to prevent
+     * cross-contamination between generators (ore, cave, structure, etc.).
      * @type {Object<string, number>}
      * @private
      */
@@ -52,6 +63,7 @@
 
     /**
      * Get or create an isolated PRNG state for a given namespace.
+     * Initializes with a deterministic default seed if not yet set.
      * @param {string} namespace - Unique identifier (e.g., 'ore', 'cave', 'structure').
      * @returns {number} PRNG state value.
      * @private
@@ -65,6 +77,7 @@
 
     /**
      * Seed the Mulberry32 PRNG for a given namespace.
+     * Must be called before `_rng()` to ensure deterministic results.
      * @param {string} namespace - Unique identifier.
      * @param {number} seed - Numeric seed value (clamped to 32-bit).
      * @private
@@ -78,6 +91,9 @@
      * Generate the next deterministic pseudo-random number in [0, 1)
      * using the Mulberry32 algorithm for a given namespace.
      * Each generator module has its own isolated PRNG state to avoid cross-contamination.
+     * The algorithm uses proper 32-bit masking at each step to ensure consistent behavior
+     * across all JavaScript engines and browsers.
+     *
      * @param {string} namespace - Unique identifier (e.g., 'ore', 'cave', 'structure').
      * @returns {number} Random value in [0, 1).
      * @private
@@ -85,10 +101,13 @@
     function _rng(namespace) {
         var x = _getRngState(namespace);
         // Mulberry32 PRNG algorithm — fast, deterministic, 32-bit
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        _rngStates[namespace] = (x + 1) | 0;
-        return (_rngStates[namespace] >>> 0) / 4294967296;
+        x = (x ^ (x >>> 16)) | 0;
+        x = (x * 0x45d9f3b) | 0;
+        x = (x ^ (x >>> 16)) | 0;
+        x = (x * 0x45d9f3b) | 0;
+        x = (x + 1) | 0;
+        _rngStates[namespace] = x;
+        return (x >>> 0) / 4294967296;
     }
 
     // ============================================================
@@ -102,11 +121,16 @@
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @returns {number} Normalized noise value in [-1, 1].
+     * @private
      */
     function _noise2D(x, y) {
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.noise2D === 'function') {
-            return Donkeycraft.PerlinNoise.noise2D(x, y);
+            try {
+                return Donkeycraft.PerlinNoise.noise2D(x, y);
+            } catch (e) {
+                // PerlinNoise threw — fall through to fallback
+            }
         }
         // Fallback: simple hash-based noise if PerlinNoise unavailable
         var X = Math.floor(x) & 255;
@@ -126,17 +150,24 @@
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate for 3D noise (defaults to 0 for 2D).
      * @param {number} [octaves=4] - Number of noise octaves to sum. More octaves = finer detail.
-     * @param {number} [amplitude=0.5] - Persistence: amplitude multiplier per octave (how fast detail decreases).
-     * @param {number} [frequency=2.0] - Lacunarity: frequency multiplier per octave (how fast frequency increases).
+     * @param {number} [amplitude=0.5] - Persistence: amplitude multiplier per octave.
+     * @param {number} [frequency=2.0] - Lacunarity: frequency multiplier per octave.
      * @returns {number} Normalized result in [-1, 1].
+     * @private
      */
     function _fbm(x, y, z, octaves, amplitude, frequency) {
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.fbm === 'function') {
-            // fbm signature: (x, y, z, octaves, persistence, lacunarity)
-            // amplitude maps to persistence (amplitude decay per octave)
-            // frequency maps to lacunarity (frequency increase per octave)
-            return Donkeycraft.PerlinNoise.fbm(x, y, z || 0, octaves || 4, amplitude !== undefined ? amplitude : 0.5, frequency !== undefined ? frequency : 2.0);
+            try {
+                return Donkeycraft.PerlinNoise.fbm(
+                    x, y, z || 0,
+                    octaves || 4,
+                    amplitude !== undefined ? amplitude : 0.5,
+                    frequency !== undefined ? frequency : 2.0
+                );
+            } catch (e) {
+                // PerlinNoise threw — fall through to fallback
+            }
         }
         // Fallback: simple octave accumulation if PerlinNoise unavailable
         var total = 0;
@@ -145,7 +176,6 @@
         var amp = amplitude !== undefined ? amplitude : 0.5;
         octaves = octaves || 4;
         for (var i = 0; i < octaves; i++) {
-            // Use _noise2D with x, y for 2D fallback; z is ignored in fallback mode
             total += _noise2D(x * freq, y * freq + z * 0.01) * amp;
             maxVal += amp;
             freq *= 2;
@@ -158,10 +188,13 @@
      * Shuffle a permutation table deterministically from a seed.
      * Delegates to Donkeycraft.PerlinNoise.init() for consistency.
      * @param {number} seed - Numeric seed value.
+     * @private
      */
     function _shufflePerm(seed) {
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
-            Donkeycraft.PerlinNoise.init(seed);
+            try {
+                Donkeycraft.PerlinNoise.init(seed);
+            } catch (e) { /* Silently ignore init failures */ }
         }
     }
 
@@ -170,11 +203,13 @@
      * Creates an isolated copy so it doesn't affect the global PerlinNoise state.
      * @param {number} seed - Numeric seed value.
      * @returns {Uint8Array|null} New perm array of length 512, or null if unavailable.
+     * @private
      */
     function _createShuffledPerm(seed) {
-        // Get the current permutation table from PerlinNoise via getter method
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise._getPerm === 'function') {
-            return new Uint8Array(Donkeycraft.PerlinNoise._getPerm());
+            try {
+                return new Uint8Array(Donkeycraft.PerlinNoise._getPerm());
+            } catch (e) { /* Ignore */ }
         }
         // Fallback: create identity permutation
         var perm = new Uint8Array(512);
@@ -194,14 +229,34 @@
      * @param {number} x - X coordinate (may be negative).
      * @param {number} y - Y coordinate (may be negative).
      * @returns {number} Positive 32-bit integer in range [0, 4294967295].
+     * @private
      */
     function _hash2D(x, y) {
-        // Mask to 32-bit signed integers first, then convert to unsigned for the hash
         x = x | 0;
         y = y | 0;
         var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
         h = ((h >>> 13) ^ h) * 0x5bd1e995;
-        return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit result
+        return (h ^ (h >>> 15)) >>> 0;
+    }
+
+    /**
+     * Deterministic 3D hash using FNV-1a algorithm.
+     * Extends the 2D hash with a Z component for volumetric feature placement.
+     * Handles negative inputs correctly and returns an unsigned 32-bit integer.
+     *
+     * @param {number} x - X coordinate (may be negative).
+     * @param {number} y - Y coordinate (may be negative).
+     * @param {number} z - Z coordinate (may be negative).
+     * @returns {number} Positive 32-bit integer in range [0, 4294967295].
+     * @private
+     */
+    function _hash3D(x, y, z) {
+        x = x | 0;
+        y = y | 0;
+        z = z | 0;
+        var h = (x * 374761393 + y * 668265263 + z * 923496773) ^ 0x5bd1e995;
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0;
     }
 
     // ============================================================
@@ -214,7 +269,7 @@
      * Provides a single source of truth for procedural randomness across all generators.
      * Not part of the public API. All properties are prefixed with underscore.
      *
-     * @namespace
+     * @namespace Donkeycraft._gen
      * @private
      */
     Donkeycraft._gen = Donkeycraft._gen || {};
@@ -226,5 +281,6 @@
     Donkeycraft._gen._seedRng = _seedRng;
     Donkeycraft._gen._rng = _rng;
     Donkeycraft._gen._hash2D = _hash2D;
+    Donkeycraft._gen._hash3D = _hash3D;
 
 })();

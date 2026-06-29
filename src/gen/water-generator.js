@@ -56,6 +56,7 @@
 
         /**
          * Resolve the water block ID and liquid cache from BlockRegistry.
+         * Populates _liquidBlocks cache for fast lookup during generation.
          * @private
          */
         function _resolveLiquidBlocks() {
@@ -165,13 +166,13 @@
         function _placeUndergroundLakes(chunk, heightmap) {
             if (!_waterBlockId || _waterBlockId === 0) return;
 
-        // Use centralized _gen._hash2D with world seed for deterministic placement.
-        var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
-        var chunkSeed = Donkeycraft._gen._hash2D(chunk.chunkX, chunk.chunkZ);
-        var lakeCount = 1 + ((chunkSeed >> 8) % 3);
+            // Use centralized _gen._hash2D with world seed for deterministic placement.
+            var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+            var chunkSeed = Donkeycraft._gen._hash2D(chunk.chunkX, chunk.chunkZ);
+            var lakeCount = 1 + ((chunkSeed >> 8) % 3);
 
-        for (var i = 0; i < lakeCount; i++) {
-            var hash = Donkeycraft._gen._hash2D(chunkSeed + i * 73, i * 97);
+            for (var i = 0; i < lakeCount; i++) {
+                var hash = Donkeycraft._gen._hash2D(chunkSeed + i * 73, i * 97);
                 var lx = hash % CHUNK_SIZE;
                 if (lx < 0) lx += CHUNK_SIZE;
                 var lz = ((hash >> 8) % CHUNK_SIZE);
@@ -313,25 +314,6 @@
         }
 
         /**
-         * Clear the liquid block cache.
-         * @private
-         */
-        function _clearLiquidCache() {
-            _liquidBlocks = {};
-        }
-
-        /**
-         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
-         * @param {number} x
-         * @param {number} y
-         * @returns {number} Positive 32-bit integer.
-         * @private
-         */
-        function _hash2D(x, y) {
-            return Donkeycraft._gen._hash2D(x, y);
-        }
-
-        /**
          * Initialize the water generator — resolves water block ID and liquid cache from BlockRegistry.
          * Should be called once during game initialization.
          * @private
@@ -339,6 +321,17 @@
         function _init() {
             _resolveLiquidBlocks();
             _resolveWaterBlockId();
+        }
+
+        /**
+         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
+         * @param {number} x - First hash coordinate.
+         * @param {number} y - Second hash coordinate.
+         * @returns {number} Positive 32-bit integer.
+         * @private
+         */
+        function _hash2D(x, y) {
+            return Donkeycraft._gen._hash2D(x, y);
         }
 
         /**

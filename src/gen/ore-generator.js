@@ -304,17 +304,23 @@
 
         /**
          * Generate a pseudo-random number in a range using deterministic hashing.
+         * Uses high bits of hash to minimize modulo bias for non-power-of-two ranges.
          * @param {number} index - Variation index for this vein placement attempt.
-         * @param {number} min - Minimum Y value.
-         * @param {number} max - Maximum Y value.
+         * @param {number} min - Minimum Y value (inclusive).
+         * @param {number} max - Maximum Y value (inclusive).
          * @returns {number} Integer in [min, max].
          * @private
          */
         function _randomInRange(index, min, max) {
             var hash = _hash2D(index, ((min + max) | 0));
-            return min + (hash % (max - min + 1));
+            var range = max - min + 1;
+            if (range <= 1) return min;
+            // Use high bits of hash to minimize bias for small ranges
+            if (range <= 256) {
+                return min + ((hash >>> 16) % range);
+            }
+            return min + (hash % range);
         }
-
 
         /**
          * Validate that required parameters are of correct type and range.

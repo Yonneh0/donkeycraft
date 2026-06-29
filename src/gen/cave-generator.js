@@ -20,6 +20,7 @@
         var _caveDensity = -0.8;
         var _caveRadius = 2.0;          // Base cave tunnel radius
         var _lavaYLevel = 10;           // Lava caves below this Y level
+        var _maxCaveIterations = 500;   // Maximum Y iterations per column to prevent infinite loops
 
         /**
          * Default dimension configuration for overworld-style generation.
@@ -31,6 +32,7 @@
         /**
          * Check if a block ID is replaceable (air, liquids, flowers, grass, etc.).
          * Uses safe method existence checks to avoid errors if BlockRegistry methods are missing.
+         * Centralized helper — also available via Donkeycraft._gen._isReplaceable when needed.
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block can be carved through.
          * @private
@@ -114,9 +116,13 @@
                     ) * 0.05;
 
                     // Continuous Y iteration for connected cave networks.
-                    // Use noise-based spacing to avoid gaps while maintaining performance.
+                    // Uses noise-based adaptive stepping for natural cave distribution.
+                    // Includes a maximum iteration guard to prevent infinite loops in edge cases.
                     var y = minY;
-                    while (y < maxY) {
+                    var iterations = 0;
+                    while (y < maxY && iterations < _maxCaveIterations) {
+                        iterations++;
+
                         // Primary cave noise — fbm via _gen wrapper for proper initialization
                         var noiseVal = Donkeycraft._gen._fbm(
                             worldX * 0.02,
