@@ -35,11 +35,8 @@
         // Maximum retry attempts for pending mesh builds before giving up
         this._maxPendingRetries = 30;
 
-        // Pre-create fallback texture so there's always a valid texture bound (avoids first-frame race).
+        // Placeholder texture — created lazily on first need to avoid constructor-order issues.
         this._placeholderTexture = null;
-        if (gl) {
-            this._createFallbackTexture();
-        }
 
         // Geometry builder and mesh optimizer
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
@@ -457,6 +454,10 @@
             Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: gl=' + (gl ? 'ok' : 'null') + ', shaderMgr=' + (this._shaderManager ? 'ok' : 'null') + ', blockFunc=' + (this._getBlockFunc ? 'ok' : 'null') + ', camera=' + (camera ? 'ok' : 'null'));
             return;
         }
+
+        // Enable depth testing for proper terrain rendering
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
 
         // Donkeycraft.Logger.info('TerrainRenderer', 'render called: chunks=' + this._chunkCount);
 

@@ -157,10 +157,10 @@
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 9 * 4, 16);
         }
 
-        // Normal attribute (3 floats at offset 32)
+        // Normal attribute (3 floats at offset 24)
         if (normLoc >= 0) {
             gl.enableVertexAttribArray(normLoc);
-            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, 9 * 4, 32);
+            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, 9 * 4, 24);
         }
 
         // Draw using indices.
