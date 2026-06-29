@@ -1229,18 +1229,19 @@
             '}\n'
         );
 
-        // Minimal sky shader WITH all required uniforms (uTopColor, uBottomColor, uHorizon)
+        // Minimal sky shader WITH all required uniforms (uTopColor, uBottomColor, uHorizon, uModel)
         this._shaderManager.createProgram('sky',
             'attribute vec3 aPosition;\n' +
             'attribute vec2 aUV;\n' +
             'uniform mat4 uProjection;\n' +
             'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
             'varying vec2 vUV;\n' +
             'varying vec3 vWorldPos;\n' +
             'void main() {\n' +
-            '  gl_Position = uProjection * uView * vec4(aPosition, 1.0);\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
             '  vUV = aUV;\n' +
-            '  vWorldPos = aPosition;\n' +
+            '  vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n' +
             '}\n',
             'precision mediump float;\n' +
             'varying vec2 vUV;\n' +

@@ -35,6 +35,12 @@
         // Maximum retry attempts for pending mesh builds before giving up
         this._maxPendingRetries = 30;
 
+        // Pre-create fallback texture so there's always a valid texture bound (avoids first-frame race).
+        this._placeholderTexture = null;
+        if (gl) {
+            this._createFallbackTexture();
+        }
+
         // Geometry builder and mesh optimizer
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
         this._meshOptimizer = new Donkeycraft.MeshOptimizer();
@@ -421,7 +427,7 @@
     /**
      * Multiply two 4×4 matrices (column-major), storing result in optional target buffer.
      * Result: r = a × b where both inputs and output are column-major arrays.
-     * Computes r[i + j*4] = dot(column_j_of_a, row_i_of_b) — standard column-major matrix multiply.
+     * Computes r[i + j*4] = sum_k(a[i + k*4] * b[k*4 + j]) — standard column-major matrix multiply.
      * @param {Float32Array} a - Left matrix (column-major).
      * @param {Float32Array} b - Right matrix (column-major).
      * @param {Float32Array} [target] - Optional target buffer to store result.
@@ -430,12 +436,12 @@
      */
     Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function (a, b, target) {
         var r = target || new Float32Array(16);
-        for (var row = 0; row < 4; row++) {
-            for (var col = 0; col < 4; col++) {
-                r[row + col * 4] = a[row] * b[col * 4] +
-                    a[4 + row] * b[col * 4 + 1] +
-                    a[8 + row] * b[col * 4 + 2] +
-                    a[12 + row] * b[col * 4 + 3];
+        for (var i = 0; i < 4; i++) {
+            for (var j = 0; j < 4; j++) {
+                r[i + j * 4] = a[i] * b[j * 4] +
+                    a[4 + i] * b[j * 4 + 1] +
+                    a[8 + i] * b[j * 4 + 2] +
+                    a[12 + i] * b[j * 4 + 3];
             }
         }
         return r;

@@ -6,22 +6,42 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * Camera — First-person camera with position, rotation, projection matrix, and FOV.
+     * Camera — First-person camera with position, rotation, and projection.
+     * @param {number} [fov=60] - Field of view in degrees.
+     * @param {number} [near=0.1] - Near clipping plane.
+     * @param {number} [far=1000] - Far clipping plane.
      */
     Donkeycraft.Camera = function (fov, near, far) {
+        this._fov = fov || 60;
+        this._near = near || 0.1;
+        this._far = far || 1000;
+        this._aspect = 1.0;
+
+        // Position and rotation
         this._position = new Donkeycraft.Vector3(0, 64, 0);
         this._yaw = 0;
         this._pitch = 0;
-        this._fov = fov || Donkeycraft.Config.FOV;
-        this._near = near || 0.1;
-        this._far = far || 1000;
-        this._aspect = 16 / 9;
 
+        // Cached matrices (regenerated on demand)
         this._projectionMatrix = null;
         this._viewMatrix = null;
+    };
 
-        this._forward = new Donkeycraft.Vector3();
-        this._right = new Donkeycraft.Vector3();
+    /**
+     * Get the horizontal forward direction vector (Y=0, always orthogonal to world-up for stable strafing).
+     * Returns a new Vector3 to avoid mutating a cached reference.
+     * @returns {Donkeycraft.Vector3} Normalized horizontal forward vector.
+     */
+    Donkeycraft.Camera.prototype.getForward = function () {
+        var cosYaw = Math.cos(this._yaw);
+        var sinYaw = Math.sin(this._yaw);
+
+        // Horizontal forward vector (always orthogonal to world-up for stable strafing).
+        return new Donkeycraft.Vector3(
+            -sinYaw,
+            0,
+            -cosYaw
+        ).normalize();
     };
 
     /**
@@ -82,26 +102,8 @@
     };
 
     /**
-     * Get the horizontal forward direction vector (Y=0, always orthogonal to world-up).
-     * Used for stable strafing and walking movement.
-     * @returns {Donkeycraft.Vector3} Normalized horizontal forward vector.
-     */
-    Donkeycraft.Camera.prototype.getForward = function () {
-        var cosYaw = Math.cos(this._yaw);
-        var sinYaw = Math.sin(this._yaw);
-
-        // Horizontal forward vector (always orthogonal to world-up for stable strafing).
-        this._forward.set(
-            -sinYaw,
-            0,
-            -cosYaw
-        ).normalize();
-
-        return this._forward;
-    };
-
-    /**
      * Get the full 3D forward direction vector including pitch.
+     * Returns a new Vector3 to avoid mutating a cached reference.
      * Used for creative/spectator flying where looking up = moving up.
      * @returns {Donkeycraft.Vector3} Normalized 3D forward vector.
      */
@@ -111,27 +113,23 @@
         var cosPitch = Math.cos(this._pitch);
 
         // Donkeycraft convention: negative pitch = looking UP (mouse down), positive pitch = looking DOWN (mouse up).
-        this._forward.set(
+        return new Donkeycraft.Vector3(
             -sinYaw * cosPitch,
             -Math.sin(this._pitch),
             -cosYaw * cosPitch
         ).normalize();
-
-        return this._forward;
     };
 
     /**
      * Get the right direction vector (horizontal, always orthogonal to world-up).
-     * Reuses cached vector.
+     * Returns a new Vector3 to avoid mutating a cached reference.
      * @returns {Donkeycraft.Vector3} Normalized right vector.
      */
     Donkeycraft.Camera.prototype.getRight = function () {
         var cosYaw = Math.cos(this._yaw);
         var sinYaw = Math.sin(this._yaw);
 
-        this._right.set(cosYaw, 0, -sinYaw).normalize();
-
-        return this._right;
+        return new Donkeycraft.Vector3(cosYaw, 0, -sinYaw).normalize();
     };
 
     /**

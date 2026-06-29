@@ -192,10 +192,9 @@
                     y: iy,
                     z: iz,
                     progress: 0,
-                    startTime: Date.now(),
                     toolTier: toolTier,
                     breakTime: cachedBreakTime, // cached for performance
-                    lastEmitStage: -1            // for debounced progress events
+                    lastEmitStage: -1           // for debounced progress events
                 };
 
                 // Add to chunk index for O(1) cleanup

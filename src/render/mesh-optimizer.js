@@ -36,14 +36,14 @@
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            // Numeric hash: combine position(3) + normal(3) + light(1) into a string key
-            // using rounded integer representation for exact matching.
+            // Exact string key: combine position(3) + normal(3) + light(1)
+            // using rounded integer representation to avoid hash collisions.
             var hx = Math.round(vertices[base] / epsilon);
             var hy = Math.round(vertices[base + 1] / epsilon);
             var hz = Math.round(vertices[base + 2] / epsilon);
             var hl = Math.round(vertices[base + 3] / epsilon);
             var hn = Math.round((vertices[base + 6] + vertices[base + 7] + vertices[base + 8]) / epsilon);
-            var key = hx ^ (hy << 10) ^ (hz << 20) ^ (hn << 30) ^ (hl << 5);
+            var key = hx + ',' + hy + ',' + hz + ',' + hl + ',' + hn;
 
             if (hashTable[key] !== undefined) {
                 vertexToIndex[i] = hashTable[key];
