@@ -405,13 +405,16 @@
      * @private
      */
     Donkeycraft.XPBar.prototype._triggerScreenShake = function() {
-        if (!this._container) return;
+        // Shake only the badge background instead of the entire container.
+        // Applying transform-based shake to the wrapper caused the whole XP bar
+        // to shift layout on levels 75+. Shaking just the badge avoids this.
+        if (!this._badgeBg) return;
 
-        this._container.style.animation = 'screen-shake 150ms ease-out';
+        this._badgeBg.style.animation = 'badge-shake 150ms ease-out';
         setTimeout((function(el) {
             el.style.animation = 'none';
             void el.offsetWidth; // force reflow
-        }).bind(this, this._container), 150);
+        }).bind(this, this._badgeBg), 150);
     };
 
     /**
@@ -540,8 +543,9 @@
         var ring = document.createElement('div');
         ring.className = 'dk-xp-badge-ambient-ring';
         var badgeSize = this._badgeBg ? parseInt(this._badgeBg.style.width) || 42 : 42;
-        ring.style.width = (badgeSize + 16) + 'px';
-        ring.style.height = (badgeSize + 16) + 'px';
+        // Reduced offset from +16 to +8 to keep ring inside badge boundary and prevent overlap with food bar
+        ring.style.width = (badgeSize + 3) + 'px';
+        ring.style.height = (badgeSize - 3) + 'px';
         ring.style.borderColor = 'rgba(150, 50, 255, 0.4)';
         ring.style.animation = 'badge-ring-rotate 1.5s linear infinite';
 
@@ -644,9 +648,9 @@
             this._watermark.style.opacity = '0';
         }
 
-        // Clear the container shake
-        if (this._container) {
-            this._container.style.animation = 'none';
+        // Clear the badge shake (redirected from container in levels 75+ fix)
+        if (this._badgeBg) {
+            this._badgeBg.style.animation = 'none';
         }
 
         // Clear timers

@@ -28,6 +28,9 @@
     <!-- Crosshair (centered) -->
     <div id="dk-crosshair"></div>
 
+    <!-- Keybindings Panel (top-center, display-only) -->
+    <div id="dk-keybindings-panel" class="dk-keybindings-panel"></div>
+
     <!-- Debug Overlay (F3 toggle) -->
     <div id="dk-debug-overlay" class="dk-debug-info"></div>
 
@@ -198,6 +201,9 @@
 
 <!-- UI Elements -->
 <script src="src/ui/gui-elements.js"></script>
+
+<!-- Keybindings Panel -->
+<script src="src/ui/keybindings-panel.js"></script>
 
 <!-- XP Bar UI -->
 <script src="src/ui/xp-bar.js"></script>
@@ -1044,6 +1050,20 @@ void main() {
                 } catch (e) {
                     Donkeycraft.Logger.warn('Game', 'GuiManager initialization failed: ' + e.message);
                 }
+            }
+
+            // ============================================================
+            // Wire up Keybindings Panel (display-only, top-center)
+            // ============================================================
+            try {
+                var keybindPanel = new Donkeycraft.KeybindingsPanel();
+                if (game2._timer && keybindPanel.startListening) {
+                    keybindPanel.startListening(game2._timer);
+                }
+                // Store reference for cleanup on game destroy
+                game2._keybindingsPanel = keybindPanel;
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'KeybindingsPanel initialization failed: ' + e.message);
             }
 
             // ============================================================

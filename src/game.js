@@ -967,6 +967,12 @@
             this._eventBus = null;
         }
 
+        // Clean up keybindings panel
+        if (this._keybindingsPanel) {
+            try { this._keybindingsPanel.destroy(); } catch (e) { Donkeycraft.Logger.warn('Game', 'KeybindingsPanel destroy error: ' + e.message); }
+            this._keybindingsPanel = null;
+        }
+
         // Clean up interaction cooldown state
         this._lastInteractionTime = 0;
 

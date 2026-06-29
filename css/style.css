@@ -455,6 +455,21 @@ body.dk-pointer-locked #dk-canvas-container {
     }
 }
 
+/* 14. Badge shake — subtle scale/rotate shake for level-up on levels 75+ (no translate to avoid layout shift) */
+@keyframes badge-shake {
+    0%   { transform: scale(1) rotate(0deg); }
+    10%  { transform: scale(1.08) rotate(-2deg); }
+    20%  { transform: scale(0.95) rotate(2deg); }
+    30%  { transform: scale(1.06) rotate(-1deg); }
+    40%  { transform: scale(0.97) rotate(1deg); }
+    50%  { transform: scale(1.04) rotate(-1deg); }
+    60%  { transform: scale(0.98) rotate(0.5deg); }
+    70%  { transform: scale(1.02) rotate(-0.5deg); }
+    80%  { transform: scale(0.99) rotate(0.3deg); }
+    90%  { transform: scale(1.01) rotate(-0.3deg); }
+    100% { transform: scale(1) rotate(0deg); }
+}
+
 /* ============================================================
    HEALTH BAR ANIMATIONS
    ============================================================ */
