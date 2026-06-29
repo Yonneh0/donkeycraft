@@ -224,7 +224,6 @@ src/
     level-data.js           # Spawn, mode, time, player data
 game.js             # Main game class: loop, init, pause/resume
 
-tests/              # Functional test pages
 assets/
   sounds/           # (Generated procedurally — no files needed)
   textures/         # (Generated procedurally — no files needed)

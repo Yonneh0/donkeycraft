@@ -8,15 +8,6 @@ For detailed file structure, module organization, configuration constants, and d
 
 ## 1. Mandatory Workflow Rules
 
-### 1.1 Follow PLAN.md
-
-- **Always read `PLAN.md` before starting any implementation.** It defines the exact file structure, class responsibilities, line estimates, module organization, and dependency chain.
-- **Implement modules in the order specified by `PLAN.md`.** Do not skip ahead or implement out of order.
-- **Do NOT modify `PLAN.md` under any circumstances without explicit user approval.** The only allowed changes are:
-  - Updating file descriptions or line counts when files are modified.
-  - Adding notes under a module's description if important findings were discovered during audit.
-- **No changelogs, bugfix reports, or development notes belong in `PLAN.md`.** It is a living plan document, not a change log.
-
 ### 1.2 Audit Before Committing
 
 After every change (file creation, modification, or deletion), you **must**:
@@ -51,26 +42,6 @@ Skipping the audit step is a critical error. An unaudited file may:
 - Leak internal state through improperly scoped variables
 - Introduce subtle bugs in math utilities that cascade through rendering and physics
 - Violate the IIFE pattern and pollute the global namespace
-
-### 1.5 User Review Before Committing or Updating PLAN.md
-
-**Before committing any changes to git and before updating `PLAN.md`, you MUST present the test results to the user and wait for confirmation.**
-
-The required workflow is:
-
-1. **Run all functional tests** for the module as defined in `PLAN.md` file inventory section.
-2. **Present a summary to the user** that includes:
-   - Which files were created or modified
-   - Which functional tests were executed
-   - The results of each test (pass/fail with details)
-   - Any errors, warnings, or unexpected behavior observed
-   - Confirmation that coding standards were met (IIFE, strict mode, docblocks, naming)
-3. **Wait for the user's approval** before proceeding with:
-   - Git commits (`git add` / `git commit`)
-   - Updating `PLAN.md` (updating file descriptions, line counts, or adding verification notes)
-4. **Do not proceed** until the user explicitly confirms or provides feedback.
-
-**Exception:** Routine per-file commits during implementation (Section 1.3) that are not tied to module completion do not require user review. However, the final commit that marks a module as complete and the corresponding `PLAN.md` update **always** requires user review first.
 
 ---
 
@@ -228,14 +199,6 @@ A file in `src/render/` should never import from `src/game/` or `src/game/`. Com
 - Listeners that throw exceptions do not prevent other listeners from firing (each is wrapped in try/catch).
 - Removing a listener while an event is being emitted does NOT affect currently iterating listeners (array is copied before iteration).
 - `once()` callbacks can be cancelled by calling the returned unsubscribe function before the event fires.
-
----
-
-## 4. Quick Reference
-
-### 4.1 Testing
-
-Each module should be validated with **standalone functional tests** before marking it as complete in `PLAN.md`. See `PLAN.md` for per-module validation criteria.
 
 ---
 

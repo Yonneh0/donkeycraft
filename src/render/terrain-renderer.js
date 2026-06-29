@@ -208,9 +208,14 @@
 
         // If geometry is empty (all air), defer mesh building.
         // The chunk may not have terrain data yet — it will be built on the next frame.
+        // IMPORTANT: Do NOT overwrite existing pending entry (which has incremented retries).
         if (geometry.vertexCount === 0) {
             var pendingKey = chunkX + ',' + chunkZ;
-            this._pendingMeshes[pendingKey] = { x: chunkX, z: chunkZ };
+            // Only create a new pending entry if one doesn't already exist.
+            // Existing entries have already had their retry counter incremented by _processPendingMeshes().
+            if (!this._pendingMeshes[pendingKey]) {
+                this._pendingMeshes[pendingKey] = { x: chunkX, z: chunkZ };
+            }
             Donkeycraft.Logger.warn('TerrainRenderer',
                 'Chunk [' + chunkX + ',' + chunkZ + '] geometry has 0 vertices — deferred (retries: ' +
                 (this._pendingMeshes[pendingKey].retries || 0) + ')');
@@ -264,7 +269,7 @@
             // Skip if max retries exceeded — log warning and drop the chunk.
             if (pending.retries > this._maxPendingRetries) {
                 Donkeycraft.Logger.warn('TerrainRenderer',
-                    'Pending chunk (' + pending.x + ',' + pending.z + ') exceeded max retries (' +
+                    'Pending chunk [' + pending.x + ',' + pending.z + '] exceeded max retries (' +
                     this._maxPendingRetries + ') — dropping from pending queue');
                 keysToDelete.push(key);
                 continue;
@@ -273,11 +278,15 @@
             // Rebuild geometry with current block data.
             self._createChunkMesh(pending.x, pending.z);
 
-            // If mesh was built successfully, remove from pending.
+            // If mesh was built successfully (geometry had vertices), remove from pending.
+            // If geometry is still empty, the chunk will be retried next frame.
+            // IMPORTANT: Do NOT create a new pending entry here — _createChunkMesh may have
+            // created one with retries=0 which would reset our counter. We track retries
+            // on the original pending object above.
             if (this._chunks[key]) {
                 keysToDelete.push(key);
             }
-            // Otherwise keep it pending for next frame retry.
+            // Otherwise keep it pending for next frame retry — the entry still exists.
         }
 
         // Remove processed entries.

@@ -155,11 +155,12 @@
     /**
      * Build a star field as point sprites using a seeded PRNG for reproducible positions.
      * Stars are distributed only on the upper hemisphere (sky visible above horizon).
+     * Each vertex includes position(3) + color(4) = 7 floats with white RGB and full alpha.
      * @private
      * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildStarField = function () {
-        var starPositions = [];
+        var starData = [];
         var seed = 42;
 
         // Simple seeded PRNG for reproducible star positions
@@ -174,16 +175,21 @@
             var phi = seededRandom() * (Math.PI / 2); // only upper hemisphere
             var r = 390;
 
-            starPositions.push(
-                r * Math.sin(phi) * Math.cos(theta),
-                r * Math.cos(phi),
-                r * Math.sin(phi) * Math.sin(theta)
+            starData.push(
+                r * Math.sin(phi) * Math.cos(theta), // x
+                r * Math.cos(phi),                    // y
+                r * Math.sin(phi) * Math.sin(theta), // z
+                1.0,                                   // color r (white)
+                1.0,                                   // color g
+                1.0,                                   // color b
+                0.8 + seededRandom() * 0.2            // color a (0.8-1.0 brightness)
             );
         }
 
         this._starGeometry = {
-            positions: new Float32Array(starPositions),
-            count: this._starCount
+            data: new Float32Array(starData),
+            count: this._starCount,
+            floatsPerVertex: 7 // position(3) + color(4)
         };
     };
 
@@ -248,12 +254,6 @@
         var gl = this._gl;
         if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return false;
 
-        // Sun discs use uModel which the sky shader lacks — switch to 'gui' shader.
-        if (!this._shaderManager.use('gui')) {
-            Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — sun disc not rendered');
-            return false;
-        }
-
         // Build a model matrix: translate to sun position + scale
         var sunPos = new Donkeycraft.Vector3(
             sunDir.x * 350,
@@ -265,8 +265,12 @@
         var scaleMatrix = Donkeycraft.Matrix4.createScale(16, 16, 1);
         var modelMatrix = Donkeycraft.Matrix4.multiply(translateMatrix, scaleMatrix);
 
-        this._shaderManager.setMat4('uModel', modelMatrix);
-        this._shaderManager.setInt('uHasTexture', 0);
+        // Use the sky shader — it now supports uModel for sun/moon positioning.
+        if (!this._shaderManager.use('sky')) {
+            gl.depthMask(true);
+            Donkeycraft.Logger.warn('Sky', 'Sky shader unavailable — sun disc not rendered');
+            return false;
+        }
 
         // Sun color: bright yellow-white, intensity-based alpha
         var r = 1.0, g = 0.95, b = 0.7, a = sunIntensity;
@@ -298,7 +302,7 @@
             // Disable depth write so sun renders on top of terrain without corrupting depth buffer.
             gl.depthMask(false);
 
-            // Set camera matrices — GUI shader needs uProjection/uView for proper positioning.
+            // Set camera matrices — sky shader needs uProjection/uView for proper positioning.
             var camData = camera.getMatrices();
             this._shaderManager.setMat4('uProjection', camData.projection);
 
@@ -309,6 +313,9 @@
             this._skyViewTemp[14] = 0;
             var sunViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
             this._shaderManager.setMat4('uView', sunViewMatrix);
+
+            // Set model matrix for sun position + scale.
+            this._shaderManager.setMat4('uModel', modelMatrix);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this._sunVertBuf);
             gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
@@ -347,12 +354,6 @@
         var gl = this._gl;
         if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return false;
 
-        // Moon discs use uModel which the sky shader lacks — switch to 'gui' shader.
-        if (!this._shaderManager.use('gui')) {
-            Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — moon disc not rendered');
-            return false;
-        }
-
         // Moon is opposite the sun
         var moonPos = new Donkeycraft.Vector3(
             moonDir.x * 350,
@@ -364,13 +365,17 @@
         var scaleMatrix = Donkeycraft.Matrix4.createScale(10, 10, 1);
         var modelMatrix = Donkeycraft.Matrix4.multiply(translateMatrix, scaleMatrix);
 
-        this._shaderManager.setMat4('uModel', modelMatrix);
-        this._shaderManager.setInt('uHasTexture', 0);
+        // Use the sky shader — it now supports uModel and aColor for sun/moon.
+        if (!this._shaderManager.use('sky')) {
+            gl.depthMask(true);
+            Donkeycraft.Logger.warn('Sky', 'Sky shader unavailable — moon disc not rendered');
+            return false;
+        }
 
         // Moon color: pale silver
         var r = 0.8, g = 0.82, b = 0.9, a = 1.0;
 
-        // Build vertex data with per-vertex color
+        // Build vertex data with per-vertex color (position(3) + uv(2) unused + color(4))
         var verts = this._moonGeometry.vertices;
         var vertCount = this._moonGeometry.vertexCount;
         var totalFloats = vertCount * 9;
@@ -397,7 +402,7 @@
             // Disable depth write so moon renders on top of terrain without corrupting depth buffer.
             gl.depthMask(false);
 
-            // Set camera matrices — GUI shader needs uProjection/uView for proper positioning.
+            // Set camera matrices — sky shader needs uProjection/uView for proper positioning.
             var camData2 = camera.getMatrices();
             this._shaderManager.setMat4('uProjection', camData2.projection);
 
@@ -408,6 +413,12 @@
             this._skyViewTemp[14] = 0;
             var moonViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
             this._shaderManager.setMat4('uView', moonViewMatrix);
+
+            // Set model matrix for moon position + scale.
+            this._shaderManager.setMat4('uModel', modelMatrix);
+
+            // Enable color overlay so fragment shader uses per-vertex color instead of gradient.
+            this._shaderManager.setInt('uHasColorOverlay', 1);
 
             gl.bindBuffer(gl.ARRAY_BUFFER, this._moonVertBuf);
             gl.bufferData(gl.ARRAY_BUFFER, buf.subarray(0, totalFloats), gl.DYNAMIC_DRAW);
@@ -436,9 +447,9 @@
     };
 
     /**
-     * Render the star field as point sprites using the sky shader.
-     * Stars are rendered as gl.POINTS with a constant white color (via attribute).
-     * Depth write is disabled so stars render as translucent overlays on terrain.
+     * Render the star field as point sprites using the sky shader with per-vertex color.
+     * Stars are rendered as gl.POINTS with position(3) + color(4) interleaved at 7 floats/vertex.
+     * Depth write must be disabled so stars render as translucent overlays on terrain.
      * @private
      */
     Donkeycraft.Sky.prototype._renderStars = function () {
@@ -446,22 +457,24 @@
         if (!gl || !this._starVertBuf || !this._starGeometry) return;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this._starVertBuf);
+
         var posLoc = this._shaderManager.getAttribute('aPosition');
         var colorLoc = this._shaderManager.getAttribute('aColor');
 
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 12, 0);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, this._starGeometry.floatsPerVertex * 4, 0);
         }
-        // Stars use a constant white color via attribute
         if (colorLoc >= 0) {
-            gl.disableVertexAttribArray(colorLoc);
+            gl.enableVertexAttribArray(colorLoc);
+            gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, this._starGeometry.floatsPerVertex * 4, 12);
         }
 
-        // Render as points (one per star) — gl.POINTS is a primitive constant passed to drawArrays, NOT a capability to enable.
+        // Render as points (one per star).
         gl.drawArrays(gl.POINTS, 0, this._starGeometry.count);
 
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
     };
 
     /**
@@ -543,45 +556,37 @@
             this._renderMoonDisc(camera, moonDir);
         }
 
-        // Restore sky shader for stars rendering.
-        if (!this._shaderManager.use('sky')) {
-            Donkeycraft.Logger.warn('Sky', 'Failed to restore sky shader — stars will not render');
-            gl.depthMask(true);
-            return;
-        }
-
-        // Re-enable depth writing before stars.
-        gl.depthMask(true);
+        // Reset color overlay flag after sun/moon rendering so stars use default gradient passthrough.
+        this._shaderManager.setInt('uHasColorOverlay', 0);
 
         // ---- Stars (visible at night, translucent point sprites — disable depth write) ----
         if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
             gl.depthMask(false);
-            // Switch to GUI shader for star rendering (solid color points).
-            var starsCurrentProgram = this._shaderManager._getActiveProgram();
-            if (!this._shaderManager.use('gui')) {
-                Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — stars will not render');
+
+            // Re-ensure sky shader is active for stars (uses same aPosition + aColor attributes).
+            if (!this._shaderManager.use('sky')) {
+                Donkeycraft.Logger.warn('Sky', 'Failed to restore sky shader — stars will not render');
                 gl.depthMask(true);
-            } else {
-                var starMatrices = camera.getMatrices();
-                this._shaderManager.setMat4('uProjection', starMatrices.projection);
-
-                // Zero out view translation for stars (keep sky fixed at world center).
-                for (var i = 0; i < 16; i++) this._skyViewTemp[i] = starMatrices.view.getData()[i];
-                this._skyViewTemp[12] = 0;
-                this._skyViewTemp[13] = 0;
-                this._skyViewTemp[14] = 0;
-                var starViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
-                this._shaderManager.setMat4('uView', starViewMatrix);
-                this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
-                this._shaderManager.setInt('uHasTexture', 0);
-
-                this._renderStars();
-
-                // Restore the previous shader program after star rendering.
-                if (starsCurrentProgram) {
-                    this._shaderManager.useProgram(starsCurrentProgram);
-                }
+                return;
             }
+
+            var starMatrices = camera.getMatrices();
+            this._shaderManager.setMat4('uProjection', starMatrices.projection);
+
+            // Zero out view translation for stars (keep sky fixed at world center).
+            for (var i = 0; i < 16; i++) this._skyViewTemp[i] = starMatrices.view.getData()[i];
+            this._skyViewTemp[12] = 0;
+            this._skyViewTemp[13] = 0;
+            this._skyViewTemp[14] = 0;
+            var starViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+            this._shaderManager.setMat4('uView', starViewMatrix);
+            this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+
+            // Enable color overlay so stars render with their per-vertex white/bright colors
+            // instead of the sky gradient.
+            this._shaderManager.setInt('uHasColorOverlay', 1);
+
+            this._renderStars();
             gl.depthMask(true);
         }
     };
@@ -626,11 +631,11 @@
             gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._moonGeometry.indices, gl.STATIC_DRAW);
         }
 
-        // Star field (points)
-        if (this._starGeometry) {
+        // Star field (points) — use the new interleaved format: position(3) + color(4) = 7 floats/vertex.
+        if (this._starGeometry && this._starGeometry.data) {
             this._starVertBuf = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, this._starVertBuf);
-            gl.bufferData(gl.ARRAY_BUFFER, this._starGeometry.positions, gl.STATIC_DRAW);
+            gl.bufferData(gl.ARRAY_BUFFER, this._starGeometry.data, gl.STATIC_DRAW);
         }
     };
 

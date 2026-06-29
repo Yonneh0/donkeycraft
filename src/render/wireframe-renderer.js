@@ -288,38 +288,21 @@
 
         // Use wireframe shader program
         var shaderUsed = this._shaderManager.use('wireframe');
-        // Donkeycraft.Logger.info('WireframeRenderer', 'Shader "wireframe" used: ' + shaderUsed);
         if (!shaderUsed) {
             Donkeycraft.Logger.error('WireframeRenderer', 'Wireframe shader program not found — check that it was compiled in game.js');
             return;
         }
 
-        // Get active program for direct uniform/attribute access
-        var activeProg = this._shaderManager._getActiveProgram();
-        // Donkeycraft.Logger.info('WireframeRenderer', 'Active program: ' + (activeProg ? '0x' + activeProg.toString(16) : 'null'));
-        if (!activeProg) {
-            Donkeycraft.Logger.error('WireframeRenderer', 'No active program after use()');
-            return;
-        }
-
-        // Set camera matrices — matrices may be Matrix4 instances (with getData()) or Float32Array
+        // Set camera matrices via ShaderManager public API (handles caching internally).
         var matrices = camera.getMatrices();
-        var projData = matrices.projection && matrices.projection.getData ? matrices.projection.getData() : matrices.projection;
-        var projLoc = gl.getUniformLocation(activeProg, 'uProjection');
-        // Donkeycraft.Logger.info('WireframeRenderer', 'uProjection loc: ' + (projLoc !== null ? 'valid' : 'NULL'));
-        if (projLoc) gl.uniformMatrix4fv(projLoc, false, projData);
-
-        var viewData = matrices.view && matrices.view.getData ? matrices.view.getData() : matrices.view;
-        var viewLoc = gl.getUniformLocation(activeProg, 'uView');
-        // Donkeycraft.Logger.info('WireframeRenderer', 'uView loc: ' + (viewLoc !== null ? 'valid' : 'NULL'));
-        if (viewLoc) gl.uniformMatrix4fv(viewLoc, false, viewData);
+        this._shaderManager.setMat4('uProjection', matrices.projection);
+        this._shaderManager.setMat4('uView', matrices.view);
 
         // Identity model matrix (required by shader uniform)
         var identityMatrix = Donkeycraft.Matrix4.createIdentity();
         this._shaderManager.setMat4('uModel', identityMatrix);
-        // Donkeycraft.Logger.info('WireframeRenderer', 'uModel set via setMat4');
 
-        // Set line width for visibility (may not work on all platforms)
+        // Set line width for visibility (may not work on all platforms — WebGL 1 ignores this for LINES on many drivers).
         try { gl.lineWidth(1.5); } catch (e) { }
 
         // Enable polygon offset to push wireframes slightly forward of terrain faces.
@@ -327,13 +310,11 @@
         if (gl.polygonOffset) {
             gl.enable(gl.POLYGON_OFFSET_FILL);
             gl.polygonOffset(2.0, 4.0); // slope and constant factor
-            // Donkeycraft.Logger.info('WireframeRenderer', 'POLYGON_OFFSET_FILL enabled');
         }
 
-        // Get attribute locations directly from the active program
-        var posLoc = gl.getAttribLocation(activeProg, 'aPosition');
-        var colorLoc = gl.getAttribLocation(activeProg, 'aColor');
-        // Donkeycraft.Logger.info('WireframeRenderer', 'aPosition loc: ' + posLoc + ', aColor loc: ' + colorLoc);
+        // Get attribute locations via ShaderManager public API (handles caching).
+        var posLoc = this._shaderManager.getAttribute('aPosition');
+        var colorLoc = this._shaderManager.getAttribute('aColor');
 
         // Enable attribute arrays and set pointers (interleaved: 3 pos + 4 color = 7 floats)
         if (posLoc >= 0) {
@@ -360,20 +341,19 @@
         // Draw all line segments
         gl.drawArrays(gl.LINES, 0, geometry.vertexCount);
 
-        // Check for WebGL errors after draw
+        // Check for WebGL errors after draw.
         var err = gl.getError();
-        // Donkeycraft.Logger.info('WireframeRenderer', 'drawArrays result: WebGL error code = 0x' + (err || 0).toString(16));
         if (err !== gl.NO_ERROR) {
             Donkeycraft.Logger.error('WireframeRenderer', 'WebGL error after drawArrays: 0x' + err.toString(16));
         }
 
-        // Restore WebGL state
+        // Restore WebGL state.
         gl.depthMask(true);
         if (gl.polygonOffset) {
             gl.disable(gl.POLYGON_OFFSET_FILL);
         }
 
-        // Disable attribute arrays
+        // Disable attribute arrays.
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
         if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
     };
