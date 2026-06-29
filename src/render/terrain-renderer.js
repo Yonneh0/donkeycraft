@@ -251,17 +251,17 @@
             var pending = this._pendingMeshes[key];
             var existingMesh = this._chunks[key];
 
-            // If a mesh already exists, skip (it was built later via another path).
+            // If a mesh already exists (built via another path), remove pending entry.
             // Do NOT increment the retry counter — the pending entry is simply stale.
             if (existingMesh) {
                 keysToDelete.push(key);
                 continue;
             }
 
-            // Increment retry counter (default to 0 if not set)
+            // Increment retry counter (default to 0 if not set).
             pending.retries = (pending.retries || 0) + 1;
 
-            // Skip if max retries exceeded — log warning and drop the chunk
+            // Skip if max retries exceeded — log warning and drop the chunk.
             if (pending.retries > this._maxPendingRetries) {
                 Donkeycraft.Logger.warn('TerrainRenderer',
                     'Pending chunk (' + pending.x + ',' + pending.z + ') exceeded max retries (' +
@@ -270,17 +270,17 @@
                 continue;
             }
 
-            // Rebuild geometry with current block data
+            // Rebuild geometry with current block data.
             self._createChunkMesh(pending.x, pending.z);
 
-            // If mesh was built successfully, remove from pending
+            // If mesh was built successfully, remove from pending.
             if (this._chunks[key]) {
                 keysToDelete.push(key);
             }
-            // Otherwise keep it pending for next frame retry
+            // Otherwise keep it pending for next frame retry.
         }
 
-        // Remove processed entries
+        // Remove processed entries.
         for (var i = 0; i < keysToDelete.length; i++) {
             delete this._pendingMeshes[keysToDelete[i]];
         }
@@ -412,16 +412,21 @@
     /**
      * Multiply two 4×4 matrices (column-major), storing result in optional target buffer.
      * Result: r = a × b where both inputs and output are column-major arrays.
+     * Computes r[i + j*4] = dot(column_j_of_a, row_i_of_b) — standard column-major matrix multiply.
+     * @param {Float32Array} a - Left matrix (column-major).
+     * @param {Float32Array} b - Right matrix (column-major).
+     * @param {Float32Array} [target] - Optional target buffer to store result.
+     * @returns {Float32Array} Target buffer containing the product.
      * @private
      */
     Donkeycraft.TerrainRenderer.prototype._multiplyMatrices = function (a, b, target) {
         var r = target || new Float32Array(16);
-        for (var i = 0; i < 4; i++) {
-            for (var j = 0; j < 4; j++) {
-                r[i + j * 4] = a[i] * b[j * 4] +
-                    a[4 + i] * b[j * 4 + 1] +
-                    a[8 + i] * b[j * 4 + 2] +
-                    a[12 + i] * b[j * 4 + 3];
+        for (var row = 0; row < 4; row++) {
+            for (var col = 0; col < 4; col++) {
+                r[row + col * 4] = a[row] * b[col * 4] +
+                    a[4 + row] * b[col * 4 + 1] +
+                    a[8 + row] * b[col * 4 + 2] +
+                    a[12 + row] * b[col * 4 + 3];
             }
         }
         return r;
@@ -548,26 +553,57 @@
             return this._placeholderTexture;
         }
 
-        // Try to use generateMissing() texture for visual consistency.
-        var missingTex = Donkeycraft.TextureGenerator ?
-            Donkeycraft.TextureGenerator.generateMissing() : null;
+        // Guard: ensure TextureGenerator is available before calling generateMissing().
+        if (!Donkeycraft.TextureGenerator) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'TextureGenerator not available — falling back to 1x1 white placeholder');
+            return this._createFallbackTexture();
+        }
 
-        if (missingTex && (missingTex.src || missingTex.getContext)) {
+        // Attempt to use the generated "missing" texture for visual consistency.
+        var missingTex = null;
+        try {
+            missingTex = Donkeycraft.TextureGenerator.generateMissing();
+        } catch (e) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'generateMissing() threw error: ' + e.message + ' — falling back to 1x1 white placeholder');
+            return this._createFallbackTexture();
+        }
+
+        if (!missingTex || !missingTex.src && !missingTex.getContext) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'generateMissing() returned invalid texture — falling back to 1x1 white placeholder');
+            return this._createFallbackTexture();
+        }
+
+        if (missingTex.getContext) {
             // Create WebGL texture
             this._placeholderTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
 
             if (missingTex.getContext) {
                 // It's a canvas — upload directly.
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
+                // Canvas element — upload directly.
+                try {
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, missingTex);
+                } catch (texErr) {
+                    Donkeycraft.Logger.warn('TerrainRenderer', 'Canvas texImage2D failed: ' + texErr.message + ' — falling back to 1x1 white placeholder');
+                    return this._createFallbackTexture();
+                }
             } else if (missingTex.complete && missingTex.naturalWidth > 0) {
-                // Image already loaded — draw to canvas first.
+                // Image already loaded — draw to a temporary canvas first.
                 var tempCanvas = document.createElement('canvas');
                 tempCanvas.width = 16;
                 tempCanvas.height = 16;
                 var tempCtx = tempCanvas.getContext('2d');
-                tempCtx.drawImage(missingTex, 0, 0, 16, 16);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
+                if (!tempCtx) {
+                    Donkeycraft.Logger.warn('TerrainRenderer', 'Failed to create temp canvas context — falling back to 1x1 white placeholder');
+                    return this._createFallbackTexture();
+                }
+                try {
+                    tempCtx.drawImage(missingTex, 0, 0, 16, 16);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tempCanvas);
+                } catch (drawErr) {
+                    Donkeycraft.Logger.warn('TerrainRenderer', 'drawImage failed: ' + drawErr.message + ' — falling back to 1x1 white placeholder');
+                    return this._createFallbackTexture();
+                }
             } else {
                 // Image not loaded yet — keep _placeholderTexture as null so the
                 // caller skips binding. Next frame the image will be ready and we retry.
@@ -575,17 +611,48 @@
                 return null;
             }
 
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            // Set texture parameters for proper sampling.
+            try {
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+            } catch (paramErr) {
+                Donkeycraft.Logger.warn('TerrainRenderer', 'texParameteri failed: ' + paramErr.message);
+            }
         } else {
-            // Fallback to white 1×1 if generateMissing not available.
+            // Fallback to white 1×1 if generateMissing is unavailable or returned invalid data.
+            return this._createFallbackTexture();
+        }
+
+        return this._placeholderTexture;
+    };
+
+    /**
+     * Create a minimal 1x1 white fallback texture.
+     * Used when generateMissing() is unavailable, throws an error, or returns invalid data.
+     * @private
+     * @returns {number} WebGL texture name.
+     */
+    Donkeycraft.TerrainRenderer.prototype._createFallbackTexture = function () {
+        var gl = this._gl;
+        if (!gl) return null;
+
+        // Delete any existing placeholder to avoid memory leak.
+        if (this._placeholderTexture && gl.isTexture(this._placeholderTexture)) {
+            gl.deleteTexture(this._placeholderTexture);
+        }
+
+        try {
             this._placeholderTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, this._placeholderTexture);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        } catch (e) {
+            Donkeycraft.Logger.error('TerrainRenderer', 'Failed to create fallback texture: ' + e.message);
+            this._placeholderTexture = null;
+            return null;
         }
 
         return this._placeholderTexture;

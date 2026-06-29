@@ -430,6 +430,7 @@
 
     /**
      * Spawn a single weather particle at the given position.
+     * Particles start with alpha=0 and fade in to avoid sudden popping.
      * @private
      */
     Donkeycraft.WeatherRenderer.prototype._spawnParticle = function (x, y, z, type) {
@@ -445,13 +446,15 @@
             this._pvx[i] = (Math.random() - 0.5) * 0.5;
             this._pvy[i] = -0.5 - Math.random() * 0.5;
             this._pvz[i] = (Math.random() - 0.5) * 0.5;
-            this._pAlpha[i] = 0.6 + Math.random() * 0.4;
+            // Start fully faded out — fade-in happens during update
+            this._pAlpha[i] = 0;
         } else {
             // Rain falls fast with slight wind
             this._pvx[i] = (Math.random() - 0.5) * 0.3;
             this._pvy[i] = -8 - Math.random() * 4;
             this._pvz[i] = (Math.random() - 0.5) * 0.3 + 0.5; // wind toward +Z
-            this._pAlpha[i] = 0.4 + Math.random() * 0.4;
+            // Start fully faded out — fade-in happens during update
+            this._pAlpha[i] = 0;
         }
 
         this._particleCount++;
@@ -459,6 +462,7 @@
 
     /**
      * Update weather particles by delta time. Respawn particles that fall below y=0 or move too far from player.
+     * Particles fade in over 0.3s after spawning to eliminate popping.
      * @param {number} deltaTime - Time since last frame in seconds.
      * @param {{x:number,y:number,z:number}} playerPos - Player position for particle culling.
      * @returns {void}
@@ -471,6 +475,12 @@
         for (var i = 0; i < this._particleCount; i++) {
             var idx = i - removed;
 
+            // Fade-in: particles that spawn with alpha=0 gradually reach full opacity over ~0.3s.
+            if (this._pAlpha[idx] < 1) {
+                this._pAlpha[idx] += deltaTime * 5; // ~0.2s to full opacity
+                if (this._pAlpha[idx] > 1) this._pAlpha[idx] = 1;
+            }
+
             // Update position
             this._px[idx] += this._pvx[idx] * deltaTime;
             this._py[idx] += this._pvy[idx] * deltaTime;
@@ -478,19 +488,21 @@
 
             // Remove particles that fall below y = 0 or are too far from player
             if (this._py[idx] < 0) {
-                // Respawn at top of render area
+                // Respawn at top of render area with alpha=0 for fade-in
                 this._py[idx] = 128;
                 this._px[idx] = playerPos.x + (Math.random() - 0.5) * 120;
                 this._pz[idx] = playerPos.z + (Math.random() - 0.5) * 120;
+                this._pAlpha[idx] = 0;
             }
 
             var dx = this._px[idx] - playerPos.x;
             var dz = this._pz[idx] - playerPos.z;
             if (dx * dx + dz * dz > 60 * 60) {
-                // Respawn closer to player
+                // Respawn closer to player with alpha=0 for fade-in
                 this._py[idx] = 128;
                 this._px[idx] = playerPos.x + (Math.random() - 0.5) * 120;
                 this._pz[idx] = playerPos.z + (Math.random() - 0.5) * 120;
+                this._pAlpha[idx] = 0;
             }
         }
     };
@@ -626,21 +638,19 @@
 
     /**
      * Spawn initial particles with random positions across the render area.
-     * Actual player-relative positions are set during update() when player position is known.
+     * All particles start with alpha=0 and fade in during update() to prevent popping.
      * @param {number} [count=500] - Number of particles to spawn (capped at maxParticles).
      * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.spawnInitialParticles = function (count) {
-        var self = this;
         count = Math.min(count || 500, this._maxParticles);
 
-        // These are seeded with random positions — actual player-relative positions
-        // are set during update() when player position is known.
+        // Spawn all particles at alpha=0 — fade-in happens during update().
         for (var i = 0; i < count; i++) {
             this._px[i] = (Math.random() - 0.5) * 120;
             this._py[i] = Math.random() * 128;
             this._pz[i] = (Math.random() - 0.5) * 120;
-            this._pAlpha[i] = 0.5 + Math.random() * 0.5;
+            this._pAlpha[i] = 0;
         }
 
         this._particleCount = count;
@@ -657,15 +667,17 @@
     /**
      * Destroy weather renderer resources and free GPU memory.
      * Cleans up vertex buffer and resets all particle data arrays.
-     * @returns {void}
      */
     Donkeycraft.WeatherRenderer.prototype.destroy = function () {
         var gl = this._gl;
-        if (this._vertexBuffer && gl) {
-            gl.deleteBuffer(this._vertexBuffer);
+
+        // Delete GPU buffer (only if context is still valid).
+        if (this._vertexBuffer && gl && !this._contextLost) {
+            try { gl.deleteBuffer(this._vertexBuffer); } catch (e) { /* already deleted */ }
             this._vertexBuffer = null;
         }
 
+        // Null all particle data arrays to free memory.
         this._px = null;
         this._py = null;
         this._pz = null;
@@ -674,8 +686,11 @@
         this._pvz = null;
         this._pAlpha = null;
         this._vertexArray = null;
+
+        // Reset state.
         this._particleCount = 0;
         this._active = false;
+        this._contextLost = true;
     };
 
     /**

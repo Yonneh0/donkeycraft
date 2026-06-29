@@ -15,9 +15,12 @@
     /**
      * Generate an optimized index buffer from unindexed vertex data.
      * Merges identical vertices using a numeric hash for fast lookup.
+     * Preserves the original index type from the input geometry (Uint16Array or Uint32Array).
      * @param {Object} geometry - Geometry with unindexed vertex data.
+     * @param {Float32Array} geometry.vertices - Vertex data array (9 floats per vertex).
+     * @param {number} geometry.vertexCount - Total number of vertices.
      * @param {number} [epsilon=0.001] - Float comparison tolerance.
-     * @returns {{vertices: Float32Array, indices: Uint16Array, vertexCount: number, indexCount: number}}
+     * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
     Donkeycraft.MeshOptimizer.prototype.generateIndexBuffer = function (geometry, epsilon) {
         epsilon = epsilon || 0.001;
@@ -91,9 +94,12 @@
     };
 
     /**
-     * Remove back-facing faces from a chunk mesh.
+     * Remove back-facing faces from a chunk mesh using dot-product test against camera.
      * Always returns Uint32Array to avoid overflow when many triangles survive culling.
      * @param {Object} geometry - Geometry object with vertices, indices, vertexCount, indexCount.
+     * @param {Float32Array} geometry.vertices - Vertex data array (9 floats per vertex).
+     * @param {Uint16Array|Uint32Array} geometry.indices - Index array.
+     * @param {number} geometry.indexCount - Total number of indices.
      * @param {Donkeycraft.Vector3} cameraPos - Camera position for face culling.
      * @returns {{vertices: Float32Array, indices: Uint32Array, vertexCount: number, indexCount: number}}
      */
@@ -155,7 +161,7 @@
     };
 
     /**
-     * Run all optimization passes on geometry.
+     * Run all optimization passes on geometry (index generation + optional back-face culling).
      * @param {Object} geometry - Geometry object.
      * @param {Donkeycraft.Vector3} [cameraPos] - Optional camera position for back-face culling.
      * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}

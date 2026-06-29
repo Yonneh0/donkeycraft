@@ -334,6 +334,14 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
 
+        // Validate inputs to prevent rendering artifacts.
+        health = Math.max(0, Math.min(maxHealth, health | 0));
+        maxHealth = Math.max(1, (maxHealth | 0) || 20);
+
+        // Clamp health values to valid range (0–20 standard Minecraft health).
+        health = Math.max(0, Math.min(health, maxHealth));
+        maxHealth = Math.max(1, maxHealth);
+
         if (!this._shaderManager.use('gui')) return;
 
         // Disable depth writes so hearts render on top of terrain.
@@ -447,6 +455,14 @@
     Donkeycraft.GUIRenderer.prototype.renderHunger = function (food, maxFood, canvasWidth, canvasHeight) {
         var gl = this._gl;
         if (!gl || !this._shaderManager || !canvasWidth || !canvasHeight) return;
+
+        // Validate inputs to prevent rendering artifacts.
+        food = Math.max(0, Math.min(maxFood, food | 0));
+        maxFood = Math.max(1, (maxFood | 0) || 20);
+
+        // Clamp food values to valid range (0–20 standard Minecraft hunger).
+        food = Math.max(0, Math.min(food, maxFood));
+        maxFood = Math.max(1, maxFood);
 
         if (!this._shaderManager.use('gui')) return;
 
@@ -563,32 +579,40 @@
     Donkeycraft.GUIRenderer.prototype.renderAll = function (state, canvasWidth, canvasHeight) {
         state = state || {};
 
-        // 1. Health hearts (top-left of HUD row)
-        if (state.hearts !== false) {
-            this.renderHearts(
-                state.health !== undefined ? state.health : 20,
-                state.maxHealth !== undefined ? state.maxHealth : 20,
-                canvasWidth, canvasHeight
-            );
-        }
+        // Validate canvas dimensions to prevent WebGL errors.
+        if (!canvasWidth || !canvasHeight || canvasWidth <= 0 || canvasHeight <= 0) return;
 
-        // 2. Hunger drumsticks (next to hearts)
-        if (state.hunger !== false) {
-            this.renderHunger(
-                state.food !== undefined ? state.food : 20,
-                state.maxFood !== undefined ? state.maxFood : 20,
-                canvasWidth, canvasHeight
-            );
-        }
+        try {
+            // 1. Health hearts (top-left of HUD row)
+            if (state.hearts !== false) {
+                this.renderHearts(
+                    state.health !== undefined ? (state.health | 0) : 20,
+                    state.maxHealth !== undefined ? (state.maxHealth | 0) : 20,
+                    canvasWidth, canvasHeight
+                );
+            }
 
-        // 3. Hotbar (bottom layer)
-        if (state.hotbar !== false) {
-            this.renderHotbar(state.selectedSlot || 0, canvasWidth, canvasHeight);
-        }
+            // 2. Hunger drumsticks (next to hearts)
+            if (state.hunger !== false) {
+                this.renderHunger(
+                    state.food !== undefined ? (state.food | 0) : 20,
+                    state.maxFood !== undefined ? (state.maxFood | 0) : 20,
+                    canvasWidth, canvasHeight
+                );
+            }
 
-        // 4. Crosshair (top layer)
-        if (state.crosshair !== false) {
-            this.renderCrosshair(canvasWidth, canvasHeight);
+            // 3. Hotbar (bottom layer)
+            if (state.hotbar !== false) {
+                var slot = state.selectedSlot;
+                this.renderHotbar((slot !== undefined && slot >= 0 && slot <= 8) ? (slot | 0) : 0, canvasWidth, canvasHeight);
+            }
+
+            // 4. Crosshair (top layer)
+            if (state.crosshair !== false) {
+                this.renderCrosshair(canvasWidth, canvasHeight);
+            }
+        } catch (e) {
+            Donkeycraft.Logger.error('GUIRenderer', 'renderAll error: ' + e.message);
         }
     };
 

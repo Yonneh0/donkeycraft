@@ -54,6 +54,11 @@
      * @returns {{r: number, g: number, b: number}} Sky color components in [0, 1].
      */
     Donkeycraft.Lighting.prototype.getSkyColor = function () {
+        // Guard against uninitialized state.
+        if (this._timeOfDay === undefined || this._timeOfDay === null) {
+            return { r: 0.3, g: 0.6, b: 1.0 };
+        }
+
         var t = this._timeOfDay;
 
         // Smooth sky color keyframes: [time, r, g, b]

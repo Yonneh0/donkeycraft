@@ -21,6 +21,9 @@
         this._heldItemId = 1; // Default: stone
         this._bobAngle = 0;
 
+        // Context lost flag — prevents rendering after context loss
+        this._contextLost = false;
+
         // Listen for context loss/restore on the source canvas
         if (gl && gl.canvas) {
             var self = this;
@@ -118,6 +121,7 @@
 
     /**
      * Render the held item in the bottom-right corner of the screen.
+     * The hand renderer uses vertex colors (not textures) for item rendering.
      * @param {Camera} camera - The camera instance.
      * @param {number} canvasWidth - Current canvas width in pixels.
      * @param {number} canvasHeight - Current canvas height in pixels.

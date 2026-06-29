@@ -210,6 +210,9 @@
             this._shaderManager.setMat4('uProjection', matrices.projection);
             this._shaderManager.setMat4('uView', matrices.view);
 
+            // Identity model matrix — particles are world-space positions.
+            this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+
             this._shaderManager.setInt('uHasTexture', 0);
 
             var right = camera.getRight();

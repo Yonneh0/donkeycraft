@@ -248,9 +248,6 @@
         var gl = this._gl;
         if (!gl || !this._sunVertBuf || !this._sunIndexBuf) return false;
 
-        // Save current shader state so we can restore it after rendering the sun.
-        var currentProgram = this._shaderManager._getActiveProgram();
-
         // Sun discs use uModel which the sky shader lacks — switch to 'gui' shader.
         if (!this._shaderManager.use('gui')) {
             Donkeycraft.Logger.warn('Sky', 'GUI shader unavailable — sun disc not rendered');
@@ -337,11 +334,6 @@
         } finally {
             // Always restore depth write state.
             gl.depthMask(true);
-            // Restore the previous shader program so subsequent rendering (stars, etc.)
-            // continues with the correct shader instead of the GUI shader.
-            if (currentProgram) {
-                this._shaderManager.useProgram(currentProgram);
-            }
         }
     };
 
@@ -354,9 +346,6 @@
     Donkeycraft.Sky.prototype._renderMoonDisc = function (camera, moonDir) {
         var gl = this._gl;
         if (!gl || !this._moonVertBuf || !this._moonIndexBuf) return false;
-
-        // Save current shader state so we can restore it after rendering the moon.
-        var currentProgram = this._shaderManager._getActiveProgram();
 
         // Moon discs use uModel which the sky shader lacks — switch to 'gui' shader.
         if (!this._shaderManager.use('gui')) {
@@ -443,16 +432,13 @@
         } finally {
             // Always restore depth write state.
             gl.depthMask(true);
-            // Restore the previous shader program so subsequent rendering (stars, etc.)
-            // continues with the correct shader instead of the GUI shader.
-            if (currentProgram) {
-                this._shaderManager.useProgram(currentProgram);
-            }
         }
     };
 
     /**
-     * Render the star field as point sprites.
+     * Render the star field as point sprites using the sky shader.
+     * Stars are rendered as gl.POINTS with a constant white color (via attribute).
+     * Depth write is disabled so stars render as translucent overlays on terrain.
      * @private
      */
     Donkeycraft.Sky.prototype._renderStars = function () {
