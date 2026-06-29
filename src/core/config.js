@@ -41,7 +41,7 @@
 
             // Camera settings
             FOV: 70,                    // Field of view (degrees)
-            MOUSE_SENSITIVITY: 0.15,    // Mouse look sensitivity
+            MOUSE_SENSITIVITY: 0.01,    // Mouse look sensitivity
             MOUSE_SCROLL_SENSITIVITY: 1,// Hotbar scroll sensitivity
 
             // Physics

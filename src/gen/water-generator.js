@@ -165,9 +165,14 @@
         function _placeUndergroundLakes(chunk, heightmap) {
             if (!_waterBlockId || _waterBlockId === 0) return;
 
-            // Incorporate world seed for deterministic placement across chunks
+            // Incorporate world seed for deterministic placement across chunks.
+            // Use 32-bit safe arithmetic with Mulberry32-compatible seeding to avoid
+            // integer overflow at large chunk coordinates (chunkX/chunkZ > ~46340).
             var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
-            var seed = chunk.chunkX * 45671 + chunk.chunkZ * 89013 + worldSeed * 1000000;
+            var sx = ((chunk.chunkX | 0) * 73856093) >>> 0;
+            var sz = ((chunk.chunkZ | 0) * 19349663) >>> 0;
+            var sseed = ((worldSeed | 0) * 16807) % 2147483647;
+            var seed = (sx ^ sz ^ sseed) >>> 0;
 
             // Try to place 1-3 underground lakes
             var lakeCount = 1 + ((seed >> 8) % 3);

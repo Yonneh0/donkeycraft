@@ -230,8 +230,7 @@
     <script src="src/gen/cave-generator.js"></script>
     <script src="src/gen/structure-generator.js"></script>
     <script src="src/gen/water-generator.js"></script>
-    <script src="src/game/terrain-surface.js"></script> <!-- not used- included for completeness -->
-    <script src="src/game/lighting-engine.js"></script> <!-- not used- included for completeness -->
+    <script src="src/game/lighting-engine.js"></script> <!-- not used - included for completeness -->
 
     <!-- Shaders -->
     <script>
@@ -713,7 +712,6 @@
 
                 setupUI();
                 if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
-                regenerateTerrain();
                 requestAnimationFrame(renderLoop);
             }
 
@@ -807,6 +805,10 @@
 
                 // Auto-regenerate if we had a saved state with different chunk/params
                 if (hasState) {
+                    regenerateTerrain();
+                } else {
+                    // First-time launch: apply default camera positioning logic before regenerating
+                    updateCameraToChunk();
                     regenerateTerrain();
                 }
 
@@ -957,7 +959,6 @@
                 }
                 document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
                 document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
-                updateCameraToChunk();
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)
@@ -1463,8 +1464,8 @@
                                 for (var e = 0; e < _BLOCK_EDGES.length; e++) {
                                     var edge = _BLOCK_EDGES[e];
                                     wv.push(
-                                        gx + x + edge[0], gy + y + edge[1], gz + z + edge[2],
-                                        gx + x + edge[3], gy + y + edge[4], gz + z + edge[5]
+                                        gx + x + edge[0], y + edge[1], gz + z + edge[2],
+                                        gx + x + edge[3], y + edge[4], gz + z + edge[5]
                                     );
                                     // Bright yellow-ish wireframe
                                     wc.push(0.9, 0.85, 0.2, 1.0, 0.9, 0.85, 0.2, 1.0);

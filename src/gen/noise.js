@@ -19,9 +19,16 @@
      */
     function _ensureNoiseInit() {
         if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
-            var isInit = typeof Donkeycraft.PerlinNoise._isInitialized === 'function' 
-                ? Donkeycraft.PerlinNoise._isInitialized() 
-                : true; // Assume initialized if getter unavailable
+            var isInit = false;
+            // Check via the public getter method first, then fallback to direct property
+            if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
+                isInit = Donkeycraft.PerlinNoise._isInitialized();
+            } else if (Donkeycraft.PerlinNoise._initialized !== undefined) {
+                isInit = !!Donkeycraft.PerlinNoise._initialized;
+            } else {
+                // If no check available, assume initialized (PerlinNoise module loaded)
+                isInit = true;
+            }
             if (!isInit) {
                 var seed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
                 Donkeycraft.PerlinNoise.init(seed);
@@ -163,6 +170,26 @@
     }
 
     // ============================================================
+    // Centralized Hash Function — replaces duplicate _hash2D in generators
+    // ============================================================
+
+    /**
+     * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
+     * Centralized in noise.js to eliminate duplication across ore-generator, water-generator,
+     * and structure-generator.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Positive 32-bit integer.
+     */
+    function _hash2D(x, y) {
+        x = x | 0;
+        y = y | 0;
+        var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
+    }
+
+    // ============================================================
     // Expose on internal namespace — single source of truth for noise
     // ============================================================
 
@@ -180,5 +207,6 @@
     Donkeycraft._gen._fbm = _fbm;
     Donkeycraft._gen._seedRng = _seedRng;
     Donkeycraft._gen._rng = _rng;
+    Donkeycraft._gen._hash2D = _hash2D;
 
 })();

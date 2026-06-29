@@ -292,22 +292,6 @@
         }
 
         /**
-         * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
-         * @param {number} x - X coordinate.
-         * @param {number} y - Y coordinate.
-         * @returns {number} Positive 32-bit integer.
-         * @private
-         */
-        function _hash2D(x, y) {
-            // FNV-1a inspired hash — produces consistent positive results
-            x = (x | 0);
-            y = (y | 0);
-            var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
-            h = ((h >>> 13) ^ h) * 0x5bd1e995;
-            return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
-        }
-
-        /**
          * Generate a pseudo-random number in a range using deterministic hashing.
          * @param {number} index - Variation index for this vein placement attempt.
          * @param {number} min - Minimum Y value.
@@ -316,8 +300,21 @@
          * @private
          */
         function _randomInRange(index, min, max) {
-            var hash = _hash2D(index, ((min + max) | 0));
+            var hash = Donkeycraft._gen._hash2D(index, ((min + max) | 0));
             return min + (hash % (max - min + 1));
+        }
+
+        /**
+         * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
+         * @deprecated Use Donkeycraft._gen._hash2D instead — centralized in noise.js.
+         * Kept locally for backward compatibility with any code that may call this directly.
+         * @param {number} x - X coordinate.
+         * @param {number} y - Y coordinate.
+         * @returns {number} Positive 32-bit integer.
+         * @private
+         */
+        function _hash2D(x, y) {
+            return Donkeycraft._gen._hash2D(x, y);
         }
 
         /**

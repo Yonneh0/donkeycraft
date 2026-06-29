@@ -28,12 +28,24 @@
 
         /**
          * Ensure PerlinNoise is initialized before terrain generation.
-         * Checks the _initialized flag set by PerlinNoise.init() in math-utils.js.
+         * Checks the _isInitialized() flag set by PerlinNoise.init() in math-utils.js.
          * @private
          */
         function _ensureNoiseInit() {
-            if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init && !Donkeycraft.PerlinNoise._initialized) {
-                Donkeycraft.PerlinNoise.init(SEED);
+            if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
+                var isInit = false;
+                // Check via the public getter method first, then fallback to direct property
+                if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
+                    isInit = Donkeycraft.PerlinNoise._isInitialized();
+                } else if (Donkeycraft.PerlinNoise._initialized !== undefined) {
+                    isInit = !!Donkeycraft.PerlinNoise._initialized;
+                } else {
+                    // If no check available, assume initialized (PerlinNoise module loaded)
+                    isInit = true;
+                }
+                if (!isInit) {
+                    Donkeycraft.PerlinNoise.init(SEED);
+                }
             }
         }
 
@@ -81,14 +93,14 @@
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Base terrain height using large-scale noise
-                    var baseNoise = Donkeycraft.PerlinNoise.fbm(
+                    // Base terrain height using large-scale noise via _gen wrapper
+                    var baseNoise = Donkeycraft._gen._fbm(
                         worldX * scale, 0, worldZ * scale,
                         4, 0.5, 2.0
                     );
 
                     // Detail noise for local variation
-                    var detailNoise = Donkeycraft.PerlinNoise.fbm(
+                    var detailNoise = Donkeycraft._gen._fbm(
                         worldX * detailScale, 0, worldZ * detailScale,
                         3, 0.5, 2.0
                     );
@@ -106,9 +118,9 @@
                         height = Donkeycraft.clamp(height, 5, 30);
                     }
 
-                    // Extreme hills: add dramatic peaks
+                    // Extreme hills: add dramatic peaks via _gen wrapper
                     if (biome.isExtremeHills) {
-                        var peakBoost = Math.abs(Donkeycraft.PerlinNoise.noise2D(
+                        var peakBoost = Math.abs(Donkeycraft._gen._noise2D(
                             worldX * 0.008, worldZ * 0.008
                         )) * heightVariation;
                         height = Math.min(height + Math.floor(peakBoost), WORLD_HEIGHT - 15);

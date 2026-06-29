@@ -108,7 +108,7 @@
 
                     // Adjust threshold based on local X/Z noise for tunnel shape variation.
                     // fbm returns [-1, 1]; threshold varies slightly around _caveDensity.
-                    var threshold = density + Donkeycraft.PerlinNoise.noise2D(
+                    var threshold = density + Donkeycraft._gen._noise2D(
                         x * 0.3, z * 0.3
                     ) * 0.05;
 
@@ -116,8 +116,8 @@
                     // Use noise-based spacing to avoid gaps while maintaining performance.
                     var y = minY;
                     while (y < maxY) {
-                        // Primary cave noise — fbm with global seed baked into PerlinNoise
-                        var noiseVal = Donkeycraft.PerlinNoise.fbm(
+                        // Primary cave noise — fbm via _gen wrapper for proper initialization
+                        var noiseVal = Donkeycraft._gen._fbm(
                             worldX * 0.02,
                             y * 0.02,
                             worldZ * 0.02,
@@ -128,7 +128,7 @@
                         // Lower threshold = fewer caves; -0.7 carves ~12% of blocks.
                         if (noiseVal < threshold) {
                             // Carve a tunnel at this position with slight Y spread
-                            var tunnelRadius = radius + Donkeycraft.PerlinNoise.noise2D(
+                            var tunnelRadius = radius + Donkeycraft._gen._noise2D(
                                 y * 0.1 + x, z * 0.1 + worldZ * 0.05
                             ) * radius * 0.5;
 
@@ -138,7 +138,7 @@
                         // Adaptive Y step: use noise to determine spacing for natural cave distribution.
                         // Near surface (y < minY + 20): step by 1 for continuous caves.
                         // Below that: step by 2-3 based on local noise variation for performance.
-                        var yNoise = Donkeycraft.PerlinNoise.noise2D(worldX * 0.1, worldZ * 0.1);
+                        var yNoise = Donkeycraft._gen._noise2D(worldX * 0.1, worldZ * 0.1);
                         var yStep = (y < minY + 20) ? 1 : ((yNoise > 0) ? 3 : 2);
 
                         // Clamp step to avoid skipping too far
