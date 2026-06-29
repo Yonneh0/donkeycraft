@@ -36,8 +36,8 @@
 
         for (var i = 0; i < vertexCount; i++) {
             var base = i * faceDataSize;
-            // Exact string key: combine position(3) + normal(3) + light(1)
-            // using rounded integer representation to avoid hash collisions.
+            // String key: combine position(3) + normal(3) + light(1) into a collision-free key.
+            // Using comma-separated rounded integers ensures exact float matching.
             var hx = Math.round(vertices[base] / epsilon);
             var hy = Math.round(vertices[base + 1] / epsilon);
             var hz = Math.round(vertices[base + 2] / epsilon);

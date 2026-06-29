@@ -127,20 +127,20 @@ Chunks, terrain generation, biomes, structures, lighting engine, physics, dimens
 |---|------|-------------|-------|
 | 33 | `src/game/chunk.js` | Chunk data structure: 16×256×16 array, block storage, lighting arrays, dirty flags | 263 |
 | 34 | `src/game/chunk-manager.js` | Chunk loading/unloading: radius management, spawn/destroy, dirty tracking | 381 |
-| 35 | `src/game/terrain-generator.js` | Heightmap generation: Perlin noise layers, biome height variation | 126 |
+| 35 | `src/gen/terrain-generator.js` | Heightmap generation: Perlin noise layers, biome height variation | 126 |
 | 36 | `src/game/biome.js` | Biome definitions: temperature, rainfall, colors, grass/leaf color, spawn rates | 264 |
-| 37 | `src/game/structure-generator.js` | Structure placement: ore veins, underground caves, surface structures | 262 |
-| 38 | `src/game/ore-generator.js` | Ore distribution: vein placement per biome, rarity, Y-level ranges | 200 |
-| 39 | `src/game/cave-generator.js` | Cave system: 3D noise-based cave generation, lava caves, mushroom caves | 159 |
-| 40 | `src/game/water-generator.js` | Water source placement: lake detection, surface water flow | 166 |
+| 37 | `src/gen/structure-generator.js` | Structure placement: ore veins, underground caves, surface structures | 262 |
+| 38 | `src/gen/ore-generator.js` | Ore distribution: vein placement per biome, rarity, Y-level ranges | 200 |
+| 39 | `src/gen/cave-generator.js` | Cave system: 3D noise-based cave generation, lava caves, mushroom caves | 159 |
+| 40 | `src/gen/water-generator.js` | Water source placement: lake detection, surface water flow | 166 |
 | 41 | `src/game/terrain-surface.js` | Surface layer: top block per biome (grass→dirt→stone), sand beaches, snow | 170 |
 | 42 | `src/game/lighting-engine.js` | Sky light & block light propagation: BFS flood fill, light updates | 235 |
 | 43 | `src/game/physics.js` | Block physics: gravity blocks (sand/gravel), liquid flow, redstone signal propagation | 252 |
 | 44 | `src/game/world-utils.js` | Shared coordinate and block access utilities | 144 |
 | 45 | `src/game/dimension.js` | Dimension system: Overworld/Nether/End types, coordinate transformation, chunk isolation | 380 |
 | 46 | `src/game/portal.js` | Portal detection, creation, dimension travel with coordinate transformation | 480 |
-| 47 | `src/game/nether-generator.js` | Nether terrain: bedrock, lava sea level, netherrack, nether ores, basalt columns | 309 |
-| 48 | `src/game/end-generator.js` | End terrain: island classification, end stone platform, end cities, chorus plants | 346 |
+| 47 | `src/gen/nether-generator.js` | Nether terrain: bedrock, lava sea level, netherrack, nether ores, basalt columns | 309 |
+| 48 | `src/gen/end-generator.js` | End terrain: island classification, end stone platform, end cities, chorus plants | 346 |
 | 49 | `src/game/time.js` | World time: 24000 tick day cycle, moon phases, hour/minute calculations | 206 |
 
 **Subtotal: 17 files, ~4,323 lines**
@@ -293,116 +293,6 @@ IndexedDB world storage, level data persistence, and asset caching.
 | 12. Storage System | 3 | ~1,530 |
 | 13. Main Entry Point | 1 | ~1,195 |
 | **TOTAL** | **103 files** | **~28,928 lines of JS/GLSL** |
-
----
-
-## Dependency Order
-
-Scripts are loaded in this order in `index.html`:
-
-```
- 1.  src/core/namespace.js          ← must be first
- 2.  src/core/eventbus.js
- 3.  src/core/config.js
- 4.  src/core/logger.js
- 5.  src/core/timer.js
- 6.  src/core/input.js
- 7.  src/core/math-utils.js
- 8.  src/core/audio.js
- 9.  src/core/init-sequence.js
-10.  src/gen/noise.js
-11.  src/gen/texture-core.js
-12.  src/gen/texture-terrain.js
-13.  src/gen/texture-blocks.js
-14.  src/gen/texture-special.js
-15.  src/gen/texture-decorative.js
-16.  src/gen/sound-manager.js
-17.  src/render/gl-context.js
-18.  src/render/shader-manager.js
-19.  src/render/geometry-builder.js
-20.  src/render/mesh-optimizer.js
-21.  src/render/chunk-mesh.js
-22.  src/render/terrain-renderer.js
-23.  src/render/camera.js
-24.  src/render/fog.js
-25.  src/render/sky.js
-26.  src/render/lighting.js
-27.  src/render/hand-renderer.js
-28.  src/render/break-particles.js
-29.  src/render/gui-renderer.js
-30.  src/render/weather.js
-31.  src/game/block.js
-32.  src/game/block-state.js
-33.  src/game/block-types.js
-34.  src/game/texture-atlas.js
-35.  src/game/block-models.js
-36.  src/game/recipe-registry.js
-37.  src/game/chunk.js
-38.  src/game/chunk-manager.js
-39.  src/game/biome.js
-40.  src/game/terrain-generator.js
-41.  src/game/ore-generator.js
-42.  src/game/cave-generator.js
-43.  src/game/water-generator.js
-44.  src/game/terrain-surface.js
-45.  src/game/lighting-engine.js
-46.  src/game/physics.js
-47.  src/game/world-utils.js
-48.  src/game/dimension.js
-49.  src/game/portal.js
-50.  src/game/nether-generator.js
-51.  src/game/end-generator.js
-52.  src/game/time.js
-53.  src/game/player.js
-54.  src/game/movement.js
-55.  src/game/collision.js
-56.  src/game/jumping.js
-57.  src/game/flying.js
-58.  src/game/damage.js
-59.  src/game/game-mode.js
-60.  src/game/stats.js
-61.  src/game/hunger.js
-62.  src/game/experience.js
-63.  src/game/raycast.js
-64.  src/game/block-action.js
-65.  src/game/block-placement.js
-66.  src/game/interactable-blocks.js
-67.  src/ui/item-stack.js
-68.  src/ui/inventory.js
-69.  src/ui/gui-manager.js
-70.  src/ui/hotbar.js
-71.  src/ui/crafting-grid.js
-72.  src/ui/creative-inventory.js
-73.  src/ui/furnace-ui.js
-74.  src/ui/chest-ui.js
-75.  src/ui/anvil-ui.js
-76.  src/ui/enchanting-ui.js
-77.  src/ui/debug-overlay.js
-78.  src/ui/gui-elements.js
-79.  src/ui/loading-screen.js
-80.  src/game/entity.js
-81.  src/game/entity-manager.js
-82.  src/game/passive-mobs.js
-83.  src/game/hostile-mobs.js
-84.  src/game/boss-mobs.js
-85.  src/game/mob-ai.js
-86.  src/game/projectiles.js
-87.  src/game/animals.js
-88.  src/game/mob-spawning.js
-89.  src/game/redstone-engine.js
-90.  src/game/repeater-comparator.js
-91.  src/game/observers.js
-92.  src/game/tnt.js
-93.  src/game/pistons.js
-94.  src/game/wiring.js
-95.  src/game/enchantment.js
-96.  src/game/potion.js
-97.  src/game/tool.js
-98.  src/core/world-store.js
-99.  src/core/level-data.js
-100. src/core/cache.js
-101. src/game.js                    ← loaded last
-```
 
 ---
 

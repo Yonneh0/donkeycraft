@@ -125,7 +125,84 @@ src/
     math-utils.js       # Vector3, Matrix4, Quaternion, noise functions
     audio.js            # Web Audio API wrapper
     init-sequence.js    # Async initialization pipeline
+  gen/ # Generation Code: Asset, Terrain, Mobs, Tresure
+    terrain-generator.js  # Heightmap generation
+    ore-generator.js      # Ore vein placement
+    cave-generator.js     # Cave tunnel systems
+    structure-generator.js# Surface structures
+    water-generator.js    # Water filling
+    nether-generator.js   # Nether terrain
+    end-generator.js      # End terrain
     asset-generator.js  # Procedural textures & sounds
+  game/
+   # Blocks, chunks, terrain generation
+    block.js              # Block definitions (257 blocks)
+    block-state.js        # Block state variants
+    block-types.js        # Block classification
+    texture-atlas.js      # 16×16 texture atlas
+    block-models.js       # Face/texture models with AO
+    recipe-registry.js    # Crafting and smelt recipes
+    chunk.js              # 16×256×16 chunk volume
+    chunk-manager.js      # Chunk loading/unloading
+    biome.js              # Biome classification
+    terrain-surface.js    # Biome surface layers
+    lighting-engine.js    # Block light propagation
+    physics.js            # Gravity-affected blocks
+    world-utils.js        # Coordinate utilities
+    dimension.js          # Overworld/Nether/End
+    portal.js             # Inter-dimensional portals
+    time.js               # World time cycle
+  # Player entity, movement, collision, stats
+    player.js             # Player entity (position, velocity, rotation)
+    movement.js           # Walking, sprinting, swimming, flying speeds
+    collision.js          # AABB collision detection
+    jumping.js            # Jump mechanics
+    flying.js             # Creative/spectator flying
+    damage.js           # Hitbox, damage, knockback, fall damage
+    game-mode.js          # Survival/Creative/Spectator modes
+    stats.js              # Achievements and statistics
+    hunger.js             # Food, saturation, starvation
+    experience.js         # XP levels and orbs
+   # Mining, placing, raycasting
+    raycast.js            # DDA voxel raycasting
+    block-action.js       # Block breaking with tool multipliers
+    block-placement.js    # Block placement with collision checks
+    interactable-blocks.js# Right-click interactions (doors, chests, etc.)
+   # Mobs and entities
+    entity.js               # Base entity class
+    entity-manager.js       # Spawn/despawn/tick management
+    passive-mobs.js         # Cow, pig, sheep, chicken
+    hostile-mobs.js         # Zombie, skeleton, spider, creeper
+    boss-mobs.js            # Ender Dragon, Wither
+    mob-ai.js               # A* pathfinding, line-of-sight
+    projectiles.js          # Arrows, snowballs, ender pearls
+    animals.js              # Animal breeding logic
+    mob-spawning.js         # Spawn definitions and caps
+   # Redstone logic system
+    redstone-engine.js      # Tick-based signal propagation
+    repeater-comparator.js  # Repeaters (1-4 ticks) and comparators
+    observers.js            # Observer blocks
+    tnt.js                  # TNT explosions
+    pistons.js              # Pistons and sticky pistons
+    wiring.js               # Redstone dust/wire
+   # Enchantments, potions, tools
+    enchantment.js          # 24 vanilla enchantments
+    potion.js               # 18 effects, 40 potions
+    tool.js                 # 7 material tiers
+  ui/               # Inventory, HUD, GUI screens
+    item-stack.js           # Item stacks with NBT-like tags
+    inventory.js            # Multi-slot inventories
+    gui-manager.js          # Screen open/close system
+    hotbar.js               # Hotbar UI (9 slots)
+    crafting-grid.js        # 3×3 crafting table
+    creative-inventory.js   # Creative item browser
+    furnace-ui.js           # Furnace GUI
+    chest-ui.js             # Chest GUI
+    anvil-ui.js             # Anvil rename/repair
+    enchanting-ui.js        # Enchanting GUI
+    debug-overlay.js        # F3 debug screen
+    gui-elements.js         # DOM UI components
+    loading-screen.js       # Loading screen UI
   render/           # WebGL rendering engine
     gl-context.js           # WebGL 1 context creation
     shader-manager.js       # Shader compilation and caching
@@ -144,81 +221,6 @@ src/
     break-particles.js    # Block breaking particles
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     weather.js            # Weather particle effects
-  game/            # Blocks, chunks, terrain generation
-    block.js              # Block definitions (257 blocks)
-    block-state.js        # Block state variants
-    block-types.js        # Block classification
-    texture-atlas.js      # 16×16 texture atlas
-    block-models.js       # Face/texture models with AO
-    recipe-registry.js    # Crafting and smelt recipes
-    chunk.js              # 16×256×16 chunk volume
-    chunk-manager.js      # Chunk loading/unloading
-    biome.js              # Biome classification
-    terrain-generator.js  # Heightmap generation
-    ore-generator.js      # Ore vein placement
-    cave-generator.js     # Cave tunnel systems
-    structure-generator.js# Surface structures
-    water-generator.js    # Water filling
-    terrain-surface.js    # Biome surface layers
-    lighting-engine.js    # Block light propagation
-    physics.js            # Gravity-affected blocks
-    world-utils.js        # Coordinate utilities
-    dimension.js          # Overworld/Nether/End
-    portal.js             # Inter-dimensional portals
-    nether-generator.js   # Nether terrain
-    end-generator.js      # End terrain
-    time.js               # World time cycle
-  game/           # Player entity, movement, collision, stats
-    player.js             # Player entity (position, velocity, rotation)
-    movement.js           # Walking, sprinting, swimming, flying speeds
-    collision.js          # AABB collision detection
-    jumping.js            # Jump mechanics
-    flying.js             # Creative/spectator flying
-    damage.js           # Hitbox, damage, knockback, fall damage
-    game-mode.js          # Survival/Creative/Spectator modes
-    stats.js              # Achievements and statistics
-    hunger.js             # Food, saturation, starvation
-    experience.js         # XP levels and orbs
-  game/      # Mining, placing, raycasting
-    raycast.js            # DDA voxel raycasting
-    block-action.js       # Block breaking with tool multipliers
-    block-placement.js    # Block placement with collision checks
-    interactable-blocks.js# Right-click interactions (doors, chests, etc.)
-  ui/               # Inventory, HUD, GUI screens
-    item-stack.js           # Item stacks with NBT-like tags
-    inventory.js            # Multi-slot inventories
-    gui-manager.js          # Screen open/close system
-    hotbar.js               # Hotbar UI (9 slots)
-    crafting-grid.js        # 3×3 crafting table
-    creative-inventory.js   # Creative item browser
-    furnace-ui.js           # Furnace GUI
-    chest-ui.js             # Chest GUI
-    anvil-ui.js             # Anvil rename/repair
-    enchanting-ui.js        # Enchanting GUI
-    debug-overlay.js        # F3 debug screen
-    gui-elements.js         # DOM UI components
-    loading-screen.js       # Loading screen UI
-  game/           # Mobs and entities
-    entity.js               # Base entity class
-    entity-manager.js       # Spawn/despawn/tick management
-    passive-mobs.js         # Cow, pig, sheep, chicken
-    hostile-mobs.js         # Zombie, skeleton, spider, creeper
-    boss-mobs.js            # Ender Dragon, Wither
-    mob-ai.js               # A* pathfinding, line-of-sight
-    projectiles.js          # Arrows, snowballs, ender pearls
-    animals.js              # Animal breeding logic
-    mob-spawning.js         # Spawn definitions and caps
-  game/         # Redstone logic system
-    redstone-engine.js      # Tick-based signal propagation
-    repeater-comparator.js  # Repeaters (1-4 ticks) and comparators
-    observers.js            # Observer blocks
-    tnt.js                  # TNT explosions
-    pistons.js              # Pistons and sticky pistons
-    wiring.js               # Redstone dust/wire
-  game/             # Enchantments, potions, tools
-    enchantment.js          # 24 vanilla enchantments
-    potion.js               # 18 effects, 40 potions
-    tool.js                 # 7 material tiers
   core/          # World save/load
     world-store.js          # IndexedDB chunk storage
     level-data.js           # Spawn, mode, time, player data
