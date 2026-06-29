@@ -233,7 +233,7 @@
                         // Use noise for organic shape variation — blocks near the edge
                         // have a probability of inclusion based on their distance from center.
                         var dist = Math.sqrt(distSq);
-                        var noiseVal = Donkeycraft.PerlinNoise ? Donkeycraft.PerlinNoise.noise2D(
+                        var noiseVal = Donkeycraft._gen ? Donkeycraft._gen._noise2D(
                             (bx + veinIndex * 100) * 0.3, (bz + veinIndex * 200) * 0.3
                         ) : 0;
 

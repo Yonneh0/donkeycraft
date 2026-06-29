@@ -1,36 +1,48 @@
 // Donkeycraft — Block Textures
-// Glass, ice, bricks, ores, metal blocks, and related block textures.
+// Glass, ice, bricks, ores, metal blocks, deepslate family, and quartz variants.
+// Provides procedural textures for all non-terrain blocks using the shared TextureGenerator infrastructure.
 (function() {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
     var _gen = Donkeycraft._gen;
 
-    // Cache noise utilities locally.
-    var _shufflePerm = _gen._shufflePerm;
-    var _noise2D = _gen._noise2D;
-    var _fbm = _gen._fbm;
-    var _seedRng = _gen._seedRng;
-    var _rng = _gen._rng;
+    // Cache noise utilities locally — guard against null if _gen is not yet initialized.
+    var _shufflePerm = (_gen && _gen._shufflePerm) ? _gen._shufflePerm : null;
+    var _noise2D = (_gen && _gen._noise2D) ? _gen._noise2D : null;
+    var _fbm = (_gen && _gen._fbm) ? _gen._fbm : null;
+    var _seedRng = (_gen && _gen._seedRng) ? _gen._seedRng : null;
+    var _rng = (_gen && _gen._rng) ? _gen._rng : null;
 
     // Import shared infrastructure from texture-core.js.
     var _textureCache = Donkeycraft.TextureGenerator._textureCache;
-    var _createCanvas = Donkeycraft.TextureGenerator._createCanvas;
-    var _cacheTexture = Donkeycraft.TextureGenerator._cacheTexture;
-    var _canvasToImage = Donkeycraft.TextureGenerator._canvasToImage;
-    var TEX_SIZE = 16;
-
-    // ---- Glass / Ice ----
+    var _createCanvas = Donkeycraft.TextureGenerator._createCanvas || null;
+    var _cacheTexture = Donkeycraft.TextureGenerator._cacheTexture || null;
+    var _canvasToImage = Donkeycraft.TextureGenerator._canvasToImage || null;
 
     /**
-     * Generate a glass texture (transparent with border).
-     * @param {number} r
-     * @param {number} g
-     * @param {number} b
-     * @returns {HTMLImageElement}
+     * Standard texture atlas cell size in pixels.
+     * All generated textures are exactly 16×16 pixels.
+     * @type {number}
+     */
+    var TEX_SIZE = 16;
+
+    // ============================================================
+    // Glass / Ice — transparent and translucent block textures
+    // ============================================================
+
+    /**
+     * Generate a glass texture with transparency and edge highlights.
+     * Creates a semi-transparent surface with brighter borders to simulate glass edges.
+     * @param {number} r - Base red value (0–255).
+     * @param {number} g - Base green value (0–255).
+     * @param {number} b - Base blue value (0–255).
+     * @returns {HTMLImageElement|null} Generated 16×16 glass texture, or null on failure.
      */
     function generateGlass(r, g, b) {
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
@@ -52,20 +64,27 @@
 
     /**
      * Generate an ice texture with seeded noise variation.
-     * @returns {HTMLImageElement}
+     * Produces a light blue translucent surface with subtle grain.
+     * @returns {HTMLImageElement|null} Generated 16×16 ice texture, or null on failure.
      */
     function generateIce() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = (_rng() - 0.5) * 15;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 180 + n;
-                imgData.data[idx + 1] = 210 + n;
-                imgData.data[idx + 2] = 240 + n;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 180 + n));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 210 + n));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 240 + n));
                 imgData.data[idx + 3] = 160;
             }
         }
@@ -74,21 +93,28 @@
     }
 
     /**
-     * Generate a blue ice texture (more opaque, deeper blue) with seeded noise.
-     * @returns {HTMLImageElement}
+     * Generate a blue ice texture — more opaque with deeper blue tones.
+     * Used for packed/blue ice variants in Minecraft.
+     * @returns {HTMLImageElement|null} Generated 16×16 blue ice texture, or null on failure.
      */
     function generateBlueIce() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = (_rng() - 0.5) * 8;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 100 + n;
-                imgData.data[idx + 1] = 160 + n;
-                imgData.data[idx + 2] = 230 + n;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 100 + n));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 160 + n));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 230 + n));
                 imgData.data[idx + 3] = 230;
             }
         }
@@ -96,18 +122,27 @@
         return _canvasToImage(canvas);
     }
 
-    // ---- Bricks ----
+    // ============================================================
+    // Bricks — patterned brick textures with mortar lines
+    // ============================================================
 
     /**
-     * Generate a brick texture with seeded color variation.
-     * @param {number} r - Brick red.
-     * @param {number} g - Brick green.
-     * @param {number} b - Brick blue.
-     * @returns {HTMLImageElement}
+     * Generate a brick texture with seeded color variation and mortar pattern.
+     * Creates a classic running bond pattern with gray mortar lines and individually shaded bricks.
+     * @param {number} r - Base red value for brick (0–255).
+     * @param {number} g - Base green value for brick (0–255).
+     * @param {number} b - Base blue value for brick (0–255).
+     * @returns {HTMLImageElement|null} Generated 16×16 brick texture, or null on failure.
      */
     function generateBricks(r, g, b) {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(r + g + b);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#999999';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -128,18 +163,28 @@
         return _canvasToImage(canvas);
     }
 
-    // ---- Ore ----
+    // ============================================================
+    // Ores — ore veins embedded in stone/netherrack base
+    // ============================================================
 
     /**
-     * Generate an ore texture (ore veins embedded in stone).
-     * @param {number} oreR - Ore color red.
-     * @param {number} oreG - Ore color green.
-     * @param {number} oreB - Ore color blue.
-     * @returns {HTMLImageElement}
+     * Generate an ore texture with ore veins embedded in a stone background.
+     * Creates a stone base using FBM noise, then overlays ore-colored pixel clusters at fixed positions
+     * with probabilistic edge variation for natural-looking ore distribution.
+     * @param {number} oreR - Ore color red component (0–255).
+     * @param {number} oreG - Ore color green component (0–255).
+     * @param {number} oreB - Ore color blue component (0–255).
+     * @returns {HTMLImageElement|null} Generated 16×16 ore texture, or null on failure.
      */
     function generateOre(oreR, oreG, oreB) {
+        if (!_shufflePerm || !_fbm || !_seedRng || !_rng) {
+            return null;
+        }
+
         _shufflePerm(7777);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
@@ -147,17 +192,20 @@
                 var n = _fbm(x * 0.15, y * 0.15, 4, 1.0, 1.0);
                 var base = 120 + n * 30;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = base;
-                imgData.data[idx + 1] = base;
-                imgData.data[idx + 2] = base + 5;
+                imgData.data[idx]     = Math.max(0, Math.min(255, base));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, base));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, base + 5));
                 imgData.data[idx + 3] = 255;
             }
         }
         ctx.putImageData(imgData, 0, 0);
+
+        // Fixed ore cluster positions for consistent texture appearance
         var orePositions = [
             { x: 4, y: 3 }, { x: 10, y: 5 }, { x: 6, y: 10 },
             { x: 12, y: 12 }, { x: 3, y: 13 }
         ];
+
         _seedRng(oreR + oreG + oreB);
         for (var i = 0; i < orePositions.length; i++) {
             var pos = orePositions[i];
@@ -175,24 +223,35 @@
         return _canvasToImage(canvas);
     }
 
-    // Ore aliases.
+    /** Ore texture — dark gray coal veins in stone. @returns {HTMLImageElement|null} */
     function generateCoalOre()       { return generateOre(30, 30, 30); }
+    /** Ore texture — light brown iron veins in stone. @returns {HTMLImageElement|null} */
     function generateIronOre()       { return generateOre(210, 180, 150); }
+    /** Ore texture — yellow gold veins in stone. @returns {HTMLImageElement|null} */
     function generateGoldOre()       { return generateOre(237, 201, 36); }
+    /** Ore texture — cyan diamond veins in stone. @returns {HTMLImageElement|null} */
     function generateDiamondOre()    { return generateOre(80, 220, 230); }
+    /** Ore texture — green emerald veins in stone. @returns {HTMLImageElement|null} */
     function generateEmeraldOre()    { return generateOre(40, 220, 80); }
+    /** Ore texture — red redstone veins in stone. @returns {HTMLImageElement|null} */
     function generateRedstoneOre()   { return generateOre(180, 20, 20); }
+    /** Ore texture — blue lapis veins in stone. @returns {HTMLImageElement|null} */
     function generateLapisOre()      { return generateOre(30, 60, 180); }
 
     /**
-     * Generate a lit redstone ore texture (glowing red).
-     * @returns {HTMLImageElement}
+     * Generate a lit redstone ore texture — glowing red ore in stone.
+     * Uses the stone generator as a base, then overlays a bright red glow.
+     * @returns {HTMLImageElement|null} Generated 16×16 lit redstone ore texture, or null on failure.
      */
     function generateLitRedstoneOre() {
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var stoneImg = Donkeycraft.TextureGenerator.generateStone(1234);
-        ctx.drawImage(stoneImg, 0, 0);
+        if (stoneImg) {
+            ctx.drawImage(stoneImg, 0, 0);
+        }
         ctx.fillStyle = '#FF2200';
         ctx.fillRect(5, 5, 6, 6);
         ctx.fillStyle = '#FF6644';
@@ -201,25 +260,32 @@
     }
 
     /**
-     * Generate a nether quartz ore texture.
-     * @returns {HTMLImageElement}
+     * Generate a nether quartz ore texture — cream-colored veins in netherrack base.
+     * @returns {HTMLImageElement|null} Generated 16×16 nether quartz ore texture, or null on failure.
      */
     function generateNetherQuartzOre() {
+        if (!_shufflePerm || !_fbm || !_seedRng || !_rng) {
+            return null;
+        }
+
         _shufflePerm(4444);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 140 + n * 40;
-                imgData.data[idx + 1] = 60 + n * 25;
-                imgData.data[idx + 2] = 60 + n * 20;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 140 + n * 40));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 60 + n * 25));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 60 + n * 20));
                 imgData.data[idx + 3] = 255;
             }
         }
         ctx.putImageData(imgData, 0, 0);
+
         var quartzPositions = [{ x: 5, y: 4 }, { x: 11, y: 8 }, { x: 7, y: 12 }];
         for (var i = 0; i < quartzPositions.length; i++) {
             ctx.fillStyle = '#E8D8C0';
@@ -229,25 +295,32 @@
     }
 
     /**
-     * Generate a nether gold ore texture.
-     * @returns {HTMLImageElement}
+     * Generate a nether gold ore texture — gold-colored veins in netherrack base.
+     * @returns {HTMLImageElement|null} Generated 16×16 nether gold ore texture, or null on failure.
      */
     function generateNetherGoldOre() {
+        if (!_shufflePerm || !_fbm || !_seedRng || !_rng) {
+            return null;
+        }
+
         _shufflePerm(4444);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = _fbm(x * 0.15, y * 0.15, 3, 1.0, 1.0);
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 140 + n * 40;
-                imgData.data[idx + 1] = 60 + n * 25;
-                imgData.data[idx + 2] = 60 + n * 20;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 140 + n * 40));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 60 + n * 25));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 60 + n * 20));
                 imgData.data[idx + 3] = 255;
             }
         }
         ctx.putImageData(imgData, 0, 0);
+
         var goldPositions = [{ x: 4, y: 5 }, { x: 10, y: 10 }, { x: 8, y: 3 }];
         for (var i = 0; i < goldPositions.length; i++) {
             ctx.fillStyle = '#DDAA33';
@@ -256,15 +329,23 @@
         return _canvasToImage(canvas);
     }
 
-    // ---- Metal blocks ----
+    // ============================================================
+    // Metal Blocks — solid ingot/block textures with sparkle
+    // ============================================================
 
     /**
-     * Generate a gold block texture (shiny yellow) with seeded noise.
-     * @returns {HTMLImageElement}
+     * Generate a gold block texture — shiny yellow with subtle noise and specular highlights.
+     * @returns {HTMLImageElement|null} Generated 16×16 gold block texture, or null on failure.
      */
     function generateGoldBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
@@ -272,9 +353,9 @@
                 var n = (_rng() - 0.5) * 12;
                 var highlight = ((x + y) % 4 === 0) ? 15 : 0;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = Math.min(255, 237 + n + highlight);
-                imgData.data[idx + 1] = Math.min(255, 201 + n + highlight);
-                imgData.data[idx + 2] = 36 + n;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 237 + n + highlight));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 201 + n + highlight));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 36 + n));
                 imgData.data[idx + 3] = 255;
             }
         }
@@ -283,11 +364,17 @@
     }
 
     /**
-     * Generate an iron block texture.
-     * @returns {HTMLImageElement}
+     * Generate an iron block texture — light gray with grid pattern and noise overlay.
+     * @returns {HTMLImageElement|null} Generated 16×16 iron block texture, or null on failure.
      */
     function generateIronBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#D4C4A8';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -297,25 +384,32 @@
         ctx.strokeRect(8.5, 0.5, 7, 7);
         ctx.strokeRect(0.5, 8.5, 7, 7);
         ctx.strokeRect(8.5, 8.5, 7, 7);
+
         _seedRng(42);
         var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
         for (var i = 0; i < imgData.data.length; i += 4) {
             var n = (_rng() - 0.5) * 8;
-            imgData.data[i]     += n;
-            imgData.data[i + 1] += n;
-            imgData.data[i + 2] += n;
+            imgData.data[i]     = Math.max(0, Math.min(255, imgData.data[i] + n));
+            imgData.data[i + 1] = Math.max(0, Math.min(255, imgData.data[i + 1] + n));
+            imgData.data[i + 2] = Math.max(0, Math.min(255, imgData.data[i + 2] + n));
         }
         ctx.putImageData(imgData, 0, 0);
         return _canvasToImage(canvas);
     }
 
     /**
-     * Generate a diamond block texture (cyan with sparkle) using seeded noise.
-     * @returns {HTMLImageElement}
+     * Generate a diamond block texture — cyan with random sparkle highlights.
+     * @returns {HTMLImageElement|null} Generated 16×16 diamond block texture, or null on failure.
      */
     function generateDiamondBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#55DDDD';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -327,12 +421,18 @@
     }
 
     /**
-     * Generate a redstone block texture with seeded specks.
-     * @returns {HTMLImageElement}
+     * Generate a redstone block texture — dark red with subtle darker specks.
+     * @returns {HTMLImageElement|null} Generated 16×16 redstone block texture, or null on failure.
      */
     function generateRedstoneBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#AA2222';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -344,12 +444,18 @@
     }
 
     /**
-     * Generate a lapis block texture with seeded blue specks.
-     * @returns {HTMLImageElement}
+     * Generate a lapis block texture — deep blue with subtle lighter specks.
+     * @returns {HTMLImageElement|null} Generated 16×16 lapis block texture, or null on failure.
      */
     function generateLapisBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#3355AA';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -361,12 +467,18 @@
     }
 
     /**
-     * Generate an emerald block texture with seeded green specks.
-     * @returns {HTMLImageElement}
+     * Generate an emerald block texture — vibrant green with lighter specks.
+     * @returns {HTMLImageElement|null} Generated 16×16 emerald block texture, or null on failure.
      */
     function generateEmeraldBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#33BB55';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -378,12 +490,18 @@
     }
 
     /**
-     * Generate a coal block texture with seeded sparkle.
-     * @returns {HTMLImageElement}
+     * Generate a coal block texture — dark gray with subtle lighter specks.
+     * @returns {HTMLImageElement|null} Generated 16×16 coal block texture, or null on failure.
      */
     function generateCoalBlock() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#333333';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -394,15 +512,23 @@
         return _canvasToImage(canvas);
     }
 
-    // ---- Quartz variants ----
+    // ============================================================
+    // Quartz Variants — white/yellowish quartz blocks and pillars
+    // ============================================================
 
     /**
-     * Generate a quartz pillar texture (horizontal stripes) with seeded noise.
-     * @returns {HTMLImageElement}
+     * Generate a quartz pillar texture — horizontal stripes with subtle noise overlay.
+     * @returns {HTMLImageElement|null} Generated 16×16 quartz pillar texture, or null on failure.
      */
     function generateQuartzPillar() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(777);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         for (var y = 0; y < TEX_SIZE; y++) {
             var isStripe = y % 4 < 2;
@@ -412,20 +538,22 @@
         var imgData = ctx.getImageData(0, 0, TEX_SIZE, TEX_SIZE);
         for (var i = 0; i < imgData.data.length; i += 4) {
             var n = (_rng() - 0.5) * 8;
-            imgData.data[i]     += n;
-            imgData.data[i + 1] += n;
-            imgData.data[i + 2] += n;
+            imgData.data[i]     = Math.max(0, Math.min(255, imgData.data[i] + n));
+            imgData.data[i + 1] = Math.max(0, Math.min(255, imgData.data[i + 1] + n));
+            imgData.data[i + 2] = Math.max(0, Math.min(255, imgData.data[i + 2] + n));
         }
         ctx.putImageData(imgData, 0, 0);
         return _canvasToImage(canvas);
     }
 
     /**
-     * Generate a quartz block texture.
-     * @returns {HTMLImageElement}
+     * Generate a plain quartz block texture — cream color with horizontal seam.
+     * @returns {HTMLImageElement|null} Generated 16×16 quartz block texture, or null on failure.
      */
     function generateQuartzBlock() {
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#E8DCC8';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -438,11 +566,13 @@
     }
 
     /**
-     * Generate a chiseled quartz block texture.
-     * @returns {HTMLImageElement}
+     * Generate a chiseled quartz block texture — plain quartz with vertical seam.
+     * @returns {HTMLImageElement|null} Generated 16×16 chiseled quartz texture, or null on failure.
      */
     function generateChiseledQuartz() {
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#E8DCC8';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -455,11 +585,13 @@
     }
 
     /**
-     * Generate a quartz brick texture.
-     * @returns {HTMLImageElement}
+     * Generate a quartz brick texture — cream base with small brick pattern.
+     * @returns {HTMLImageElement|null} Generated 16×16 quartz bricks texture, or null on failure.
      */
     function generateQuartzBricks() {
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         ctx.fillStyle = '#E8DCC8';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
@@ -474,24 +606,32 @@
         return _canvasToImage(canvas);
     }
 
-    // ---- Deepslate family ----
+    // ============================================================
+    // Deepslate Family — polished and cobbled deepslate variants
+    // ============================================================
 
     /**
-     * Generate a deepslate texture with seeded noise variation.
-     * @returns {HTMLImageElement}
+     * Generate a deepslate texture — dark gray-blue with noise variation.
+     * @returns {HTMLImageElement|null} Generated 16×16 deepslate texture, or null on failure.
      */
     function generateDeepslate() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = (_rng() - 0.5) * 15;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 70 + n;
-                imgData.data[idx + 1] = 80 + n;
-                imgData.data[idx + 2] = 90 + n;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 70 + n));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 80 + n));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 90 + n));
                 imgData.data[idx + 3] = 255;
             }
         }
@@ -500,12 +640,18 @@
     }
 
     /**
-     * Generate a cobbled deepslate texture with seeded stone shades.
-     * @returns {HTMLImageElement}
+     * Generate a cobbled deepslate texture — dark cobblestone pattern with seeded stone shades.
+     * @returns {HTMLImageElement|null} Generated 16×16 cobbled deepslate texture, or null on failure.
      */
     function generateCobbledDeepslate() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(777);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var stones = [
             { x: 0, y: 8, w: 7, h: 8 },
@@ -523,21 +669,27 @@
     }
 
     /**
-     * Generate a polished deepslate texture with seeded noise.
-     * @returns {HTMLImageElement}
+     * Generate a polished deepslate texture — smooth dark stone with subtle noise.
+     * @returns {HTMLImageElement|null} Generated 16×16 polished deepslate texture, or null on failure.
      */
     function generatePolishedDeepslate() {
+        if (!_seedRng || !_rng) {
+            return null;
+        }
+
         _seedRng(42);
         var canvas = _createCanvas(TEX_SIZE, TEX_SIZE);
+        if (!canvas) return null;
+
         var ctx = canvas.getContext('2d');
         var imgData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
         for (var y = 0; y < TEX_SIZE; y++) {
             for (var x = 0; x < TEX_SIZE; x++) {
                 var n = (_rng() - 0.5) * 8;
                 var idx = (y * TEX_SIZE + x) * 4;
-                imgData.data[idx]     = 60 + n;
-                imgData.data[idx + 1] = 70 + n;
-                imgData.data[idx + 2] = 80 + n;
+                imgData.data[idx]     = Math.max(0, Math.min(255, 60 + n));
+                imgData.data[idx + 1] = Math.max(0, Math.min(255, 70 + n));
+                imgData.data[idx + 2] = Math.max(0, Math.min(255, 80 + n));
                 imgData.data[idx + 3] = 255;
             }
         }
@@ -545,7 +697,10 @@
         return _canvasToImage(canvas);
     }
 
-    // Export block texture generators.
+    // ============================================================
+    // Export all block texture generators on TextureGenerator
+    // ============================================================
+
     Donkeycraft.TextureGenerator.generateGlass = generateGlass;
     Donkeycraft.TextureGenerator.generateIce = generateIce;
     Donkeycraft.TextureGenerator.generateBlueIce = generateBlueIce;

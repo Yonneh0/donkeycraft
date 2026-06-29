@@ -161,19 +161,26 @@
 
         /**
          * Generate bedrock ceiling layers (top 3-5 blocks).
+         * Uses noise-based thickness variation for natural-looking ceiling.
+         * Validates all Y coordinates are within world bounds before writing.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @private
          */
         function _generateBedrockCeiling(chunk) {
             if (!chunk || !chunk.setBlock || !_bedrockId) return;
 
+            var maxCeilingY = WORLD_HEIGHT - 1;
+            if (maxCeilingY < 0) return; // World too small for ceiling
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var n = (Donkeycraft.PerlinNoise.noise2D(x * 0.15 + 100, z * 0.15 + 100) + 1) * 0.5;
                     var thickness = Math.floor(n * 3) + 3; // 3 to 5
 
-                    for (var y = 0; y < thickness && WORLD_HEIGHT - 1 - y >= 0; y++) {
-                        var ceilingY = WORLD_HEIGHT - 1 - y;
+                    for (var y = 0; y < thickness; y++) {
+                        var ceilingY = maxCeilingY - y;
+                        // Only write if Y is within valid world bounds
+                        if (ceilingY < 0) break;
                         chunk.setBlock(x, ceilingY, z, _bedrockId);
                     }
                 }
@@ -182,16 +189,20 @@
 
         /**
          * Fill the main chunk body with netherrack, leaving space for bedrock floor/ceiling.
+         * Skips areas already occupied by bedrock to avoid redundant writes.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @private
          */
         function _fillNetherrack(chunk) {
             if (!chunk || !chunk.setBlock || !_netherrackId) return;
 
-            // Floor bedrock occupies Y=0..~5, ceiling bedrock occupies Y=~WORLD_HEIGHT-5..end
-            // Fill netherrack in between, avoiding areas already occupied by bedrock
+            // Floor bedrock occupies Y=0..~5, ceiling bedrock occupies Y=~WORLD_HEIGHT-5..end.
+            // Fill netherrack in between, avoiding areas already occupied by bedrock.
+            var startY = 6;
+            var endY = WORLD_HEIGHT - 6;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var y = 6; y < WORLD_HEIGHT - 6; y++) {
+                for (var y = startY; y < endY && y >= 0 && y < WORLD_HEIGHT; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         chunk.setBlock(x, y, z, _netherrackId);
                     }
@@ -200,7 +211,9 @@
         }
 
         /**
-         * Generate lava seas at Y=31-32.
+         * Generate lava seas at Y=31-32 with noise-based variation.
+         * Places a base layer of lava at sea level plus adjacent blocks for depth.
+         * Uses Perlin noise to create subtle undulations in the lava surface.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @private
          */
@@ -211,13 +224,17 @@
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    // Place lava at sea level
-                    chunk.setBlock(x, lavaY, z, _lavaId);
-                    chunk.setBlock(x, lavaY + 1, z, _lavaId);
+                    // Place lava at sea level and one above for surface depth
+                    if (lavaY >= 0 && lavaY < WORLD_HEIGHT) {
+                        chunk.setBlock(x, lavaY, z, _lavaId);
+                    }
+                    if (lavaY + 1 >= 0 && lavaY + 1 < WORLD_HEIGHT) {
+                        chunk.setBlock(x, lavaY + 1, z, _lavaId);
+                    }
 
-                    // Add some variation
+                    // Add variation: extra layer where noise peaks
                     var variation = Donkeycraft.PerlinNoise.noise2D(x * 0.05, z * 0.05);
-                    if (variation > 0.3) {
+                    if (variation > 0.3 && lavaY - 1 >= 0 && lavaY - 1 < WORLD_HEIGHT) {
                         chunk.setBlock(x, lavaY - 1, z, _lavaId);
                     }
                 }
@@ -226,6 +243,8 @@
 
         /**
          * Generate nether features: soul sand layers, basalt columns, blackstone clusters.
+         * Uses noise-based detection to determine feature placement regions.
+         * Only replaces netherrack blocks to avoid overwriting other terrain types.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
          * @param {number} chunkX - Chunk X coordinate (for noise seeding).
          * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
@@ -239,13 +258,14 @@
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Soul sand layers (flat patches near Y=20-40)
+                    // Soul sand layers — flat patches near Y=20-40
                     if (_soulSandId) {
                         var soulSandNoise = Donkeycraft.PerlinNoise.fbm(
                             worldX * 0.03, 0, worldZ * 0.03, 3, 0.5, 2.0
                         );
                         if (soulSandNoise > 0.4) {
-                            for (var y = 18; y <= 42; y++) {
+                            for (var y = 18; y <= 42 && y < WORLD_HEIGHT; y++) {
+                                if (y < 0) continue;
                                 var block = chunk.getBlock(x, y, z);
                                 if (block === _netherrackId) {
                                     chunk.setBlock(x, y, z, _soulSandId);
@@ -254,13 +274,14 @@
                         }
                     }
 
-                    // Basalt columns (tall vertical structures)
+                    // Basalt columns — tall vertical structures near Y=40-70
                     if (_basaltId) {
                         var basaltNoise = Donkeycraft.PerlinNoise.fbm(
                             worldX * 0.02 + 50, 0, worldZ * 0.02 + 50, 2, 0.6, 2.0
                         );
                         if (basaltNoise > 0.5) {
-                            for (var y2 = 40; y2 <= 70; y2++) {
+                            for (var y2 = 40; y2 <= 70 && y2 < WORLD_HEIGHT; y2++) {
+                                if (y2 < 0) continue;
                                 var bBlock = chunk.getBlock(x, y2, z);
                                 if (bBlock === _netherrackId) {
                                     chunk.setBlock(x, y2, z, _basaltId);
@@ -269,20 +290,23 @@
                         }
                     }
 
-                    // Blackstone clusters
+                    // Blackstone clusters — small random aggregations near Y=50
                     if (_blackstoneId) {
                         var blackstoneNoise = Donkeycraft.PerlinNoise.noise2D(
                             worldX * 0.08 + 200, worldZ * 0.08 + 200
                         );
                         if (blackstoneNoise > 0.6) {
                             var clusterSize = 2 + Math.floor(Math.random() * 3);
+                            var halfCluster = Math.floor(clusterSize / 2);
                             for (var cdx = 0; cdx < clusterSize; cdx++) {
                                 for (var cdy = 0; cdy < clusterSize; cdy++) {
                                     for (var cdz = 0; cdz < clusterSize; cdz++) {
-                                        var nbx = x + cdx - Math.floor(clusterSize / 2);
-                                        var nby = 50 + cdy - Math.floor(clusterSize / 2);
-                                        var nbz = z + cdz - Math.floor(clusterSize / 2);
-                                        if (nbx >= 0 && nbx < CHUNK_SIZE && nby > 5 && nby < WORLD_HEIGHT - 5 && nbz >= 0 && nbz < CHUNK_SIZE) {
+                                        var nbx = x + cdx - halfCluster;
+                                        var nby = 50 + cdy - halfCluster;
+                                        var nbz = z + cdz - halfCluster;
+                                        if (nbx >= 0 && nbx < CHUNK_SIZE &&
+                                            nby >= 0 && nby < WORLD_HEIGHT &&
+                                            nbz >= 0 && nbz < CHUNK_SIZE) {
                                             if (chunk.getBlock(nbx, nby, nbz) === _netherrackId) {
                                                 chunk.setBlock(nbx, nby, nbz, _blackstoneId);
                                             }
@@ -297,17 +321,19 @@
         }
 
         /**
-         * Generate ore veins in the nether.
+         * Generate ore veins in the nether using noise-based placement on netherrack blocks.
+         * Each ore type has its own noise threshold and rarity for varied distribution.
+         * Ancient debris is restricted to Y=8-22 as per vanilla nether mining patterns.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+         * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
          * @private
          */
         function _generateOreVeins(chunk, chunkX, chunkZ) {
             if (!chunk || !chunk.setBlock || !_netherrackId) return;
 
             for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var y = 5; y < WORLD_HEIGHT - 5; y++) {
+                for (var y = 5; y < WORLD_HEIGHT - 5 && y >= 0; y++) {
                     for (var z = 0; z < CHUNK_SIZE; z++) {
                         var block = chunk.getBlock(x, y, z);
                         if (block !== _netherrackId) continue;
@@ -316,7 +342,7 @@
                         var worldY = y;
                         var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                        // Nether quartz ore
+                        // Nether quartz ore — moderate frequency, distributed everywhere
                         if (_quartzOreId) {
                             var quartzNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.1 + 300, worldZ * 0.1 + 300
@@ -326,7 +352,7 @@
                             }
                         }
 
-                        // Nether gold ore
+                        // Nether gold ore — slightly rarer, uses Y-based noise for depth variation
                         if (_netherGoldOreId) {
                             var goldNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.12 + 400, worldY * 0.1 + 400
@@ -336,7 +362,7 @@
                             }
                         }
 
-                        // Gilded blackstone
+                        // Gilded blackstone — rare, distributed in clusters via X/Z noise
                         if (_gildedBlackstoneId) {
                             var gildedNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.09 + 500, worldZ * 0.09 + 500
@@ -346,7 +372,7 @@
                             }
                         }
 
-                        // Magma blocks (rare)
+                        // Magma blocks — very rare, scattered throughout the dimension
                         if (_magmaBlockId) {
                             var magmaNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.06 + 600, worldY * 0.06 + 600
@@ -356,7 +382,7 @@
                             }
                         }
 
-                        // Ancient debris (extremely rare, Y=8-22)
+                        // Ancient debris — extremely rare, restricted to Y=8-22
                         if (_ancientDebrisId && y >= 8 && y <= 22) {
                             var debrisNoise = Donkeycraft.PerlinNoise.noise2D(
                                 worldX * 0.04 + 700, worldZ * 0.04 + 700
@@ -371,10 +397,11 @@
         }
 
         /**
-         * Generate a heightmap for the nether (simplified — mostly flat).
+         * Generate a heightmap for the nether (simplified — mostly flat terrain).
+         * Uses fbm noise with low frequency to create gentle rolling terrain typical of the nether.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
-         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
+         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE, where each entry is the surface Y level.
          */
         function generateNetherHeightmap(chunkX, chunkZ) {
             var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -397,9 +424,10 @@
         }
 
         /**
-         * Check if a Y level is lava sea level.
-         * @param {number} y - Y coordinate.
-         * @returns {boolean}
+         * Check if a Y level corresponds to the nether lava sea level.
+         * The nether lava sea spans Y=31 and Y=32.
+         * @param {number} y - Y coordinate to check.
+         * @returns {boolean} True if y is 31 or 32.
          */
         function isLavaSeaLevel(y) {
             return y === 31 || y === 32;

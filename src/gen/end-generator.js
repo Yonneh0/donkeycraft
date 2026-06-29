@@ -163,9 +163,12 @@
 
         /**
          * Generate End midlands terrain (moderate islands).
+         * Creates 2-8 block tall islands using fbm noise for shape and height variation.
+         * Chorus plants and flowers have a small chance to spawn on top of end stone columns.
+         * All block positions are validated against world bounds before writing.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+         * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
          * @private
          */
         function _generateMidlands(chunk, chunkX, chunkZ) {
@@ -190,6 +193,8 @@
 
                         for (var y = 0; y < height; y++) {
                             var blockY = islandY + y;
+                            // Skip if block would be above world height
+                            if (blockY >= WORLD_HEIGHT) continue;
 
                             if (y === height - 1 && Math.random() < 0.08 && _chorusPlantId) {
                                 chunk.setBlock(x, blockY, z, _chorusPlantId);
@@ -198,8 +203,12 @@
                             }
                         }
 
+                        // Chorus flower on top (only if within bounds)
                         if (Math.random() < 0.12 && _chorusFlowerId) {
-                            chunk.setBlock(x, islandY + height, z, _chorusFlowerId);
+                            var flowerY = islandY + height;
+                            if (flowerY >= 0 && flowerY < WORLD_HEIGHT) {
+                                chunk.setBlock(x, flowerY, z, _chorusFlowerId);
+                            }
                         }
                     }
                 }
@@ -208,9 +217,12 @@
 
         /**
          * Generate End highlands terrain (large elevated islands).
+         * Creates 4-14 block tall islands using fbm noise for height variation.
+         * Chorus plants have a 20% chance to spawn on top of end stone columns.
+         * All block positions are validated against world bounds before writing.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+         * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
          * @private
          */
         function _generateHighlands(chunk, chunkX, chunkZ) {
@@ -234,43 +246,18 @@
                         var height = Math.floor((heightNoise + 1) * 5 + 4); // 4-14 blocks tall
 
                         for (var y = 0; y < height; y++) {
-                            chunk.setBlock(x, baseY + y, z, _endStoneId);
+                            var blockY = baseY + y;
+                            if (blockY >= 0 && blockY < WORLD_HEIGHT) {
+                                chunk.setBlock(x, blockY, z, _endStoneId);
+                            }
                         }
 
+                        // Chorus plant on top (only if within bounds)
                         if (Math.random() < 0.2 && _chorusPlantId) {
-                            chunk.setBlock(x, baseY + height, z, _chorusPlantId);
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
-         * Generate Outer End terrain (sparse small islands).
-         * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
-         * @private
-         */
-        function _generateOuterEnd(chunk, chunkX, chunkZ) {
-            if (!chunk || !chunk.setBlock || !_endStoneId) return;
-
-            var baseY = 45;
-
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var worldX = chunkX * CHUNK_SIZE + x;
-                    var worldZ = chunkZ * CHUNK_SIZE + z;
-
-                    var noise = Donkeycraft.PerlinNoise.noise2D(
-                        worldX * 0.15 + 200, worldZ * 0.15 + 200
-                    );
-
-                    if (noise > 0.4) {
-                        var height = Math.floor((noise - 0.4) * 4 + 1); // 1-3 blocks tall
-
-                        for (var y = 0; y < height; y++) {
-                            chunk.setBlock(x, baseY + y, z, _endStoneId);
+                            var plantY = baseY + height;
+                            if (plantY >= 0 && plantY < WORLD_HEIGHT) {
+                                chunk.setBlock(x, plantY, z, _chorusPlantId);
+                            }
                         }
                     }
                 }
@@ -279,9 +266,12 @@
 
         /**
          * Generate an End City structure within a chunk.
+         * Creates a hollow tower with purpur blocks, corner pillars, and shroomlight decoration.
+         * Validates all block positions against world bounds to prevent out-of-range writes.
+         * End cities are rare — ~5% chance per highlands chunk based on noise threshold.
          * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+         * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
          * @private
          */
         function _generateEndCity(chunk, chunkX, chunkZ) {
@@ -303,24 +293,29 @@
             var towerHeight = 8 + Math.floor(Math.random() * 6); // 8-13 blocks tall
 
             for (var y = 0; y < towerHeight; y++) {
+                var by = baseY + y;
+                // Skip if tower extends beyond world height
+                if (by >= WORLD_HEIGHT - 5) break;
+
                 // Tower walls (3x3 with hollow center)
                 for (var tx = -1; tx <= 1; tx++) {
                     for (var tz = -1; tz <= 1; tz++) {
                         if (Math.abs(tx) === 1 || Math.abs(tz) === 1) {
                             var bx = cx + tx;
-                            var by = baseY + y;
                             var bz = cz + tz;
 
-                            if (bx >= 0 && bx < CHUNK_SIZE && by > 5 && by < WORLD_HEIGHT - 5 && bz >= 0 && bz < CHUNK_SIZE) {
+                            if (bx >= 0 && bx < CHUNK_SIZE &&
+                                by > 5 && by < WORLD_HEIGHT - 5 &&
+                                bz >= 0 && bz < CHUNK_SIZE) {
                                 chunk.setBlock(bx, by, bz, _purpurBlockId);
                             }
                         }
                     }
                 }
 
-                // Floor
+                // Floor (skip top block — it's the roof)
                 if (y < towerHeight - 1) {
-                    chunk.setBlock(cx, baseY + y, cz, _purpurBlockId);
+                    chunk.setBlock(cx, by, cz, _purpurBlockId);
                 }
             }
 
@@ -332,25 +327,70 @@
                 var ph = pillarHeights[p];
 
                 for (var py = 0; py < ph; py++) {
-                    if (px >= 0 && px < CHUNK_SIZE && pz >= 0 && pz < CHUNK_SIZE) {
+                    var pillarY = baseY + towerHeight + py;
+                    if (px >= 0 && px < CHUNK_SIZE && pz >= 0 && pz < CHUNK_SIZE && pillarY < WORLD_HEIGHT - 5) {
                         var blockId = _purpurBlockId;
                         if (_purpurPillarId) blockId = _purpurPillarId;
-                        chunk.setBlock(px, baseY + towerHeight + py, pz, blockId);
+                        chunk.setBlock(px, pillarY, pz, blockId);
                     }
                 }
             }
 
             // Add shroomlights for decoration
             if (Math.random() < 0.5 && _shroomlightId) {
-                chunk.setBlock(cx + 3, baseY + 2, cz + 3, _shroomlightId);
+                var slX = cx + 3;
+                var slY = baseY + 2;
+                var slZ = cz + 3;
+                if (slX >= 0 && slX < CHUNK_SIZE && slY > 5 && slY < WORLD_HEIGHT - 5 && slZ >= 0 && slZ < CHUNK_SIZE) {
+                    chunk.setBlock(slX, slY, slZ, _shroomlightId);
+                }
             }
         }
 
         /**
-         * Generate a heightmap for the End dimension.
+         * Generate Outer End terrain (sparse small islands).
+         * Creates 1-3 block tall islands with noise-based placement.
+         * Islands are rare in the outer End — only chunks with noise > 0.4 generate terrain.
+         * All block positions are validated against world bounds before writing.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to fill.
+         * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+         * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
+         * @private
+         */
+        function _generateOuterEnd(chunk, chunkX, chunkZ) {
+            if (!chunk || !chunk.setBlock || !_endStoneId) return;
+
+            var baseY = 45;
+
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                    var noise = Donkeycraft.PerlinNoise.noise2D(
+                        worldX * 0.15 + 200, worldZ * 0.15 + 200
+                    );
+
+                    if (noise > 0.4) {
+                        var height = Math.floor((noise - 0.4) * 4 + 1); // 1-3 blocks tall
+
+                        for (var y = 0; y < height; y++) {
+                            var blockY = baseY + y;
+                            if (blockY >= 0 && blockY < WORLD_HEIGHT) {
+                                chunk.setBlock(x, blockY, z, _endStoneId);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Generate a heightmap for the End dimension based on island type and noise variation.
+         * Returns 0 for void chunks (inner islands) and the surface Y level for island chunks.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
-         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
+         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE, where each entry is the surface Y level or 0 for void.
          */
         function generateEndHeightmap(chunkX, chunkZ) {
             var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
@@ -388,10 +428,12 @@
         }
 
         /**
-         * Check if a chunk position is on an island.
+         * Check if a chunk position falls on a valid End island (non-void area).
+         * Inner islands (distance 0-2 from center) return false; all others may return true
+         * depending on noise-based island type classification.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
-         * @returns {boolean}
+         * @returns {boolean} True if the position is on a valid island chunk.
          */
         function isIslandChunk(chunkX, chunkZ) {
             var type = _getIslandType(chunkX, chunkZ);
@@ -400,8 +442,8 @@
 
         /**
          * Get the base Y level for a given island type.
-         * @param {string} islandType - Island type string.
-         * @returns {number} Base Y level.
+         * @param {string} islandType - Island type string ('highlands', 'outer', 'midlands').
+         * @returns {number} Base Y level for the island type.
          */
         function getBaseYForIslandType(islandType) {
             switch (islandType) {
@@ -409,14 +451,6 @@
                 case 'outer': return 45;
                 default: return 49; // midlands
             }
-        }
-
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The EndGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.EndGenerator;
         }
 
         /**
@@ -435,6 +469,7 @@
 
         /**
          * Destroy and free resources.
+         * Clears all cached block IDs and chunk manager reference.
          */
         function destroy() {
             _chunkManager = null;
@@ -444,6 +479,14 @@
             _purpurBlockId = 0;
             _purpurPillarId = 0;
             _shroomlightId = 0;
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The EndGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.EndGenerator;
         }
 
         return {

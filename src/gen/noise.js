@@ -15,10 +15,12 @@
     /**
      * Ensure the canonical PerlinNoise is initialized before any generator runs.
      * Checks the _isInitialized() flag set by PerlinNoise.init() in math-utils.js.
+     * If not initialized, initializes with the seed from Config or defaults to 42.
      * @private
      */
     function _ensureNoiseInit() {
-        if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
+        if (!Donkeycraft.PerlinNoise) return;
+        if (Donkeycraft.PerlinNoise.init) {
             var isInit = false;
             // Check via the public getter method first, then fallback to direct property
             if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
@@ -75,12 +77,14 @@
     /**
      * Generate the next deterministic pseudo-random number in [0, 1)
      * using the Mulberry32 algorithm for a given namespace.
-     * @param {string} namespace - Unique identifier.
+     * Each generator module has its own isolated PRNG state to avoid cross-contamination.
+     * @param {string} namespace - Unique identifier (e.g., 'ore', 'cave', 'structure').
      * @returns {number} Random value in [0, 1).
      * @private
      */
     function _rng(namespace) {
         var x = _getRngState(namespace);
+        // Mulberry32 PRNG algorithm — fast, deterministic, 32-bit
         x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
         x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
         _rngStates[namespace] = (x + 1) | 0;
@@ -93,9 +97,11 @@
 
     /**
      * 2D Perlin noise — delegates to Donkeycraft.PerlinNoise.noise2D.
+     * Returns a value in [-1, 1] representing normalized noise at the given coordinates.
+     * Automatically initializes PerlinNoise if not already initialized.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
-     * @returns {number} Noise value in [-1, 1].
+     * @returns {number} Normalized noise value in [-1, 1].
      */
     function _noise2D(x, y) {
         _ensureNoiseInit();
@@ -109,29 +115,38 @@
     }
 
     /**
-     * Fractal Brownian Motion — delegates to Donkeycraft.PerlinNoise.fbm.
+     * Fractal Brownian Motion (fBm) — delegates to Donkeycraft.PerlinNoise.fbm.
+     * Sums multiple octaves of Perlin noise with decreasing amplitude and increasing frequency
+     * to produce smooth, natural-looking terrain features.
+     *
+     * The PerlinNoise.fbm signature is: (x, y, z, octaves, persistence, lacunarity).
+     * This wrapper maps our parameters correctly: amplitude → persistence, frequency → lacunarity.
+     *
      * @param {number} x - X coordinate.
-     * @param {number} y - Y coordinate (or Z for 3D noise).
-     * @param {number} octaves - Number of noise octaves to sum.
-     * @param {number} [frequency=1] - Frequency multiplier per octave (lacunarity in fbm terms).
-     * @param {number} [amplitude=1] - Amplitude multiplier per octave (persistence in fbm terms).
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate for 3D noise (defaults to 0 for 2D).
+     * @param {number} [octaves=4] - Number of noise octaves to sum. More octaves = finer detail.
+     * @param {number} [amplitude=0.5] - Persistence: amplitude multiplier per octave (how fast detail decreases).
+     * @param {number} [frequency=2.0] - Lacunarity: frequency multiplier per octave (how fast frequency increases).
      * @returns {number} Normalized result in [-1, 1].
      */
-    function _fbm(x, y, octaves, frequency, amplitude) {
+    function _fbm(x, y, z, octaves, amplitude, frequency) {
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.fbm === 'function') {
             // fbm signature: (x, y, z, octaves, persistence, lacunarity)
-            // frequency → lacunarity (how fast frequency increases per octave), amplitude → persistence (how fast amplitude decreases)
-            return Donkeycraft.PerlinNoise.fbm(x, y, 0, octaves || 4, amplitude !== undefined ? amplitude : 0.5, frequency !== undefined ? frequency : 2.0);
+            // amplitude maps to persistence (amplitude decay per octave)
+            // frequency maps to lacunarity (frequency increase per octave)
+            return Donkeycraft.PerlinNoise.fbm(x, y, z || 0, octaves || 4, amplitude !== undefined ? amplitude : 0.5, frequency !== undefined ? frequency : 2.0);
         }
-        // Fallback: simple octave accumulation
+        // Fallback: simple octave accumulation if PerlinNoise unavailable
         var total = 0;
         var maxVal = 0;
-        var freq = frequency || 1;
-        var amp = amplitude || 1;
+        var freq = frequency || 2.0;
+        var amp = amplitude !== undefined ? amplitude : 0.5;
         octaves = octaves || 4;
         for (var i = 0; i < octaves; i++) {
-            total += _noise2D(x * freq, y * freq) * amp;
+            // Use _noise2D with x, y for 2D fallback; z is ignored in fallback mode
+            total += _noise2D(x * freq, y * freq + z * 0.01) * amp;
             maxVal += amp;
             freq *= 2;
             amp *= 0.5;
@@ -169,24 +184,24 @@
         return perm;
     }
 
-    // ============================================================
-    // Centralized Hash Function — replaces duplicate _hash2D in generators
-    // ============================================================
-
     /**
-     * Simple 2D hash for deterministic randomness using FNV-1a inspired algorithm.
+     * Deterministic 2D hash using an FNV-1a inspired algorithm.
      * Centralized in noise.js to eliminate duplication across ore-generator, water-generator,
-     * and structure-generator.
-     * @param {number} x - X coordinate.
-     * @param {number} y - Y coordinate.
-     * @returns {number} Positive 32-bit integer.
+     * structure-generator, and other generation modules.
+     * Handles negative inputs correctly by masking to 32-bit signed integers first,
+     * then returning an unsigned 32-bit integer for consistent use as PRNG seeds.
+     *
+     * @param {number} x - X coordinate (may be negative).
+     * @param {number} y - Y coordinate (may be negative).
+     * @returns {number} Positive 32-bit integer in range [0, 4294967295].
      */
     function _hash2D(x, y) {
+        // Mask to 32-bit signed integers first, then convert to unsigned for the hash
         x = x | 0;
         y = y | 0;
         var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
         h = ((h >>> 13) ^ h) * 0x5bd1e995;
-        return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
+        return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit result
     }
 
     // ============================================================
@@ -196,7 +211,9 @@
     /**
      * Donkeycraft._gen — internal cross-module namespace for noise and PRNG state.
      * Delegates to the canonical PerlinNoise in math-utils.js for all noise generation.
+     * Provides a single source of truth for procedural randomness across all generators.
      * Not part of the public API. All properties are prefixed with underscore.
+     *
      * @namespace
      * @private
      */

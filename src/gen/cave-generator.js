@@ -20,7 +20,6 @@
         var _caveDensity = -0.8;
         var _caveRadius = 2.0;          // Base cave tunnel radius
         var _lavaYLevel = 10;           // Lava caves below this Y level
-        var _surfaceDepth = 5;          // Surface depth for hanging caves
 
         /**
          * Default dimension configuration for overworld-style generation.
@@ -31,30 +30,32 @@
 
         /**
          * Check if a block ID is replaceable (air, liquids, flowers, grass, etc.).
-         * Used to determine which blocks caves can carve through.
+         * Uses safe method existence checks to avoid errors if BlockRegistry methods are missing.
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block can be carved through.
          * @private
          */
         function _isReplaceable(blockId) {
-            // Air is always replaceable
             if (blockId === 0) return true;
-
-            // Check via BlockRegistry if available
             if (Donkeycraft.BlockRegistry) {
-                if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return true;
-                if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return true;
-                if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return true;
+                try {
+                    if (typeof Donkeycraft.BlockRegistry.isReplaceable === 'function' && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return true;
+                    if (typeof Donkeycraft.BlockRegistry.isTransparent === 'function' && Donkeycraft.BlockRegistry.isTransparent(blockId)) return true;
+                    if (typeof Donkeycraft.BlockRegistry.isLiquid === 'function' && Donkeycraft.BlockRegistry.isLiquid(blockId)) return true;
+                } catch (e) { /* BlockRegistry method threw — skip */ }
             }
-
             return false;
         }
 
         /**
          * Generate caves in a chunk using 3D noise.
+         * Creates main cave layers and deep lava caves based on biome type.
          * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
          * @param {number} biomeId - Biome ID for this chunk.
-         * @param {Object} [dimConfig] - Optional dimension config {minY, maxY, lavaYLevel}.
+         * @param {Object} [dimConfig] - Optional dimension configuration.
+         * @param {number} [dimConfig.minY] - Minimum Y level for cave generation. Defaults to 1.
+         * @param {number} [dimConfig.maxY] - Maximum Y level for cave generation. Defaults to WORLD_HEIGHT - 1.
+         * @param {number} [dimConfig.lavaYLevel] - Y level threshold for lava caves. Defaults to 10.
          */
         function generateCaves(chunk, biomeId, dimConfig) {
             // Input validation
@@ -245,7 +246,7 @@
         }
 
         /**
-         * Destroy and free resources.
+         * Destroy and free resources. Cleans up internal state.
          */
         function destroy() {
             // No dynamic resources to free — all state is in closure variables

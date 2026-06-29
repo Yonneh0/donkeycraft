@@ -42,27 +42,51 @@
          * Uses multi-octave Perlin noise (fbm) with biome-specific parameters.
          * @param {number} chunkX - Chunk X coordinate (in chunks).
          * @param {number} chunkZ - Chunk Z coordinate (in chunks).
-         * @param {Donkeycraft.Biome|null} [biome=null] - Biome for this chunk; defaults to plains.
+         * @param {Donkeycraft.Biome|number|string} [biome] - Biome for this chunk.
+         *   Accepts a biome object, biome ID number, or biome name string.
+         *   Defaults to plains (ID 1) if not provided or invalid.
          * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE with height values.
          */
         function generateHeightmap(chunkX, chunkZ, biome) {
             _ensureNoiseInit();
-            biome = biome || Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
+
+            // Resolve biome from ID/string if needed, or default to plains
+            var resolvedBiome = null;
+            if (biome) {
+                if (typeof biome === 'object' && biome.isOcean !== undefined) {
+                    resolvedBiome = biome;
+                } else if (Donkeycraft.BiomeRegistry) {
+                    if (typeof biome === 'number') {
+                        resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeById(biome);
+                    } else if (typeof biome === 'string') {
+                        resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
+                    }
+                }
+            }
+            biome = resolvedBiome || Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
+
+            // Validate biome has required properties after resolution.
+            // Use local variables to avoid mutating a potentially frozen BlockRegistry object.
+            var isOcean = biome.isOcean === true;
+            var isDesert = biome.isDesert === true;
+            var isExtremeHills = biome.isExtremeHills === true;
+            var hasSnow = biome.hasSnow === true;
+
             var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
 
             // Biome-specific noise parameters
             var baseHeight, heightVariation;
 
-            if (biome.isOcean) {
+            if (isOcean) {
                 baseHeight = 20;
                 heightVariation = 5;
-            } else if (biome.isDesert) {
+            } else if (isDesert) {
                 baseHeight = 60;
                 heightVariation = 10;
-            } else if (biome.isExtremeHills) {
+            } else if (isExtremeHills) {
                 baseHeight = 100;
                 heightVariation = 80;
-            } else if (biome.hasSnow) {
+            } else if (hasSnow) {
                 baseHeight = 70;
                 heightVariation = 30;
             } else {
@@ -82,12 +106,14 @@
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
                     // Base terrain height using large-scale noise via _gen wrapper
+                    // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
                     var baseNoise = Donkeycraft._gen._fbm(
                         worldX * scale, 0, worldZ * scale,
                         4, 0.5, 2.0
                     );
 
                     // Detail noise for local variation
+                    // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
                     var detailNoise = Donkeycraft._gen._fbm(
                         worldX * detailScale, 0, worldZ * detailScale,
                         3, 0.5, 2.0
@@ -102,12 +128,12 @@
                     height = Donkeycraft.clamp(Math.floor(height), 1, WORLD_HEIGHT - 10);
 
                     // Ocean biomes: lower terrain, more water
-                    if (biome.isOcean) {
+                    if (isOcean) {
                         height = Donkeycraft.clamp(height, 5, 30);
                     }
 
                     // Extreme hills: add dramatic peaks via _gen wrapper
-                    if (biome.isExtremeHills) {
+                    if (isExtremeHills) {
                         var peakBoost = Math.abs(Donkeycraft._gen._noise2D(
                             worldX * 0.008, worldZ * 0.008
                         )) * heightVariation;
@@ -140,10 +166,11 @@
          * Note: generateHeightmap already calls _ensureNoiseInit internally, so this is safe.
          * @param {number} chunkX - Chunk X coordinate.
          * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {Donkeycraft.Biome|number|string} [biome] - Optional biome for this chunk (plains if omitted).
          * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
          */
-        function generate(chunkX, chunkZ) {
-            return generateHeightmap(chunkX, chunkZ);
+        function generate(chunkX, chunkZ, biome) {
+            return generateHeightmap(chunkX, chunkZ, biome);
         }
 
         return {

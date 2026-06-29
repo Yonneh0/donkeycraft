@@ -1,5 +1,7 @@
 // Donkeycraft — Texture Generator Core Infrastructure
 // Shared cache, canvas helpers, and color definitions for all texture modules.
+// Provides the foundational texture generation primitives used by texture-terrain.js,
+// texture-blocks.js, texture-special.js, and texture-decorative.js.
 (function() {
     'use strict';
 
@@ -7,27 +9,36 @@
     var _gen = Donkeycraft._gen;
 
     // Cache noise utilities locally to avoid repeated namespace lookups.
-    var _shufflePerm = _gen._shufflePerm;
-    var _noise2D = _gen._noise2D;
-    var _fbm = _gen._fbm;
-    var _seedRng = _gen._seedRng;
-    var _rng = _gen._rng;
+    var _shufflePerm = _gen ? _gen._shufflePerm : null;
+    var _noise2D = _gen ? _gen._noise2D : null;
+    var _fbm = _gen ? _gen._fbm : null;
+    var _seedRng = _gen ? _gen._seedRng : null;
+    var _rng = _gen ? _gen._rng : null;
 
     // ============================================================
     // TextureGenerator — procedural 16×16 texture generation core
     // ============================================================
 
     /**
-     * TextureGenerator — generates 16×16 pixel textures procedurally.
+     * TextureGenerator — procedural 16×16 pixel texture generation core.
+     * All texture modules (terrain, blocks, special, decorative) extend this base.
+     * Provides shared infrastructure: canvas creation, texture caching with LRU eviction,
+     * color definitions, and utility functions for converting between canvas and Image objects.
      */
     Donkeycraft.TextureGenerator = Donkeycraft.TextureGenerator || {};
 
+    /**
+     * Standard texture atlas cell size in pixels.
+     * All generated textures are exactly TEX_SIZE × TEX_SIZE (16×16).
+     * @type {number}
+     */
     var TEX_SIZE = 16;
 
     /**
      * Internal cache for generated textures to avoid regeneration.
-     * Keys are prefixed by generator name to prevent collisions between
-     * different generators that may share the same seed value.
+     * Keys are prefixed by generator name (e.g., "stone:42", "dirt:12345") to prevent collisions
+     * between different generators that may use the same seed value.
+     * Uses LRU-style eviction when the cache exceeds MAX_CACHE_SIZE entries.
      * @type {Object.<string, HTMLImageElement>}
      * @private
      */
@@ -35,23 +46,26 @@
 
     /**
      * Ordered insertion list for LRU-style eviction tracking.
-     * Keys stored here in order they were added for reliable oldest-entry removal.
+     * Keys stored here in order they were added; oldest entries are removed first when cache is full.
+     * Initialized on first texture cache write via _cacheTexture().
      * @type {string[]|null}
      * @private
      */
     var _cacheInsertionOrder = null;
 
     /**
-     * Maximum number of textures to cache (prevents unbounded memory growth).
-     * Set to 4096 to accommodate all block variants without premature eviction.
+     * Maximum number of textures to cache before evicting oldest entries.
+     * Set to 4096 to accommodate all block variants (16 colors × ~200 blocks) without premature eviction.
+     * Uses FIFO eviction — oldest inserted entry is removed first when the limit is reached.
      * @type {number}
      * @private
      */
     var MAX_CACHE_SIZE = 4096;
 
     /**
-     * Color definitions for block families.
-     * Maps color names to RGB values used in texture generation.
+     * Standard 16-color palette mapped to RGB values.
+     * Used by wool, concrete, stained glass, beds, and other color-variant blocks.
+     * Each entry maps a named color to its {r, g, b} component values (0–255).
      * @type {Object.<string, {r: number, g: number, b: number}>}
      */
     var COLOR_MAP = {
@@ -74,13 +88,17 @@
     };
 
     /**
-     * Create an offscreen canvas of given size.
-     * @param {number} width
-     * @param {number} height
-     * @returns {HTMLCanvasElement}
+     * Create an offscreen HTMLCanvasElement of the specified dimensions.
+     * Used by all texture generators as the drawing surface before conversion to Image.
+     * @param {number} width - Canvas width in pixels.
+     * @param {number} height - Canvas height in pixels.
+     * @returns {HTMLCanvasElement} The created canvas element with a 2D context.
      * @private
      */
     function _createCanvas(width, height) {
+        if (typeof document === 'undefined') {
+            return null;
+        }
         var c = document.createElement('canvas');
         c.width = width;
         c.height = height;
@@ -89,34 +107,51 @@
 
     /**
      * Cache a generated texture by key with generator prefix to prevent collisions.
-     * Implements LRU-style eviction using insertion order tracking for reliable removal.
-     * @param {string} prefix - Generator prefix (e.g., "stone", "dirt").
-     * @param {string} key - Unique cache key within the prefix.
-     * @param {HTMLImageElement} img - Generated image.
-     * @returns {HTMLImageElement}
+     * Implements FIFO eviction using insertion order tracking — oldest entries are removed first
+     * when the cache exceeds MAX_CACHE_SIZE entries. Only caches if the key is not already present.
+     * @param {string} prefix - Generator prefix (e.g., "stone", "dirt") to namespace the cache key.
+     * @param {string} key - Unique cache key within the prefix (often a seed value).
+     * @param {HTMLImageElement} img - Generated image element to cache.
+     * @returns {HTMLImageElement} The cached image element for immediate use.
      * @private
      */
     function _cacheTexture(prefix, key, img) {
-        var fullKey = prefix + ':' + key;
-        if (!_textureCache[fullKey]) {
-            _textureCache[fullKey] = img;
-            // Initialize insertion order tracking on first use.
-            if (_cacheInsertionOrder === null) {
-                _cacheInsertionOrder = [];
-            }
-            // Evict oldest entries if cache exceeds max size (FIFO eviction).
-            if (_cacheInsertionOrder.length > MAX_CACHE_SIZE) {
-                var oldestKey = _cacheInsertionOrder.shift();
+        // Validate inputs
+        if (!img || !(img instanceof HTMLImageElement)) {
+            return null;
+        }
+
+        var fullKey = prefix + ':' + String(key);
+
+        // Skip if already cached (idempotent — prevents duplicate insertion order entries)
+        if (_textureCache[fullKey]) {
+            return _textureCache[fullKey];
+        }
+
+        // Initialize insertion order tracking on first use
+        if (_cacheInsertionOrder === null) {
+            _cacheInsertionOrder = [];
+        }
+
+        // Evict oldest entries if cache exceeds max size (FIFO eviction)
+        while (_cacheInsertionOrder.length >= MAX_CACHE_SIZE) {
+            var oldestKey = _cacheInsertionOrder.shift();
+            if (oldestKey && _textureCache[oldestKey]) {
                 delete _textureCache[oldestKey];
             }
-            _cacheInsertionOrder.push(fullKey);
         }
+
+        // Store the image and record insertion order
+        _textureCache[fullKey] = img;
+        _cacheInsertionOrder.push(fullKey);
+
         return _textureCache[fullKey];
     }
 
     /**
-     * clearTextureCache — clear the internal texture cache and insertion order tracking.
-     * Call during game reset/shutdown to free memory.
+     * Clear the internal texture cache and insertion order tracking.
+     * Call during game reset or shutdown to free memory and prevent stale textures.
+     * After calling this, all subsequent texture requests will regenerate textures.
      */
     function clearTextureCache() {
         _textureCache = {};
@@ -124,29 +159,50 @@
     }
 
     /**
-     * Convert a canvas element to an Image element via data URL.
-     * @param {HTMLCanvasElement} canvas - Source canvas.
-     * @returns {HTMLImageElement}
+     * Convert a canvas element to an HTMLImageElement via data URL encoding.
+     * Uses PNG format for lossless texture quality. Returns null if the canvas is invalid
+     * or the browser environment does not support canvas operations.
+     * @param {HTMLCanvasElement} canvas - Source canvas element to encode.
+     * @returns {HTMLImageElement|null} The converted image element, or null on failure.
      * @private
      */
     function _canvasToImage(canvas) {
-        var img = new Image();
-        img.src = canvas.toDataURL('image/png');
-        return img;
+        if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
+            return null;
+        }
+        try {
+            var img = new Image();
+            img.src = canvas.toDataURL('image/png');
+            return img;
+        } catch (e) {
+            // Tainted canvas or other toDataURL failure — return a fallback
+            if (Donkeycraft.Logger) {
+                Donkeycraft.Logger.warn('TextureGenerator', 'Canvas to Image conversion failed: ' + e.message);
+            }
+            return null;
+        }
     }
 
-    // Export shared infrastructure on the TextureGenerator object.
+    // ============================================================
+    // Export shared infrastructure on the TextureGenerator object
+    // ============================================================
+
     // _textureCache is exposed for cache-read checks (storage goes through _cacheTexture).
-    // _cacheInsertionOrder is exposed for debugging cache size: .length
     Donkeycraft.TextureGenerator._textureCache = _textureCache;
+
+    // _cacheInsertionOrder is exposed for debugging cache size: .length
     Donkeycraft.TextureGenerator._cacheInsertionOrder = _cacheInsertionOrder;
+
+    // Public utility functions for use by other texture modules
     Donkeycraft.TextureGenerator._createCanvas = _createCanvas;
     Donkeycraft.TextureGenerator._cacheTexture = _cacheTexture;
     Donkeycraft.TextureGenerator.clearTextureCache = clearTextureCache;
     Donkeycraft.TextureGenerator._canvasToImage = _canvasToImage;
+
+    // Color palette exposed for external use by texture generators
     Donkeycraft.TextureGenerator.COLOR_MAP = COLOR_MAP;
 
-    // Export TEX_SIZE constant for use by other modules.
+    // Texture size constant exposed for use by other modules
     Donkeycraft.TextureGenerator.TEX_SIZE = TEX_SIZE;
 
 })();

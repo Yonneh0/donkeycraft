@@ -57,8 +57,10 @@
         /**
          * Generate a complete chunk using the full terrain generation pipeline.
          * Pipeline order: air fill → terrain → surface layer → ores → caves → water → decoration.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to generate.
-         * @param {number} biomeId - Biome ID for this chunk.
+         * Validates all inputs and gracefully skips optional steps if generators are unavailable.
+         * @param {Donkeycraft.Chunk} chunk - The chunk to generate. Must have getBlock, setBlock, fill, and generated properties.
+         * @param {number} biomeId - Biome ID for this chunk (must be a non-negative integer).
+         * @throws {Error} If chunk object is invalid or missing required methods.
          */
         function generateChunkFull(chunk, biomeId) {
             // Step 1: Fill with air
@@ -95,8 +97,9 @@
          * Place terrain blocks (stone/bedrock below heightmap).
          * Does NOT place surface blocks — those are handled by applySurfaceLayer()
          * to avoid redundant work. Surface Y is excluded from this loop.
+         * For snow biomes, also places a thin layer of snow blocks near the surface.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array.
+         * @param {number[]} heightmap - Heightmap array with height values per column.
          * @param {number} biomeId - Biome ID (unused but kept for API consistency).
          * @private
          */
@@ -132,9 +135,10 @@
         /**
          * Place surface decoration (trees, flowers, grass, cacti).
          * Uses biome constants from Donkeycraft.BiomeID for consistent checks.
+         * Delegates to biome-specific decoration placers based on the biome's decoration config.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array.
+         * @param {number[]} heightmap - Heightmap array with height values per column.
          * @private
          */
         function _placeSurfaceDecoration(chunk, biomeId, heightmap) {
@@ -171,13 +175,16 @@
         }
 
         /**
-         * Place trees in a chunk.
+         * Place trees in a chunk using deterministic hash-based positioning.
          * Uses biome constants from Donkeycraft.BiomeID for consistent checks.
+         * Taiga biomes get taller spruce-style trees; forest variants get medium-height trees;
+         * all other biomes get standard oak-height trees (4 blocks).
+         * Validates trunk space is clear before placing each tree to avoid clipping into terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array.
-         * @param {number} seed - Random seed.
-         * @param {number} count - Number of tree attempts per chunk.
+         * @param {number[]} heightmap - Heightmap array with height values per column.
+         * @param {number} seed - Random seed derived from chunk coordinates.
+         * @param {number} count - Number of tree placement attempts per chunk.
          * @private
          */
         function _placeTrees(chunk, biomeId, heightmap, seed, count) {
@@ -233,16 +240,18 @@
         }
 
         /**
-         * Place an oak-style tree at the given position.
-         * Validates that trunk space is clear before placing.
+         * Place an oak-style tree at the given position with a 3×3×3 rounded leaf canopy.
+         * Validates that trunk space is clear (air or replaceable blocks) before placing.
+         * Leaf canopy is a 3×3×3 box centered above the trunk top, with corners clipped for a rounded look.
+         * Only replaces air blocks in the leaf area — never overwrites solid terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - X coordinate.
-         * @param {number} y - Y coordinate (trunk base).
-         * @param {number} z - Z coordinate.
-         * @param {number} height - Trunk height.
-         * @param {number} logId - Log block ID.
-         * @param {number} leavesId - Leaves block ID.
-         * @returns {boolean} True if the tree was placed successfully.
+         * @param {number} x - X coordinate (within chunk bounds).
+         * @param {number} y - Y coordinate for trunk base (within world bounds).
+         * @param {number} z - Z coordinate (within chunk bounds).
+         * @param {number} height - Trunk height in blocks (4+ recommended).
+         * @param {number} logId - Log block ID for the trunk.
+         * @param {number} leavesId - Leaves block ID for the canopy.
+         * @returns {boolean} True if the tree was placed successfully, false if blocked.
          * @private
          */
         function _placeOakTree(chunk, x, y, z, height, logId, leavesId) {
@@ -285,28 +294,29 @@
 
         /**
          * Check if a block ID is replaceable (air or transparent decorative).
+         * Delegates to BlockRegistry when available, with safe fallback.
          * @param {number} blockId - Block ID to check.
          * @returns {boolean} True if the block can be overwritten.
          * @private
          */
         function isReplaceable(blockId) {
-            // Air is always replaceable
             if (blockId === 0) return true;
-
-            // Check via BlockRegistry if available
             if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isReplaceable === 'function') {
-                return Donkeycraft.BlockRegistry.isReplaceable(blockId);
+                try {
+                    return Donkeycraft.BlockRegistry.isReplaceable(blockId);
+                } catch (e) { /* ignore */ }
             }
             return false;
         }
 
         /**
-         * Place flowers in a chunk.
+         * Place flowers on grass blocks in a chunk using deterministic hash-based positioning.
+         * Only places flowers on grass_block type surfaces to respect biome-specific terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array.
-         * @param {number} seed - Random seed.
-         * @param {number} count - Number of flower attempts.
+         * @param {number} biomeId - Biome ID (unused but kept for API consistency).
+         * @param {number[]} heightmap - Heightmap array with height values per column.
+         * @param {number} seed - Random seed derived from chunk coordinates.
+         * @param {number} count - Number of flower placement attempts per chunk.
          * @private
          */
         function _placeFlowers(chunk, biomeId, heightmap, seed, count) {
@@ -332,12 +342,13 @@
         }
 
         /**
-         * Place tall grass in a chunk.
+         * Place tall grass on grass blocks in a chunk using deterministic hash-based positioning.
+         * Only places grass on grass_block type surfaces to respect biome-specific terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array.
-         * @param {number} seed - Random seed.
-         * @param {number} count - Number of grass attempts.
+         * @param {number} biomeId - Biome ID (unused but kept for API consistency).
+         * @param {number[]} heightmap - Heightmap array with height values per column.
+         * @param {number} seed - Random seed derived from chunk coordinates.
+         * @param {number} count - Number of tall grass placement attempts per chunk.
          * @private
          */
         function _placeGrass(chunk, biomeId, heightmap, seed, count) {
@@ -362,11 +373,13 @@
         }
 
         /**
-         * Place cacti in a desert chunk.
+         * Place cacti on sand blocks in a desert chunk using deterministic hash-based positioning.
+         * Each cactus is 1-3 blocks tall, placed vertically above the sand surface.
+         * Only places cacti when the biome is identified as a desert type via Donkeycraft.BiomeID constants.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array.
-         * @param {number} seed - Random seed.
-         * @param {number} count - Number of cactus attempts.
+         * @param {number[]} heightmap - Heightmap array with height values per column.
+         * @param {number} seed - Random seed derived from chunk coordinates.
+         * @param {number} count - Number of cactus placement attempts per chunk.
          * @private
          */
         function _placeCacti(chunk, heightmap, seed, count) {
@@ -396,10 +409,11 @@
         }
 
         /**
-         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
-         * @param {number} x
-         * @param {number} y
-         * @returns {number} Positive 32-bit integer.
+         * Deterministic 2D hash — delegates to centralized _gen._hash2D for consistent
+         * pseudo-random values across all decoration placement operations.
+         * @param {number} x - First hash coordinate (typically a variation index).
+         * @param {number} y - Second hash coordinate (typically derived from seed).
+         * @returns {number} Positive 32-bit integer in range [0, 2^32-1].
          * @private
          */
         function _hash2D(x, y) {
@@ -408,16 +422,35 @@
 
         /**
          * Invalidate cached block IDs and re-resolve from BlockRegistry.
-         * Call this after dynamically adding new blocks to the registry.
+         * Call this after dynamically adding new blocks to the registry to ensure
+         * the generator picks up newly registered block references.
          */
         function invalidateBlockIdCache() {
             _blocks = {};
             _resolveBlocks();
         }
 
+        /**
+         * Destroy the structure generator and free resources.
+         * Clears all cached block IDs and resets resolution state.
+         */
+        function destroy() {
+            _blocks = {};
+        }
+
+        /**
+         * Get the module object itself as the "instance".
+         * @returns {object} The StructureGenerator module.
+         */
+        function getInstance() {
+            return Donkeycraft.StructureGenerator;
+        }
+
         return {
+            getInstance: getInstance,
             generateChunkFull: generateChunkFull,
-            invalidateBlockIdCache: invalidateBlockIdCache
+            invalidateBlockIdCache: invalidateBlockIdCache,
+            destroy: destroy
         };
     })();
 

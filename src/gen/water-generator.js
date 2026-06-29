@@ -165,20 +165,13 @@
         function _placeUndergroundLakes(chunk, heightmap) {
             if (!_waterBlockId || _waterBlockId === 0) return;
 
-            // Incorporate world seed for deterministic placement across chunks.
-            // Use 32-bit safe arithmetic with Mulberry32-compatible seeding to avoid
-            // integer overflow at large chunk coordinates (chunkX/chunkZ > ~46340).
-            var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
-            var sx = ((chunk.chunkX | 0) * 73856093) >>> 0;
-            var sz = ((chunk.chunkZ | 0) * 19349663) >>> 0;
-            var sseed = ((worldSeed | 0) * 16807) % 2147483647;
-            var seed = (sx ^ sz ^ sseed) >>> 0;
+        // Use centralized _gen._hash2D with world seed for deterministic placement.
+        var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+        var chunkSeed = Donkeycraft._gen._hash2D(chunk.chunkX, chunk.chunkZ);
+        var lakeCount = 1 + ((chunkSeed >> 8) % 3);
 
-            // Try to place 1-3 underground lakes
-            var lakeCount = 1 + ((seed >> 8) % 3);
-
-            for (var i = 0; i < lakeCount; i++) {
-                var hash = _hash2D(seed + i * 73, i * 97);
+        for (var i = 0; i < lakeCount; i++) {
+            var hash = Donkeycraft._gen._hash2D(chunkSeed + i * 73, i * 97);
                 var lx = hash % CHUNK_SIZE;
                 if (lx < 0) lx += CHUNK_SIZE;
                 var lz = ((hash >> 8) % CHUNK_SIZE);
@@ -212,7 +205,8 @@
         /**
          * Place a small underground lake (sphere of water).
          * Only replaces air blocks to avoid overwriting terrain.
-         * Validates that water blocks have solid support below to prevent floating water.
+         * Uses efficient support validation: checks only nearby blocks below instead of
+         * scanning all the way to Y=0, preventing performance issues in deep caves.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -241,20 +235,18 @@
                             bz >= 0 && bz < CHUNK_SIZE) {
                             // Only replace air blocks — never overwrite existing terrain.
                             if (chunk.getBlock(bx, by, bz) === 0) {
-                                // Validate: water block must have solid support below (not air)
-                                // Exception: the bottom-most water block in a lake can rest on air
-                                // since caves may have carved out space beneath it.
+                                // Validate: water block must have solid support below (not air).
+                                // Uses efficient nearby check (up to 8 blocks down) instead of
+                                // scanning all the way to Y=0, preventing O(n) per-block cost.
                                 if (by > 0) {
                                     var blockBelow = chunk.getBlock(bx, by - 1, bz);
                                     if (blockBelow === 0) {
-                                        // No solid block below — skip unless this is the bottom of the lake
-                                        // Check if there's anything below that either
+                                        // Check within a limited depth for solid support.
+                                        // Lakes can sit on terrain below caves without scanning infinitely.
                                         var foundSupport = false;
-                                        for (var checkY = by - 1; checkY >= 0; checkY--) {
-                                            var checkBlock = chunk.getBlock(bx, checkY, bz);
-                                            if (checkBlock !== 0) {
-                                                // Found solid block below — this water is floating above a cave
-                                                // Only place if it's the lowest water block
+                                        var checkLimit = Math.max(0, by - 8); // At most 8 blocks down
+                                        for (var checkY = by - 1; checkY >= checkLimit; checkY--) {
+                                            if (chunk.getBlock(bx, checkY, bz) !== 0) {
                                                 foundSupport = true;
                                                 break;
                                             }
@@ -271,16 +263,16 @@
         }
 
         /**
-         * Get the default water level.
-         * @returns {number}
+         * Get the default water level (sea level).
+         * @returns {number} Water level Y coordinate.
          */
         function getWaterLevel() {
             return _waterLevel;
         }
 
         /**
-         * Set the default water level.
-         * @param {number} value - New water level.
+         * Set the default water level (sea level).
+         * @param {number} value - New water level (must be > 0 and < WORLD_HEIGHT).
          */
         function setWaterLevel(value) {
             if (typeof value === 'number' && value > 0 && value < WORLD_HEIGHT) {
@@ -340,7 +332,8 @@
         }
 
         /**
-         * Resolve the water block ID and liquid cache from BlockRegistry (called once at init).
+         * Initialize the water generator — resolves water block ID and liquid cache from BlockRegistry.
+         * Should be called once during game initialization.
          * @private
          */
         function _init() {
@@ -349,7 +342,8 @@
         }
 
         /**
-         * Destroy and free resources.
+         * Destroy the water generator and free resources.
+         * Clears cached block IDs and liquid cache.
          */
         function destroy() {
             _waterBlockId = null;
