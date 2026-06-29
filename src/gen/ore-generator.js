@@ -168,28 +168,31 @@
          */
         function _placeVein(chunk, cx, cy, cz, blockId, radius, veinIndex) {
             var halfRadius = Math.floor(radius / 2) + 1;
+            var radiusSq = halfRadius * halfRadius;
 
             for (var dx = -halfRadius; dx <= halfRadius; dx++) {
+                var dx2 = dx * dx;
                 for (var dy = -halfRadius; dy <= halfRadius; dy++) {
+                    var dy2 = dy * dy;
                     for (var dz = -halfRadius; dz <= halfRadius; dz++) {
-                        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        if (dist <= halfRadius) {
+                        var distSq = dx2 + dy2 + (dz * dz);
+                        if (distSq <= radiusSq) {
                             var bx = cx + dx;
                             var by = cy + dy;
                             var bz = cz + dz;
 
                             // Check bounds
-                            if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz >= CHUNK_SIZE) {
+                            if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz < CHUNK_SIZE) {
                                 continue;
                             }
 
                             // Add some randomness to shape
-                            if (dist < halfRadius - 0.5) {
+                            if (distSq < (halfRadius - 0.5) * (halfRadius - 0.5)) {
                                 var noiseVal = _hash2D(bx + veinIndex * 1000, bz + veinIndex * 2000) % 10;
                                 if (noiseVal > 3) {
                                     chunk.setBlock(bx, by, bz, blockId);
                                 }
-                            } else if (dist <= halfRadius) {
+                            } else {
                                 // Edge: 50% chance
                                 var edgeHash = _hash2D(bx * 7, bz * 13 + veinIndex);
                                 if ((edgeHash % 2) === 0) {

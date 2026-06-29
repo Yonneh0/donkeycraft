@@ -22,11 +22,31 @@
     };
 
     /**
-     * Create a zero vector.
-     * @returns {Donkeycraft.Vector3}
+     * Matrix4 — column-major 4×4 matrix (for WebGL)
+     * @param {Float32Array} [data=null]
      */
-    Donkeycraft.Vector3.zero = function () {
-        return new Donkeycraft.Vector3(0, 0, 0);
+    Donkeycraft.Matrix4 = function (data) {
+        this._data = data || new Float32Array(16);
+    };
+
+    /**
+     * Matrix4 — column-major 4×4 matrix (for WebGL)
+     * @param {Float32Array} [data=null]
+     */
+    Donkeycraft.Matrix4.prototype.multiply = function (m) {
+        var a = this._data, b = m._data;
+        var r = new Float32Array(16);
+        // R = A × B
+        for (var i = 0; i < 4; i++) {
+            for (var j = 0; j < 4; j++) {
+                r[i * 4 + j] = a[i * 4] * b[j] +
+                    a[i * 4 + 1] * b[4 + j] +
+                    a[i * 4 + 2] * b[8 + j] +
+                    a[i * 4 + 3] * b[12 + j];
+            }
+        }
+        this._data.set(r);
+        return this;
     };
 
     /**

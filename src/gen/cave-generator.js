@@ -41,11 +41,11 @@
             if (blockId === 0) return true;
 
             // Check via BlockRegistry if available
-            try {
+            if (Donkeycraft.BlockRegistry) {
                 if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return true;
                 if (Donkeycraft.BlockRegistry.isTransparent && Donkeycraft.BlockRegistry.isTransparent(blockId)) return true;
                 if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return true;
-            } catch (e) { /* ignore registry method errors */ }
+            }
 
             return false;
         }
@@ -159,11 +159,14 @@
         function _carveTunnel(chunk, cx, cy, cz, radius) {
             var r = Math.ceil(radius);
 
+            var radiusSq = radius * radius;
             for (var dx = -r; dx <= r; dx++) {
+                var dx2 = dx * dx;
                 for (var dy = -r; dy <= r; dy++) {
+                    var dy2 = dy * dy;
                     for (var dz = -r; dz <= r; dz++) {
-                        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        if (dist <= radius) {
+                        var distSq = dx2 + dy2 + (dz * dz);
+                        if (distSq <= radiusSq) {
                             var bx = cx + dx;
                             var by = cy + dy;
                             var bz = cz + dz;
