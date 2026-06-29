@@ -853,9 +853,23 @@
 
     /**
      * PerlinNoise — 1D, 2D, and 3D Perlin noise.
+     * All generators delegate to this canonical implementation to ensure
+     * spatial coherence (caves align with terrain, ores match biomes).
      */
     Donkeycraft.PerlinNoise = (function () {
+        /**
+         * _perm — permutation table for Perlin noise. Initialized with identity mapping, shuffled deterministically by seed.
+         * @type {Uint8Array}
+         * @private
+         */
         var _perm = new Uint8Array(512);
+
+        /**
+         * _initialized — flag set to true after init() is called.
+         * Used by noise.js to check if the permutation table needs seeding.
+         * @type {boolean}
+         * @private
+         */
         var _initialized = false;
 
         /**
@@ -1022,10 +1036,21 @@
             noise3D: noise3D,
             noise2D: noise2D,
             noise1D: noise1D,
-            fbm: fbm
+            fbm: fbm,
+            /**
+             * Get the internal permutation table.
+             * Exposed for cross-module access by noise.js delegation.
+             * @returns {Uint8Array} The 512-entry permutation table.
+             */
+            _getPerm: function() { return _perm; },
+            /**
+             * Check if PerlinNoise has been initialized with a seed.
+             * Exposed for cross-module access by noise.js delegation.
+             * @returns {boolean} True if init() has been called.
+             */
+            _isInitialized: function() { return _initialized; }
         };
     })();
-
     // ============================================================
     // Utility Functions
     // ============================================================

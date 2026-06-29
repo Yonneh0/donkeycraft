@@ -49,21 +49,23 @@
         var key = this._namespace + event;
         var fired = false;
 
+        // Create a wrapped callback that removes itself after first invocation.
         var wrapped = function () {
             if (fired) return;
             fired = true;
-            // Remove the wrapped callback from listeners
+            // Remove the wrapped callback from listeners array.
             if (self._listeners[key]) {
                 self._listeners[key] = self._listeners[key].filter(function (entry) {
-                    return entry.callback !== wrapped && entry._originalCallback !== callback;
+                    return entry.callback !== wrapped;
                 });
             }
             callback.apply(context || self, arguments);
         };
 
-        this.on(event, wrapped, context || this);
+        // Register the wrapped callback using the standard on() method.
+        var unsubscribe = this.on(event, wrapped, context || this);
 
-        // Tag the last-added entry so off(event, originalCallback) also removes it
+        // Tag the last-added entry so off(event, originalCallback) also removes it.
         var listeners = this._listeners[key];
         if (listeners && listeners.length > 0) {
             listeners[listeners.length - 1]._originalCallback = callback;
@@ -71,13 +73,14 @@
 
         return function () {
             fired = true;
-            self.off(event, callback);
+            unsubscribe(); // Use the unsubscribe from on() to properly remove the listener.
         };
     };
 
     /**
      * Remove a previously registered listener for an event.
      * Works with both regular (`on`) and one-time (`once`) callbacks.
+     * For `once()` listeners, removes by matching the _originalCallback tag.
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - The exact callback function reference to remove.
      */
@@ -85,11 +88,13 @@
         var key = this._namespace + event;
         if (!this._listeners[key]) return;
 
+        // Filter out entries matching either the wrapped callback or the original callback.
+        var before = this._listeners[key].length;
         this._listeners[key] = this._listeners[key].filter(function (entry) {
-            return !(entry.callback === callback || entry._originalCallback === callback);
+            return entry.callback !== callback && entry._originalCallback !== callback;
         });
 
-        // Clean up empty arrays to prevent memory leaks
+        // Clean up empty arrays to prevent memory leaks.
         if (this._listeners[key].length === 0) {
             delete this._listeners[key];
         }

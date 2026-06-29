@@ -722,14 +722,16 @@
             }
 
             // ============================================================
-            // Camera positioning — query actual terrain height
+            // Camera positioning — angled top-down view of current chunk
             // ============================================================
             function updateCameraToChunk() {
                 var cs = Donkeycraft.Config.CHUNK_SIZE;
-                camera.x = currentChunkX * cs + cs / 2;
-                camera.z = currentChunkZ * cs + cs / 2;
 
-                // Query actual terrain height for camera Y — position well above surface
+                // Center X/Z of the current chunk in world space
+                var cx = (currentChunkX * cs + cs / 2);
+                var cz = (currentChunkZ * cs + cs / 2);
+
+                // Query actual terrain height for camera Y — sample multiple points
                 if (Donkeycraft.TerrainGenerator && Donkeycraft.BiomeRegistry) {
                     var biome = Donkeycraft.BiomeRegistry.getBiomeById(selectedBiomeId);
                     var hm = Donkeycraft.TerrainGenerator.generateHeightmap(currentChunkX, currentChunkZ, biome);
@@ -743,11 +745,27 @@
                         }
                     }
                     var avgSurfaceY = totalH / sampleCount;
-                    // Position camera high enough to see the terrain layout
-                    camera.y = Math.max(avgSurfaceY + 20, 95);
+
+                    // Position camera offset diagonally from chunk center for angled view.
+                    // Offset by ~1.5 chunks in XZ so the whole chunk fits on screen at an angle.
+                    var diagonalOffset = cs * 1.2;
+                    camera.x = cx - diagonalOffset - 50;
+                    camera.z = cz - diagonalOffset - 50;
+
+                    // Camera Y: high enough to see the full chunk from above, plus some margin
+                    camera.y = avgSurfaceY + 125;
                 } else {
-                    camera.y = 120; // Fallback
+                    // Fallback: angled view centered on chunk
+                    camera.x = cx + cs * 1.2;
+                    camera.z = cz + cs * 1.2;
+                    camera.y = 95;
                 }
+
+                // Set yaw/pitch for a top-down angled look at the chunk center.
+                // Yaw: point back toward the chunk center (diagonal direction).
+                camera.yaw = Math.PI + Math.PI / 4; // 225° — points SW toward chunk from NE position
+                // Pitch: ~45° down from horizontal for a nice angled view
+                camera.pitch = -Math.PI / 4; // -45° looking down
             }
 
             // ============================================================
@@ -794,15 +812,46 @@
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)
+            /**
+             * Resolve block IDs from BlockRegistry for fallback generation.
+             * @returns {Object} Object with bedrockId, stoneId, dirtId, grassBlockId.
+             * @private
+             */
+            function _resolveFallbackBlockIds() {
+                var ids = {};
+                if (!Donkeycraft.BlockRegistry) return ids;
+
+                var bedrock = Donkeycraft.BlockRegistry.getBlockById(1000);
+                ids.bedrockId = bedrock ? bedrock.id : 1000;
+
+                var stone = Donkeycraft.BlockRegistry.getBlockByName('stone');
+                ids.stoneId = stone ? stone.id : 1;
+
+                var dirt = Donkeycraft.BlockRegistry.getBlockByName('dirt');
+                ids.dirtId = dirt ? dirt.id : 7;
+
+                var grassBlock = Donkeycraft.BlockRegistry.getBlockByName('grass_block');
+                ids.grassBlockId = grassBlock ? grassBlock.id : 8;
+
+                return ids;
+            }
+
             function _generateChunkFallback(chunk, biomeId) {
                 var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
                 var heightmap = Donkeycraft.TerrainGenerator ? Donkeycraft.TerrainGenerator.generateHeightmap(chunk.chunkX, chunk.chunkZ, biome) : null;
                 var ws = Donkeycraft.Config.WORLD_HEIGHT, cs = Donkeycraft.Config.CHUNK_SIZE;
 
+                // Resolve block IDs from registry instead of hardcoding
+                var ids = _resolveFallbackBlockIds();
+                var bedrockId = ids.bedrockId || 1000;
+                var stoneId = ids.stoneId || 1;
+                var dirtId = ids.dirtId || 7;
+                var grassBlockId = ids.grassBlockId || 8;
+
                 // Place bedrock at Y=0
                 for (var x = 0; x < cs; x++) {
                     for (var z = 0; z < cs; z++) {
-                        chunk.setBlock(x, 0, z, 1000); // bedrock
+                        chunk.setBlock(x, 0, z, bedrockId);
                     }
                 }
 
@@ -811,10 +860,15 @@
                         for (var z2 = 0; z2 < cs; z2++) {
                             var h = Math.max(1, Math.min(heightmap[x2 + z2 * cs] || 64, ws - 10));
                             for (var y2 = 1; y2 < h; y2++) {
-                                if (y2 < h - 3) chunk.setBlock(x2, y2, z2, 1); // stone
-                                else chunk.setBlock(x2, y2, z2, 7); // dirt
+                                if (y2 < h - 3) chunk.setBlock(x2, y2, z2, stoneId);
+                                else chunk.setBlock(x2, y2, z2, dirtId);
                             }
-                            chunk.setBlock(x2, h, z2, 8); // grass_block top
+                            // Place grass block at surface level
+                            if (grassBlockId) {
+                                chunk.setBlock(x2, h, z2, grassBlockId);
+                            } else {
+                                chunk.setBlock(x2, h, z2, stoneId);
+                            }
                         }
                     }
                 }

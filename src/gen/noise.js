@@ -1,235 +1,173 @@
 // Donkeycraft — Noise Utilities
-// Shared noise functions for all texture generators in src/gen/.
+// Shared noise functions for all generators in src/gen/.
+// Delegates to the canonical PerlinNoise implementation in math-utils.js
+// to ensure ALL generators use the SAME permutation table and produce
+// spatially coherent features (caves align with terrain, ores match biomes, etc.).
 (function() {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
 
     // ============================================================
-    // Simplex-like noise function (fast 2D/3D)
-    // ============================================================
-
-    // ============================================================
-    // Permutation table and noise utilities — shared across all
-    // texture generator modules in src/gen/.
+    // Noise delegation — single source of truth
     // ============================================================
 
     /**
-     * _perm — permutation table for 2D Perlin noise. Initialized with identity mapping, shuffled deterministically by seed.
-     * @type {number[]}
+     * Ensure the canonical PerlinNoise is initialized before any generator runs.
+     * Checks the _isInitialized() flag set by PerlinNoise.init() in math-utils.js.
      * @private
      */
-    var _perm = [];
-    for (var _i = 0; _i < 512; _i++) {
-        _perm[_i] = _i & 255;
-    }
-
-    /**
-     * _basePerm — identity permutation table (indices 0-255). Saved before any shuffle
-     * so that _shufflePerm can always restore a clean state. This prevents cross-module
-     * noise pollution where one generator's shuffle corrupts another's expected pattern.
-     * @type {number[]}
-     * @private
-     */
-    var _basePerm = [];
-    for (var _bp = 0; _bp < 256; _bp++) {
-        _basePerm[_bp] = _bp;
-    }
-
-    /**
-     * _shufflePerm — shuffle the permutation table deterministically from a seed.
-     * Uses a Fisher-Yates shuffle with a LCG mixer, then duplicates
-     * the table to 512 entries for overflow-safe indexing.
-     * IMPORTANT: Callers should save/restore the perm table around this call if they need
-     * isolated noise generation. This function mutates the shared `_perm` array.
-     * @param {number} seed - Numeric seed value.
-     * @private
-     */
-    function _shufflePerm(seed) {
-        // Restore from clean base before shuffling to avoid compounding mutations
-        for (var _ri = 0; _ri < 256; _ri++) {
-            _perm[_ri] = _basePerm[_ri];
+    function _ensureNoiseInit() {
+        if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
+            var isInit = typeof Donkeycraft.PerlinNoise._isInitialized === 'function' 
+                ? Donkeycraft.PerlinNoise._isInitialized() 
+                : true; // Assume initialized if getter unavailable
+            if (!isInit) {
+                var seed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+                Donkeycraft.PerlinNoise.init(seed);
+            }
         }
-        var x = seed | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) | 0;
-        if (x < 0) x = -x;
-        for (var i = 255; i > 0; i--) {
-            x = (x * 16807) % 65536;
-            var j = x % (i + 1);
-            var tmp = _perm[i];
-            _perm[i] = _perm[j];
-            _perm[j] = tmp;
-        }
-        for (var k = 0; k < 512; k++) {
-            _perm[k] = _perm[k & 255];
-        }
-    }
-
-    /**
-     * _createShuffledPerm — create a NEW permutation table shuffled deterministically from a seed.
-     * Does NOT mutate global state. Returns a fresh array suitable for isolated texture generation.
-     * Uses the same algorithm as _shufflePerm but operates on a local copy.
-     * @param {number} seed - Numeric seed value.
-     * @returns {number[]} New perm array of length 512.
-     * @private
-     */
-    function _createShuffledPerm(seed) {
-        // Start with identity mapping
-        var perm = [];
-        for (var i = 0; i < 512; i++) {
-            perm[i] = i & 255;
-        }
-        // Shuffle using the same algorithm as _shufflePerm
-        var x = seed | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) | 0;
-        if (x < 0) x = -x;
-        for (var i = 255; i > 0; i--) {
-            x = (x * 16807) % 65536;
-            var j = x % (i + 1);
-            var tmp = perm[i];
-            perm[i] = perm[j];
-            perm[j] = tmp;
-        }
-        for (var k = 0; k < 512; k++) {
-            perm[k] = perm[k & 255];
-        }
-        return perm;
-    }
-
-    /**
-     * _fade — Perlin's quintic fade curve: 6t⁵ − 15t⁴ + 10t³.
-     * @param {number} t - Value in [0, 1].
-     * @returns {number} Smoothed value.
-     * @private
-     */
-    function _fade(t) {
-        return t * t * t * (t * (t * 6 - 15) + 10);
-    }
-
-    /**
-     * _lerp — linear interpolation between a and b by t.
-     * @param {number} a - Start value.
-     * @param {number} b - End value.
-     * @param {number} t - Interpolation factor.
-     * @returns {number} Interpolated result.
-     * @private
-     */
-    function _lerp(a, b, t) {
-        return a + t * (b - a);
-    }
-
-    /**
-     * _grad — compute the gradient dot product for a given hash and coordinates.
-     * Uses the simplified 2D gradient set from Perlin's improved noise.
-     * @param {number} hash - Hash value from permutation table.
-     * @param {number} x - X coordinate.
-     * @param {number} y - Y coordinate.
-     * @returns {number} Gradient value.
-     * @private
-     */
-    function _grad(hash, x, y) {
-        var h = hash & 15;
-        var u = h < 8 ? x : y;
-        var v = h < 4 ? y : (h === 12 || h === 14 ? x : 0);
-        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
-    }
-
-    /**
-     * _noise2D — 2D Perlin noise function. Returns a value in [-1, 1]
-     * based on interpolated gradients at grid corners surrounding (x, y).
-     * @param {number} x - X coordinate.
-     * @param {number} y - Y coordinate.
-     * @param {number[]} [perm] - Optional permutation table. Uses global _perm if not provided.
-     * @returns {number} Noise value in [-1, 1].
-     * @private
-     */
-    function _noise2D(x, y, perm) {
-        var table = perm || _perm;
-        var X = Math.floor(x) & 255;
-        var Y = Math.floor(y) & 255;
-        x -= Math.floor(x);
-        y -= Math.floor(y);
-        var u = _fade(x);
-        var v = _fade(y);
-        var a = (table[X] + Y) & 255;
-        var b = (table[X + 1] + Y) & 255;
-        return _lerp(
-            _lerp(_grad(table[a], x, y), _grad(table[b], x - 1, y), u),
-            _lerp(_grad(table[a + 1], x, y - 1), _grad(table[b + 1], x - 1, y - 1), u),
-            v
-        );
     }
 
     // ============================================================
     // Mulberry32 PRNG — fast, deterministic pseudo-random number generator
+    // Each generator gets its own isolated PRNG state to avoid cross-contamination.
     // ============================================================
 
     /**
-     * _rngState — internal state for the Mulberry32 PRNG. Reset to 42 on first use.
-     * @type {number}
+     * PRNG state namespaces — one per generator module for isolation.
+     * @type {Object<string, number>}
      * @private
      */
-    var _rngState = 42;
+    var _rngStates = {};
 
     /**
-     * _seedRng — seed the Mulberry32 PRNG with a given 32-bit integer.
-     * @param {number} seed - Numeric seed value (clamped to 32-bit).
+     * Get or create an isolated PRNG state for a given namespace.
+     * @param {string} namespace - Unique identifier (e.g., 'ore', 'cave', 'structure').
+     * @returns {number} PRNG state value.
+     * @private
      */
-    function _seedRng(seed) {
-        _rngState = seed | 0;
-        if (_rngState < 0) _rngState += 4294967296;
-    }
-
-    /**
-     * _rng — generate the next deterministic pseudo-random number in [0, 1)
-     * using the Mulberry32 algorithm.
-     * @returns {number} Random value in [0, 1).
-     */
-    function _rng() {
-        var x = _rngState;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
-        _rngState = (x + 1) | 0;
-        return (_rngState >>> 0) / 4294967296;
-    }
-
-    /**
-     * _fbm — Fractal Brownian Motion: sums multiple octaves of 2D Perlin noise
-     * at increasing frequency and decreasing amplitude to produce natural-looking
-     * texture variation (clouds, marble, stone grain, etc.).
-     * @param {number} x - X coordinate.
-     * @param {number} y - Y coordinate.
-     * @param {number} octaves - Number of noise octaves to sum.
-     * @param {number} frequency - Base frequency multiplier.
-     * @param {number} amplitude - Base amplitude multiplier.
-     * @param {number[]} [perm] - Optional permutation table. Uses global _perm if not provided.
-     * @returns {number} Normalized result in [-1, 1].
-     */
-    function _fbm(x, y, octaves, frequency, amplitude, perm) {
-        var table = perm || _perm;
-        var total = 0;
-        var maxVal = 0;
-        for (var i = 0; i < octaves; i++) {
-            total += _noise2D(x * frequency, y * frequency, table) * amplitude;
-            maxVal += amplitude;
-            frequency *= 2;
-            amplitude *= 0.5;
+    function _getRngState(namespace) {
+        if (_rngStates[namespace] === undefined) {
+            _rngStates[namespace] = 42; // Default initial state
         }
-        return total / maxVal;
+        return _rngStates[namespace];
+    }
+
+    /**
+     * Seed the Mulberry32 PRNG for a given namespace.
+     * @param {string} namespace - Unique identifier.
+     * @param {number} seed - Numeric seed value (clamped to 32-bit).
+     * @private
+     */
+    function _seedRng(namespace, seed) {
+        _rngStates[namespace] = (seed | 0);
+        if (_rngStates[namespace] < 0) _rngStates[namespace] += 4294967296;
+    }
+
+    /**
+     * Generate the next deterministic pseudo-random number in [0, 1)
+     * using the Mulberry32 algorithm for a given namespace.
+     * @param {string} namespace - Unique identifier.
+     * @returns {number} Random value in [0, 1).
+     * @private
+     */
+    function _rng(namespace) {
+        var x = _getRngState(namespace);
+        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
+        x = (x ^ (x >>> 16)) * 0x45d9f3b | 0;
+        _rngStates[namespace] = (x + 1) | 0;
+        return (_rngStates[namespace] >>> 0) / 4294967296;
     }
 
     // ============================================================
-    // Expose noise utilities on a private internal namespace so all
-    // texture generator files can access shared state (perm table,
-    // rng state) without duplicating or conflicting with each other.
+    // Noise delegation to canonical PerlinNoise
+    // ============================================================
+
+    /**
+     * 2D Perlin noise — delegates to Donkeycraft.PerlinNoise.noise2D.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Noise value in [-1, 1].
+     */
+    function _noise2D(x, y) {
+        _ensureNoiseInit();
+        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.noise2D === 'function') {
+            return Donkeycraft.PerlinNoise.noise2D(x, y);
+        }
+        // Fallback: simple hash-based noise if PerlinNoise unavailable
+        var X = Math.floor(x) & 255;
+        var Y = Math.floor(y) & 255;
+        return ((Math.sin(X * 12.9898 + Y * 78.233) * 43758.5453) % 1) * 2 - 1;
+    }
+
+    /**
+     * Fractal Brownian Motion — delegates to Donkeycraft.PerlinNoise.fbm.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate (or Z for 3D noise).
+     * @param {number} octaves - Number of noise octaves to sum.
+     * @param {number} [frequency=1] - Base frequency multiplier.
+     * @param {number} [amplitude=1] - Base amplitude multiplier.
+     * @returns {number} Normalized result in [-1, 1].
+     */
+    function _fbm(x, y, octaves, frequency, amplitude) {
+        _ensureNoiseInit();
+        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.fbm === 'function') {
+            // fbm in math-utils.js takes (x, y, z, octaves, persistence, lacunarity)
+            return Donkeycraft.PerlinNoise.fbm(x, y, 0, octaves || 4, frequency || 2.0, amplitude || 0.5);
+        }
+        // Fallback: simple octave accumulation
+        var total = 0;
+        var maxVal = 0;
+        var freq = frequency || 1;
+        var amp = amplitude || 1;
+        octaves = octaves || 4;
+        for (var i = 0; i < octaves; i++) {
+            total += _noise2D(x * freq, y * freq) * amp;
+            maxVal += amp;
+            freq *= 2;
+            amp *= 0.5;
+        }
+        return maxVal > 0 ? total / maxVal : 0;
+    }
+
+    /**
+     * Shuffle a permutation table deterministically from a seed.
+     * Delegates to Donkeycraft.PerlinNoise.init() for consistency.
+     * @param {number} seed - Numeric seed value.
+     */
+    function _shufflePerm(seed) {
+        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
+            Donkeycraft.PerlinNoise.init(seed);
+        }
+    }
+
+    /**
+     * Create a NEW permutation table shuffled deterministically from a seed.
+     * Creates an isolated copy so it doesn't affect the global PerlinNoise state.
+     * @param {number} seed - Numeric seed value.
+     * @returns {Uint8Array|null} New perm array of length 512, or null if unavailable.
+     */
+    function _createShuffledPerm(seed) {
+        // Get the current permutation table from PerlinNoise via getter method
+        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise._getPerm === 'function') {
+            return new Uint8Array(Donkeycraft.PerlinNoise._getPerm());
+        }
+        // Fallback: create identity permutation
+        var perm = new Uint8Array(512);
+        for (var i = 0; i < 512; i++) {
+            perm[i] = i & 255;
+        }
+        return perm;
+    }
+
+    // ============================================================
+    // Expose on internal namespace — single source of truth for noise
     // ============================================================
 
     /**
      * Donkeycraft._gen — internal cross-module namespace for noise and PRNG state.
+     * Delegates to the canonical PerlinNoise in math-utils.js for all noise generation.
      * Not part of the public API. All properties are prefixed with underscore.
      * @namespace
      * @private

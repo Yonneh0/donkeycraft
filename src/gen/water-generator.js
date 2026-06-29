@@ -72,12 +72,14 @@
 
         /**
          * Place water sources in a chunk.
+         * Only replaces air blocks — never overwrites existing terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place water in.
          * @param {number} biomeId - Biome ID for this chunk.
          * @param {number[]} heightmap - Heightmap array.
          */
         function placeWater(chunk, biomeId, heightmap) {
-            if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
+            // Input validation
+            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
 
             var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
             if (!biome) return;
@@ -101,16 +103,20 @@
 
         /**
          * Place ocean water across the chunk.
+         * Fills from surface+1 to water level with water, only replacing air blocks.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
         function _placeOceanWater(chunk, heightmap) {
+            if (!heightmap) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var surfaceY = heightmap[x + z * CHUNK_SIZE] || 20;
 
-                    // Fill from surface+1 to water level with water
+                    // Fill from surface+1 to water level with water, only replacing air blocks.
+                    // This prevents overwriting terrain that was placed above the heightmap.
                     for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
                         if (chunk.getBlock(x, y, z) === 0) { // Only replace air
                             chunk.setBlock(x, y, z, _waterBlockId);
@@ -123,16 +129,20 @@
         /**
          * Place surface water in low-lying areas of overworld biomes.
          * Fills below water level with water where terrain is below sea level.
+         * Only replaces air blocks to avoid overwriting placed terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number[]} heightmap - Heightmap array.
          * @private
          */
         function _placeSurfaceWater(chunk, heightmap) {
+            if (!heightmap) return;
+
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var surfaceY = heightmap[x + z * CHUNK_SIZE] || 63;
 
-                    // Place water where terrain is below water level
+                    // Place water where terrain is below water level.
+                    // Only fill air blocks — never overwrite existing terrain.
                     if (surfaceY < _waterLevel) {
                         for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
                             if (chunk.getBlock(x, y, z) === 0) { // Only replace air
@@ -177,6 +187,7 @@
 
         /**
          * Place a small underground lake (sphere of water).
+         * Only replaces air blocks to avoid overwriting terrain.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -185,24 +196,27 @@
          * @private
          */
         function _placeLake(chunk, cx, cy, cz, radius) {
+            if (!_waterBlockId || _waterBlockId === 0) return;
+
             var r = Math.ceil(radius);
 
             for (var dx = -r; dx <= r; dx++) {
                 for (var dy = -r; dy <= r; dy++) {
                     for (var dz = -r; dz <= r; dz++) {
-                        var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        if (dist <= radius) {
-                            var bx = cx + dx;
-                            var by = cy + dy;
-                            var bz = cz + dz;
+                        var distSq = dx * dx + dy * dy + dz * dz;
+                        if (distSq > radius * radius) continue;
 
-                            // Check bounds
-                            if (bx >= 0 && bx < CHUNK_SIZE &&
-                                by >= 0 && by < WORLD_HEIGHT &&
-                                bz >= 0 && bz < CHUNK_SIZE) {
-                                if (chunk.getBlock(bx, by, bz) === 0) { // Air only
-                                    chunk.setBlock(bx, by, bz, _waterBlockId);
-                                }
+                        var bx = cx + dx;
+                        var by = cy + dy;
+                        var bz = cz + dz;
+
+                        // Check bounds
+                        if (bx >= 0 && bx < CHUNK_SIZE &&
+                            by >= 0 && by < WORLD_HEIGHT &&
+                            bz >= 0 && bz < CHUNK_SIZE) {
+                            // Only replace air blocks — never overwrite existing terrain.
+                            if (chunk.getBlock(bx, by, bz) === 0) {
+                                chunk.setBlock(bx, by, bz, _waterBlockId);
                             }
                         }
                     }

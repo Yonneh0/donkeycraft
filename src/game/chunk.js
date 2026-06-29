@@ -124,7 +124,8 @@
 
     /**
      * Get the sky light value at local coordinates within this chunk.
-     * Returns 15 (full sky light) if coordinates are out of bounds.
+     * Returns 0 (no sky light) if coordinates are out of bounds — chunks at world
+     * edges have no terrain above them, so they should not receive full sky light.
      * @param {number} x - X coordinate [0, 15].
      * @param {number} y - Y coordinate [0, 255].
      * @param {number} z - Z coordinate [0, 15].
@@ -132,7 +133,7 @@
      */
     Donkeycraft.Chunk.prototype.getSkyLight = function (x, y, z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
-            return 15; // Outside chunk = full sky light
+            return 0; // Outside chunk = no sky light (world edge / void)
         }
         return this.skyLight[blockIndex(x, y, z)];
     };
@@ -147,7 +148,7 @@
      */
     Donkeycraft.Chunk.prototype.setSkyLight = function (x, y, z, light) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
-            return;
+            return; // Out of bounds — silently ignore
         }
         this.skyLight[blockIndex(x, y, z)] = Donkeycraft.clamp(light, 0, 15);
     };
@@ -162,7 +163,7 @@
      */
     Donkeycraft.Chunk.prototype.getBlockLight = function (x, y, z) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
-            return 0;
+            return 0; // Outside chunk = no block light
         }
         return this.blockLight[blockIndex(x, y, z)];
     };
@@ -177,7 +178,7 @@
      */
     Donkeycraft.Chunk.prototype.setBlockLight = function (x, y, z, light) {
         if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || z < 0 || z >= CHUNK_SIZE) {
-            return;
+            return; // Out of bounds — silently ignore
         }
         this.blockLight[blockIndex(x, y, z)] = Donkeycraft.clamp(light, 0, 15);
     };
@@ -200,14 +201,15 @@
 
     /**
      * Convert global X/Z coordinates to local chunk coordinates.
-     * @param {number} gx - Global X coordinate.
-     * @param {number} gz - Global Z coordinate.
+     * Handles negative world coordinates correctly via modular arithmetic.
+     * @param {number} gx - Global X coordinate (can be negative).
+     * @param {number} gz - Global Z coordinate (can be negative).
      * @returns {{lx: number, lz: number}} Object with local x and z in [0, 15].
      */
     Donkeycraft.Chunk.prototype.globalToLocal = function (gx, gz) {
         return {
-            lx: gx - this.chunkX * CHUNK_SIZE,
-            lz: gz - this.chunkZ * CHUNK_SIZE
+            lx: ((gx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE,
+            lz: ((gz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE
         };
     };
 

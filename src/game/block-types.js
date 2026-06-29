@@ -101,7 +101,7 @@
         _solid[165] = false;
         _transparent[166] = true;  // lily_pad
         _solid[166] = false;
-        _transparent[167] = true;  // fern (duplicate)
+        _transparent[167] = true;  // glow_lichen — transparent decorative block
         _solid[167] = false;
         _transparent[168] = true;  // dead_bush
         _solid[168] = false;
@@ -118,7 +118,7 @@
         _solid[172] = false;
         _replaceable[172] = true;
 
-        // All plants (158-170, 167) are replaceable
+        // All plants and decorative blocks are replaceable
         _replaceable[158] = true;  // grass
         _replaceable[159] = true;  // tall_grass
         _replaceable[160] = true;  // fern
@@ -128,7 +128,7 @@
         _replaceable[164] = true;  // rose_bush
         _replaceable[165] = true;  // sunflower
         _replaceable[166] = true;  // lily_pad
-        _replaceable[167] = true;  // fern (duplicate)
+        _replaceable[167] = true;  // glow_lichen
         _replaceable[168] = true;  // dead_bush
         _replaceable[169] = true;  // vine
         _replaceable[170] = true;  // cave_vines

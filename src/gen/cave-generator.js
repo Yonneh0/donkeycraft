@@ -57,7 +57,9 @@
          * @param {Object} [dimConfig] - Optional dimension config {minY, maxY, lavaYLevel}.
          */
         function generateCaves(chunk, biomeId, dimConfig) {
-            if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
+            // Input validation
+            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
+            if (typeof biomeId !== 'number' || biomeId < 0) return;
 
             // Resolve dimension configuration
             var config = dimConfig || _defaultConfig;
@@ -133,10 +135,11 @@
                             _carveTunnel(chunk, x, y, z, tunnelRadius);
                         }
 
-                        // Skip Y levels for performance — caves are spaced vertically
-                        // Jump ahead after the first few Y levels to avoid excessive computation
+                        // Skip Y levels for performance — caves are spaced vertically.
+                        // Jump ahead after the first few Y levels to avoid excessive computation.
+                        // Net increase per iteration: 4 (when y > minY + 20) or 1 (otherwise).
                         if (y > minY + 20) {
-                            y += 4; // +1 from while increment = net +5 per iteration
+                            y += 4;
                         } else {
                             y++;
                         }
@@ -242,7 +245,7 @@
          * Destroy and free resources.
          */
         function destroy() {
-            // No resources to free
+            // No dynamic resources to free — all state is in closure variables
         }
 
         return {

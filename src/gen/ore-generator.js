@@ -31,7 +31,7 @@
 
     /**
      * Resolve all ore block IDs from BlockRegistry and cache them.
-     * Handles both standard blocks and special cases (e.g., deepslate variants).
+     * Uses exact block names from definitions for reliable lookup.
      * @private
      */
     function _resolveBlockIds() {
@@ -40,20 +40,27 @@
 
         for (var i = 0; i < ORE_DEFS.length; i++) {
             var def = ORE_DEFS[i];
-            // Try exact block name first, then common aliases
+            // Try exact block name first
             var block = Donkeycraft.BlockRegistry.getBlockByName(def.blockName);
             if (!block) {
-                // Try without underscore prefix (e.g., "coal_ore" → "coal")
-                var shortName = def.blockName.split('_')[0];
-                block = Donkeycraft.BlockRegistry.getBlockByName(shortName);
-            }
-            if (!block) {
-                // Try appending "_ore" to material name
-                var matName = def.blockName.replace('_ore', '');
-                block = Donkeycraft.BlockRegistry.getBlockByName(matName + '_ore');
+                // Fallback: try common naming variations
+                var parts = def.blockName.split('_');
+                if (parts.length > 1) {
+                    // Try without last part (e.g., "coal_ore" → "coal")
+                    block = Donkeycraft.BlockRegistry.getBlockByName(parts[0]);
+                }
             }
             if (block) {
                 _blockCache[def.name] = block.id;
+            } else {
+                // Log warning for missing blocks (only once per name)
+                if (!_blockCache._warned) _blockCache._warned = {};
+                if (!_blockCache._warned[def.blockName]) {
+                    _blockCache._warned[def.blockName] = true;
+                    if (Donkeycraft.Logger) {
+                        Donkeycraft.Logger.warn('OreGenerator: block "' + def.blockName + '" not found in BlockRegistry');
+                    }
+                }
             }
         }
     }
@@ -156,7 +163,8 @@
         }
 
         /**
-         * Place a single ore vein as a rough sphere.
+         * Place a single ore vein as a rough sphere with natural variation.
+         * Uses fbm noise for organic shape instead of hard sphere edges.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -167,38 +175,36 @@
          * @private
          */
         function _placeVein(chunk, cx, cy, cz, blockId, radius, veinIndex) {
-            var halfRadius = Math.floor(radius / 2) + 1;
-            var radiusSq = halfRadius * halfRadius;
+            var halfRadius = Math.ceil(radius);
+            var seedX = cx + veinIndex * 1000;
+            var seedZ = cz + veinIndex * 2000;
 
             for (var dx = -halfRadius; dx <= halfRadius; dx++) {
-                var dx2 = dx * dx;
                 for (var dy = -halfRadius; dy <= halfRadius; dy++) {
-                    var dy2 = dy * dy;
                     for (var dz = -halfRadius; dz <= halfRadius; dz++) {
-                        var distSq = dx2 + dy2 + (dz * dz);
-                        if (distSq <= radiusSq) {
-                            var bx = cx + dx;
-                            var by = cy + dy;
-                            var bz = cz + dz;
+                        var distSq = dx * dx + dy * dy + dz * dz;
+                        if (distSq > radius * radius) continue;
 
-                            // Check bounds
-                            if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz < CHUNK_SIZE) {
-                                continue;
-                            }
+                        var bx = cx + dx;
+                        var by = cy + dy;
+                        var bz = cz + dz;
 
-                            // Add some randomness to shape
-                            if (distSq < (halfRadius - 0.5) * (halfRadius - 0.5)) {
-                                var noiseVal = _hash2D(bx + veinIndex * 1000, bz + veinIndex * 2000) % 10;
-                                if (noiseVal > 3) {
-                                    chunk.setBlock(bx, by, bz, blockId);
-                                }
-                            } else {
-                                // Edge: 50% chance
-                                var edgeHash = _hash2D(bx * 7, bz * 13 + veinIndex);
-                                if ((edgeHash % 2) === 0) {
-                                    chunk.setBlock(bx, by, bz, blockId);
-                                }
-                            }
+                        // Check bounds
+                        if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz >= CHUNK_SIZE) {
+                            continue;
+                        }
+
+                        // Use noise for organic shape variation — blocks near the edge
+                        // have a probability of inclusion based on their distance from center.
+                        var dist = Math.sqrt(distSq);
+                        var noiseVal = Donkeycraft.PerlinNoise ? Donkeycraft.PerlinNoise.noise2D(
+                            (bx + veinIndex * 100) * 0.3, (bz + veinIndex * 200) * 0.3
+                        ) : 0;
+
+                        // Smooth falloff: center blocks always placed, edge blocks probabilistic
+                        var threshold = radius - 0.5 + noiseVal * 0.8;
+                        if (dist < threshold) {
+                            chunk.setBlock(bx, by, bz, blockId);
                         }
                     }
                 }
@@ -258,8 +264,8 @@
          */
         function _hash2D(x, y) {
             // FNV-1a inspired hash — produces consistent positive results
-            x = x | 0;
-            y = y | 0;
+            x = (x | 0);
+            y = (y | 0);
             var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
             h = ((h >>> 13) ^ h) * 0x5bd1e995;
             return (h ^ (h >>> 15)) >>> 0; // Unsigned 32-bit
@@ -274,8 +280,20 @@
          * @private
          */
         function _randomInRange(index, min, max) {
-            var hash = _hash2D(index, (min + max) | 0);
+            var hash = _hash2D(index, ((min + max) | 0));
             return min + (hash % (max - min + 1));
+        }
+
+        /**
+         * Validate that required parameters are of correct type and range.
+         * @param {Object} params - Parameters to validate.
+         * @returns {boolean} True if all validations pass.
+         * @private
+         */
+        function _validateParams(params) {
+            if (!params.chunk || typeof params.chunk.getBlock !== 'function') return false;
+            if (typeof params.biomeId !== 'number' || params.biomeId < 0) return false;
+            return true;
         }
 
         /**
