@@ -75,8 +75,8 @@
             // Step 3: Apply surface layer (grass/dirt/stone per biome) — replaces top blocks
             Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, biomeId, heightmap);
 
-            // Step 4: Place ores in stone layers
-            if (Donkeycraft.OreGenerator) Donkeycraft.OreGenerator.placeOres(chunk, biomeId);
+            // Step 4: Place ores in stone layers (pass heightmap for terrain clamping)
+            if (Donkeycraft.OreGenerator) Donkeycraft.OreGenerator.placeOres(chunk, biomeId, heightmap);
 
             // Step 5: Generate caves
             if (Donkeycraft.CaveGenerator) Donkeycraft.CaveGenerator.generateCaves(chunk, biomeId);

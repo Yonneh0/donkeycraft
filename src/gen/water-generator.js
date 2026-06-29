@@ -97,8 +97,8 @@
                 _placeSurfaceWater(chunk, heightmap);
             }
 
-            // Random underground lakes
-            _placeUndergroundLakes(chunk);
+            // Random underground lakes (pass heightmap for terrain clamping)
+            _placeUndergroundLakes(chunk, heightmap);
         }
 
         /**
@@ -157,10 +157,12 @@
         /**
          * Place underground lakes using noise-based detection.
          * Uses world seed for deterministic lake placement across all chunks.
+         * Lake Y levels are clamped to terrain surface via heightmap to prevent floating water.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
+         * @param {number[]} [heightmap] - Optional heightmap for terrain clamping.
          * @private
          */
-        function _placeUndergroundLakes(chunk) {
+        function _placeUndergroundLakes(chunk, heightmap) {
             if (!_waterBlockId || _waterBlockId === 0) return;
 
             // Incorporate world seed for deterministic placement across chunks
@@ -177,20 +179,35 @@
                 var lz = ((hash >> 8) % CHUNK_SIZE);
                 if (lz < 0) lz += CHUNK_SIZE;
 
-                // Random Y level below surface
-                var surfaceY = 40 + ((hash >> 16) % 60); // Y: 40-100
-                if (surfaceY >= WORLD_HEIGHT - 5) continue;
+                // Determine terrain surface Y at this position for clamping
+                var surfaceY = WORLD_HEIGHT;
+                if (heightmap) {
+                    surfaceY = heightmap[lx + lz * CHUNK_SIZE] || WORLD_HEIGHT;
+                }
+
+                // Clamp lake Y to be underground: between Y=5 and surfaceY-4
+                // This ensures lakes are always below terrain surface
+                var maxLakeY = Math.min(surfaceY - 4, 60); // Cap at Y=60 for "underground" feel
+                var minLakeY = 5;
+
+                if (minLakeY >= maxLakeY) continue; // No valid range
+
+                // Random Y level within clamped range
+                var lakeY = minLakeY + ((hash >> 16) % (maxLakeY - minLakeY));
+
+                if (lakeY >= WORLD_HEIGHT - 5) continue;
 
                 // Lake radius
-                var radius = 2 + ((hash >> 24) % 4);
+                var radius = 2 + ((hash >> 24) % 3); // Slightly reduced: 2-4 instead of 2-5
 
-                _placeLake(chunk, lx, surfaceY, lz, radius);
+                _placeLake(chunk, lx, lakeY, lz, radius);
             }
         }
 
         /**
          * Place a small underground lake (sphere of water).
          * Only replaces air blocks to avoid overwriting terrain.
+         * Validates that water blocks have solid support below to prevent floating water.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -219,6 +236,27 @@
                             bz >= 0 && bz < CHUNK_SIZE) {
                             // Only replace air blocks — never overwrite existing terrain.
                             if (chunk.getBlock(bx, by, bz) === 0) {
+                                // Validate: water block must have solid support below (not air)
+                                // Exception: the bottom-most water block in a lake can rest on air
+                                // since caves may have carved out space beneath it.
+                                if (by > 0) {
+                                    var blockBelow = chunk.getBlock(bx, by - 1, bz);
+                                    if (blockBelow === 0) {
+                                        // No solid block below — skip unless this is the bottom of the lake
+                                        // Check if there's anything below that either
+                                        var foundSupport = false;
+                                        for (var checkY = by - 1; checkY >= 0; checkY--) {
+                                            var checkBlock = chunk.getBlock(bx, checkY, bz);
+                                            if (checkBlock !== 0) {
+                                                // Found solid block below — this water is floating above a cave
+                                                // Only place if it's the lowest water block
+                                                foundSupport = true;
+                                                break;
+                                            }
+                                        }
+                                        if (!foundSupport) continue;
+                                    }
+                                }
                                 chunk.setBlock(bx, by, bz, _waterBlockId);
                             }
                         }

@@ -14,16 +14,17 @@
     /**
      * Ore definitions with Y-level ranges, vein size, rarity, and biome restrictions.
      * Block IDs resolved at runtime via BlockRegistry using block names.
+     * Y-levels are absolute, but actual placement is clamped to terrain surface during generation.
      * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
      */
     var ORE_DEFS = [
-        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 160, veinSize: 8, rarity: 12, biomes: null },
-        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 164, veinSize: 6, rarity: 10, biomes: null },
-        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 64, veinSize: 4, rarity: 20, biomes: null },
-        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 28, biomes: null },
-        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 32, veinSize: 5, rarity: 16, biomes: null },
-        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 64, veinSize: 4, rarity: 18, biomes: null },
-        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 32, veinSize: 2, rarity: 30, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
+        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 60, veinSize: 5, rarity: 20, biomes: null },
+        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 50, veinSize: 4, rarity: 16, biomes: null },
+        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 24, biomes: null },
+        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 20, veinSize: 3, rarity: 32, biomes: null },
+        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 28, veinSize: 3, rarity: 20, biomes: null },
+        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 24, veinSize: 2, rarity: 28, biomes: null },
+        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 20, veinSize: 1, rarity: 40, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
     ];
 
     // Cache for resolved block IDs to avoid repeated lookups.
@@ -98,10 +99,12 @@
          * Place ores in a chunk based on biome restrictions and ore definitions.
          * Resolves block IDs from BlockRegistry at runtime for correctness.
          * Auto-initializes the ore generator (resolves all block IDs) on first call.
+         * Ore Y levels are clamped to terrain surface via heightmap to prevent spawning above ground.
          * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
          * @param {number} biomeId - Biome ID for this chunk.
+         * @param {number[]} [heightmap] - Optional heightmap array for terrain clamping.
          */
-        function placeOres(chunk, biomeId) {
+        function placeOres(chunk, biomeId, heightmap) {
             if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
 
             // Auto-initialize: resolve all block IDs from BlockRegistry on first call
@@ -129,18 +132,20 @@
                 }
 
                 // Place veins for this ore type
-                _placeOreVeins(chunk, oreDef, blockId);
+                _placeOreVeins(chunk, oreDef, blockId, heightmap);
             }
         }
 
         /**
          * Place veins for a single ore type in a chunk.
+         * Y levels are clamped to terrain surface when heightmap is provided.
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {object} oreDef - Ore definition.
          * @param {number} blockId - Resolved block ID.
+         * @param {number[]} [heightmap] - Optional heightmap for terrain clamping.
          * @private
          */
-        function _placeOreVeins(chunk, oreDef, blockId) {
+        function _placeOreVeins(chunk, oreDef, blockId, heightmap) {
             // Determine how many vein placement attempts based on rarity
             var attempts = Math.floor((CHUNK_SIZE * CHUNK_SIZE) / oreDef.rarity);
 
@@ -154,8 +159,30 @@
                 var vz = seedZ % CHUNK_SIZE;
                 if (vz < 0) vz += CHUNK_SIZE;
 
-                // Random Y level within ore's range
-                var vy = _randomInRange(v, oreDef.minY, oreDef.maxY);
+                // Determine terrain surface Y at this position for clamping
+                var surfaceY = WORLD_HEIGHT; // Default: use max if no heightmap
+                if (heightmap) {
+                    surfaceY = heightmap[vx + vz * CHUNK_SIZE] || WORLD_HEIGHT;
+                }
+
+                // Calculate max Y: ore must be below terrain surface
+                // Subtract offset based on ore depth tier to create proper underground distribution
+                var depthOffset;
+                if (oreDef.name === 'coal_ore' || oreDef.name === 'iron_ore') {
+                    depthOffset = 6; // Common ores: a bit deeper
+                } else if (oreDef.name === 'gold_ore' || oreDef.name === 'redstone_ore') {
+                    depthOffset = 12; // Rarer ores: deeper
+                } else {
+                    depthOffset = 10; // Default
+                }
+
+                var maxYForOre = Math.min(oreDef.maxY, surfaceY - depthOffset);
+
+                // Skip this vein if no valid Y range exists (terrain too low)
+                if (oreDef.minY >= maxYForOre) continue;
+
+                // Random Y level within ore's clamped range
+                var vy = _randomInRange(v, oreDef.minY, maxYForOre);
 
                 // Place the vein (simple sphere shape)
                 _placeVein(chunk, vx, vy, vz, blockId, oreDef.veinSize, v);
@@ -165,6 +192,7 @@
         /**
          * Place a single ore vein as a rough sphere with natural variation.
          * Uses fbm noise for organic shape instead of hard sphere edges.
+         * Validates that the ore is placed inside solid terrain (block below must not be air).
          * @param {Donkeycraft.Chunk} chunk - The chunk.
          * @param {number} cx - Center X.
          * @param {number} cy - Center Y.
@@ -192,6 +220,14 @@
                         // Check bounds
                         if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz >= CHUNK_SIZE) {
                             continue;
+                        }
+
+                        // Validate: block below must be solid (not air) to ensure ore is underground
+                        if (by > 0) {
+                            var blockBelow = chunk.getBlock(bx, by - 1, bz);
+                            if (blockBelow === 0) continue; // Skip — no solid block beneath
+                        } else {
+                            continue; // Y=0 has nothing below, skip
                         }
 
                         // Use noise for organic shape variation — blocks near the edge

@@ -170,7 +170,7 @@
         {
           id: Donkeycraft.BiomeID.FOREST, name: 'forest', temp: 0.7, rain: 0.5,
           ground: 0x228b22, grass: 0x3a7a3a, leaf: 0x2d6e2d, waterColor: 0x4fc3f7,
-          decor: { trees: 8, flowers: 2, grass: 3, cacti: 0 }
+          decor: { trees: 6, flowers: 2, grass: 3, cacti: 0 }
         },
         {
           id: Donkeycraft.BiomeID.SWAMP, name: 'swamp', temp: 0.7, rain: 0.8,
@@ -209,7 +209,7 @@
         {
           id: Donkeycraft.BiomeID.FLOWER_FOREST, name: 'flower_forest', temp: 0.7, rain: 0.5,
           ground: 0x228b22, grass: 0x3a7a3a, leaf: 0x2d6e2d, waterColor: 0x4fc3f7,
-          decor: { trees: 8, flowers: 15, grass: 3, cacti: 0 }
+          decor: { trees: 6, flowers: 10, grass: 3, cacti: 0 }
         },
         {
           id: Donkeycraft.BiomeID.ICE_PLAINS, name: 'ice_plains', temp: 0.05, rain: 0.3,
@@ -226,12 +226,12 @@
         {
           id: Donkeycraft.BiomeID.FOREST_HILL, name: 'forest_hills', temp: 0.7, rain: 0.5,
           ground: 0x228b22, grass: 0x3a7a3a, leaf: 0x2d6e2d, waterColor: 0x4fc3f7,
-          decor: { trees: 10, flowers: 2, grass: 3, cacti: 0 }
+          decor: { trees: 8, flowers: 2, grass: 3, cacti: 0 }
         },
         {
           id: Donkeycraft.BiomeID.TAIGA_HILL, name: 'taiga_hills', temp: 0.3, rain: 0.5,
           ground: 0x3a5f3a, grass: 0x2d6e2d, leaf: 0x1a4a1a, waterColor: 0x4fc3f7,
-          decor: { trees: 8, flowers: 1, grass: 4, cacti: 0 },
+          decor: { trees: 6, flowers: 1, grass: 4, cacti: 0 },
           spawn: { passive: 0.008, hostile: 0.03, aqua: 0.003 }
         },
         {

@@ -16,9 +16,9 @@
      */
     Donkeycraft.CaveGenerator = (function () {
         // Cave density threshold — fbm value below which caves form.
-        // fbm returns [-1, 1]; -0.7 carves the lowest ~12% of values for natural cave density.
-        var _caveDensity = -0.7;
-        var _caveRadius = 3.0;          // Base cave tunnel radius
+        // fbm returns [-1, 1]; -0.8 carves the lowest ~5% of values for natural cave density.
+        var _caveDensity = -0.8;
+        var _caveRadius = 2.0;          // Base cave tunnel radius
         var _lavaYLevel = 10;           // Lava caves below this Y level
         var _surfaceDepth = 5;          // Surface depth for hanging caves
 
@@ -72,17 +72,17 @@
             var radius = _caveRadius;
 
             if (biomeId === Donkeycraft.BiomeID.OCEAN) {
-                density = -0.9;  // More negative = fewer caves carved
+                density = -0.95;  // More negative = fewer caves carved
                 radius = _caveRadius * 0.5;
             } else if (biomeId === Donkeycraft.BiomeID.DESERT || biomeId === Donkeycraft.BiomeID.DESERT_M) {
-                density = -0.8;  // Slightly fewer caves in deserts
+                density = -0.9;  // Slightly fewer caves in deserts
             }
 
             // Generate main cave layer with continuous Y iteration
             _generateCaveLayer(chunk, density, radius, minY, maxY, 'main');
 
             // Generate lava caves near bedrock floor
-            _generateCaveLayer(chunk, -0.9, radius * 0.7, minY, lavaYLevel + 5, 'lava');
+            _generateCaveLayer(chunk, -0.95, radius * 0.6, minY, lavaYLevel + 4, 'lava');
         }
 
         /**

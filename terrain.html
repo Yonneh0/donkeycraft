@@ -258,28 +258,20 @@
         varying vec3 vNormal;
         varying float vAlpha;
         varying float vDepth;
-        varying vec3 vWorldPos;
         uniform vec3 uFogColor;
         uniform float uFogDensity;
         uniform float uLightFactor;
         void main() {
-            // Lighting: directional light + ambient
-            vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+            // Simple directional lighting: ambient + diffuse
+            vec3 lightDir = normalize(vec3(0.4, 0.8, 0.3));
             float diff = max(dot(normalize(vNormal), lightDir), 0.0);
-            float lighting = 0.45 + diff * 0.55;
+            float lighting = 0.55 + diff * 0.45;
             vec3 finalColor = vColor * lighting * uLightFactor;
 
             // Fog with exponential falloff
             float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
             fogFactor = clamp(fogFactor, 0.0, 1.0);
             finalColor = mix(finalColor, uFogColor, fogFactor);
-
-            // Subtle edge darkening for block border definition
-            vec3 viewDir = normalize(-vWorldPos);
-            float fresnel = 1.0 - abs(dot(viewDir, normalize(vNormal)));
-            fresnel = pow(fresnel, 2.5);
-            vec3 edgeColor = vec3(0.08, 0.08, 0.08);
-            finalColor = mix(finalColor, edgeColor, fresnel * 0.15);
 
             gl_FragColor = vec4(finalColor, vAlpha);
         }
@@ -1004,9 +996,11 @@
 
                                 // Show face if neighbor is air OR transparent
                                 if (nid === 0 || neighborTransparent) {
-                                    for (var v = 0; v < 4; v++) {
-                                        var cr = face.c[v];
-                                        pos.push(x + cr[0], y + cr[1], z + cr[2]);
+                                    // Each quad = 6 vertices (2 triangles), consistent winding [0,1,2] + [0,2,3]
+                                    var triIndices = [0, 1, 2, 0, 2, 3];
+                                    for (var ti = 0; ti < 6; ti++) {
+                                        var vi = face.c[triIndices[ti]];
+                                        pos.push(x + vi[0], y + vi[1], z + vi[2]);
                                         col.push(clr[0], clr[1], clr[2]);
                                         alp.push(alpha);
                                         nor.push(face.n[0], face.n[1], face.n[2]);
@@ -1310,7 +1304,9 @@
                     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(wc), gl.DYNAMIC_DRAW);
                 }
 
-                gl.disable(gl.DEPTH_TEST);
+                // Wireframe: depth test ON so lines behind geometry don't show,
+                // but depthMask false so lines render on top without affecting depth buffer
+                gl.enable(gl.DEPTH_TEST);
                 gl.depthMask(false);
 
                 gl.enableVertexAttribArray(wireframeLocs.aPosition);
@@ -1321,7 +1317,7 @@
 
                 gl.drawArrays(gl.LINES, 0, _wireframeBufferCount);
 
-                gl.enable(gl.DEPTH_TEST);
+                // Restore state
                 gl.depthMask(true);
             }
 
