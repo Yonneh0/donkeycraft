@@ -112,17 +112,18 @@
     /**
      * _getDrumstickSVG — return SVG markup for a drumstick in the given state.
      * Uses the exact paths from the reference drumstick icon (1024x1024 viewBox).
+     * All 3 states share an identical bone shape (whiteBody path with #F2F5FB fill + dark outline).
      *   full  — complete drumstick with all layers and colors
-     *   half  — all paths visible, only the tan body fill (#DD9121) clipped to bottom half
-     *   empty — outline only (no fill)
+     *   half  — body fills clipped to bottom half, bone fully visible
+     *   empty — outlines only, no meat shadow, identical bone
      * @private
      * @param {string} state - 'full', 'half', or 'empty'.
      * @returns {string} SVG markup string.
      */
     Donkeycraft.HungerBar.prototype._getDrumstickSVG = function(state) {
         // Reference SVG paths extracted from ref/drumstick.svg
-        var whiteBody = 'M241 919.7c-9.3 4.2-19.4 6.3-29.9 6.1-18.3-0.4-35.2-7.9-47.9-21.1-9.8-10.2-16-22.9-18-36.6-13.6-2.7-26-9.5-35.8-19.7-26-27.2-25-70.6 2.2-96.6 24.3-23.2 61.4-24.9 87.6-5.7L343.8 608c3.2-3.1 7.7-4.5 12.2-3.9 4.4 0.6 8.4 3.3 10.6 7.1 5.8 9.9 12.4 18.8 19.8 26.5 7.9 8.3 17.2 15.8 27.7 22.3 3.9 2.4 6.4 6.4 6.8 10.9 0.5 4.5-1.2 9-4.5 12.1L271 822c16.3 26.8 12.4 62.4-11.2 85-5.5 5.2-11.9 9.5-18.8 12.7z';
-        var lightFill = 'M358.6 628.4c-6.3-6.6-26 3.7-21.1 8.9 6.6 6.9 7 3.9 13.4 12 12.7 15.9 3 25.2 0.2 27.8l-132 125.3c13.7 22.5 7.3 45.9-7.7 56.6-16.1 11.5-49 13.9-59.4 3.8 2.6 5.4 6.1 10.5 10.4 14.9 10.8 11.3 29.5 31.7 45.2 32.1 9 0.2 17.7-1.6 25.7-5.2 5.9-2.7 11.4-6.4 16.2-11 20.3-19.4 19.6-63.9 5.5-86.9l125-119.4c2.8-2.7 15.7-13.5 15-17.3-2.3-12.2-29.6-34.5-36.4-41.6z';
+        var bone = 'M241 919.7c-9.3 4.2-19.4 6.3-29.9 6.1-18.3-0.4-35.2-7.9-47.9-21.1-9.8-10.2-16-22.9-18-36.6-13.6-2.7-26-9.5-35.8-19.7-26-27.2-25-70.6 2.2-96.6 24.3-23.2 61.4-24.9 87.6-5.7L343.8 608c3.2-3.1 7.7-4.5 12.2-3.9 4.4 0.6 8.4 3.3 10.6 7.1 5.8 9.9 12.4 18.8 19.8 26.5 7.9 8.3 17.2 15.8 27.7 22.3 3.9 2.4 6.4 6.4 6.8 10.9 0.5 4.5-1.2 9-4.5 12.1L271 822c16.3 26.8 12.4 62.4-11.2 85-5.5 5.2-11.9 9.5-18.8 12.7z';
+        var meatFill = 'M358.6 628.4c-6.3-6.6-26 3.7-21.1 8.9 6.6 6.9 7 3.9 13.4 12 12.7 15.9 3 25.2 0.2 27.8l-132 125.3c13.7 22.5 7.3 45.9-7.7 56.6-16.1 11.5-49 13.9-59.4 3.8 2.6 5.4 6.1 10.5 10.4 14.9 10.8 11.3 29.5 31.7 45.2 32.1 9 0.2 17.7-1.6 25.7-5.2 5.9-2.7 11.4-6.4 16.2-11 20.3-19.4 19.6-63.9 5.5-86.9l125-119.4c2.8-2.7 15.7-13.5 15-17.3-2.3-12.2-29.6-34.5-36.4-41.6z';
         var mainBody = 'M314.5 642.2l110.3-400.7s37-66.3 117.1-103.9 244.8-28.7 301.5 51.9C900 270.2 962 423.1 876.1 531.1S408.8 703.5 408.8 703.5L391 658.8l-30.7-24.3-45.8 7.7z';
         var shadowFill = 'M864.7 218.4C830.4 169.6 721 89 635.1 128.2c28.4 11.9 113.6 32.1 147.2 74.2 73.4 92 98.5 206.8 12.6 314.8-58.6 73.7-288 110.2-406.7 136.7l-3.8 56.6s392.8-50.9 478.8-159 58.1-252.4 1.5-333.1z';
         var outlinePath = 'M240 917.4c-9.3 4.2-19.4 6.3-29.9 6.1-18.3-0.4-35.2-7.9-47.9-21.1-9.8-10.2-16-22.9-18-36.6-13.6-2.7-26-9.5-35.8-19.7-26-27.2-25-70.6 2.2-96.6 24.3-23.2 61.4-24.9 87.6-5.7l144.6-138.1c3.2-3.1 7.7-4.5 12.2-3.9 4.4 0.6 8.4 3.3 10.6 7.1 5.8 9.9 12.4 18.8 19.8 26.5 7.9 8.3 17.2 15.8 27.7 22.3 3.9 2.4 6.4 6.4 6.8 10.9 0.5 4.5-1.2 9-4.5 12.1L270 819.7c16.3 26.8 12.4 62.4-11.2 85-5.5 5.3-11.9 9.6-18.8 12.7z m-98.3-154c-3.9 1.8-7.5 4.2-10.7 7.3-15.6 14.9-16.1 39.6-1.3 55.2 7.4 7.8 17.5 12 28.4 11.9 4 0 7.9 1.6 10.7 4.5 2.8 2.9 4.2 6.8 4 10.9-0.6 10.9 3.2 21.2 10.6 28.9 7.2 7.5 16.9 11.8 27.3 12.1 10.4 0.2 20.3-3.6 27.9-10.8 15.6-14.9 16.1-39.6 1.3-55.2-5.6-5.9-5.4-15.1 0.5-20.7l141.9-135.6c-6.5-5.1-12.6-10.5-18.1-16.3-4.9-5.1-9.5-10.7-13.9-16.6L208.5 774.5c-2.9 2.8-6.8 4.2-10.8 4-4-0.2-7.8-2-10.4-5-0.3-0.3-1.2-1.5-1.6-2-11.7-12-29.5-14.8-44-8.1z';
@@ -131,31 +132,34 @@
         var eyeDots = '<circle cx="485.8" cy="334.4" r="16.9" fill="#004364"/><circle cx="500.4" cy="246.1" r="16.9" fill="#004364"/><circle cx="606.6" cy="181.1" r="16.9" fill="#004364"/><circle cx="701.1" cy="211.4" r="16.9" fill="#004364"/><circle cx="588.7" cy="281.2" r="16.9" fill="#004364"/>';
 
         if (state === 'half') {
-            // All paths visible; only the tan body fill (#DD9121) clipped to bottom half.
-            // Outline, shadow, details, eye, and bone dots remain fully intact on both halves.
+            // Body fills clipped to bottom half. Bone, outline, detail, eye, and dots fully visible.
             return '<svg viewBox="0 0 1024 1024" class="dk-drumstick dk-drumstick-half">' +
                 '<defs>' +
-                '<clipPath id="dk-hunger-clip-bottom"><rect x="0" y="512" width="1024" height="512"/></clipPath>' +
+                '<clipPath id="dk-hunger-clip-bottom">' +
+                '<rect x="0" y="512" width="1024" height="512"/>' +
+                '</clipPath>' +
                 '</defs>' +
-                // Non-clipped layers (outline, shadow, details, eye, bone dots) — fully visible
-                '<path d="' + whiteBody + '" fill="#F2F5FB"/>' +
-                '<path d="' + lightFill + '" fill="#DEEAF4"/>' +
-                '<path d="' + shadowFill + '" fill="#CE790A"/>' +
+                // Bone — identical in all states, fully visible
+                '<path d="' + bone + '" fill="#F2F5FB" stroke="#004364" stroke-width="3"/>' +
+                // Outline/detail layers — fully visible (not clipped)
                 '<path d="' + outlinePath + '" fill="#004364"/>' +
                 '<path d="' + detailPath + '" fill="#004364"/>' +
                 '<path d="' + eye + '" fill="#004364"/>' +
                 eyeDots +
-                // Tan body fill — clipped to bottom half only
+                // Body fills — clipped to bottom half only
                 '<g clip-path="url(#dk-hunger-clip-bottom)">' +
+                '<path d="' + meatFill + '" fill="#DEEAF4"/>' +
                 '<path d="' + mainBody + '" fill="#DD9121"/>' +
+                '<path d="' + shadowFill + '" fill="#CE790A"/>' +
                 '</g>' +
                 '</svg>';
         }
         if (state === 'full') {
-            // Complete drumstick: all layers and colors from reference
+            // Complete drumstick: bone + all layers and colors from reference
             return '<svg viewBox="0 0 1024 1024" class="dk-drumstick dk-drumstick-full">' +
-                '<path d="' + whiteBody + '" fill="#F2F5FB"/>' +
-                '<path d="' + lightFill + '" fill="#DEEAF4"/>' +
+                // Bone — identical in all states
+                '<path d="' + bone + '" fill="#F2F5FB" stroke="#004364" stroke-width="3"/>' +
+                '<path d="' + meatFill + '" fill="#DEEAF4"/>' +
                 '<path d="' + mainBody + '" fill="#DD9121"/>' +
                 '<path d="' + shadowFill + '" fill="#CE790A"/>' +
                 '<path d="' + outlinePath + '" fill="#004364"/>' +
@@ -164,16 +168,17 @@
                 eyeDots +
                 '</svg>';
         }
-        // Empty — all paths visible as outlines, bone dots stay filled #004364 (same color in all states)
+        // Empty — outlines only, no meat shadow layer. Bone identical to other states.
         return '<svg viewBox="0 0 1024 1024" class="dk-drumstick dk-drumstick-empty-svg">' +
-            '<path d="' + whiteBody + '" fill="none" stroke="#b0b8c8" stroke-width="4"/>' +
-            '<path d="' + lightFill + '" fill="none" stroke="#a8b8c8" stroke-width="4"/>' +
-            '<path d="' + mainBody + '" fill="none" stroke="#c09020" stroke-width="4"/>' +
-            '<path d="' + shadowFill + '" fill="none" stroke="#a87010" stroke-width="4"/>' +
-            '<path d="' + outlinePath + '" fill="none" stroke="#004364" stroke-width="6"/>' +
-            '<path d="' + detailPath + '" fill="none" stroke="#004364" stroke-width="4"/>' +
-            '<path d="' + eye + '" fill="none" stroke="#004364" stroke-width="4"/>' +
-            // Bone dots stay filled #004364 in all states — no hallucinated color changes
+            // Bone — identical in all states
+            '<path d="' + bone + '" fill="#F2F5FB" stroke="#004364" stroke-width="3"/>' +
+            // Outlines with thick strokes so visible at small scale (no shadow/meat layers)
+            '<path d="' + meatFill + '" fill="none" stroke="#7a6a5a" stroke-width="24"/>' +
+            '<path d="' + mainBody + '" fill="none" stroke="#b8760a" stroke-width="24"/>' +
+            '<path d="' + outlinePath + '" fill="none" stroke="#004364" stroke-width="32"/>' +
+            '<path d="' + detailPath + '" fill="none" stroke="#004364" stroke-width="24"/>' +
+            '<path d="' + eye + '" fill="none" stroke="#004364" stroke-width="24"/>' +
+            // Bone dots stay filled #004364 in all states
             eyeDots +
             '</svg>';
     };
