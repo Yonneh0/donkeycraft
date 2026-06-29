@@ -26,7 +26,6 @@ body {
     height: 100vh;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    cursor: none;
 }
 
 /* Pointer lock cursor hiding — controlled via JS by toggling .dk-pointer-locked class on body.

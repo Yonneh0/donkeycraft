@@ -1335,24 +1335,35 @@
     Donkeycraft.Game.prototype._tick = function(dt, tickCount) {
         if (!this._running || this._paused) return;
 
-        // Update input key states and mouse button states (for just-pressed detection)
+        // Update input key states and mouse button states (for just-pressed detection).
         if (this._input) {
             this._input.updateKeyStates();
             this._input.updateMouseButtonStates();
         }
 
-        // Tick block break progress (decrement timers, spawn drops)
+        // Tick block break progress (decrement timers, spawn drops).
         if (this._blockActionSystem && this._chunkManager) {
             this._blockActionSystem.tickBreakProgress(dt);
         }
 
-        // Process player movement and collision
-        this._updatePlayer(dt);
+        // Tick player subsystems in dependency order:
+        // 1. Flying — state management (toggle, speed queries)
+        // 2. Movement — physics, gravity, swimming, collision resolution
+        // 3. Jumping — jump input, cooldown, water swimming boost
+        if (this._flyingSystem) {
+            try { this._flyingSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Flying tick error: ' + e.message); }
+        }
+        if (this._movementSystem) {
+            try { this._movementSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Movement tick error: ' + e.message); }
+        }
+        if (this._jumpSystem) {
+            try { this._jumpSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Jump tick error: ' + e.message); }
+        }
 
-        // Update chunk manager based on player position
+        // Update chunk manager based on player position.
         this._updateChunks();
 
-        // Process interactions (block break/place)
+        // Process interactions (block break/place).
         this._processInteractions();
 
         // Periodically sync player inventory hotbar to Hotbar UI display (every 30 ticks ≈ 1.5s)
@@ -1429,168 +1440,30 @@
     };
 
     /**
-     * Update player movement based on input.
+     * Update player rotation from camera and notify tick subscribers.
+     * Movement, collision, and physics are handled by the subsystems (Movement, Jumping, Flying).
      * @private
      * @param {number} dt - Delta time in seconds.
      */
     Donkeycraft.Game.prototype._updatePlayer = function(dt) {
-        if (!this._player || !this._input) return;
+        if (!this._player || !this._camera) return;
 
-        var pos = this._player.getPosition();
-        var vel = this._player.getVelocity();
+        // Update player rotation from camera (yaw/pitch from mouse look).
         var rot = this._player.getRotation();
-
-        // Determine movement direction from input
-        var moveX = 0;
-        var moveZ = 0;
-        var isSprinting = this._input.isKeyDown('ShiftLeft');
-
-        if (this._input.isKeyDown('KeyW')) moveZ -= 1;
-        if (this._input.isKeyDown('KeyS')) moveZ += 1;
-        if (this._input.isKeyDown('KeyA')) moveX -= 1;
-        if (this._input.isKeyDown('KeyD')) moveX += 1;
-
-        // Normalize diagonal movement
-        if (moveX !== 0 && moveZ !== 0) {
-            var invSqrt2 = 0.70710678118;
-            moveX *= invSqrt2;
-            moveZ *= invSqrt2;
-        }
-
-        // Determine if player is in flying mode (creative with flight enabled or spectator)
-        var isFlying = (this._player.gameMode === 'creative' && this._player.flyEnabled) ||
-                       this._player.gameMode === 'spectator';
-
-        // Apply movement based on game mode
-        if (isFlying) {
-            this._updateFlyingMovement(dt, moveX, moveZ, isSprinting);
-        } else {
-            this._updateWalkingMovement(dt, moveX, moveZ, isSprinting);
-
-            // Handle jumping (before gravity, so jump happens before falling)
-            if (this._jumpSystem && this._input.isKeyJustPressed('Space')) {
-                if (this._jumpSystem.canJump(this._player)) {
-                    this._jumpSystem.performJump(this._player);
-                }
-            }
-
-            // Handle swimming upward — use Config.SWIM_BOOST for upward velocity boost
-            if (this._input.isKeyDown('Space') && this._jumpSystem && this._jumpSystem.isSwimmingUp(this._player)) {
-                vel.y += Config.SWIM_BOOST;
-            }
-        }
-
-        // Apply gravity only when not flying (spectator and creative-fly ignore gravity)
-        if (!isFlying) {
-            vel.y += Config.GRAVITY * dt;
-
-            // Clamp vertical velocity to terminal velocity from Config
-            if (vel.y < Config.TERMINAL_VELOCITY) vel.y = Config.TERMINAL_VELOCITY;
-        } else if (this._player.gameMode === 'creative' && this._player.flyEnabled) {
-            // Creative flying: clamp downward fly speed only
-            if (vel.y > -Config.FLYING_TERMINAL_VELOCITY) vel.y = -Config.FLYING_TERMINAL_VELOCITY;
-        }
-        // Spectator mode: no velocity clamping — free movement
-
-        // Handle knockback — modify directly on player object to ensure decay persists
-        var kb = this._player.getKnockback();
-        if (kb && (kb.x !== 0 || kb.z !== 0)) {
-            vel.x += kb.x * dt;
-            vel.z += kb.z * dt;
-            // Decay knockback directly on the player's knockback object
-            kb.x *= 0.9;
-            kb.z *= 0.9;
-            if (Math.abs(kb.x) < 0.01) { kb.x = 0; kb.z = 0; }
-        }
-
-        // Resolve collision if collision system is available
-        if (this._collisionSystem) {
-            var deltaX = vel.x * dt;
-            var deltaY = vel.y * dt;
-            var deltaZ = vel.z * dt;
-
-            var result = this._collisionSystem.resolveMovement(
-                pos, { x: deltaX, y: deltaY, z: deltaZ },
-                this._player.width, this._player.height
-            );
-
-            pos.x = result.newX;
-            pos.y = result.newY;
-            pos.z = result.newZ;
-        } else {
-            // Fallback: apply velocity directly (no collision)
-            pos.x += vel.x * dt;
-            pos.y += vel.y * dt;
-            pos.z += vel.z * dt;
-        }
-
-        // Update player rotation from camera
         rot.yaw = this._camera.getYaw();
         rot.pitch = this._camera.getPitch();
 
-        // Emit player tick event
+        // Decay knockback directly on the player's knockback object.
+        var kb = this._player.getKnockback();
+        if (kb && (Math.abs(kb.x) > 0.001 || Math.abs(kb.z) > 0.001)) {
+            kb.x *= 0.9;
+            kb.z *= 0.9;
+            if (Math.abs(kb.x) < 0.01) { kb.x = 0; }
+            if (Math.abs(kb.z) < 0.01) { kb.z = 0; }
+        }
+
+        // Emit player tick event for subscribers (e.g., stats tracking).
         this._player._notifyTick(dt);
-    };
-
-    /**
-     * Update walking movement based on input.
-     * @private
-     * @param {number} dt - Delta time.
-     * @param {number} moveX - Horizontal input X.
-     * @param {number} moveZ - Horizontal input Z.
-     * @param {boolean} isSprinting - Whether sprinting.
-     */
-    Donkeycraft.Game.prototype._updateWalkingMovement = function(dt, moveX, moveZ, isSprinting) {
-        var vel = this._player.getVelocity();
-
-        // Get movement speed from Config based on game mode and sprint state
-        var speed = Config.PLAYER_SPEED; // Survival walking speed
-        if (this._player.gameMode === 'creative') {
-            speed = Config.PLAYER_FLY_SPEED; // Creative walking speed (uses same base)
-        }
-        if (isSprinting) {
-            speed = Config.PLAYER_SPRINT_SPEED; // Sprint speed from Config
-        }
-
-        // Apply horizontal movement
-        vel.x = moveX * speed;
-        vel.z = moveZ * speed;
-    };
-
-    /**
-     * _updateFlyingMovement — Update flying movement based on input.
-     * Normalizes diagonal movement and applies delta-time for consistent speed across framerates.
-     * @private
-     * @param {number} dt - Delta time in seconds.
-     * @param {number} moveX - Horizontal input X.
-     * @param {number} moveZ - Horizontal input Z.
-     * @param {boolean} isSprinting - Whether sprinting.
-     */
-    Donkeycraft.Game.prototype._updateFlyingMovement = function(dt, moveX, moveZ, isSprinting) {
-        var vel = this._player.getVelocity();
-
-        // Get flying speed from Config based on sprint state
-        var speed = isSprinting ? Config.PLAYER_FLY_SPEED_BOOST : Config.PLAYER_FLY_SPEED;
-
-        // Normalize diagonal movement (same as walking — prevents 41% speed boost)
-        if (moveX !== 0 && moveZ !== 0) {
-            var invSqrt2 = 0.70710678118;
-            moveX *= invSqrt2;
-            moveZ *= invSqrt2;
-        }
-
-        // Apply horizontal movement (delta-time normalized)
-        vel.x = moveX * speed;
-        vel.z = moveZ * speed;
-
-        // Handle up/down flying (delta-time normalized for consistent vertical speed at any framerate)
-        // Uses Config.FLY_BASELINE_FPS instead of hardcoded 60 to handle high-refresh-rate monitors correctly.
-        if (this._input.isKeyDown('Space')) {
-            vel.y += speed * 0.5 * dt * Config.FLY_BASELINE_FPS;
-        }
-        if (this._input.isKeyDown('ShiftLeft')) {
-            vel.y -= speed * 0.5 * dt * Config.FLY_BASELINE_FPS;
-        }
     };
 
     /**

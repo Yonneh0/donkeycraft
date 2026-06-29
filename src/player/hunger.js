@@ -7,11 +7,13 @@
     var Config = Donkeycraft.Config;
 
     /**
-     * Hunger — manages player hunger, saturation, and starvation.
+     * Hunger — manages player hunger, saturation, and starvation damage.
      * @param {Donkeycraft.Player} player - Player entity instance.
+     * @param {Donkeycraft.HurtBox} [hurtBox=null] - Optional HurtBox instance for health-based regen/starvation.
      */
-    Donkeycraft.Hunger = function(player) {
+    Donkeycraft.Hunger = function(player, hurtBox) {
         this._player = player;
+        this._hurtBox = hurtBox || null;
 
         /**
          * Current food level (0-20, displayed as 10 hunger icons).
@@ -28,18 +30,11 @@
         this._saturation = 20.0;
 
         /**
-         * Starvation damage timer (ticks toward 1 HP damage when food = 0).
+         * Starvation damage timer (seconds toward 1 HP damage when food = 0).
          * @type {number}
          * @private
          */
         this._starvationTimer = 0;
-
-        /**
-         * Reference to the player's HurtBox system (if available).
-         * @type {Donkeycraft.HurtBox|null}
-         * @private
-         */
-        this._hurtBox = null;
     };
 
     /**

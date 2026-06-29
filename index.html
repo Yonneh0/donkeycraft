@@ -922,10 +922,14 @@ void main() {
                         debugOverlay.setBiome(Donkeycraft.Biome || null);
                         debugOverlay.setGameMode(game2._gameMode);
 
-                        // Wire wireframe renderer reference into DebugOverlay for status display
-                        if (game2._wireframeRenderer) {
-                            debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
-                        }
+                    // Wire wireframe renderer reference into DebugOverlay for status display.
+                    if (game2._wireframeRenderer) {
+                        debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
+                    }
+                    // Wire terrain renderer reference so the F3 overlay can show rendering stats.
+                    if (game2._terrainRenderer) {
+                        debugOverlay.setTerrainRenderer(game2._terrainRenderer);
+                    }
 
                         // Store reference for toggleDebugOverlay to use
                         game2._debugOverlay = debugOverlay;

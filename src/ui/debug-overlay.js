@@ -6,8 +6,7 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * DebugOverlay — collects and tracks debug information for the F3 debug screen.
-     * Does NOT render DOM — data is emitted via EventBus for the main game to display.
+     * DebugOverlay — collects debug data and renders it to the F3 debug DOM overlay.
      * @param {Object} eventBus - The global EventBus instance.
      * @param {Object} [config=null] - Donkeycraft.Config for constants.
      */
@@ -38,8 +37,22 @@
         // Wireframe renderer reference (set via setWireframeRenderer)
         this._wireframeRenderer = null;
 
+        // DOM element reference
+        this._element = null;
+
         // Listeners for timer render events
         this._unsubscribeRender = null;
+
+        // One-time init: grab the DOM element
+        this._initDOM();
+    };
+
+    /**
+     * _initDOM — caches a reference to the debug overlay DOM element.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._initDOM = function() {
+        this._element = document.getElementById('dk-debug-overlay');
     };
 
     /**
@@ -81,6 +94,14 @@
      */
     Donkeycraft.DebugOverlay.prototype.setGameMode = function(mode) {
         this._gameMode = mode || 'survival';
+    };
+
+    /**
+     * setTerrainRenderer — sets a reference to the terrain renderer for rendering stats.
+     * @param {Object} terrainRenderer - TerrainRenderer instance with getRenderStats() method.
+     */
+    Donkeycraft.DebugOverlay.prototype.setTerrainRenderer = function(terrainRenderer) {
+        this._terrainRenderer = terrainRenderer || null;
     };
 
     /**
@@ -138,9 +159,9 @@
 
     /**
      * getPlayerCoords — gets player position and rotation data.
-     * Each getter is independently try/catched so one failure does not
-     * suppress the others.
-     * @returns {Object} Position, rotation, and mode data.
+     * Uses the Player API: getPosition() returns Vector3, getRotation() returns {yaw, pitch}.
+     * Each access is independently try/catched so one failure does not suppress others.
+     * @returns {{x: number, y: number, z: number, pitch: number, yaw: number, mode: string}}
      */
     Donkeycraft.DebugOverlay.prototype.getPlayerCoords = function() {
         var x = 0, y = 0, z = 0;
@@ -148,12 +169,24 @@
         var mode = this._gameMode;
 
         if (this._player) {
-            // Each getter is isolated so a throwing method does not suppress others.
-            try { x = this._player.getX ? this._player.getX() : 0; } catch (e) {}
-            try { y = this._player.getY ? this._player.getY() : 0; } catch (e) {}
-            try { z = this._player.getZ ? this._player.getZ() : 0; } catch (e) {}
-            try { pitch = this._player.getPitch ? this._player.getPitch() : 0; } catch (e) {}
-            try { yaw = this._player.getYaw ? this._player.getYaw() : 0; } catch (e) {}
+            // getPosition() returns a Vector3 with .x, .y, .z properties.
+            try {
+                var pos = this._player.getPosition ? this._player.getPosition() : null;
+                if (pos) {
+                    x = typeof pos.x === 'number' ? pos.x : 0;
+                    y = typeof pos.y === 'number' ? pos.y : 0;
+                    z = typeof pos.z === 'number' ? pos.z : 0;
+                }
+            } catch (e) {}
+
+            // getRotation() returns { yaw: number, pitch: number } in radians.
+            try {
+                var rot = this._player.getRotation ? this._player.getRotation() : null;
+                if (rot) {
+                    yaw = typeof rot.yaw === 'number' ? rot.yaw : 0;
+                    pitch = typeof rot.pitch === 'number' ? rot.pitch : 0;
+                }
+            } catch (e) {}
 
             try {
                 mode = this._player.getGameMode ? this._player.getGameMode() : 'survival';
@@ -171,33 +204,32 @@
     };
 
     /**
-     * getBiomeName — gets the current biome name at the player's position.
+     * getBiomeName — gets the current biome name at the player's chunk position.
+     * Uses getPosition() to extract chunk coordinates, then calls biome.getBiomeAt(chunkX, chunkZ).
      * @returns {string} Biome name or 'Unknown' if unavailable.
      */
     Donkeycraft.DebugOverlay.prototype.getBiomeName = function() {
         if (!this._biome || !this._player) return 'Unknown';
 
-        var playerName = this._player.getName ? this._player.getName() : null;
-        if (!playerName) {
-            // Player may not have getName — continue with position lookup
-        }
-
+        var px = 0, pz = 0;
         try {
-            var x = this._player.getX ? this._player.getX() : 0;
+            var pos = this._player.getPosition ? this._player.getPosition() : null;
+            if (pos) {
+                px = typeof pos.x === 'number' ? pos.x : 0;
+                pz = typeof pos.z === 'number' ? pos.z : 0;
+            }
         } catch (e) {
             return 'Unknown';
         }
 
-        try {
-            var z = this._player.getZ ? this._player.getZ() : 0;
-        } catch (e) {
-            return 'Unknown';
-        }
+        // Convert world coordinates to chunk coordinates (floor division).
+        var chunkX = Math.floor(px / Donkeycraft.Config.CHUNK_SIZE);
+        var chunkZ = Math.floor(pz / Donkeycraft.Config.CHUNK_SIZE);
 
         if (!this._biome.getBiomeAt) return 'Unknown';
 
         try {
-            var biome = this._biome.getBiomeAt(x, z);
+            var biome = this._biome.getBiomeAt(chunkX, chunkZ);
             return biome && biome.name ? biome.name : 'Unknown';
         } catch (e) {
             return 'Unknown';
@@ -216,8 +248,9 @@
     };
 
     /**
-     * getLightLevels — gets sky and block light levels at player position.
-     * @returns {Object} Sky light and block light values (0-15).
+     * getLightLevels — gets sky light and block light levels at the player's block position.
+     * Uses getPosition() to read world coordinates, then queries the chunk for light data.
+     * @returns {{sky: number, block: number}} Sky and block light values (0-15).
      */
     Donkeycraft.DebugOverlay.prototype.getLightLevels = function() {
         var skyLight = 15; // Default: full daylight
@@ -225,9 +258,11 @@
 
         if (this._player && this._chunkManager) {
             try {
-                var x = Math.floor(this._player.getX ? this._player.getX() : 0);
-                var y = Math.floor(this._player.getY ? this._player.getY() : 0);
-                var z = Math.floor(this._player.getZ ? this._player.getZ() : 0);
+                var pos = this._player.getPosition ? this._player.getPosition() : null;
+                if (!pos) return { sky: skyLight, block: blockLight };
+                var x = Math.floor(typeof pos.x === 'number' ? pos.x : 0);
+                var y = Math.floor(typeof pos.y === 'number' ? pos.y : 0);
+                var z = Math.floor(typeof pos.z === 'number' ? pos.z : 0);
 
                 // Get chunk and local coords
                 var chunkX = Math.floor(x / 16);
@@ -298,8 +333,21 @@
                 } catch (e) {}
             }
 
+            // Get terrain renderer stats
+            var renderStats = { chunksRendered: 0, meshesBuilt: 0, drawCalls: 0 };
+            if (this._terrainRenderer) {
+                try {
+                    var stats = this._terrainRenderer.getRenderStats && this._terrainRenderer.getRenderStats();
+                    if (stats) {
+                        renderStats.chunksRendered = stats.chunksRendered || 0;
+                        renderStats.meshesBuilt = stats.meshesBuilt || 0;
+                        renderStats.drawCalls = stats.drawCalls || 0;
+                    }
+                } catch (e) {}
+            }
+
             return {
-                fps: this._fps,
+                fps: this._getFPS(),
                 coordinates: coords,
                 chunkInfo: chunkInfo,
                 lightLevels: lightLevels,
@@ -309,7 +357,8 @@
                 wireframeEnabled: wireframeEnabled,
                 wireframeShowBedrock: showBedrock,
                 wireframeShowClouds: showClouds,
-                wireframeShowSolidBlocks: showSolidBlocks
+                wireframeShowSolidBlocks: showSolidBlocks,
+                renderStats: renderStats
             };
         } finally {
             // Always restore original references, even if an exception occurred
@@ -339,14 +388,103 @@
     };
 
     /**
-     * update — updates all data and emits a debug event.
+     * _getFPS — gets the current FPS from the Timer instance.
+     * Falls back to the internal FPS counter if Timer is unavailable.
+     * @returns {number} Current FPS count.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._getFPS = function() {
+        // Prefer Timer's FPS counter (most accurate, uses performance.now).
+        if (this._timer) {
+            try {
+                if (typeof this._timer.getFPS === 'function') {
+                    var fps = this._timer.getFPS();
+                    return (typeof fps === 'number' && fps >= 0) ? fps : 0;
+                }
+            } catch (e) {}
+        }
+        // Fallback to internal FPS counter (render-frame based).
+        return this._fps;
+    };
+
+    /**
+     * _renderDOM — renders debug data as HTML into the overlay element.
+     * @private
+     * @param {Object} data - Complete debug data object from collectData().
+     */
+    Donkeycraft.DebugOverlay.prototype._renderDOM = function(data) {
+        if (!this._element) return;
+
+        var coords = data.coordinates;
+        var chunkInfo = data.chunkInfo;
+        var light = data.lightLevels;
+        var renderStats = data.renderStats || { chunksRendered: 0, meshesBuilt: 0, drawCalls: 0 };
+
+        // Build section lines
+        var lines = [];
+
+        // Section 1: Version / FPS
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Donkeycraft</span> <span class="dk-debug-value">' + data.fps + ' fps</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Delta:</span> <span class="dk-debug-value">' + data.deltaTime.toFixed(3) + 's</span></span>');
+        lines.push('</div>');
+
+        // Section 2: Position & Rotation
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Position</span> <span class="dk-debug-value">X: ' + coords.x + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Y:</span> <span class="dk-debug-value">' + coords.y + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Z:</span> <span class="dk-debug-value">' + coords.z + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Yaw</span> <span class="dk-debug-value">: ' + coords.yaw + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Pitch</span> <span class="dk-debug-value">: ' + coords.pitch + '</span></span>');
+        lines.push('</div>');
+
+        // Section 3: Chunk & Biome
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Biome</span> <span class="dk-debug-value">: ' + data.biome + '</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Chunk</span> <span class="dk-debug-value">: ' + chunkInfo.loaded + ' loaded</span></span>');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Render dist</span> <span class="dk-debug-value">: ' + chunkInfo.renderDistance + '</span></span>');
+        lines.push('</div>');
+
+        // Section 4: Light levels
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Light</span> <span class="dk-debug-value">Sky: ' + light.sky + ' Block: ' + light.block + '</span></span>');
+        lines.push('</div>');
+
+        // Section 5: Render stats (chunks, meshes, draw calls)
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Render</span> <span class="dk-debug-value">' + renderStats.chunksRendered + ' chunks, ' + renderStats.meshesBuilt + ' meshes, ' + renderStats.drawCalls + ' calls</span></span>');
+        lines.push('</div>');
+
+        // Section 7: Wireframe debug info (if wireframe renderer is active)
+        if (data.wireframeEnabled) {
+            lines.push('<div class="dk-debug-section">');
+            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Wireframe</span> <span class="dk-debug-value">ON</span></span>');
+            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Bedrock</span> <span class="dk-debug-value">' + (data.wireframeShowBedrock ? 'show' : 'hide') + '</span></span>');
+            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Clouds</span> <span class="dk-debug-value">' + (data.wireframeShowClouds ? 'show' : 'hide') + '</span></span>');
+            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Solid</span> <span class="dk-debug-value">' + (data.wireframeShowSolidBlocks ? 'show' : 'hide') + '</span></span>');
+            lines.push('</div>');
+        }
+
+        // Section 8: Game mode
+        lines.push('<div class="dk-debug-section">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Mode</span> <span class="dk-debug-value">' + data.gameMode + '</span></span>');
+        lines.push('</div>');
+
+        this._element.innerHTML = lines.join('\n');
+    };
+
+    /**
+     * update — updates all data, renders DOM, and emits a debug event.
      * @param {Donkeycraft.Player} player - Player instance.
      * @param {Object} chunkManager - ChunkManager instance.
      */
     Donkeycraft.DebugOverlay.prototype.update = function(player, chunkManager) {
         var data = this.collectData(player, chunkManager);
 
-        // Emit debug event for the main game to consume
+        // Render directly to DOM
+        this._renderDOM(data);
+
+        // Also emit debug event for any external consumers
         if (this._eventBus) {
             try {
                 this._eventBus.emit('debug:update', data);

@@ -572,17 +572,31 @@
 }
 
 /* ============================================================
-   DEBUG OVERLAY
-   ============================================================ */
+    DEBUG OVERLAY (F3)
+    ============================================================ */
 
 .dk-debug-info {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 12px;
     line-height: 1.5;
     color: #fff;
+    white-space: pre;
+    pointer-events: none;
+    user-select: none;
+    z-index: 100;
+    display: none;
+}
+
+.dk-debug-info.visible {
+    display: block;
 }
 
 .dk-debug-info .dk-debug-line {
     white-space: nowrap;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000, 0 0 4px rgba(0,0,0,0.5);
 }
 
 .dk-debug-info .dk-debug-label {
@@ -591,6 +605,18 @@
 
 .dk-debug-info .dk-debug-value {
     color: #2ecc71;
+}
+
+.dk-debug-info .dk-debug-section {
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 4px;
+}
+
+.dk-debug-info .dk-debug-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 /* ============================================================
