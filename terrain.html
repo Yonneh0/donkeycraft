@@ -231,7 +231,7 @@
     </div>
 
     <div id="dk-fps-counter">FPS: --</div>
-    <div id="dk-terrain-instructions">WASD: Move | Q: Speed Cycle | Z: Down (Fly) | Mouse: Look | Click: Lock Pointer | F: Toggle Fly | R: Regenerate</div>
+    <div id="dk-terrain-instructions">WASD: Move | Q: Speed Cycle | Z: Down | Mouse: Look | Click: Lock Pointer | E: Ground Level | F: NE Overview | R: Regenerate</div>
 
     <div id="dk-speed-indicator">
         <span class="speed-emoji">🏃</span>
@@ -602,7 +602,7 @@
             // ============================================================
             var canvas, gl, terrainProgram, skyProgram;
             var terrainLocs = {}, skyLocs = {};
-            var camera = { x: 0, y: 100, z: 0, yaw: 0, pitch: 0, fly: true };
+            var camera = { x: 0, y: 100, z: 0, yaw: 0, pitch: 0 };
             var keys = {}, mouseDX = 0, mouseDY = 0, pointerLocked = false;
             var chunks = new Map(), currentChunkX = 0, currentChunkZ = 0;
             var renderDistance = 4, selectedBiomeId = 1, worldSeed = 42;
@@ -867,7 +867,8 @@
                 document.addEventListener('keydown', function (e) {
                     keys[e.code] = true;
                     if (e.code === 'KeyR') regenerateTerrain();
-                    if (e.code === 'KeyF') camera.fly = !camera.fly;
+                    if (e.code === 'KeyE') placeViewerAboveGround();
+                    if (e.code === 'KeyF') setNEOverviewView();
                     if (e.code === 'KeyQ' && !e.repeat) {
                         // Cycle speed: 0→1→2→0
                         speedLevel = (speedLevel + 1) % SPEED_LEVELS.length;
@@ -1426,6 +1427,97 @@
                 gl.depthMask(true);
 
                 requestAnimationFrame(renderLoop);
+            }
+
+            // ============================================================
+            // E key: Place viewer 1 meter above ground at current position
+            // Snaps to bedrock level (Y=2) when not over a rendered chunk
+            // ============================================================
+            function placeViewerAboveGround() {
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var ws = Donkeycraft.Config.WORLD_HEIGHT;
+
+                // Convert camera world position to chunk/local coords
+                // Use modulo that handles negative coordinates correctly
+                var camChunkX = Math.floor(camera.x / cs);
+                var camChunkZ = Math.floor(camera.z / cs);
+                var localX = ((camera.x % cs) + cs) % cs;
+                var localZ = ((camera.z % cs) + cs) % cs;
+
+                // Check if this chunk is currently rendered
+                var key = camChunkX + ',' + camChunkZ;
+                var chunk = chunks.get(key);
+
+                if (chunk) {
+                    // Camera is over a rendered chunk — scan actual block data for highest non-air block
+                    var surfaceY = 0;
+                    for (var y = ws - 1; y >= 0; y--) {
+                        var block = chunk.getBlock(Math.floor(localX), y, Math.floor(localZ));
+                        if (block !== 0) { // Non-air block found
+                            surfaceY = y;
+                            break;
+                        }
+                    }
+                    // Position camera 1 meter above the surface
+                    camera.y = surfaceY + 2;
+                } else {
+                    // Not over a rendered chunk — snap to bedrock level (Y=2 for clearance)
+                    camera.y = 2;
+                }
+            }
+
+            // ============================================================
+            // F key: Place viewer over NE corner of rendered area, facing SW
+            // ============================================================
+            function setNEOverviewView() {
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var halfRd = Math.floor(renderDistance / 2);
+
+                // Rendered grid bounds in chunk coordinates
+                var minChunkX = currentChunkX - halfRd;
+                var maxChunkX = currentChunkX + halfRd;
+                var minChunkZ = currentChunkZ - halfRd;
+                var maxChunkZ = currentChunkZ + halfRd;
+
+                // NE corner of the rendered grid: max X, min Z (NE in world space)
+                var neWorldX = maxChunkX * cs + cs;  // Right edge of NE chunk
+                var neWorldZ = minChunkZ * cs;       // Top edge of NE chunk
+
+                // Total grid size for proper distance calculation
+                var gridWidthChunks = (maxChunkX - minChunkX + 1);
+                var gridDepthChunks = (maxChunkZ - minChunkZ + 1);
+                var gridWorldSize = Math.max(gridWidthChunks, gridDepthChunks) * cs;
+
+                // Camera position: offset diagonally NE from the corner, high above
+                var diagonalOffset = gridWorldSize * 0.7;
+                camera.x = neWorldX + diagonalOffset;
+                camera.z = neWorldZ - diagonalOffset;
+
+                // Query terrain height at NE corner for camera Y
+                var surfaceY = 80; // default fallback
+                if (Donkeycraft.TerrainGenerator && Donkeycraft.BiomeRegistry) {
+                    var biome = Donkeycraft.BiomeRegistry.getBiomeById(selectedBiomeId);
+                    var hm = Donkeycraft.TerrainGenerator.generateHeightmap(maxChunkX, minChunkZ, biome);
+                    var cornerLocalX = cs - 1;
+                    var cornerLocalZ = 0;
+                    var h = hm[cornerLocalX + cornerLocalZ * cs] || 64;
+                    surfaceY = h;
+                }
+
+                // Camera Y: high enough to see entire grid, plus some margin
+                camera.y = surfaceY + gridWorldSize * 0.6;
+
+                // Face SW (toward the center of the grid)
+                var targetX = (minChunkX + maxChunkX) * cs / 2;
+                var targetZ = (minChunkZ + maxChunkZ) * cs / 2;
+                camera.yaw = Math.atan2(-(targetX - camera.x), -(targetZ - camera.z));
+
+                // Pitch: slightly down to see the entire grid
+                var heightToAngle = Math.abs(camera.y - surfaceY);
+                var distanceToTarget = Math.sqrt(
+                    Math.pow(targetX - camera.x, 2) + Math.pow(targetZ - camera.z, 2)
+                );
+                camera.pitch = -Math.atan2(heightToAngle, distanceToTarget) * 0.8;
             }
 
             // Edge definitions: 12 edges of a unit cube (each edge = 2 vertices)
