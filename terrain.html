@@ -149,6 +149,39 @@
             font-size: 11px;
             text-align: center;
         }
+
+        #dk-speed-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            background: rgba(30, 30, 30, 0.9);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 20px;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+        }
+
+        #dk-speed-indicator.show {
+            opacity: 1;
+        }
+
+        #dk-speed-indicator .speed-emoji {
+            font-size: 28px;
+        }
+
+        #dk-speed-indicator .speed-label {
+            display: block;
+            font-size: 13px;
+            color: #4fc3f7;
+            margin-top: 4px;
+        }
     </style>
 </head>
 
@@ -198,7 +231,11 @@
     </div>
 
     <div id="dk-fps-counter">FPS: --</div>
-    <div id="dk-terrain-instructions">WASD: Move | Mouse: Look | Click: Lock Pointer | F: Toggle Fly | R: Regenerate
+    <div id="dk-terrain-instructions">WASD: Move | Q: Speed Cycle | Z: Down (Fly) | Mouse: Look | Click: Lock Pointer | F: Toggle Fly | R: Regenerate</div>
+
+    <div id="dk-speed-indicator">
+        <span class="speed-emoji">🏃</span>
+        <span class="speed-label">Normal Speed</span>
     </div>
 
     <!-- Core Infrastructure -->
@@ -572,6 +609,30 @@
             var options = { caves: true, ores: true, water: true, surface: true };
             var frameCount = 0, lastFpsTime = 0, currentFps = 0, lastSaveTime = 0;
 
+            // Speed levels: walk, jog, sprint
+            var SPEED_LEVELS = [4, 8, 16];
+            var SPEED_NAMES = ['Walk', 'Jog', 'Sprint'];
+            var SPEED_EMOJIS = ['🚶', '🏃', '⚡'];
+            var speedLevel = 0;
+            var speedIndicatorTimeout = null;
+
+            // ============================================================
+            // Show speed indicator overlay
+            // ============================================================
+            function showSpeedIndicator() {
+                var indicator = document.getElementById('dk-speed-indicator');
+                if (!indicator) return;
+                var emojiEl = indicator.querySelector('.speed-emoji');
+                var labelEl = indicator.querySelector('.speed-label');
+                if (emojiEl) emojiEl.textContent = SPEED_EMOJIS[speedLevel];
+                if (labelEl) labelEl.textContent = SPEED_NAMES[speedLevel] + ' Speed';
+                indicator.classList.add('show');
+                if (speedIndicatorTimeout) clearTimeout(speedIndicatorTimeout);
+                speedIndicatorTimeout = setTimeout(function () {
+                    indicator.classList.remove('show');
+                }, 1200);
+            }
+
             // ============================================================
             // Browser storage — save/load state to localStorage
             // ============================================================
@@ -807,6 +868,11 @@
                     keys[e.code] = true;
                     if (e.code === 'KeyR') regenerateTerrain();
                     if (e.code === 'KeyF') camera.fly = !camera.fly;
+                    if (e.code === 'KeyQ' && !e.repeat) {
+                        // Cycle speed: 0→1→2→0
+                        speedLevel = (speedLevel + 1) % SPEED_LEVELS.length;
+                        showSpeedIndicator();
+                    }
                 });
                 document.addEventListener('keyup', function (e) { keys[e.code] = false; });
                 canvas.addEventListener('click', function () { if (!pointerLocked) canvas.requestPointerLock(); });
@@ -1252,8 +1318,8 @@
                 camera.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, camera.pitch));
                 mouseDX = 0; mouseDY = 0;
 
-                // Movement
-                var spd = (keys['ShiftLeft'] ? 12 : 6) * 0.016;
+                // Movement — Q cycles through speed levels
+                var spd = SPEED_LEVELS[speedLevel] * 0.016;
                 var fwd = [-Math.sin(camera.yaw), 0, -Math.cos(camera.yaw)];
                 var rgt = [Math.cos(camera.yaw), 0, -Math.sin(camera.yaw)];
 
@@ -1262,7 +1328,7 @@
                 if (keys['KeyA']) { camera.x -= rgt[0] * spd; camera.z -= rgt[2] * spd; }
                 if (keys['KeyD']) { camera.x += rgt[0] * spd; camera.z += rgt[2] * spd; }
                 if (keys['Space']) camera.y += spd;
-                if (keys['ControlLeft']) camera.y -= spd;
+                if (keys['KeyZ']) camera.y -= spd;
 
                 // Resize check
                 if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) resizeCanvas();
