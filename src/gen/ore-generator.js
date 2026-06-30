@@ -18,13 +18,13 @@
      * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
      */
     var ORE_DEFS = [
-        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 60, veinSize: 5, rarity: 20, biomes: null },
-        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 50, veinSize: 4, rarity: 16, biomes: null },
-        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 24, biomes: null },
-        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 20, veinSize: 3, rarity: 32, biomes: null },
-        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 28, veinSize: 3, rarity: 20, biomes: null },
-        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 24, veinSize: 2, rarity: 28, biomes: null },
-        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 20, veinSize: 1, rarity: 40, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
+        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 60, veinSize: 5, rarity: 200, biomes: null },
+        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 50, veinSize: 4, rarity: 160, biomes: null },
+        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 240, biomes: null },
+        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 20, veinSize: 3, rarity: 320, biomes: null },
+        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 28, veinSize: 3, rarity: 200, biomes: null },
+        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 24, veinSize: 2, rarity: 280, biomes: null },
+        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 20, veinSize: 1, rarity: 400, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
     ];
 
     // Cache for resolved block IDs to avoid repeated lookups.

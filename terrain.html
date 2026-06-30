@@ -329,7 +329,8 @@
                     BLOCK_COLORS[b.id] = color;
 
                     // Determine alpha from block properties
-                    var alpha = 1.0;
+                    // Solid blocks are now semi-transparent for better terrain visibility
+                    var alpha = 0.90;
                     if (b.transparent) {
                         if (b.name === 'water' || b.name === 'lava') alpha = 0.55;
                         else if (b.name === 'glass' || b.name.indexOf('stained_glass') >= 0) alpha = 0.3;
