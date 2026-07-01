@@ -120,6 +120,30 @@ body.dk-pointer-locked #dk-canvas-container {
     display: block;
 }
 
+/* Debug overlay renderer toggles — interactive section */
+.dk-debug-info .dk-renderer-toggles {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(100, 100, 100, 0.5);
+}
+
+.dk-debug-info .dk-toggle-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.dk-debug-info .dk-renderer-toggle {
+    pointer-events: auto; /* Override parent's pointer-events: none */
+    cursor: pointer;
+    margin: 0;
+    accent-color: #aaa;
+}
+
+.dk-debug-info .dk-renderer-toggle:checked {
+    accent-color: #5f5;
+}
+
 /* Loading screen */
 #dk-loading-screen {
     position: fixed;

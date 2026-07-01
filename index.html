@@ -984,6 +984,19 @@ void main() {
 
                                 // Wire game reference into DebugOverlay for renderer toggle access
                                 debugOverlay.setGame(game2);
+
+                                // --- Renderer Toggle Checkboxes: event delegation on debug overlay ---
+                                var dkDebugOverlay = document.getElementById('dk-debug-overlay');
+                                if (dkDebugOverlay) {
+                                    dkDebugOverlay.addEventListener('change', function (e) {
+                                        if (e.target.classList && e.target.classList.contains('dk-renderer-toggle')) {
+                                            var renderer = e.target.getAttribute('data-renderer');
+                                            if (renderer) {
+                                                game2.setRendererVisibility(renderer, e.target.checked);
+                                            }
+                                        }
+                                    });
+                                }
                             } catch (e) {
                                 Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
                             }
