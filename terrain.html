@@ -182,6 +182,85 @@
             color: #4fc3f7;
             margin-top: 4px;
         }
+
+        /* Chunk grid display */
+        .chunk-grid-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            margin: 4px 0;
+            min-height: 32px;
+        }
+
+        .grid-row-mid {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .grid-dir-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .chunk-grid-display {
+            display: grid;
+            gap: 1px;
+            background: #222;
+            border: 1px solid #555;
+            padding: 1px;
+        }
+
+        .chunk-grid-cell {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
+
+        .expand-btn {
+            background: #4caf50 !important;
+            min-width: 36px;
+            padding: 2px 4px !important;
+            font-size: 11px !important;
+        }
+
+        .expand-btn:hover {
+            background: #66bb6a !important;
+        }
+
+        .contract-btn {
+            background: #ff7043 !important;
+            min-width: 36px;
+            padding: 2px 4px !important;
+            font-size: 11px !important;
+        }
+
+        .contract-btn:hover {
+            background: #ff8a65 !important;
+        }
+
+        /* Grid directional button positioning */
+        .grid-top {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .grid-bottom {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .grid-left {
+            flex-direction: row;
+            align-items: center;
+        }
+
+        .grid-right {
+            flex-direction: row;
+            align-items: center;
+        }
     </style>
 </head>
 
@@ -195,11 +274,27 @@
             <input type="number" id="ui-seed" value="42" min="-999999" max="999999">
             <button id="btn-apply-seed">Apply</button>
         </div>
-        <div class="row"><span>Render Dist:</span>
-            <button id="btn-rd-minus" style="width:24px;padding:0;">−</button>
-            <input type="range" id="ui-render-dist" min="1" max="30" value="4" style="flex:1;">
-            <button id="btn-rd-plus" style="width:24px;padding:0;">+</button>
-            <span id="ui-render-dist-val">4</span>
+        <div class="row"><span>Loaded Chunks:</span></div>
+        <div id="chunk-grid-wrapper" class="chunk-grid-wrapper">
+            <div class="grid-dir-buttons grid-top">
+                <button id="btn-expand-n" class="expand-btn" title="Expand North">＋N</button>
+                <button id="btn-contract-n" class="contract-btn" title="Contract North">－N</button>
+            </div>
+            <div class="grid-row-mid">
+                <div class="grid-dir-buttons grid-left">
+                    <button id="btn-expand-w" class="expand-btn" title="Expand West">＋W</button>
+                    <button id="btn-contract-w" class="contract-btn" title="Contract West">－W</button>
+                </div>
+                <div id="chunk-grid-display" class="chunk-grid-display"></div>
+                <div class="grid-dir-buttons grid-right">
+                    <button id="btn-expand-e" class="expand-btn" title="Expand East">＋E</button>
+                    <button id="btn-contract-e" class="contract-btn" title="Contract East">－E</button>
+                </div>
+            </div>
+            <div class="grid-dir-buttons grid-bottom">
+                <button id="btn-expand-s" class="expand-btn" title="Expand South">＋S</button>
+                <button id="btn-contract-s" class="contract-btn" title="Contract South">－S</button>
+            </div>
         </div>
         <div class="separator"></div>
         <div style="font-size:12px;color:#888;margin-bottom:4px;">Chunk Position</div>
@@ -605,7 +700,29 @@
             var camera = { x: 0, y: 100, z: 0, yaw: 0, pitch: 0 };
             var keys = {}, mouseDX = 0, mouseDY = 0, pointerLocked = false;
             var chunks = new Map(), currentChunkX = 0, currentChunkZ = 0;
-            var renderDistance = 4, selectedBiomeId = 1, worldSeed = 42;
+
+            /**
+             * Directional chunk render radii from current position.
+             * N = North (negative Z), S = South (positive Z), W = West (negative X), E = East (positive X).
+             * @type {number}
+             */
+            var chunkRadiusN = 2, chunkRadiusS = 2, chunkRadiusE = 2, chunkRadiusW = 2;
+
+            /**
+             * Maximum allowable radius in any single direction.
+             * Controls how far chunks can be loaded from the center chunk in each direction.
+             * Default: 15 (equivalent to legacy render distance of 30 when symmetric).
+             * @type {number}
+             */
+            var MAX_CHUNK_RADIUS = 15;
+
+            /**
+             * Maximum total grid cells to prevent browser freeze from corrupted/invalid state.
+             * @type {number}
+             * @private
+             */
+            var MAX_GRID_CELLS = 4096; // 64x64 chunks max — safety cap
+            var selectedBiomeId = 1, worldSeed = 42;
             var options = { caves: true, ores: true, water: true, surface: true };
             var frameCount = 0, lastFpsTime = 0, currentFps = 0, lastSaveTime = 0;
 
@@ -640,7 +757,10 @@
             function saveState() {
                 try {
                     var state = {
-                        renderDistance: renderDistance,
+                        chunkRadiusN: chunkRadiusN,
+                        chunkRadiusS: chunkRadiusS,
+                        chunkRadiusE: chunkRadiusE,
+                        chunkRadiusW: chunkRadiusW,
                         selectedBiomeId: selectedBiomeId,
                         worldSeed: worldSeed,
                         options: options,
@@ -659,9 +779,19 @@
                     var state = JSON.parse(raw);
                     if (!state || typeof state !== 'object') return false;
 
-                    // Restore render distance
-                    if (typeof state.renderDistance === 'number') {
-                        renderDistance = Math.max(1, Math.min(30, state.renderDistance));
+                    // Restore directional chunk radii (or legacy renderDistance for backward compat)
+                    if (typeof state.chunkRadiusN === 'number') {
+                        chunkRadiusN = state.chunkRadiusN;
+                        chunkRadiusS = state.chunkRadiusS;
+                        chunkRadiusE = state.chunkRadiusE;
+                        chunkRadiusW = state.chunkRadiusW;
+                    } else if (typeof state.renderDistance === 'number') {
+                        // Legacy: convert symmetric renderDistance to asymmetric radii
+                        var legacyR = Math.max(1, Math.min(state.renderDistance, 30));
+                        chunkRadiusN = Math.floor(legacyR / 2);
+                        chunkRadiusS = chunkRadiusN;
+                        chunkRadiusE = chunkRadiusN;
+                        chunkRadiusW = chunkRadiusN;
                     }
                     // Restore biome
                     if (typeof state.selectedBiomeId === 'number') {
@@ -754,6 +884,69 @@
             }
 
             // ============================================================
+            // Chunk grid helpers — get top block color from a loaded chunk
+            // ============================================================
+            function getTopBlockColorForChunk(chunk) {
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                // Sample the center of the chunk for top block color
+                var cx = Math.floor(cs / 2);
+                var cz = Math.floor(cs / 2);
+                var ws = Donkeycraft.Config.WORLD_HEIGHT;
+                for (var y = ws - 1; y >= 0; y--) {
+                    var bid = chunk.getBlock(cx, y, cz);
+                    if (bid !== 0) {
+                        var clr = BLOCK_COLORS[bid];
+                        return clr ? 'rgb(' + Math.round(clr[0] * 255) + ',' + Math.round(clr[1] * 255) + ',' + Math.round(clr[2] * 255) + ')' : '#000';
+                    }
+                }
+                return '#111'; // empty — no block found
+            }
+
+            // ============================================================
+            // Render the chunk grid DOM element
+            // ============================================================
+            function renderChunkGrid() {
+                var display = document.getElementById('chunk-grid-display');
+                if (!display) return;
+
+                var rows = chunkRadiusN + chunkRadiusS + 1;
+                var cols = chunkRadiusW + chunkRadiusE + 1;
+
+                // Grid is just the chunk cells — buttons are positioned around it via CSS flex layout
+                display.style.gridTemplateColumns = 'repeat(' + cols + ', 16px)';
+                display.style.gridTemplateRows = 'repeat(' + rows + ', 16px)';
+                display.innerHTML = '';
+
+                // Row 0 = North direction (above center), last row = South direction
+                // Col 0 = West direction (left of center), last col = East direction
+                for (var r = 0; r < rows; r++) {
+                    for (var c = 0; c < cols; c++) {
+                        var chunkDx = currentChunkX + (c - chunkRadiusW);
+                        var chunkDz = currentChunkZ + (r - chunkRadiusN);
+                        var key = chunkDx + ',' + chunkDz;
+                        var loadedChunk = chunks.get(key);
+
+                        var div = document.createElement('div');
+                        div.className = 'chunk-grid-cell';
+
+                        if (loadedChunk) {
+                            var color = getTopBlockColorForChunk(loadedChunk);
+                            div.style.backgroundColor = color;
+                        } else {
+                            div.style.backgroundColor = '#1a1a1a';
+                        }
+
+                        // Highlight center chunk (current position)
+                        if (c === chunkRadiusW && r === chunkRadiusN) {
+                            div.style.border = '2px solid #4fc3f7';
+                        }
+
+                        display.appendChild(div);
+                    }
+                }
+            }
+
+            // ============================================================
             // UI Setup
             // ============================================================
             function setupUI() {
@@ -765,32 +958,6 @@
                     worldSeed = parseInt(document.getElementById('ui-seed').value) || 42;
                     if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
                     regenerateTerrain();
-                });
-                // Render distance slider — update display on input, regenerate on change (lose focus)
-                var rdSlider = document.getElementById('ui-render-dist');
-                rdSlider.addEventListener('input', function () {
-                    renderDistance = parseInt(this.value);
-                    document.getElementById('ui-render-dist-val').textContent = renderDistance;
-                });
-                rdSlider.addEventListener('change', function () {
-                    regenerateTerrain();
-                    saveState();
-                });
-
-                // Render distance +/- buttons
-                document.getElementById('btn-rd-minus').addEventListener('click', function () {
-                    renderDistance = Math.max(1, renderDistance - 1);
-                    rdSlider.value = renderDistance;
-                    document.getElementById('ui-render-dist-val').textContent = renderDistance;
-                    regenerateTerrain();
-                    saveState();
-                });
-                document.getElementById('btn-rd-plus').addEventListener('click', function () {
-                    renderDistance = Math.min(30, renderDistance + 1);
-                    rdSlider.value = renderDistance;
-                    document.getElementById('ui-render-dist-val').textContent = renderDistance;
-                    regenerateTerrain();
-                    saveState();
                 });
 
                 // Seed input — auto-apply on Enter or lose focus
@@ -806,8 +973,6 @@
                 var hasState = loadState();
 
                 // Apply loaded values to UI elements
-                document.getElementById('ui-render-dist').value = renderDistance;
-                document.getElementById('ui-render-dist-val').textContent = renderDistance;
                 document.getElementById('ui-seed').value = worldSeed;
                 document.getElementById('opt-caves').checked = options.caves;
                 document.getElementById('opt-ores').checked = options.ores;
@@ -831,8 +996,10 @@
                 if (hasState) {
                     regenerateTerrain();
                 } else {
-                    // First-time launch: apply default camera positioning logic before regenerating
-                    updateCameraToChunk();
+                    // First-time launch: set a simple default camera position
+                    camera.x = 0;
+                    camera.y = 100;
+                    camera.z = 0;
                     regenerateTerrain();
                 }
 
@@ -848,7 +1015,8 @@
                         var btn = document.getElementById(id);
                         if (btn) btn.addEventListener('click', function () {
                             currentChunkX += d[0]; currentChunkZ += d[1];
-                            updateCameraToChunk(); regenerateTerrain();
+                            regenerateTerrain();
+                            renderChunkGrid();
                         });
                     })(ids[i], navMap[ids[i]]);
                 }
@@ -863,6 +1031,28 @@
                         saveState();
                     });
                 });
+
+                // Chunk grid expand/contract button handlers
+                var chunkBtnActions = {
+                    'btn-expand-n': function () { if (chunkRadiusN < MAX_CHUNK_RADIUS) { chunkRadiusN++; regenerateTerrain(); saveState(); } },
+                    'btn-contract-n': function () { if (chunkRadiusN > 0) { chunkRadiusN--; regenerateTerrain(); saveState(); } },
+                    'btn-expand-s': function () { if (chunkRadiusS < MAX_CHUNK_RADIUS) { chunkRadiusS++; regenerateTerrain(); saveState(); } },
+                    'btn-contract-s': function () { if (chunkRadiusS > 0) { chunkRadiusS--; regenerateTerrain(); saveState(); } },
+                    'btn-expand-e': function () { if (chunkRadiusE < MAX_CHUNK_RADIUS) { chunkRadiusE++; regenerateTerrain(); saveState(); } },
+                    'btn-contract-e': function () { if (chunkRadiusE > 0) { chunkRadiusE--; regenerateTerrain(); saveState(); } },
+                    'btn-expand-w': function () { if (chunkRadiusW < MAX_CHUNK_RADIUS) { chunkRadiusW++; regenerateTerrain(); saveState(); } },
+                    'btn-contract-w': function () { if (chunkRadiusW > 0) { chunkRadiusW--; regenerateTerrain(); saveState(); } }
+                };
+                var btnIds = Object.keys(chunkBtnActions);
+                for (var bi = 0; bi < btnIds.length; bi++) {
+                    (function (id, action) {
+                        var btn = document.getElementById(id);
+                        if (btn) btn.addEventListener('click', action);
+                    })(btnIds[bi], chunkBtnActions[btnIds[bi]]);
+                }
+
+                // Render the chunk grid after UI setup
+                renderChunkGrid();
 
                 document.addEventListener('keydown', function (e) {
                     keys[e.code] = true;
@@ -890,67 +1080,17 @@
             }
 
             // ============================================================
-            // Camera positioning — angled top-down view of current chunk
-            // ============================================================
-            function updateCameraToChunk() {
-                var cs = Donkeycraft.Config.CHUNK_SIZE;
-
-                // Center X/Z of the current chunk in world space
-                var cx = (currentChunkX * cs + cs / 2);
-                var cz = (currentChunkZ * cs + cs / 2);
-
-                // Query actual terrain height for camera Y — sample multiple points
-                if (Donkeycraft.TerrainGenerator && Donkeycraft.BiomeRegistry) {
-                    var biome = Donkeycraft.BiomeRegistry.getBiomeById(selectedBiomeId);
-                    var hm = Donkeycraft.TerrainGenerator.generateHeightmap(currentChunkX, currentChunkZ, biome);
-                    // Sample multiple points for a better average height
-                    var totalH = 0, sampleCount = 0;
-                    for (var sx = 0; sx < cs; sx += 4) {
-                        for (var sz = 0; sz < cs; sz += 4) {
-                            var h = hm[sx + sz * cs] || 64;
-                            totalH += h;
-                            sampleCount++;
-                        }
-                    }
-                    var avgSurfaceY = totalH / sampleCount;
-
-                    // Position camera offset diagonally from chunk center for angled view.
-                    // Offset by ~1.5 chunks in XZ so the whole chunk fits on screen at an angle.
-                    var diagonalOffset = cs * 1.2;
-                    camera.x = cx - diagonalOffset - 50;
-                    camera.z = cz - diagonalOffset - 50;
-
-                    // Camera Y: high enough to see the full chunk from above, plus some margin
-                    camera.y = avgSurfaceY + 125;
-                } else {
-                    // Fallback: angled view centered on chunk
-                    camera.x = cx + cs * 1.2;
-                    camera.z = cz + cs * 1.2;
-                    camera.y = 95;
-                }
-
-                // Calculate yaw to point toward the chunk center from the camera position.
-                // The camera is offset diagonally (NE direction), so we point SW toward the chunk.
-                var dx = cx - camera.x;
-                var dz = cz - camera.z;
-                camera.yaw = Math.atan2(-dx, -dz); // Point toward chunk center
-                // Pitch: ~45° down from horizontal for a nice angled view
-                camera.pitch = -Math.PI / 4; // -45° looking down
-            }
-
-            // ============================================================
-            // Terrain regeneration — uses StructureGenerator pipeline
+            // Terrain regeneration — uses StructureGenerator pipeline with asymmetric radii
             // ============================================================
             function regenerateTerrain() {
                 chunks.clear();
                 meshBuffers = {};
                 dirtyChunks.clear();
 
-                var halfRd = Math.floor(renderDistance / 2);
                 var allBiomes = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getAllBiomes() : [];
 
-                for (var cx = currentChunkX - halfRd; cx <= currentChunkX + halfRd; cx++) {
-                    for (var cz = currentChunkZ - halfRd; cz <= currentChunkZ + halfRd; cz++) {
+                for (var cx = currentChunkX - chunkRadiusW; cx <= currentChunkX + chunkRadiusE; cx++) {
+                    for (var cz = currentChunkZ - chunkRadiusN; cz <= currentChunkZ + chunkRadiusS; cz++) {
                         var key = cx + ',' + cz;
                         var chunk = new Donkeycraft.Chunk(cx, cz);
                         chunk.fill(0);
@@ -978,6 +1118,9 @@
                 }
                 document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
                 document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
+
+                // Refresh chunk grid visual to reflect new bounds/center
+                renderChunkGrid();
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)
@@ -1471,13 +1614,12 @@
             // ============================================================
             function setNEOverviewView() {
                 var cs = Donkeycraft.Config.CHUNK_SIZE;
-                var halfRd = Math.floor(renderDistance / 2);
 
-                // Rendered grid bounds in chunk coordinates
-                var minChunkX = currentChunkX - halfRd;
-                var maxChunkX = currentChunkX + halfRd;
-                var minChunkZ = currentChunkZ - halfRd;
-                var maxChunkZ = currentChunkZ + halfRd;
+                // Rendered grid bounds in chunk coordinates (asymmetric)
+                var minChunkX = currentChunkX - chunkRadiusW;
+                var maxChunkX = currentChunkX + chunkRadiusE;
+                var minChunkZ = currentChunkZ - chunkRadiusN;
+                var maxChunkZ = currentChunkZ + chunkRadiusS;
 
                 // NE corner of the rendered grid: max X, min Z (NE in world space)
                 var neWorldX = maxChunkX * cs + cs;  // Right edge of NE chunk
