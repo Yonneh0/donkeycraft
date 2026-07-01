@@ -981,6 +981,9 @@ void main() {
                                     }
                                     return visible;
                                 };
+
+                                // Wire game reference into DebugOverlay for renderer toggle access
+                                debugOverlay.setGame(game2);
                             } catch (e) {
                                 Donkeycraft.Logger.warn('Game', 'DebugOverlay initialization failed: ' + e.message);
                             }

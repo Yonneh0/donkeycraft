@@ -42,6 +42,9 @@
         this._geometryBuilder = new Donkeycraft.GeometryBuilder();
         this._meshOptimizer = new Donkeycraft.MeshOptimizer();
 
+        // Back-face culling config — set to false to disable (useful for debugging)
+        this._cullBackFaces = true;
+
         // Reusable temp buffer for matrix multiplication (avoids per-frame allocation)
         this._tempMatrixData = new Float32Array(16);
 
@@ -227,9 +230,16 @@
 
         // Run MeshOptimizer for vertex deduplication and back-face culling
         var cameraPos = this._camera ? this._camera.getPosition() : null;
-        geometry = this._meshOptimizer.optimize(geometry, cameraPos);
 
-        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] after optimization: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
+        // Log pre-optimization state (one-time per chunk)
+        Donkeycraft.Logger.info('TerrainRenderer',
+            'Chunk [' + chunkX + ',' + chunkZ + '] before optimize: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
+
+        geometry = this._meshOptimizer.optimize(geometry, cameraPos, this._cullBackFaces);
+
+        // Log post-optimization state (one-time per chunk)
+        Donkeycraft.Logger.info('TerrainRenderer',
+            'Chunk [' + chunkX + ',' + chunkZ + '] after optimize: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
 
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -296,18 +306,6 @@
         for (var i = 0; i < keysToDelete.length; i++) {
             delete this._pendingMeshes[keysToDelete[i]];
         }
-    };
-
-    /**
-     * Check if a block is fully opaque (no faces should be shown adjacent to it).
-     * @private
-     */
-    Donkeycraft.TerrainRenderer.prototype._isBlockSolid = function (blockId) {
-        // Use BlockRegistry if available (Phase 3+), otherwise fall back to hardcoded list.
-        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isOpaque === 'function') {
-            return Donkeycraft.BlockRegistry.isOpaque(blockId);
-        }
-        return blockId !== 0 && blockId !== 9 && blockId !== 10 && blockId !== 11;
     };
 
     /**
@@ -487,6 +485,7 @@
 
         // Set texture unit (atlas on unit 0)
         gl.activeTexture(gl.TEXTURE0);
+
         if (this._textureAtlas && this._textureAtlas.isReady()) {
             // Bind the generated texture atlas
             this._textureAtlas.bind();

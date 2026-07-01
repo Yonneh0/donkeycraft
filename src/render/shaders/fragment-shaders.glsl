@@ -15,11 +15,22 @@ uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uLightFactor;
 
-void main() {
-    vec4 texColor = texture2D(uTexture, vUV);
-    if (texColor.a < 0.5) discard;
+// DEBUG_MODE: Set to 1 to output solid magenta when texture alpha is zero (indicates UV mismatch)
+#define DEBUG_TEXTURE_SAMPLING 0
 
-    // Apply dynamic lighting factor (sun intensity * ambient) on top of baked face light
+void main() {
+    // Sample the texture atlas using UV coordinates
+    vec4 texColor = texture2D(uTexture, vUV);
+
+    // Debug: if texture alpha is zero, output magenta to indicate UV sampling issue
+    #if DEBUG_TEXTURE_SAMPLING == 1
+    if (texColor.a < 0.1) {
+        gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+        return;
+    }
+    #endif
+
+    // Apply vertex lighting (baked face light) to sampled color
     vec3 finalColor = texColor.rgb * vLight * uLightFactor;
 
     // Exponential distance fog

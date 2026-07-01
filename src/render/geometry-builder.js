@@ -7,14 +7,14 @@
     var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE; // 16
     var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT; // 256
 
-    // Face definitions: direction, corner order (CCW for front-facing), light intensity
+    // Face definitions: direction, corner order (CCW for front-facing), light intensity, UV corner mapping
     var FACES = [
-        { dir: [1, 0, 0], name: 'right', light: 0.8, corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]] },   // +X
-        { dir: [-1, 0, 0], name: 'left', light: 0.7, corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]] },  // -X
-        { dir: [0, 1, 0], name: 'top', light: 1.0, corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]] },   // +Y
-        { dir: [0, -1, 0], name: 'bottom', light: 0.5, corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]] },  // -Y
-        { dir: [0, 0, 1], name: 'front', light: 0.9, corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },   // +Z
-        { dir: [0, 0, -1], name: 'back', light: 0.6, corners: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] }   // -Z
+        { dir: [1, 0, 0], name: 'right', light: 0.8, corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], uvCorners: [[1, 0], [1, 1], [0, 1], [0, 0]] },   // +X: U=-Z, V=+Y
+        { dir: [-1, 0, 0], name: 'left', light: 0.7, corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]], uvCorners: [[1, 0], [1, 1], [0, 1], [0, 0]] },  // -X: U=-Z, V=+Y
+        { dir: [0, 1, 0], name: 'top', light: 1.0, corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], uvCorners: [[0, 0], [1, 0], [1, 1], [0, 1]] },   // +Y: U=+X, V=-Z
+        { dir: [0, -1, 0], name: 'bottom', light: 0.5, corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], uvCorners: [[0, 0], [1, 0], [1, 1], [0, 1]] }, // -Y: U=+X, V=+Z
+        { dir: [0, 0, 1], name: 'front', light: 0.9, corners: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]], uvCorners: [[0, 0], [1, 0], [1, 1], [0, 1]] },  // +Z: U=+X, V=+Y
+        { dir: [0, 0, -1], name: 'back', light: 0.6, corners: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]], uvCorners: [[0, 0], [1, 0], [1, 1], [0, 1]] }   // -Z: U=-X, V=+Y
     ];
 
     /**
@@ -59,12 +59,22 @@
         var vertices = [];
         var indices = [];
 
+        // DEBUG: Counters for first chunk
+        var _debugBlockCount = 0;
+        var _debugFaceCount = 0;
+        var _debugSampledBlockId = null;
+
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var blockId = getBlockFunc(x, y, z);
 
                     if (blockId === 0) continue;
+
+                    // Count visible blocks (first chunk only for debug)
+                    if (chunkX === 0 && chunkZ === 0) {
+                        _debugBlockCount++;
+                    }
 
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldY = y;
@@ -80,19 +90,32 @@
 
                         if (!this.isTransparent(adjBlock)) continue;
 
+                        _debugFaceCount++;
+
+                        // Sample UV for first visible block (first chunk)
+                        if (_debugSampledBlockId === null && chunkX === 0 && chunkZ === 0) {
+                            _debugSampledBlockId = blockId;
+                            var debugUV = this._getBlockUV(blockId, face.name);
+                            Donkeycraft.Logger.info('GeometryBuilder',
+                                'Chunk [0,0] DEBUG: First visible block=' + blockId +
+                                ', face=' + face.name +
+                                ', UV=[' + debugUV.u0.toFixed(4) + ',' + debugUV.v0.toFixed(4) + ']->[' + debugUV.u1.toFixed(4) + ',' + debugUV.v1.toFixed(4) + ']');
+                        }
+
                         var uvOffset = this._getBlockUV(blockId, face.name);
                         var dir = face.dir;
                         var light = face.light;
 
                         for (var c = 0; c < 4; c++) {
                             var corner = face.corners[c];
+                            var uvCorner = face.uvCorners[c];
                             vertices.push(
                                 worldX + corner[0],
                                 worldY + corner[1],
                                 worldZ + corner[2],
                                 light,
-                                uvOffset.u0 + corner[0] * (uvOffset.u1 - uvOffset.u0),
-                                uvOffset.v0 + corner[1] * (uvOffset.v1 - uvOffset.v0),
+                                uvOffset.u0 + uvCorner[0] * (uvOffset.u1 - uvOffset.u0),
+                                uvOffset.v0 + uvCorner[1] * (uvOffset.v1 - uvOffset.v0),
                                 dir[0], dir[1], dir[2]
                             );
                         }
@@ -109,6 +132,15 @@
 
         var vertexCount = vertices.length / 9;
         var indexCount = indices.length;
+
+        // Debug log for first chunk
+        if (chunkX === 0 && chunkZ === 0) {
+            Donkeycraft.Logger.info('GeometryBuilder',
+                'Chunk [0,0] DEBUG: blocks=' + _debugBlockCount +
+                ', faces=' + _debugFaceCount +
+                ', vertices=' + vertexCount +
+                ', indices=' + indexCount);
+        }
 
         return {
             vertices: new Float32Array(vertices),
@@ -131,8 +163,14 @@
             return getBlockFunc(localX, ny, localZ);
         }
 
-        // Out of bounds — treat as solid (don't show faces on chunk edges)
-        return 1; // stone
+        // Out of bounds — treat as solid (don't show faces on chunk edges).
+        // Use BlockRegistry to find a known solid block ID instead of hardcoding.
+        if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlockByName === 'function') {
+            var stone = Donkeycraft.BlockRegistry.getBlockByName('stone');
+            return stone ? stone.id : 1;
+        }
+        // Ultimate fallback: assume block ID 1 is stone (common convention).
+        return 1;
     };
 
     /**

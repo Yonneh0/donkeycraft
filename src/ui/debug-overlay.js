@@ -113,6 +113,14 @@
     };
 
     /**
+     * setGame — sets a reference to the Game instance for renderer toggle access.
+     * @param {Object} game - Game instance with getRendererVisibility/setRendererVisibility methods.
+     */
+    Donkeycraft.DebugOverlay.prototype.setGame = function (game) {
+        this._game = game || null;
+    };
+
+    /**
      * getFPS — gets the current FPS value.
      * @returns {number}
      */
@@ -346,6 +354,15 @@
                 } catch (e) { }
             }
 
+            // Get renderer visibility toggles from Game instance
+            var renderers = {};
+            if (this._game && typeof this._game.getRendererVisibility === 'function') {
+                var keys = ['sky','terrain','particles','hand','weather','wireframe','gui'];
+                for (var _i = 0; _i < keys.length; _i++) {
+                    renderers[keys[_i]] = this._game.getRendererVisibility(keys[_i]);
+                }
+            }
+
             return {
                 fps: this._getFPS(),
                 coordinates: coords,
@@ -358,7 +375,8 @@
                 wireframeShowBedrock: showBedrock,
                 wireframeShowClouds: showClouds,
                 wireframeShowSolidBlocks: showSolidBlocks,
-                renderStats: renderStats
+                renderStats: renderStats,
+                renderers: renderers
             };
         } finally {
             // Always restore original references, even if an exception occurred
@@ -466,9 +484,16 @@
             lines.push('</div>');
         }
 
-        // Section 8: Game mode
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Mode</span> <span class="dk-debug-value">' + data.gameMode + '</span></span>');
+        // Section 9: Renderer toggles (interactive checkboxes)
+        lines.push('<div class="dk-debug-section dk-renderer-toggles">');
+        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Renderers</span></span>');
+        var r = data.renderers || {};
+        var rkeys = ['sky','terrain','particles','hand','weather','wireframe','gui'];
+        for (var _j = 0; _j < rkeys.length; _j++) {
+            var rk = rkeys[_j];
+            var rchecked = r[rk] ? 'checked' : '';
+            lines.push('<span class="dk-debug-line dk-toggle-line"><input type="checkbox" class="dk-renderer-toggle" data-renderer="' + rk + '" ' + rchecked + '> <span class="dk-debug-value">' + rk.charAt(0).toUpperCase() + rk.slice(1) + '</span></span>');
+        }
         lines.push('</div>');
 
         this._element.innerHTML = lines.join('\n');
@@ -556,6 +581,7 @@
         this._biome = null;
         this._wireframeRenderer = null;
         this._timer = null;
+        this._game = null;
     };
 
 })();

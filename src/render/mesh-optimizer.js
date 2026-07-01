@@ -164,15 +164,28 @@
      * Run all optimization passes on geometry (index generation + optional back-face culling).
      * @param {Object} geometry - Geometry object.
      * @param {Donkeycraft.Vector3} [cameraPos] - Optional camera position for back-face culling.
+     * @param {boolean} [cullBackFaces=true] - Whether to perform back-face culling.
      * @returns {{vertices: Float32Array, indices: Uint16Array|Uint32Array, vertexCount: number, indexCount: number}}
      */
-    Donkeycraft.MeshOptimizer.prototype.optimize = function (geometry, cameraPos) {
+    Donkeycraft.MeshOptimizer.prototype.optimize = function (geometry, cameraPos, cullBackFaces) {
         var result = geometry;
+
+        // Log pre-index state
+        Donkeycraft.Logger.info('MeshOptimizer',
+            'optimize pre-index: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
 
         result = this.generateIndexBuffer(result);
 
-        if (cameraPos) {
+        // Log post-index state
+        Donkeycraft.Logger.info('MeshOptimizer',
+            'optimize post-index: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
+
+        if (cullBackFaces !== false && cameraPos) {
             result = this.cullBackFaces(result, cameraPos);
+
+            // Log post-culling state
+            Donkeycraft.Logger.info('MeshOptimizer',
+                'optimize post-cull: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
         }
 
         return result;

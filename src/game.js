@@ -91,6 +91,15 @@
         // Debug overlay toggle state (F3)
         this._debugVisible = false;
 
+        // Renderer visibility toggles (debug menu)
+        this._renderSky = true;
+        this._renderTerrain = true;
+        this._renderParticles = true;
+        this._renderHand = true;
+        this._renderWeather = true;
+        this._renderWireframe = true;
+        this._renderGUI = true;
+
         // GuiManager reference for GUI screen management (set externally after init)
         this._guiManager = null;
 
@@ -397,6 +406,40 @@
      */
     Donkeycraft.Game.prototype.isDebugVisible = function () {
         return this._debugVisible;
+    };
+
+    /**
+     * getRendererVisibility — get a renderer toggle state.
+     * @param {string} name - Renderer name ('sky'|'terrain'|'particles'|'hand'|'weather'|'wireframe'|'gui').
+     * @returns {boolean}
+     */
+    Donkeycraft.Game.prototype.getRendererVisibility = function (name) {
+        var map = this._getRendererMap();
+        return this[map[name]] !== false;
+    };
+
+    /**
+     * setRendererVisibility — set a renderer toggle state.
+     * @param {string} name - Renderer name.
+     * @param {boolean} visible - Whether the renderer is visible.
+     */
+    Donkeycraft.Game.prototype.setRendererVisibility = function (name, visible) {
+        var map = this._getRendererMap();
+        if (map[name]) this[map[name]] = !!visible;
+    };
+
+    /**
+     * _getRendererMap — internal helper to get the name-to-property map.
+     * @returns {Object}
+     * @private
+     */
+    Donkeycraft.Game.prototype._getRendererMap = function () {
+        return {
+            'sky': '_renderSky', 'terrain': '_renderTerrain',
+            'particles': '_renderParticles', 'hand': '_renderHand',
+            'weather': '_renderWeather', 'wireframe': '_renderWireframe',
+            'gui': '_renderGUI'
+        };
     };
 
     /**
@@ -1779,7 +1822,7 @@
                 var timeOfDay = this._getTimeOfDay();
                 this._lighting.setTimeOfDay(timeOfDay);
             }
-            if (this._sky) {
+            if (this._renderSky && this._sky) {
                 this._sky.render(this._camera, this._lighting);
             }
         } catch (e) {
@@ -1788,7 +1831,7 @@
 
         // Render terrain (handles fog color + uLightFactor internally)
         try {
-            if (this._terrainRenderer && this._camera) {
+            if (this._renderTerrain && this._terrainRenderer && this._camera) {
                 this._terrainRenderer.render(this._camera);
             }
         } catch (e) {
@@ -1796,20 +1839,20 @@
         }
 
         // Update and render break particles (physics simulation + rendering)
-        if (this._breakParticles && this._player) {
+        if (this._renderParticles && this._breakParticles && this._player) {
             var playerPos = this._player.getPosition();
             this._breakParticles.update(dt, -20.0); // gravity: -20 blocks/s²
             this._breakParticles.render(this._camera);
         }
 
         // Update and render hand (first-person item) with bob animation
-        if (this._handRenderer && this._camera && this._canvas) {
+        if (this._renderHand && this._handRenderer && this._camera && this._canvas) {
             this._handRenderer.setBobAngle(this._handRenderer.getBobAngle() + dt * 3);
             this._handRenderer.render(this._camera, this._canvas.width, this._canvas.height);
         }
 
         // Tick and render weather effects
-        if (this._weather && this._weatherRenderer) {
+        if (this._renderWeather && this._weather && this._weatherRenderer) {
             try {
                 this._weather.tick();
                 var particleDensity = this._weather.getParticleDensity();
@@ -1827,7 +1870,7 @@
         }
 
         // Render wireframes (debug overlay — after terrain, before GUI)
-        if (this._wireframeRenderer && this._camera) {
+        if (this._renderWireframe && this._wireframeRenderer && this._camera) {
             try {
                 var activeChunks = this._chunkManager ? this._chunkManager.getAllChunks() : [];
                 var self = this;
@@ -1840,7 +1883,7 @@
         }
 
         // Render GUI overlay (crosshair, HUD elements)
-        if (this._guiRenderer && this._canvas) {
+        if (this._renderGUI && this._guiRenderer && this._canvas) {
             // Gather health/food values from HurtBox and Hunger systems.
             var health = 20, maxHealth = 20, food = 20, maxFood = 20;
             try {

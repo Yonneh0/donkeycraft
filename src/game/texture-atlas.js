@@ -120,10 +120,13 @@
             var u = col * TEX_SIZE;
             var v = row * TEX_SIZE;
 
-            // Store UV coordinates (normalized to 0-1 range)
+            // Store UV coordinates (normalized to 0-1 range).
+            // V is flipped because WebGL V=0 is at bottom but atlas rows start from top.
+            var uv = u / ATLAS_SIZE;
+            var vt = 1.0 - (v + TEX_SIZE) / ATLAS_SIZE; // flipped: row 0 → top of texture → V≈1.0
             this._uvMap[id] = {
-                u: u / ATLAS_SIZE,
-                v: v / ATLAS_SIZE,
+                u: uv,
+                v: vt,
                 uSize: TEX_SIZE / ATLAS_SIZE,
                 vSize: TEX_SIZE / ATLAS_SIZE,
                 // Pixel-space UVs for non-normalized systems
@@ -231,6 +234,31 @@
         this._images = {};
         this._uvMap = {};
         Donkeycraft.Logger.info('TextureAtlas', 'Atlas destroyed');
+    };
+
+    /**
+     * Static helper: Get UV coordinates for a block ID.
+     * Uses the atlas instance's UV map if available, otherwise falls back to
+     * the standard 16×16 grid layout calculation (tileU = blockId % 16, tileV = floor(blockId / 16)).
+     * @param {number} blockId - Block ID.
+     * @returns {{u0: number, v0: number, u1: number, v1: number}|null} UV coords normalized to 0-1, or null if not found.
+     */
+    Donkeycraft.TextureAtlas.getBlockUV = function (blockId) {
+        // Atlas grid layout: column = blockId % 16, row = floor(blockId / 16)
+        // UVs are flipped on V-axis because WebGL V=0 is at bottom but atlas rows start from top.
+        var atlasSize = 16;
+        var tileU = blockId % atlasSize;
+        var tileV = Math.floor(blockId / atlasSize);
+
+        // Clamp tileV to atlas bounds to prevent UV overflow for blockId >= 256.
+        if (tileV >= atlasSize) tileV = atlasSize - 1;
+
+        return {
+            u0: tileU / atlasSize,
+            v0: 1.0 - (tileV + 1) / atlasSize,
+            u1: (tileU + 1) / atlasSize,
+            v1: 1.0 - tileV / atlasSize
+        };
     };
 
     // ============================================================
