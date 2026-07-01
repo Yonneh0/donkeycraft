@@ -4,8 +4,6 @@ Quick-reference guide for all core modules. Designed for AI assistant RAG — ea
 
 ## Table of Contents
 
-- [game.js](#gamejs)
-- [index.html](#indexhtml)
 - [namespace.js](#namespacejs)
 - [eventbus.js](#eventbusjs)
 - [config.js](#configjs)
@@ -18,189 +16,6 @@ Quick-reference guide for all core modules. Designed for AI assistant RAG — ea
 - [cache.js](#cachejs)
 - [level-data.js](#level-datajs)
 - [world-store.js](#world-storejs)
-
----
-
-## game.js
-
-**Purpose:** Main Game class — orchestrates all subsystems into a cohesive game loop. Handles WebGL rendering, player physics, chunk management, and GUI. Acts as the central coordinator between initialization and runtime.
-
-### Constructor
-
-```js
-new Donkeycraft.Game(options)
-```
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `options.renderDistance` | `number` | `Config.RENDER_DISTANCE` | Override render distance |
-| `options.gameMode` | `string` | `'survival'` | Starting game mode |
-
-### Instance Methods
-
-| Method | Signature | Returns | Description |
-|--------|-----------|---------|-------------|
-| `init()` | `() → boolean` | success? | Initialize all subsystems (WebGL, shaders, player, chunks, etc.) |
-| `start()` | `() → void` | — | Start the game loop |
-| `stop()` | `() → void` | — | Stop the game loop |
-| `pause()` | `() → void` | — | Pause the game loop |
-| `resume()` | `() → void` | — | Resume the game loop |
-| `destroy()` | `() → void` | — | Destroy the game and free all resources |
-| `isRunning()` | `() → boolean` | running? | Check if game is running |
-| `isPaused()` | `() → boolean` | paused? | Check if game is paused |
-| `toggleDebugOverlay()` | `() → boolean` | visible? | Toggle F3 debug overlay |
-| `isDebugVisible()` | `() → boolean` | visible? | Check debug overlay state |
-| `setSystems(...)` | `(movement, collision, jump, flying, raycast, blockAction, blockPlacement, interactableBlocks, redstoneEngine?, hurtBoxCtor?, hungerCtor?) → boolean` | success? | Wire external systems |
-| `setWorldStore(worldStore)` | `(WorldStore) → void` | — | Set WorldStore for auto-save |
-| `setLevelData(levelData, worldName)` | `(LevelData, string) → void` | — | Set LevelData and activate auto-save |
-| `setHotbar(hotbar)` | `(Hotbar) → void` | — | Set hotbar UI reference |
-| `setGuiManager(guiManager)` | `(GuiManager) → void` | — | Set GUI manager for screen management |
-| `setOverlay(overlayEl)` | `(HTMLElement) → void` | — | Set overlay DOM element for pointer lock |
-| `requestPointerLock()` | `() → void` | — | Request mouse capture |
-| `exitPointerLock()` | `() → void` | — | Release mouse capture |
-| `isPointerLocked()` | `() → boolean` | locked? | Check pointer lock state |
-| `setCameraSync(enabled)` | `(boolean) → void` | — | Enable/disable camera-player sync |
-| `getFPS()` | `() → number` | FPS | Get current FPS |
-| `getTickCount()` | `() → number` | count | Get current tick count |
-| `getPlayer()` | `() → Player` | player | Get player entity |
-| `getCamera()` | `() → Camera` | camera | Get camera |
-| `getChunkManager()` | `() → ChunkManager` | chunkMgr | Get chunk manager |
-| `getInput()` | `() → Input` | input | Get input handler |
-| `getTimer()` | `() → Timer` | timer | Get timer |
-| `getEventBus()` | `() → EventBus` | eventBus | Get event bus |
-
-### Game Loop Architecture
-
-The game uses a fixed-timestep tick loop (20 TPS) paired with variable-framerate rendering:
-
-```
-Timer.onTick → _tick(dt, tickCount)  [fixed 20 TPS]
-Timer.onRender → _render(dt)         [variable FPS]
-```
-
-**Tick order (per frame):**
-1. Input state updates
-2. Player rotation sync from camera
-3. Flying system tick (state management)
-4. Movement system tick (physics, gravity, swimming)
-5. Jump system tick (jump input, cooldown)
-6. HurtBox tick (fire damage before hunger)
-7. Hunger system tick (starvation, regeneration)
-8. Chunk updates (load/unload based on player position)
-9. Interaction processing (block break/place)
-10. Auto-save checks
-11. Debug overlay toggles
-
-**Render order (per frame):**
-1. Canvas resize check
-2. Force chunk load (first frame only)
-3. Screen clear
-4. Camera sync to player
-5. Sky rendering
-6. Terrain rendering (with fog)
-7. Break particles update + render
-8. Hand renderer (bob animation)
-9. Weather effects
-10. GUI overlay (HUD, crosshair)
-
-### Key Constants Used
-
-| Constant | Source | Value |
-|----------|--------|-------|
-| `Config.GAME_TICKS_PER_SECOND` | config.js | `20` |
-| `Config.RENDER_DISTANCE` | config.js | `8` |
-| `Config.AUTO_SAVE_INTERVAL` | config.js | `30000ms` |
-| `Config.INTERACTION_COOLDOWN_MS` | internal | `60ms` |
-
----
-
-## index.html
-
-**Purpose:** Main HTML entry point for the application. Defines the canvas, overlay elements, GUI containers, and script loading order. Serves as the bootstrap document that initializes the entire game.
-
-### DOM Structure
-
-```html
-dk-canvas-container          → WebGL canvas container (full viewport)
-  └─ dk-canvas               → Primary WebGL rendering surface
-dk-overlay                   → Game UI overlay layer
-  ├─ dk-crosshair           → Center crosshair
-  ├─ dk-keybindings-panel   → Top-center keybind display
-  ├─ dk-debug-overlay       → F3 debug info (toggled)
-  ├─ dk-gui-backdrop        → Dimmed background for GUI screens
-  ├─ dk-gui-container       → Modal GUI panels (inventory, crafting, etc.)
-  ├─ dk-hotbar-container    → Hotbar slot display
-  ├─ dk-xp-bar-wrapper      → XP bar (above hotbar)
-  ├─ dk-health-bar-wrapper  → Health hearts (above hotbar, left)
-  └─ dk-hunger-bar-wrapper  → Hunger drumsticks (above hotbar, right)
-dk-error-screen              → Fatal error display (hidden by default)
-```
-
-### Script Loading Order
-
-Scripts are loaded in dependency order via individual `<script>` tags:
-
-1. **Core Infrastructure** — namespace, eventbus, config, logger, timer, input, math-utils, audio
-2. **Block System** — block, block-state, block-types, texture-atlas, block-models, recipe-registry
-3. **World Generation** — chunk, chunk-manager, biome, terrain-generator, ore-generator, cave-generator, structure-generator, water-generator, terrain-surface, lighting-engine, physics, world-utils
-4. **Player & Movement** — player, movement, collision, jumping, flying, damage, game-mode, stats, hunger, experience
-5. **Interaction** — raycast, block-action, block-placement, interactable-blocks
-6. **Asset Generation** — noise, texture-core, texture-terrain, texture-blocks, texture-special, texture-decorative, sound-manager
-7. **Loading Screen & Init** — init-sequence, loading-screen
-8. **Inventory & UI** — item-stack, inventory, gui-manager, hotbar, crafting-grid, creative-inventory, furnace-ui, chest-ui, anvil-ui, enchanting-ui, debug-overlay
-9. **Entities & Mobs** — entity, entity-manager, passive-mobs, hostile-mobs, boss-mobs, mob-ai, projectiles, animals, mob-spawning
-10. **Redstone** — redstone-engine, wiring, repeater-comparator, observers, pistons, tnt
-11. **Dimensions** — dimension, portal, nether-generator, end-generator
-12. **Time & Weather** — time, weather
-13. **Storage** — world-store, level-data, cache
-14. **Enchanting & Potions** — enchantment, potion
-15. **Tools** — tool
-16. **UI Elements** — gui-elements, keybindings-panel, xp-bar, health-bar, hunger-bar
-17. **Shader Sources** — embedded `<script type="text/plain">` tags with GLSL vertex/fragment shaders
-18. **WebGL Rendering** — gl-context, shader-manager, geometry-builder, mesh-optimizer, chunk-mesh, terrain-renderer, camera, fog, sky, lighting, hand-renderer, break-particles, gui-renderer
-19. **Main Entry** — game.js
-20. **Initialization Script** — inline `<script>` that runs InitSequence and starts the game
-
-### Shader Sources
-
-Two embedded script tags provide GLSL shader sources for `file://` compatibility:
-
-| ID | Content |
-|----|---------|
-| `dk-vertex-shaders` | TERRAIN_VERTEX_SHADER, BREAK_VERTEX_SHADER, GUI_VERTEX_SHADER, SKY_VERTEX_SHADER, HAND_VERTEX_SHADER |
-| `dk-fragment-shaders` | TERRAIN_FRAGMENT_SHADER, FOG_FRAGMENT_SHADER, GUI_FRAGMENT_SHADER, SKY_FRAGMENT_SHADER, HAND_FRAGMENT_SHADER, PARTICLE_FRAGMENT_SHADER |
-
-### Initialization Flow
-
-```html
-Inline Script (IIFE):
-  1. setupRetry() — attach reload handler to #dk-retry-btn
-  2. Create LoadingScreen instance
-  3. Create InitSequence instance
-  4. Wire progress events (phase:start → phase:end)
-  5. Call initSeq.initialize().then(callback):
-     a. Extract gameSystems from Config
-     b. Call startGame(gameSystems, initSystems)
-        - Create Donkeycraft.Game instance
-        - game.init() — initialize subsystems
-        - game.setSystems() — wire movement/collision/jump/flying
-        - game.setWorldStore() + game.setLevelData() — persistence
-        - game.setOverlay() — pointer lock target
-        - Attach event listeners (click→pointerLock, keydown, mousemove, contextmenu)
-        - game.start() — begin game loop
-        - Wire UI systems (hotbar, health bar, hunger bar, XP bar, debug overlay, GUI manager)
-        - Dispose LoadingScreen
-  6. Debug test buttons (gated behind ?debug=1)
-```
-
-### CSS Classes Used
-
-| Class | Purpose |
-|-------|---------|
-| `dk-pointer-locked` | Set on `<body>` when pointer is locked (hides cursor) |
-| `dk-keybindings-panel` | Keybind display panel |
-| `dk-debug-info` + `.visible` | Debug overlay visibility toggle |
-| `dk-interactive` | Interactive UI elements (blocks backdrop clicks) |
 
 ---
 
@@ -283,25 +98,25 @@ var C = Donkeycraft.Config;
 | `C.PLAYER_SPRINT_SPEED` | `7.8` | Sprinting speed (blocks/sec) |
 | `C.PLAYER_FLY_SPEED` | `5.0` | Creative fly speed |
 | `C.PLAYER_FLY_SPEED_BOOST` | `10.0` | Creative fly speed with sprint |
-| `C.PLAYER_JUMP_FORCE` | `5.0` | Jump velocity (blocks/s) |
+| `C.PLAYER_JUMP_FORCE` | `5.0` | Jump velocity (blocks/s) — gives ~0.6 block jump height with GRAVITY=-20 |
 | `C.PLAYER_REACH` | `6.0` | Block interaction reach distance |
 | `C.FOV` | `70` | Field of view (degrees) |
-| `C.MOUSE_SENSITIVITY` | `0.15` | Mouse look sensitivity |
+| `C.MOUSE_SENSITIVITY` | `0.01` | Mouse look sensitivity |
 | `C.MOUSE_SCROLL_SENSITIVITY` | `1` | Hotbar scroll sensitivity |
 | `C.GRAVITY` | `-20.0` | Gravity acceleration (blocks/s²) |
 | `C.TERMINAL_VELOCITY` | `-40.0` | Max fall speed (blocks/s) |
-| `C.FLYING_TERMINAL_VELOCITY` | `-20.0` | Max downward fly speed |
-| `C.FLY_BASELINE_FPS` | `60` | Delta-time normalization baseline for flying |
-| `C.SWIM_BOOST` | `0.15` | Upward velocity boost when swimming with jump |
+| `C.FLYING_TERMINAL_VELOCITY` | `-20.0` | Max downward fly speed (blocks/s) |
+| `C.FLY_BASELINE_FPS` | `60` | Delta-time normalization baseline for flying movement |
+| `C.SWIM_BOOST` | `0.15` | Upward velocity boost when swimming with jump (blocks/s) |
 | `C.JUMP_COOLDOWN` | `0.1` | Cooldown between jumps (seconds) |
-| `C.FALL_DAMAGE_THRESHOLD` | `3` | Free-fall blocks before damage begins |
-| `C.WORLD_TIME_SCALE` | `60` | Ticks per second for time-of-day |
+| `C.FALL_DAMAGE_THRESHOLD` | `3` | Blocks of free fall before damage begins |
+| `C.WORLD_TIME_SCALE` | `60` | Ticks per second for time-of-day (60s = full day cycle) |
 | `C.CHUNKS_PER_SAVE` | `4` | Chunks to save per batch |
 | `C.LEVEL_DATA_AUTO_SAVE_INTERVAL` | `60000` | Level data auto-save interval (ms) |
 | `C.ASSET_CACHE_VERSION` | `1` | Asset cache version (increment to invalidate) |
 | `C.ASSET_CACHE_MAX_AGE_MS` | `86400000` | 24 hours — expired entries cleared on quota |
-| `C.NETHER_SCALE` | `8` | Overworld/8 = Nether coords (and vice versa) |
-| `C.END_SCALE` | `1` | Overworld × 1 = End coords |
+| `C.NETHER_SCALE` | `8` | Overworld coords / 8 = Nether coords (and vice versa) |
+| `C.END_SCALE` | `1` | Overworld coords × 1 = End coords |
 | `C.NETHER_HEIGHT` | `128` | Nether world height (Y: 0–127) |
 | `C.END_HEIGHT` | `256` | End world height (Y: 0–255) |
 
@@ -594,6 +409,8 @@ var audio = new Donkeycraft.AudioSystem();
 | `setVolume(volume)` | `(number) → void` | — | Set master volume 0.0–1.0 |
 | `getVolume()` | `() → number` | volume | Get current master volume |
 | `setEnabled(enabled)` | `(boolean) → void` | — | Enable/disable all audio |
+| `resumeContext()` | `() → Promise<boolean>` | resumed? | Resume suspended AudioContext (call after user gesture on mobile browsers) |
+| `isReady()` | `() → boolean` | ready? | True if context is initialized and running |
 | `loadSound(name, source)` | `(string, string\|ArrayBuffer) → Promise` | resolves | Load sound from URL or ArrayBuffer |
 | `play(name, options)` | `(string, Object) → AudioBufferSourceNode\|void` | source node | Play a cached sound |
 | `stop(source)` | `(AudioBufferSourceNode) → void` | — | Stop a playing sound source |
@@ -684,8 +501,8 @@ var cache = new Donkeycraft.AssetCache(dbName);  // default: 'donkeycraft-assets
 | `setTextureAtlas(canvas, worldName)` | `(HTMLCanvasElement, string) → Promise<boolean>` | success? | Cache texture atlas as ImageData |
 | `getSound(soundName)` | `(string) → Promise<string\|null>` | base64 URI or null | Load cached sound |
 | `setSound(soundName, base64Data)` | `(string, string) → Promise<boolean>` | success? | Cache sound as base64 data URI |
-| `has(key)` | `(string) → Promise<boolean>` | exists? | Check if key exists in cache |
-| `delete(key)` | `(string) → Promise<boolean>` | deleted? | Delete a cached asset (returns false if not found) |
+| `has(key)` | `(string) → Promise<boolean>` | exists? | Check if key exists in cache (validates key is non-empty string) |
+| `delete(key)` | `(string) → Promise<boolean>` | deleted? | Delete a cached asset (returns false if not found; single-transaction) |
 | `clearExpired(maxAgeMs)` | `(number) → Promise<number>` | cleared count | Remove entries older than maxAgeMs (default: 86400000 = 24h) |
 | `clearAll()` | `() → Promise<number>` | cleared count | Clear all cached assets |
 | `getUsageStats()` | `() → Promise<Object>` | `{entryCount, totalSize, entries}` | Cache statistics |
@@ -776,7 +593,7 @@ var levelData = new Donkeycraft.LevelData();
 | `stopAutoSave()` | `() → void` | — | Stop auto-save |
 | `isAutoSaveEnabled()` | `() → boolean` | enabled? | Check auto-save status |
 | `tickAutoSave(dt)` | `(number) → void` | — | Call once per game tick (dt in seconds) |
-| `persistToStore()` | `() → Promise<boolean>` | success? | Trigger immediate save to WorldStore |
+| `persistToStore()` | `() → Promise<boolean>` | success? | Trigger immediate save to WorldStore (logs warnings on failure) |
 | `markSaved()` | `() → void` | — | Record current timestamp |
 | `getLastSaved()` | `() → number` | ms timestamp | Last save time |
 
@@ -818,7 +635,7 @@ var store = new Donkeycraft.WorldStore(dbName);  // default: 'donkeycraft-worlds
 | `setChunkManager(chunkManager)` | `(ChunkManager) → void` | — | Set reference for `saveDirtyChunks()` |
 | `setEventBus(eventBus)` | `(EventBus) → void` | — | Set event bus for storage events |
 | `saveWorld(worldName, levelData, chunks)` | `(string, Object, Array) → Promise<boolean>` | success? | Save full world (level data + chunk array) |
-| `loadWorld(worldName)` | `(string) → Promise<Object\|null>` | `{levelData, chunks, savedAt}` or null | Load full world |
+| `loadWorld(worldName)` | `(string) → Promise<Object\|null>` | `{levelData, chunks, savedAt}` or null | Load full world (normalizes chunk formats) |
 | `deleteWorld(worldName)` | `(string) → Promise<boolean>` | deleted? | Delete a world |
 | `listWorlds()` | `() → Promise<string[]>` | world names | List all saved world names |
 | `saveChunk(worldName, cx, cz, chunkData)` | `(string, number, number, Object) → Promise<boolean>` | success? | Save single chunk |

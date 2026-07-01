@@ -312,6 +312,10 @@
      */
     Donkeycraft.AssetCache.prototype.has = function (key) {
         var self = this;
+        // Validate key parameter to prevent DOMException from IndexedDB
+        if (!key || typeof key !== 'string') {
+            return Promise.resolve(false);
+        }
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
@@ -337,39 +341,49 @@
 
     /**
      * Delete a specific cached asset.
-     * Verifies the key exists before deletion; returns false if the key is not found.
+     * Returns false if the key is not found or cache is not ready.
+     * Uses cursor-based single-transaction approach for efficiency.
      * @param {string} key — Cache key to delete.
      * @returns {Promise<boolean>} True if deleted, false if key not found.
      */
     Donkeycraft.AssetCache.prototype.delete = function (key) {
         var self = this;
+        // Validate key parameter to prevent DOMException from IndexedDB
+        if (!key || typeof key !== 'string') {
+            return Promise.resolve(false);
+        }
         if (!this.isReady()) {
             return Promise.resolve(false);
         }
 
-        // First verify the key exists
-        return self.has(key).then(function (exists) {
-            if (!exists) {
-                return false;
-            }
+        return new Promise(function (resolve) {
+            try {
+                var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
+                var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
+                var deleted = false;
 
-            return new Promise(function (resolve) {
-                try {
-                    var transaction = self._db.transaction([Donkeycraft.ASSET_CACHE_STORE_NAME], 'readwrite');
-                    var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
-                    var request = store.delete(key);
+                // Use cursor to find and delete in a single transaction
+                var request = store.openCursor();
+                request.onsuccess = function (event) {
+                    var cursor = event.target.result;
+                    if (cursor) {
+                        if (cursor.value && cursor.value.key === key) {
+                            cursor.delete();
+                            deleted = true;
+                        }
+                        cursor.continue();
+                    } else {
+                        // Cursor exhausted — resolve with whether we found and deleted the key
+                        resolve(deleted);
+                    }
+                };
 
-                    request.onsuccess = function () {
-                        resolve(true);
-                    };
-
-                    request.onerror = function () {
-                        resolve(false);
-                    };
-                } catch (e) {
+                request.onerror = function () {
                     resolve(false);
-                }
-            });
+                };
+            } catch (e) {
+                resolve(false);
+            }
         });
     };
 

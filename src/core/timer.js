@@ -137,8 +137,10 @@
         this._animationFrameId = requestAnimationFrame(function (ts) { self._loop(ts); });
 
         // Calculate delta time (capped to prevent spiral of death)
+        // Guard against negative deltas from clock adjustments or timing anomalies
         var rawDelta = (currentTime - this._lastFrameTime) / 1000;
-        this._deltaTime = Math.min(rawDelta, 0.1);
+        var safeDelta = Math.max(0, Math.min(rawDelta, 0.1));
+        this._deltaTime = safeDelta;
         this._lastFrameTime = currentTime;
 
         // FPS counter — reset timer to zero after each update for accurate measurement

@@ -573,6 +573,8 @@
      * Persist current level data to WorldStore immediately.
      * Loads existing world data first to preserve chunks, then merges updated level data.
      * Also triggers dirty chunk save via WorldStore.saveDirtyChunks().
+     * If the world doesn't exist yet (loadWorld returns null), creates a new entry
+     * while preserving any existing chunks from a previous save.
      * @returns {Promise<boolean>} True if persistence succeeded.
      */
     Donkeycraft.LevelData.prototype.persistToStore = function () {
@@ -592,10 +594,12 @@
             if (worldData && worldData.chunks) {
                 existingChunks = worldData.chunks;
             }
+            // If worldData is null (new world), existingChunks stays empty — this is correct.
 
             // Save merged data: updated level + preserved chunks
             return self._worldStore.saveWorld(self._worldNameRef, levelData, existingChunks).then(function (saveSuccess) {
                 if (!saveSuccess) {
+                    Donkeycraft.Logger.warn('LevelData', 'Failed to save world data for: ' + self._worldNameRef);
                     return false;
                 }
                 // Also save dirty chunks if available
@@ -603,6 +607,7 @@
                     return self._worldStore.saveDirtyChunks(self._worldNameRef).then(function () {
                         return true;
                     }).catch(function () {
+                        Donkeycraft.Logger.warn('LevelData', 'World data saved but dirty chunks failed for: ' + self._worldNameRef);
                         return true; // Level data saved even if chunks failed
                     });
                 }

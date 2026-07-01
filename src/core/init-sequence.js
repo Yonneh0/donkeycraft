@@ -217,14 +217,21 @@
                 // The game.js click handler will call resume() when the user clicks.
                 var audioSys = new Donkeycraft.AudioSystem();
                 audioSys.init().then(function () {
+                    // Check if destroy was called while waiting for init to complete
+                    if (self._destroyed) {
+                        // Clean up the audio system before rejecting
+                        audioSys.destroy().catch(function () {});
+                        resolve({ perlinNoiseReady: true });
+                        return;
+                    }
+
                     // Attempt to resume if the context is in 'suspended' state.
                     // This is required on mobile browsers and some desktop browsers
                     // that defer audio context creation until a user gesture.
                     if (audioSys._context && audioSys._context.state === 'suspended') {
-                        audioSys._context.resume().catch(function (e) {
+                        audioSys.resumeContext().catch(function () {
                             Donkeycraft.Logger.warn('InitSequence',
-                                'AudioContext could not be auto-resumed: ' + e.message +
-                                '. Audio will start after first user interaction.');
+                                'AudioContext could not be auto-resumed: audio will start after first user interaction.');
                         });
                     }
                     Donkeycraft.Logger.info('InitSequence', 'AudioSystem initialized successfully');
@@ -261,6 +268,12 @@
                 worldStore.setEventBus(self._eventBus);
 
                 worldStore.init().then(function (ok) {
+                    // Check if destroy was called while waiting for init to complete
+                    if (self._destroyed) {
+                        worldStore.destroy();
+                        resolve({});
+                        return;
+                    }
                     if (ok && worldStore.isReady()) {
                         Donkeycraft.Logger.info('InitSequence', 'WorldStore initialized successfully');
                         resolve({ worldStore: worldStore });
@@ -295,6 +308,12 @@
                 var assetCache = new Donkeycraft.AssetCache();
 
                 assetCache.init().then(function (ok) {
+                    // Check if destroy was called while waiting for init to complete
+                    if (self._destroyed) {
+                        assetCache.destroy();
+                        resolve({});
+                        return;
+                    }
                     if (ok && assetCache.isReady()) {
                         Donkeycraft.Logger.info('InitSequence', 'AssetCache initialized successfully');
                         resolve({ assetCache: assetCache });

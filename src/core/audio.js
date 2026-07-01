@@ -14,10 +14,14 @@
         this._soundCache = {};
         this._volume = 1.0;
         this._enabled = true;
+        this._audioReady = false; // Tracks whether audio context is ready to play sounds
     };
 
     /**
      * Initialize the audio system. Must be called from a user gesture context.
+     * Sets _audioReady to true only when the context state is 'running'.
+     * On some browsers (especially mobile), the context starts in 'suspended' state
+     * and requires a user gesture to resume. Use resumeContext() after first interaction.
      * @returns {Promise}
      */
     Donkeycraft.AudioSystem.prototype.init = function () {
@@ -29,6 +33,19 @@
                 self._masterGain = self._context.createGain();
                 self._masterGain.gain.value = self._volume;
                 self._masterGain.connect(self._context.destination);
+
+                // Context is ready to play only if already running
+                if (self._context.state === 'running') {
+                    self._audioReady = true;
+                } else {
+                    // Track when context resumes — sounds will start playing then
+                    self._context.addEventListener('statechange', function () {
+                        if (self._context.state === 'running') {
+                            self._audioReady = true;
+                        }
+                    });
+                }
+
                 resolve();
             } catch (e) {
                 if (Donkeycraft.Logger) {
@@ -64,6 +81,39 @@
      */
     Donkeycraft.AudioSystem.prototype.setEnabled = function (enabled) {
         this._enabled = enabled;
+    };
+
+    /**
+     * Resume the audio context if it's suspended.
+     * Call this after first user interaction on browsers that defer audio context creation.
+     * @returns {Promise<boolean>} True if context was successfully resumed.
+     */
+    Donkeycraft.AudioSystem.prototype.resumeContext = function () {
+        var self = this;
+        if (!this._context) return Promise.resolve(false);
+
+        if (this._context.state === 'running') {
+            this._audioReady = true;
+            return Promise.resolve(true);
+        }
+
+        return this._context.resume().then(function () {
+            self._audioReady = (self._context.state === 'running');
+            return self._audioReady;
+        }).catch(function (e) {
+            if (Donkeycraft.Logger) {
+                Donkeycraft.Logger.warn('AudioSystem', 'Failed to resume audio context:', e);
+            }
+            return false;
+        });
+    };
+
+    /**
+     * Check if the audio system is ready to play sounds.
+     * @returns {boolean} True if context is initialized and running.
+     */
+    Donkeycraft.AudioSystem.prototype.isReady = function () {
+        return !!this._audioReady;
     };
 
     /**
@@ -135,7 +185,7 @@
      */
     Donkeycraft.AudioSystem.prototype.play = function (name, options) {
         options = options || {};
-        if (!this._enabled || !this._context) return;
+        if (!this._enabled || !this._audioReady) return;
         if (!this._soundCache[name]) return;
 
         var self = this;
@@ -234,7 +284,13 @@
         for (var i = 0; i < sounds.length; i++) {
             promises.push(this.loadSound(sounds[i].name, sounds[i].url));
         }
-        return Promise.all(promises);
+        return Promise.all(promises).then(function () {
+            // Ensure context is running after preload completes
+            if (self._context && self._context.state !== 'running') {
+                return self.resumeContext();
+            }
+            return true;
+        });
     };
 
     /**

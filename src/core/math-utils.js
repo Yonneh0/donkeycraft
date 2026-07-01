@@ -565,8 +565,11 @@
     };
 
     /**
-     * Get the inverse of this matrix.
-     * @returns {Donkeycraft.Matrix4}
+     * Get the inverse of this matrix (non-mutating — returns a new Matrix4).
+     * Equivalent to invert() but with a name that clearly indicates it does not
+     * modify the original matrix. This is provided for API clarity since invert()
+     * also returns a new matrix rather than mutating in place.
+     * @returns {Donkeycraft.Matrix4} A new inverted matrix.
      */
     Donkeycraft.Matrix4.prototype.getInverse = function () {
         return this.invert();
@@ -808,11 +811,11 @@
             for (var i = 0; i < 256; i++) p[i] = i;
 
             // Mulberry32-compatible seed handling
+            // Clamp seed to valid range [1, 2147483646] using modulo to avoid silent changes
             var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed))
                 ? Math.floor(Math.abs(seed)) : 42;
-            if (s <= 0 || s >= 2147483647) {
-                s = (seed === 0) ? 1 : 42;
-            }
+            // Normalize to LCG-safe range: [1, MAX_PRIME - 1]
+            s = ((s % 2147483646) + 2147483646) % 2147483646 + 1;
             for (var i = 255; i > 0; i--) {
                 s = (s * 16807) % 2147483647;
                 var j = s % (i + 1);
