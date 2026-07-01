@@ -329,22 +329,6 @@ void main() {
 }
 `;
 
-// Wireframe Vertex Shader (debug wireframe rendering)
-var WIREFRAME_VERTEX_SHADER = `
-attribute vec3 aPosition;
-attribute vec4 aColor;
-
-uniform mat4 uProjection;
-uniform mat4 uView;
-uniform mat4 uModel;
-
-varying vec4 vColor;
-
-void main() {
-    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-    vColor = aColor;
-}
-`;
 </script>
 
     <script type="text/plain" id="dk-fragment-shaders">
@@ -472,16 +456,6 @@ void main() {
 }
 `;
 
-// Wireframe Fragment Shader (debug wireframe rendering)
-var WIREFRAME_FRAGMENT_SHADER = `
-precision mediump float;
-
-varying vec4 vColor;
-
-void main() {
-    gl_FragColor = vColor;
-}
-`;
 </script>
 
     <!-- WebGL Rendering -->
@@ -498,7 +472,6 @@ void main() {
     <script src="src/render/hand-renderer.js"></script>
     <script src="src/render/break-particles.js"></script>
     <script src="src/render/gui-renderer.js"></script>
-    <script src="src/render/wireframe-renderer.js"></script>
     <!-- Main Entry Point & Game Loop -->
     <script src="src/game.js"></script>
 
@@ -958,10 +931,6 @@ void main() {
                                 debugOverlay.setBiome(Donkeycraft.Biome || null);
                                 debugOverlay.setGameMode(game2._gameMode);
 
-                                // Wire wireframe renderer reference into DebugOverlay for status display.
-                                if (game2._wireframeRenderer) {
-                                    debugOverlay.setWireframeRenderer(game2._wireframeRenderer);
-                                }
                                 // Wire terrain renderer reference so the F3 overlay can show rendering stats.
                                 if (game2._terrainRenderer) {
                                     debugOverlay.setTerrainRenderer(game2._terrainRenderer);

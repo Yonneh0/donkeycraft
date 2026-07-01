@@ -212,7 +212,6 @@ UI subsystem for Donkeycraft — DOM-based rendering, inventory management, and 
 | `setBiome(biome)` | Set biome definitions |
 | `setGameMode(mode)` | Set game mode string |
 | `setTerrainRenderer(renderer)` | Set terrain renderer for stats |
-| `setWireframeRenderer(renderer)` | Set wireframe renderer reference |
 
 ### Lifecycle
 | Method | Description |

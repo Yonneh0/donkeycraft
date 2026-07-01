@@ -36,7 +36,6 @@
         this._guiRenderer = null;
         this._weather = null;
         this._weatherRenderer = null;
-        this._wireframeRenderer = null;
 
         // Texture atlas (generated from AssetManager textures)
         this._textureAtlas = null;
@@ -97,7 +96,6 @@
         this._renderParticles = true;
         this._renderHand = true;
         this._renderWeather = true;
-        this._renderWireframe = true;
         this._renderGUI = true;
 
         // GuiManager reference for GUI screen management (set externally after init)
@@ -246,8 +244,6 @@
             // Create GUI renderer
             this._guiRenderer = new Donkeycraft.GUIRenderer(this._gl, this._shaderManager);
 
-            // Create wireframe renderer (debug overlay)
-            this._wireframeRenderer = new Donkeycraft.WireframeRenderer(this._gl, this._shaderManager);
 
             // Create weather state manager and weather renderer
             if (Donkeycraft.Weather) {
@@ -410,7 +406,7 @@
 
     /**
      * getRendererVisibility — get a renderer toggle state.
-     * @param {string} name - Renderer name ('sky'|'terrain'|'particles'|'hand'|'weather'|'wireframe'|'gui').
+     * @param {string} name - Renderer name ('sky'|'terrain'|'particles'|'hand'|'weather'|'gui').
      * @returns {boolean}
      */
     Donkeycraft.Game.prototype.getRendererVisibility = function (name) {
@@ -437,8 +433,7 @@
         return {
             'sky': '_renderSky', 'terrain': '_renderTerrain',
             'particles': '_renderParticles', 'hand': '_renderHand',
-            'weather': '_renderWeather', 'wireframe': '_renderWireframe',
-            'gui': '_renderGUI'
+            'weather': '_renderWeather', 'gui': '_renderGUI'
         };
     };
 
@@ -950,11 +945,6 @@
             this._weatherRenderer = null;
         }
 
-        if (this._wireframeRenderer) {
-            this._wireframeRenderer.destroy();
-            this._wireframeRenderer = null;
-        }
-
         if (this._weather) {
             this._weather.destroy();
             this._weather = null;
@@ -1167,7 +1157,6 @@
         _compileShaderPair('gui', 'GUI_VERTEX_SHADER', 'GUI_FRAGMENT_SHADER');
         _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
         _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
-        _compileShaderPair('wireframe', 'WIREFRAME_VERTEX_SHADER', 'WIREFRAME_FRAGMENT_SHADER');
 
         // Log compilation results
         var stats = this._shaderManager.getStats();
@@ -1295,25 +1284,6 @@
             'void main() {\n' +
             '  float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);\n' +
             '  gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);\n' +
-            '}\n'
-        );
-
-        // Minimal wireframe shader (debug overlay)
-        this._shaderManager.createProgram('wireframe',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec4 aColor;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'uniform mat4 uModel;\n' +
-            'varying vec4 vColor;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vColor = aColor;\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec4 vColor;\n' +
-            'void main() {\n' +
-            '  gl_FragColor = vColor;\n' +
             '}\n'
         );
 
@@ -1514,12 +1484,6 @@
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Portal tick check failed: ' + e.message);
             }
-        }
-
-        // Toggle wireframe rendering with G key (debug)
-        if (this._input && this._wireframeRenderer && this._input.isKeyJustPressed('KeyG')) {
-            var enabled = this._wireframeRenderer.toggle();
-            Donkeycraft.Logger.info('Game', 'Wireframes ' + (enabled ? 'enabled' : 'disabled'));
         }
 
         // Emit tick event
@@ -1866,19 +1830,6 @@
                 this._weatherRenderer.render(this._camera, particleDensity, particleType);
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Weather render error: ' + e.message);
-            }
-        }
-
-        // Render wireframes (debug overlay — after terrain, before GUI)
-        if (this._renderWireframe && this._wireframeRenderer && this._camera) {
-            try {
-                var activeChunks = this._chunkManager ? this._chunkManager.getAllChunks() : [];
-                var self = this;
-                this._wireframeRenderer.render(this._camera, function (wx, wy, wz) {
-                    return self._getBlockAt(wx, wy, wz);
-                }, activeChunks);
-            } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'Wireframe render failed: ' + e.message);
             }
         }
 

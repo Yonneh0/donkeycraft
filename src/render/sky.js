@@ -1,6 +1,5 @@
 // Donkeycraft — Sky
 // Sky rendering: day/night gradient, sun, moon, stars.
-// Cloud layer is rendered via wireframe renderer debug overlay (future enhancement).
 (function () {
     'use strict';
 

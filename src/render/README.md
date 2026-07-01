@@ -1,6 +1,6 @@
 # Donkeycraft — Render Module
 
-WebGL 1 rendering subsystem for Donkeycraft. Manages everything from WebGL context creation, shader compilation, terrain mesh generation, and chunk rendering to GUI overlays, lighting, sky, weather, and debug wireframes.
+WebGL 1 rendering subsystem for Donkeycraft. Manages everything from WebGL context creation, shader compilation, terrain mesh generation, and chunk rendering to GUI overlays, lighting, sky, and weather.
 
 ## Table of Contents
 
@@ -21,7 +21,6 @@ WebGL 1 rendering subsystem for Donkeycraft. Manages everything from WebGL conte
 | 13 | [hand-renderer.js](#hand-rendererjs) | First-person held item rendering |
 | 14 | [break-particles.js](#break-particlesjs) | Block breaking particle system |
 | 15 | [weather.js](#weatherjs) | Weather state management and particle rendering |
-| 16 | [wireframe-renderer.js](#wireframe-rendererjs) | Debug wireframe overlays for blocks |
 
 ---
 
@@ -77,7 +76,7 @@ new Donkeycraft.ShaderManager(gl)
 | `compileShader(source, type)` | `WebGLShader\|null` | Compile a shader ('vertex' or 'fragment') |
 | `linkProgram(vertShader, fragShader, attribLocations)` | `WebGLProgram\|null` | Link vertex + fragment shaders into a program |
 | `createProgram(name, vertSource, fragSource, attribLocations)` | `WebGLProgram\|null` | Compile + link in one call, cache by name |
-| `createProgramsFromDOM()` | `Object\|null` | Parse DOM `<script>` tags, create 'terrain', 'sky', 'gui', 'break', 'wireframe' programs |
+| `createProgramsFromDOM()` | `Object\|null` | Parse DOM `<script>` tags, create 'terrain', 'sky', 'gui', 'break' programs |
 | `use(name)` | `boolean` | Activate a cached program by name |
 | `useProgram(program)` | `boolean` | Activate a program directly |
 | `setMat4(name, value)` | `boolean` | Set mat4 uniform (value must have getData()) |
@@ -105,11 +104,10 @@ GLSL shader source strings stored in JavaScript template literals.
 |-----------------|-------|
 | `TERRAIN_FRAGMENT_SHADER` | Terrain lighting, fog, texture sampling |
 | `FOG_FRAGMENT_SHADER` | Solid color fog pass |
-| `GUI_FRAGMENT_SHADER` | HUD, particles, wireframes (color-based) |
+| `GUI_FRAGMENT_SHADER` | HUD, particles |
 | `SKY_FRAGMENT_SHADER` | Sky dome gradient |
 | `HAND_FRAGMENT_SHADER` | Reserved for future hand/item rendering |
 | `PARTICLE_FRAGMENT_SHADER` | Reserved for future particle rendering |
-| `WIREFRAME_FRAGMENT_SHADER` | Debug wireframe line rendering |
 
 ### vertex-shaders.glsl
 
@@ -120,19 +118,17 @@ GLSL shader source strings stored in JavaScript template literals.
 | `GUI_VERTEX_SHADER` | HUD overlay rendering |
 | `SKY_VERTEX_SHADER` | Sky dome positioning |
 | `HAND_VERTEX_SHADER` | Reserved for future hand/item rendering |
-| `WIREFRAME_VERTEX_SHADER` | Debug wireframe line rendering |
 
 ### Common Uniforms
 
 **Terrain program:** `uProjection`, `uView`, `uModel`, `uTexture`, `uFogColor`, `uFogDensity`, `uLightFactor`
 **GUI/Break program:** `uProjection`, `uView`, `uModel`, `uTexture`, `uHasTexture`
 **Sky program:** `uProjection`, `uView`, `uTopColor`, `uBottomColor`, `uHorizon`
-**Wireframe program:** `uProjection`, `uView`, `uModel`
 
 ### Common Attributes
 
 **Terrain:** `aPosition`, `aUV`, `aNormal`, `aLight`
-**GUI/Break/Wireframe:** `aPosition`, `aUV`, `aColor`
+**GUI/Break:** `aPosition`, `aUV`, `aColor`
 
 ---
 
@@ -513,50 +509,13 @@ new Donkeycraft.WeatherRenderer(gl, shaderManager)
 
 ---
 
-## wireframe-renderer.js
-
-**Debug wireframe overlays** — colored line outlines around solid blocks, bedrock, and clouds.
-
-### Constructor
-```js
-new Donkeycraft.WireframeRenderer(gl, shaderManager)
-```
-
-### Methods
-
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `setEnabled(enabled, showBedrock, showClouds, showSolidBlocks)` | `void` | Configure render flags |
-| `toggle()` | `boolean` | Toggle enabled, return new state |
-| `render(camera, getBlockFunc, activeChunks)` | `void` | Build and render wireframes |
-| `destroy()` | `void` | Free GPU resources |
-
-### Color Palette
-| Block Type | Color | RGBA |
-|------------|-------|------|
-| Bedrock | Red | [1.0, 0.2, 0.2, 1.0] |
-| Clouds | White | [1.0, 1.0, 1.0, 0.8] |
-| Solid blocks | Magenta | [1.0, 0.0, 1.0, 1.0] |
-| Water | Blue | [0.2, 0.4, 1.0, 0.6] |
-| Lava | Orange | [1.0, 0.5, 0.0, 0.8] |
-
-### Rendering Details
-- 12 edges per block (24 vertices in interleaved pos+color format)
-- Epsilon offset (0.002) to avoid depth fighting with terrain
-- Polygon offset enabled (`gl.polygonOffset(2.0, 4.0)`)
-- Depth write disabled for overlay rendering
-- Max 16,384 wireframe blocks (~1.4MB float data)
-- 64-block render radius from player position
-
----
-
 ## Architecture Overview
 
 ```
 game.js
   │
   ├─ GLContext          → WebGL 1 context wrapper
-  ├─ ShaderManager      → Compiles terrain/sky/gui/break/wireframe programs
+  ├─ ShaderManager      → Compiles terrain/sky/gui/break programs
   │     └─ shaders/     → GLSL source strings
   │
   ├─ Camera             → Position, rotation, projection
@@ -573,8 +532,7 @@ game.js
   ├─ GUIRenderer        → HUD overlay (crosshair, hotbar, hearts, hunger)
   ├─ HandRenderer       → First-person held item
   ├─ BreakParticles     → Block breaking VFX
-  ├─ WeatherRenderer    → Rain/snow particles
-  └─ WireframeRenderer  → Debug overlays
+  └─ WeatherRenderer    → Rain/snow particles
 ```
 
 All renderers use **manual attribute binding** (no VAOs in WebGL 1) and handle **WebGL context loss/restoration** via canvas event listeners. Vertex buffers are pre-allocated or lazily created to minimize per-frame GC pressure.

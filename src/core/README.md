@@ -101,8 +101,7 @@ Timer.onRender → _render(dt)         [variable FPS]
 7. Break particles update + render
 8. Hand renderer (bob animation)
 9. Weather effects
-10. Wireframe debug overlay
-11. GUI overlay (HUD, crosshair)
+10. GUI overlay (HUD, crosshair)
 
 ### Key Constants Used
 
@@ -158,7 +157,7 @@ Scripts are loaded in dependency order via individual `<script>` tags:
 15. **Tools** — tool
 16. **UI Elements** — gui-elements, keybindings-panel, xp-bar, health-bar, hunger-bar
 17. **Shader Sources** — embedded `<script type="text/plain">` tags with GLSL vertex/fragment shaders
-18. **WebGL Rendering** — gl-context, shader-manager, geometry-builder, mesh-optimizer, chunk-mesh, terrain-renderer, camera, fog, sky, lighting, hand-renderer, break-particles, gui-renderer, wireframe-renderer
+18. **WebGL Rendering** — gl-context, shader-manager, geometry-builder, mesh-optimizer, chunk-mesh, terrain-renderer, camera, fog, sky, lighting, hand-renderer, break-particles, gui-renderer
 19. **Main Entry** — game.js
 20. **Initialization Script** — inline `<script>` that runs InitSequence and starts the game
 
@@ -168,8 +167,8 @@ Two embedded script tags provide GLSL shader sources for `file://` compatibility
 
 | ID | Content |
 |----|---------|
-| `dk-vertex-shaders` | TERRAIN_VERTEX_SHADER, BREAK_VERTEX_SHADER, GUI_VERTEX_SHADER, SKY_VERTEX_SHADER, HAND_VERTEX_SHADER, WIREFRAME_VERTEX_SHADER |
-| `dk-fragment-shaders` | TERRAIN_FRAGMENT_SHADER, FOG_FRAGMENT_SHADER, GUI_FRAGMENT_SHADER, SKY_FRAGMENT_SHADER, HAND_FRAGMENT_SHADER, PARTICLE_FRAGMENT_SHADER, WIREFRAME_FRAGMENT_SHADER |
+| `dk-vertex-shaders` | TERRAIN_VERTEX_SHADER, BREAK_VERTEX_SHADER, GUI_VERTEX_SHADER, SKY_VERTEX_SHADER, HAND_VERTEX_SHADER |
+| `dk-fragment-shaders` | TERRAIN_FRAGMENT_SHADER, FOG_FRAGMENT_SHADER, GUI_FRAGMENT_SHADER, SKY_FRAGMENT_SHADER, HAND_FRAGMENT_SHADER, PARTICLE_FRAGMENT_SHADER |
 
 ### Initialization Flow
 

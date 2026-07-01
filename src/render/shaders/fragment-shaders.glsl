@@ -121,14 +121,3 @@ void main() {
     gl_FragColor = vec4(vColor.rgb, vColor.a * texColor.a);
 }
 `;
-
-// Wireframe Fragment Shader — renders solid colored lines for debug wireframes.
-var WIREFRAME_FRAGMENT_SHADER = `
-precision mediump float;
-
-varying vec4 vColor;
-
-void main() {
-    gl_FragColor = vColor;
-}
-`;

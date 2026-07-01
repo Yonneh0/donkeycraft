@@ -36,7 +36,6 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Block breaking particles** — Animated sprites with fade-out
 - **HUD overlay** — Crosshair, hotbar, health/hunger bars, XP bar
 - **Debug screen (F3)** — FPS, chunk info, biome, coordinates, light levels
-- **Wireframe debug mode** — Vertex-rendered wireframe overlay for debugging (render/wireframe-renderer.js)
 
 ### Player & Movement
 - **WASD movement** — Walking, sprinting, swimming with game-mode-specific speed modifiers
@@ -217,7 +216,6 @@ src/
     break-particles.js    # Block breaking particles
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     weather.js            # Weather particle effects
-    wireframe-renderer.js # Wireframe debug overlay
   ui/                 # Inventory, HUD, GUI screens (17 files, ~7,236 lines)
     item-stack.js           # Item stacks with NBT-like tags
     inventory.js            # Multi-slot inventories

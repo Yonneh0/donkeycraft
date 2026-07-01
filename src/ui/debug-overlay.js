@@ -11,7 +11,7 @@
      * DebugOverlay — collects debug data and renders it to the F3 debug DOM overlay.
      *
      * Displays real-time game information including FPS, player coordinates, chunk stats,
-     * light levels, biome info, renderer toggles, and wireframe status.
+     * light levels, biome info, and renderer toggles.
      *
      * Toggle visibility with the F3 key. Renderer checkboxes are interactive and call
      * Game.setRendererVisibility() on change.
@@ -45,9 +45,6 @@
         // Game mode (set via setGameMode)
         this._gameMode = 'survival';
 
-        // Wireframe renderer reference (set via setWireframeRenderer)
-        this._wireframeRenderer = null;
-
         // Terrain renderer reference (set via setTerrainRenderer)
         this._terrainRenderer = null;
 
@@ -72,10 +69,6 @@
             lightBlock: null,
             renderStats: { chunks: null, meshes: null, calls: null },
             gameMode: null,
-            wireframeContainer: null,
-            wfBedrock: null,
-            wfClouds: null,
-            wfSolid: null,
             toggles: {} // key -> input element
         };
 
@@ -145,9 +138,6 @@
             <div class="dk-debug-section">
                 <span class="dk-debug-line"><span class="dk-debug-label">Mode</span> <span class="dk-debug-value mode-val">survival</span></span>
             </div>
-            <div id="dk-wireframe-info" style="display: none;">
-                <!-- Populated dynamically if wireframe is enabled -->
-            </div>
             <div class="dk-debug-section dk-renderer-toggles">
                 <span class="dk-debug-line"><span class="dk-debug-label">Renderers</span></span>
             </div>
@@ -167,10 +157,9 @@
         this._cache.lightSpan = el.querySelector('.light-val');
         this._cache.renderStatsText = el.querySelector('.render-stats-val');
         this._cache.gameMode = el.querySelector('.mode-val');
-        this._cache.wireframeContainer = el.querySelector('#dk-wireframe-info');
 
         // Renderer toggle keys in display order
-        const rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
+        const rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui'];
         const togglesContainer = el.querySelector('.dk-renderer-toggles');
         
         for (let i = 0; i < rendererKeys.length; i++) {
@@ -241,14 +230,6 @@
      */
     Donkeycraft.DebugOverlay.prototype.setTerrainRenderer = function (renderer) {
         this._terrainRenderer = renderer || null;
-    };
-
-    /**
-     * setWireframeRenderer — sets a reference to the wireframe renderer.
-     * @param {Object} [renderer=null] - WireframeRenderer instance or null.
-     */
-    Donkeycraft.DebugOverlay.prototype.setWireframeRenderer = function (renderer) {
-        this._wireframeRenderer = renderer || null;
     };
 
     /**
@@ -454,36 +435,15 @@
     };
 
     /**
-     * _getWireframeInfo — gets wireframe renderer state.
-     * @returns {{ enabled: boolean, showBedrock: boolean, showClouds: boolean, showSolidBlocks: boolean }}
-     * @private
-     */
-    Donkeycraft.DebugOverlay.prototype._getWireframeInfo = function () {
-        const info = { enabled: false, showBedrock: true, showClouds: true, showSolidBlocks: true };
-        if (!this._wireframeRenderer) return info;
-
-        try {
-            info.enabled = this._wireframeRenderer._enabled !== false;
-            info.showBedrock = this._wireframeRenderer._showBedrock !== false;
-            info.showClouds = this._wireframeRenderer._showClouds !== false;
-            info.showSolidBlocks = this._wireframeRenderer._showSolidBlocks !== false;
-        } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', `Failed to read wireframe state: ${e.message}`);
-        }
-
-        return info;
-    };
-
-    /**
      * _getRendererToggles — gets renderer visibility toggles from the Game instance.
-     * @returns {{ sky: boolean, terrain: boolean, particles: boolean, hand: boolean, weather: boolean, wireframe: boolean, gui: boolean }}
+     * @returns {{ sky: boolean, terrain: boolean, particles: boolean, hand: boolean, weather: boolean, gui: boolean }}
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getRendererToggles = function () {
         const toggles = {};
         if (!this._game || typeof this._game.getRendererVisibility !== 'function') return toggles;
 
-        const keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
+        const keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui'];
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
             try {
@@ -506,7 +466,6 @@
         const lightLevels = this.getLightLevels();
         const biomeName = this.getBiomeName();
         const gameMode = this.getGameMode();
-        const wf = this._getWireframeInfo();
         const renderStats = this._getRenderStats();
         const renderers = this._getRendererToggles();
 
@@ -518,10 +477,6 @@
             biome: biomeName,
             gameMode: gameMode,
             deltaTime: this._getDeltaTime(),
-            wireframeEnabled: wf.enabled,
-            wireframeShowBedrock: wf.showBedrock,
-            wireframeShowClouds: wf.showClouds,
-            wireframeShowSolidBlocks: wf.showSolidBlocks,
             renderStats: renderStats,
             renderers: renderers
         };
@@ -607,20 +562,6 @@
         
         this._cache.gameMode.textContent = this._escapeHtml(data.gameMode);
 
-        // Update Wireframe section if enabled
-        if (data.wireframeEnabled) {
-            this._cache.wireframeContainer.style.display = 'block';
-            if (!this._cache.wfBedrock) {
-                this._buildWireframeElements();
-            }
-            this._cache.wfBedrock.textContent = data.wireframeShowBedrock ? 'show' : 'hide';
-            this._cache.wfClouds.textContent = data.wireframeShowClouds ? 'show' : 'hide';
-            this._cache.wfSolid.textContent = data.wireframeShowSolidBlocks ? 'show' : 'hide';
-        } else {
-            this._cache.wireframeContainer.style.display = 'none';
-            this._cache.wfBedrock = null; // Reset for next time it's enabled
-        }
-
         // Update Renderer Toggles (checkboxes)
         for (const key in data.renderers) {
             if (this._cache.toggles[key]) {
@@ -630,23 +571,6 @@
                 }
             }
         }
-    };
-
-    /**
-     * _buildWireframeElements — creates sub-elements for the wireframe debug section.
-     * @private
-     */
-    Donkeycraft.DebugOverlay.prototype._buildWireframeElements = function () {
-        const container = this._cache.wireframeContainer;
-        container.innerHTML = `
-            <span class="dk-debug-line"><span class="dk-debug-label">Wireframe</span> <span class="dk-debug-value">ON</span></span>
-            <span class="dk-debug-line"><span class="dk-debug-label">  Bedrock</span> <span class="dk-debug-value wf-bedrock">show</span></span>
-            <span class="dk-debug-line"><span class="dk-debug-label">  Clouds</span> <span class="dk-debug-value wf-clouds">show</span></span>
-            <span class="dk-debug-line"><span class="dk-debug-label">  Solid</span> <span class="dk-debug-value wf-solid">show</span></span>
-        `;
-        this._cache.wfBedrock = container.querySelector('.wf-bedrock');
-        this._cache.wfClouds = container.querySelector('.wf-clouds');
-        this._cache.wfSolid = container.querySelector('.wf-solid');
     };
 
     /**
@@ -742,7 +666,7 @@
     Donkeycraft.DebugOverlay.prototype.destroy = function () {
         this.stopListening();
         this._eventBus = this._player = this._chunkManager = this._biome = 
-        this._wireframeRenderer = this._terrainRenderer = this._timer = 
+        this._terrainRenderer = this._timer = 
         this._game = this._element = null;
     };
 

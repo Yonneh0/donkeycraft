@@ -106,20 +106,3 @@ void main() {
     vColor = vec4(aLight, aLight, aLight, 1.0);
 }
 `;
-
-// Wireframe Vertex Shader — renders colored line outlines for debug wireframes.
-var WIREFRAME_VERTEX_SHADER = `
-attribute vec3 aPosition;
-attribute vec4 aColor;
-
-uniform mat4 uProjection;
-uniform mat4 uView;
-uniform mat4 uModel;
-
-varying vec4 vColor;
-
-void main() {
-    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-    vColor = aColor;
-}
-`;
