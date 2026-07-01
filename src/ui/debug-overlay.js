@@ -5,7 +5,7 @@
 (function () {
     'use strict';
 
-    var Donkeycraft = window.Donkeycraft;
+    const Donkeycraft = window.Donkeycraft;
 
     /**
      * DebugOverlay — collects debug data and renders it to the F3 debug DOM overlay.
@@ -57,8 +57,30 @@
         // DOM element reference
         this._element = null;
 
-        // One-time flag: has the DOM element been located?
-        this._domReady = false;
+        /** 
+         * @private 
+         * @type {Object}
+         */
+        this._cache = {
+            fps: null,
+            deltaTime: null,
+            coords: {}, // x, y, z, yaw, pitch
+            biome: null,
+            chunkLoaded: null,
+            renderDist: null,
+            lightSky: null,
+            lightBlock: null,
+            renderStats: { chunks: null, meshes: null, calls: null },
+            gameMode: null,
+            wireframeContainer: null,
+            wfBedrock: null,
+            wfClouds: null,
+            wfSolid: null,
+            toggles: {} // key -> input element
+        };
+
+        // One-time flag: has the DOM structure been built?
+        this._domBuilt = false;
 
         // Unsubscribe for render events (startListening)
         this._unsubscribeRender = null;
@@ -69,26 +91,113 @@
     // ============================================================
 
     /**
-     * _ensureDOM — caches a reference to the debug overlay DOM element.
+     * _ensureDOM — caches a reference to the debug overlay DOM element and builds structure.
      * Called lazily on first data collection to ensure the element exists.
      * @private
-     * @returns {boolean} True if the element was found.
+     * @returns {boolean} True if the element was found and built.
      */
     Donkeycraft.DebugOverlay.prototype._ensureDOM = function () {
-        if (this._domReady) return true;
+        if (this._domBuilt) return true;
+
         this._element = document.getElementById('dk-debug-overlay');
-        if (this._element) {
-            this._domReady = true;
-            return true;
+        if (!this._element) {
+            Donkeycraft.Logger.warn('DebugOverlay', 'DOM element #dk-debug-overlay not found');
+            return false;
         }
-        Donkeycraft.Logger.warn('DebugOverlay', 'DOM element #dk-debug-overlay not found');
-        return false;
+
+        // Build the initial DOM structure once to avoid innerHTML every frame
+        this._buildDOM();
+
+        this._domBuilt = true;
+        return true;
+    };
+
+    /**
+     * _buildDOM — creates the static HTML structure for the debug overlay and caches references.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._buildDOM = function () {
+        const el = this._element;
+        el.innerHTML = `
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Donkeycraft</span> <span class="dk-debug-value fps-val">0 fps</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">Delta:</span> <span class="dk-debug-value dt-val">0.000s</span></span>
+            </div>
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Position</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">  X:</span> <span class="dk-debug-value x-val">0</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">  Y:</span> <span class="dk-debug-value y-val">0</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">  Z:</span> <span class="dk-debug-value z-val">0</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">Yaw</span> <span class="dk-debug-value yaw-val">0</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">Pitch</span> <span class="dk-debug-value pitch-val">0</span></span>
+            </div>
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Biome</span> <span class="dk-debug-value biome-val">Unknown</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">Chunk</span> <span class="dk-debug-value chunk-loaded-val">0 loaded</span></span>
+                <span class="dk-debug-line"><span class="dk-debug-label">Render dist</span> <span class="dk-debug-value rd-val">8</span></span>
+            </div>
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Light</span> <span class="dk-debug-value light-val">Sky: 15 Block: 0</span></span>
+            </div>
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Render</span> <span class="dk-debug-value render-stats-val">0 chunks, 0 meshes, 0 calls</span></span>
+            </div>
+            <div class="dk-debug-section">
+                <span class="dk-debug-line"><span class="dk-debug-label">Mode</span> <span class="dk-debug-value mode-val">survival</span></span>
+            </div>
+            <div id="dk-wireframe-info" style="display: none;">
+                <!-- Populated dynamically if wireframe is enabled -->
+            </div>
+            <div class="dk-debug-section dk-renderer-toggles">
+                <span class="dk-debug-line"><span class="dk-debug-label">Renderers</span></span>
+            </div>
+        `;
+
+        // Cache references to elements that change frequently
+        this._cache.fps = el.querySelector('.fps-val');
+        this._cache.deltaTime = el.querySelector('.dt-val');
+        this._cache.coords.x = el.querySelector('.x-val');
+        this._cache.coords.y = el.querySelector('.y-val');
+        this._cache.coords.z = el.querySelector('.z-val');
+        this._cache.coords.yaw = el.querySelector('.yaw-val');
+        this._cache.coords.pitch = el.querySelector('.pitch-val');
+        this._cache.biome = el.querySelector('.biome-val');
+        this._cache.chunkLoaded = el.querySelector('.chunk-loaded-val');
+        this._cache.renderDist = el.querySelector('.rd-val');
+        this._cache.lightSpan = el.querySelector('.light-val');
+        this._cache.renderStatsText = el.querySelector('.render-stats-val');
+        this._cache.gameMode = el.querySelector('.mode-val');
+        this._cache.wireframeContainer = el.querySelector('#dk-wireframe-info');
+
+        // Renderer toggle keys in display order
+        const rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
+        const togglesContainer = el.querySelector('.dk-renderer-toggles');
+        
+        for (let i = 0; i < rendererKeys.length; i++) {
+            const key = rendererKeys[i];
+            const line = document.createElement('span');
+            line.className = 'dk-debug-line dk-toggle-line';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'dk-renderer-toggle';
+            checkbox.dataset.renderer = key;
+            
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'dk-debug-value';
+            labelSpan.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+
+            line.appendChild(checkbox);
+            line.appendChild(labelSpan);
+            togglesContainer.appendChild(line);
+            
+            this._cache.toggles[key] = checkbox;
+        }
     };
 
     /**
      * setTimer — sets a reference to the Timer instance for delta time access.
-     * Accepts any object with a getDeltaTime() method (duck typing).
-     * @param {Object} [timer=null] - Donkeycraft.Timer instance or compatible duck-typed object.
+     * @param {Object} [timer=null] - Donkeycraft.Timer instance or compatible object.
      */
     Donkeycraft.DebugOverlay.prototype.setTimer = function (timer) {
         this._timer = timer || null;
@@ -96,7 +205,7 @@
 
     /**
      * setPlayer — sets a reference to the player entity.
-     * @param {Object} [player=null] - Donkeycraft.Player instance or null to clear.
+     * @param {Object} [player=null] - Donkeycraft.Player instance or null.
      */
     Donkeycraft.DebugOverlay.prototype.setPlayer = function (player) {
         this._player = player || null;
@@ -104,7 +213,7 @@
 
     /**
      * setChunkManager — sets a reference to the chunk manager.
-     * @param {Object} [chunkManager=null] - ChunkManager instance or null to clear.
+     * @param {Object} [chunkManager=null] - ChunkManager instance or null.
      */
     Donkeycraft.DebugOverlay.prototype.setChunkManager = function (chunkManager) {
         this._chunkManager = chunkManager || null;
@@ -112,7 +221,7 @@
 
     /**
      * setBiome — sets a reference to the biome definitions.
-     * @param {Object} [biome=null] - Biome module with getBiomeAt(chunkX, chunkZ) method or null.
+     * @param {Object} [biome=null] - Biome module with getBiomeAt(chunkX, chunkZ).
      */
     Donkeycraft.DebugOverlay.prototype.setBiome = function (biome) {
         this._biome = biome || null;
@@ -171,71 +280,63 @@
      * @returns {{ loaded: number, renderDistance: number }} Chunk information.
      */
     Donkeycraft.DebugOverlay.prototype.getChunkInfo = function () {
-        var renderDist = 8; // Default fallback
+        let renderDist = 8;
         try {
             if (this._config && typeof this._config.RENDER_DISTANCE === 'number') {
                 renderDist = this._config.RENDER_DISTANCE;
             }
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read RENDER_DISTANCE: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to read RENDER_DISTANCE: ${e.message}`);
         }
 
-        // Count loaded chunks
-        var loaded = 0;
+        let loaded = 0;
         try {
-            if (this._chunkManager && this._chunkManager.getAllChunks) {
-                var chunks = this._chunkManager.getAllChunks();
+            if (this._chunkManager && typeof this._chunkManager.getAllChunks === 'function') {
+                const chunks = this._chunkManager.getAllChunks();
                 loaded = Array.isArray(chunks) ? chunks.length : 0;
             }
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to count chunks: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to count chunks: ${e.message}`);
         }
 
-        return {
-            loaded: loaded,
-            renderDistance: renderDist
-        };
+        return { loaded, renderDistance: renderDist };
     };
 
     /**
      * getPlayerCoords — gets player position and rotation data.
-     * Uses the Player API: getPosition() returns Vector3, getRotation() returns {yaw, pitch}.
-     * Each access is independently try/catched so one failure does not suppress others.
      * @returns {{ x: number, y: number, z: number, pitch: number, yaw: number, mode: string }}
      */
     Donkeycraft.DebugOverlay.prototype.getPlayerCoords = function () {
-        var x = 0, y = 0, z = 0;
-        var pitch = 0, yaw = 0;
-        var mode = this._gameMode;
+        let x = 0, y = 0, z = 0;
+        let pitch = 0, yaw = 0;
+        let mode = this._gameMode;
 
         if (this._player) {
-            // getPosition() returns a Vector3 with .x, .y, .z properties.
             try {
-                var pos = this._player.getPosition && this._player.getPosition();
+                const pos = this._player.getPosition && this._player.getPosition();
                 if (pos) {
                     x = typeof pos.x === 'number' ? pos.x : 0;
                     y = typeof pos.y === 'number' ? pos.y : 0;
                     z = typeof pos.z === 'number' ? pos.z : 0;
                 }
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read player position: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to read player position: ${e.message}`);
             }
 
-            // getRotation() returns { yaw: number, pitch: number } in radians.
             try {
-                var rot = this._player.getRotation && this._player.getRotation();
+                const rot = this._player.getRotation && this._player.getRotation();
                 if (rot) {
                     yaw = typeof rot.yaw === 'number' ? rot.yaw : 0;
                     pitch = typeof rot.pitch === 'number' ? rot.pitch : 0;
                 }
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read player rotation: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to read player rotation: ${e.message}`);
             }
 
             try {
                 mode = this._player.getGameMode ? this._player.getGameMode() : 'survival';
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read game mode: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to read game mode: ${e.message}`);
             }
         }
 
@@ -251,35 +352,33 @@
 
     /**
      * getBiomeName — gets the current biome name at the player's chunk position.
-     * Uses getPosition() to extract chunk coordinates, then calls biome.getBiomeAt(chunkX, chunkZ).
-     * @returns {string} Biome name or 'Unknown' if unavailable.
+     * @returns {string} Biome name or 'Unknown'.
      */
     Donkeycraft.DebugOverlay.prototype.getBiomeName = function () {
         if (!this._biome || !this._player) return 'Unknown';
 
-        var px = 0, pz = 0;
+        let px = 0, pz = 0;
         try {
-            var pos = this._player.getPosition && this._player.getPosition();
+            const pos = this._player.getPosition && this._player.getPosition();
             if (!pos) return 'Unknown';
             px = typeof pos.x === 'number' ? pos.x : 0;
             pz = typeof pos.z === 'number' ? pos.z : 0;
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read player position for biome: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to read player position for biome: ${e.message}`);
             return 'Unknown';
         }
 
-        // Convert world coordinates to chunk coordinates (floor division).
-        var chunkSize = Donkeycraft.Config && Donkeycraft.Config.CHUNK_SIZE ? Donkeycraft.Config.CHUNK_SIZE : 16;
-        var chunkX = Math.floor(px / chunkSize);
-        var chunkZ = Math.floor(pz / chunkSize);
+        const chunkSize = Donkeycraft.Config && Donkeycraft.Config.CHUNK_SIZE ? Donkeycraft.Config.CHUNK_SIZE : 16;
+        const chunkX = Math.floor(px / chunkSize);
+        const chunkZ = Math.floor(pz / chunkSize);
 
         if (!this._biome.getBiomeAt) return 'Unknown';
 
         try {
-            var biome = this._biome.getBiomeAt(chunkX, chunkZ);
-            return biome && biome.name ? biome.name : 'Unknown';
+            const biome = this._biome.getBiomeAt(chunkX, chunkZ);
+            return (biome && biome.name) ? biome.name : 'Unknown';
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to get biome: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to get biome: ${e.message}`);
             return 'Unknown';
         }
     };
@@ -289,54 +388,46 @@
      * @returns {string}
      */
     Donkeycraft.DebugOverlay.prototype.getGameMode = function () {
-        if (this._player && this._player.getGameMode) {
-            try { return this._player.getGameMode(); } catch (e) { }
+        if (this._player && typeof this._player.getGameMode === 'function') {
+            try { return this._player.getGameMode(); } catch (e) { Donkeycraft.Logger.warn('DebugOverlay', `Failed to get game mode: ${e.message}`); }
         }
         return this._gameMode;
     };
 
     /**
-     * getLightLevels — gets sky light and block light levels at the player's block position.
-     * Uses getPosition() to read world coordinates, then queries the chunk for light data.
+     * getLightLevels — gets sky light and block light levels at the player's position.
      * @returns {{ sky: number, block: number }} Sky and block light values (0-15).
      */
     Donkeycraft.DebugOverlay.prototype.getLightLevels = function () {
-        var skyLight = 15; // Default: full daylight
-        var blockLight = 0;
+        let skyLight = 15;
+        let blockLight = 0;
 
         if (this._player && this._chunkManager) {
             try {
-                var pos = this._player.getPosition && this._player.getPosition();
+                const pos = this._player.getPosition && this._player.getPosition();
                 if (!pos) return { sky: skyLight, block: blockLight };
 
-                var x = Math.floor(typeof pos.x === 'number' ? pos.x : 0);
-                var y = Math.floor(typeof pos.y === 'number' ? pos.y : 0);
-                var z = Math.floor(typeof pos.z === 'number' ? pos.z : 0);
+                const x = Math.floor(typeof pos.x === 'number' ? pos.x : 0);
+                const y = Math.floor(typeof pos.y === 'number' ? pos.y : 0);
+                const z = Math.floor(typeof pos.z === 'number' ? pos.z : 0);
 
-                // Get chunk and local coords
-                var chunkX = Math.floor(x / 16);
-                var chunkZ = Math.floor(z / 16);
-                var localX = ((x % 16) + 16) % 16;
-                var localY = ((y % 256) + 256) % 256;
-                var localZ = ((z % 16) + 16) % 16;
+                const chunkX = Math.floor(x / 16);
+                const chunkZ = Math.floor(z / 16);
+                const localX = ((x % 16) + 16) % 16;
+                const localY = ((y % 256) + 256) % 256;
+                const localZ = ((z % 16) + 16) % 16;
 
-                // Get the chunk
-                var chunk = this._chunkManager.getChunk ? this._chunkManager.getChunk(chunkX, chunkZ) : null;
-                if (chunk) {
-                    try {
-                        skyLight = chunk.getSkyLight ? chunk.getSkyLight(localX, localY, localZ) : 15;
-                        blockLight = chunk.getBlockLight ? chunk.getBlockLight(localX, localY, localZ) : 0;
-                    } catch (e) { }
+                const chunk = this._chunkManager.getChunk ? this._chunkManager.getChunk(chunkX, chunkZ) : null;
+                if (chunk && typeof chunk.getSkyLight === 'function') {
+                    skyLight = Math.max(0, Math.min(15, chunk.getSkyLight(localX, localY, localZ)));
+                    blockLight = Math.max(0, Math.min(15, chunk.getBlockLight ? chunk.getBlockLight(localX, localY, localZ) : 0));
                 }
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read light levels: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to read light levels: ${e.message}`);
             }
         }
 
-        return {
-            sky: Math.max(0, Math.min(15, skyLight)),
-            block: Math.max(0, Math.min(15, blockLight))
-        };
+        return { sky: skyLight, block: blockLight };
     };
 
     /**
@@ -345,18 +436,18 @@
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getRenderStats = function () {
-        var stats = { chunksRendered: 0, meshesBuilt: 0, drawCalls: 0 };
+        const stats = { chunksRendered: 0, meshesBuilt: 0, drawCalls: 0 };
         if (!this._terrainRenderer) return stats;
 
         try {
-            var raw = this._terrainRenderer.getRenderStats && this._terrainRenderer.getRenderStats();
+            const raw = this._terrainRenderer.getRenderStats && this._terrainRenderer.getRenderStats();
             if (raw) {
                 stats.chunksRendered = typeof raw.chunksRendered === 'number' ? raw.chunksRendered : 0;
                 stats.meshesBuilt = typeof raw.meshesBuilt === 'number' ? raw.meshesBuilt : 0;
                 stats.drawCalls = typeof raw.drawCalls === 'number' ? raw.drawCalls : 0;
             }
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to get render stats: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to get render stats: ${e.message}`);
         }
 
         return stats;
@@ -368,13 +459,7 @@
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getWireframeInfo = function () {
-        var info = {
-            enabled: false,
-            showBedrock: true,
-            showClouds: true,
-            showSolidBlocks: true
-        };
-
+        const info = { enabled: false, showBedrock: true, showClouds: true, showSolidBlocks: true };
         if (!this._wireframeRenderer) return info;
 
         try {
@@ -383,7 +468,7 @@
             info.showClouds = this._wireframeRenderer._showClouds !== false;
             info.showSolidBlocks = this._wireframeRenderer._showSolidBlocks !== false;
         } catch (e) {
-            Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read wireframe state: ' + e.message);
+            Donkeycraft.Logger.warn('DebugOverlay', `Failed to read wireframe state: ${e.message}`);
         }
 
         return info;
@@ -395,16 +480,17 @@
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getRendererToggles = function () {
-        var toggles = {};
+        const toggles = {};
         if (!this._game || typeof this._game.getRendererVisibility !== 'function') return toggles;
 
-        var keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
-        for (var i = 0; i < keys.length; i++) {
+        const keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
             try {
-                toggles[keys[i]] = this._game.getRendererVisibility(keys[i]);
+                toggles[key] = this._game.getRendererVisibility(key);
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to read renderer toggle "' + keys[i] + '": ' + e.message);
-                toggles[keys[i]] = true; // Default to visible on error
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to read renderer toggle "${key}": ${e.message}`);
+                toggles[key] = true; 
             }
         }
         return toggles;
@@ -412,23 +498,17 @@
 
     /**
      * collectData — collects all debug data into a single object.
-     * @returns {{ fps: number, coordinates: Object, chunkInfo: Object, lightLevels: Object, biome: string, gameMode: string, deltaTime: number, wireframeEnabled: boolean, wireframeShowBedrock: boolean, wireframeShowClouds: boolean, wireframeShowSolidBlocks: boolean, renderStats: Object, renderers: Object }}
+     * @returns {Object} Complete debug data object.
      */
     Donkeycraft.DebugOverlay.prototype.collectData = function () {
-        var coords = this.getPlayerCoords();
-        var chunkInfo = this.getChunkInfo();
-        var lightLevels = this.getLightLevels();
-        var biomeName = this.getBiomeName();
-        var gameMode = this.getGameMode();
-
-        // Wireframe info
-        var wf = this._getWireframeInfo();
-
-        // Terrain renderer stats
-        var renderStats = this._getRenderStats();
-
-        // Renderer visibility toggles
-        var renderers = this._getRendererToggles();
+        const coords = this.getPlayerCoords();
+        const chunkInfo = this.getChunkInfo();
+        const lightLevels = this.getLightLevels();
+        const biomeName = this.getBiomeName();
+        const gameMode = this.getGameMode();
+        const wf = this._getWireframeInfo();
+        const renderStats = this._getRenderStats();
+        const renderers = this._getRendererToggles();
 
         return {
             fps: this._getFPS(),
@@ -449,229 +529,188 @@
 
     /**
      * _getDeltaTime — gets delta time from the timer reference.
-     * Uses duck typing: any object with a getDeltaTime() method is accepted.
-     * @returns {number} Delta time in seconds, or 0 if unavailable.
+     * @returns {number} Delta time in seconds.
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getDeltaTime = function () {
-        if (this._timer) {
+        if (this._timer && typeof this._timer.getDeltaTime === 'function') {
             try {
-                if (typeof this._timer.getDeltaTime === 'function') {
-                    var dt = this._timer.getDeltaTime();
-                    return (typeof dt === 'number' && dt >= 0) ? dt : 0;
-                }
+                const dt = this._timer.getDeltaTime();
+                return (typeof dt === 'number' && dt >= 0) ? dt : 0;
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to get delta time: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to get delta time: ${e.message}`);
             }
         }
         return 0;
     };
 
     /**
-     * _getFPS — gets the current FPS from the Timer instance.
-     * Falls back to the internal FPS counter if Timer is unavailable.
+     * _getFPS — gets the current FPS from the Timer instance or internal counter.
      * @returns {number} Current FPS count.
      * @private
      */
     Donkeycraft.DebugOverlay.prototype._getFPS = function () {
-        // Prefer Timer's FPS counter (most accurate, uses performance.now).
-        if (this._timer) {
+        if (this._timer && typeof this._timer.getFPS === 'function') {
             try {
-                if (typeof this._timer.getFPS === 'function') {
-                    var fps = this._timer.getFPS();
-                    return (typeof fps === 'number' && fps >= 0) ? fps : 0;
-                }
+                const fps = this._timer.getFPS();
+                return (typeof fps === 'number' && fps >= 0) ? fps : 0;
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to get FPS from timer: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to get FPS from timer: ${e.message}`);
             }
         }
-        // Fallback to internal FPS counter (render-frame based).
         return this._fps;
     };
 
     /**
-     * _escapeHtml — escapes special HTML characters to prevent XSS in debug output.
-     * @private
+     * _escapeHtml — escapes special HTML characters.
      * @param {string} str - The string to escape.
      * @returns {string} The escaped string.
+     * @private
      */
     Donkeycraft.DebugOverlay.prototype._escapeHtml = function (str) {
         if (typeof str !== 'string') return '';
         return str
-            .replace(/&/g, '&' + 'amp;')
-            .replace(/</g, '&' + 'lt;')
-            .replace(/>/g, '&' + 'gt;')
-            .replace(/"/g, '&' + 'quot;')
-            .replace(/'/g, '&' + '#39;');
+            .replace(/&/g, '&')
+            .replace(/</g, '<')
+            .replace(/>/g, '>')
+            .replace(/"/g, '"')
+            .replace(/'/g, '&#39;');
     };
 
     /**
-     * _renderDOM — renders debug data as HTML into the overlay element.
+     * _renderDOM — updates the DOM with current debug data using cached elements.
      * @private
      * @param {Object} data - Complete debug data object from collectData().
      */
     Donkeycraft.DebugOverlay.prototype._renderDOM = function (data) {
         if (!this._ensureDOM() || !this._element) return;
 
-        var coords = data.coordinates;
-        var chunkInfo = data.chunkInfo;
-        var light = data.lightLevels;
-        var renderStats = data.renderStats || { chunksRendered: 0, meshesBuilt: 0, drawCalls: 0 };
-        var r = data.renderers || {};
+        // Update simple text values via cached elements
+        this._cache.fps.textContent = `${this._escapeHtml(String(data.fps))} fps`;
+        this._cache.deltaTime.textContent = `${data.deltaTime.toFixed(3)}s`;
+        
+        const c = data.coordinates;
+        this._cache.coords.x.textContent = this._escapeHtml(String(c.x));
+        this._cache.coords.y.textContent = this._escapeHtml(String(c.y));
+        this._cache.coords.z.textContent = this._escapeHtml(String(c.z));
+        this._cache.coords.yaw.textContent = `: ${this._escapeHtml(String(c.yaw))}`;
+        this._cache.coords.pitch.textContent = `: ${this._escapeHtml(String(c.pitch))}`;
 
-        // Renderer toggle keys in display order
-        var rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'wireframe', 'gui'];
+        this._cache.biome.textContent = this._escapeHtml(data.biome);
+        this._cache.chunkLoaded.textContent = `${this._escapeHtml(String(data.chunkInfo.loaded))} loaded`;
+        this._cache.renderDist.textContent = this._escapeHtml(String(data.chunkInfo.renderDistance));
 
-        // Build section lines array for efficient DOM update
-        var lines = [];
+        this._cache.lightSpan.textContent = `Sky: ${this._escapeHtml(String(data.lightLevels.sky))} Block: ${this._escapeHtml(String(data.lightLevels.block))}`;
+        
+        const rs = data.renderStats;
+        this._cache.renderStatsText.textContent = `${this._escapeHtml(String(rs.chunksRendered))} chunks, ${this._escapeHtml(String(rs.meshesBuilt))} meshes, ${this._escapeHtml(String(rs.drawCalls))} calls`;
+        
+        this._cache.gameMode.textContent = this._escapeHtml(data.gameMode);
 
-        // Section 1: Version / FPS / Delta
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Donkeycraft</span> <span class="dk-debug-value">' + this._escapeHtml(String(data.fps)) + ' fps</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Delta:</span> <span class="dk-debug-value">' + data.deltaTime.toFixed(3) + 's</span></span>');
-        lines.push('</div>');
-
-        // Section 2: Position & Rotation
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Position</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  X:</span> <span class="dk-debug-value">' + this._escapeHtml(String(coords.x)) + '</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Y:</span> <span class="dk-debug-value">' + this._escapeHtml(String(coords.y)) + '</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Z:</span> <span class="dk-debug-value">' + this._escapeHtml(String(coords.z)) + '</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Yaw</span> <span class="dk-debug-value">: ' + this._escapeHtml(String(coords.yaw)) + '</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Pitch</span> <span class="dk-debug-value">: ' + this._escapeHtml(String(coords.pitch)) + '</span></span>');
-        lines.push('</div>');
-
-        // Section 3: Chunk & Biome
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Biome</span> <span class="dk-debug-value">: ' + this._escapeHtml(data.biome) + '</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Chunk</span> <span class="dk-debug-value">: ' + this._escapeHtml(String(chunkInfo.loaded)) + ' loaded</span></span>');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Render dist</span> <span class="dk-debug-value">: ' + this._escapeHtml(String(chunkInfo.renderDistance)) + '</span></span>');
-        lines.push('</div>');
-
-        // Section 4: Light levels
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Light</span> <span class="dk-debug-value">Sky: ' + this._escapeHtml(String(light.sky)) + ' Block: ' + this._escapeHtml(String(light.block)) + '</span></span>');
-        lines.push('</div>');
-
-        // Section 5: Render stats (chunks, meshes, draw calls)
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Render</span> <span class="dk-debug-value">' +
-            this._escapeHtml(String(renderStats.chunksRendered)) + ' chunks, ' +
-            this._escapeHtml(String(renderStats.meshesBuilt)) + ' meshes, ' +
-            this._escapeHtml(String(renderStats.drawCalls)) + ' calls</span></span>');
-        lines.push('</div>');
-
-        // Section 6: Game mode
-        lines.push('<div class="dk-debug-section">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Mode</span> <span class="dk-debug-value">: ' + this._escapeHtml(data.gameMode) + '</span></span>');
-        lines.push('</div>');
-
-        // Section 7: Wireframe debug info (if wireframe renderer is active)
+        // Update Wireframe section if enabled
         if (data.wireframeEnabled) {
-            lines.push('<div class="dk-debug-section">');
-            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Wireframe</span> <span class="dk-debug-value">ON</span></span>');
-            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Bedrock</span> <span class="dk-debug-value">' + this._escapeHtml(data.wireframeShowBedrock ? 'show' : 'hide') + '</span></span>');
-            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Clouds</span> <span class="dk-debug-value">' + this._escapeHtml(data.wireframeShowClouds ? 'show' : 'hide') + '</span></span>');
-            lines.push('<span class="dk-debug-line"><span class="dk-debug-label">  Solid</span> <span class="dk-debug-value">' + this._escapeHtml(data.wireframeShowSolidBlocks ? 'show' : 'hide') + '</span></span>');
-            lines.push('</div>');
+            this._cache.wireframeContainer.style.display = 'block';
+            if (!this._cache.wfBedrock) {
+                this._buildWireframeElements();
+            }
+            this._cache.wfBedrock.textContent = data.wireframeShowBedrock ? 'show' : 'hide';
+            this._cache.wfClouds.textContent = data.wireframeShowClouds ? 'show' : 'hide';
+            this._cache.wfSolid.textContent = data.wireframeShowSolidBlocks ? 'show' : 'hide';
+        } else {
+            this._cache.wireframeContainer.style.display = 'none';
+            this._cache.wfBedrock = null; // Reset for next time it's enabled
         }
 
-        // Section 8: Renderer toggles (interactive checkboxes)
-        lines.push('<div class="dk-debug-section dk-renderer-toggles">');
-        lines.push('<span class="dk-debug-line"><span class="dk-debug-label">Renderers</span></span>');
-        for (var i = 0; i < rendererKeys.length; i++) {
-            var key = rendererKeys[i];
-            var checked = r[key] ? 'checked' : '';
-            var label = key.charAt(0).toUpperCase() + key.slice(1);
-            lines.push('<span class="dk-debug-line dk-toggle-line"><input type="checkbox" class="dk-renderer-toggle" data-renderer="' + this._escapeHtml(key) + '" ' + checked + '> <span class="dk-debug-value">' + this._escapeHtml(label) + '</span></span>');
+        // Update Renderer Toggles (checkboxes)
+        for (const key in data.renderers) {
+            if (this._cache.toggles[key]) {
+                const isChecked = data.renderers[key];
+                if (this._cache.toggles[key].checked !== isChecked) {
+                    this._cache.toggles[key].checked = isChecked;
+                }
+            }
         }
-        lines.push('</div>');
+    };
 
-        this._element.innerHTML = lines.join('\n');
+    /**
+     * _buildWireframeElements — creates sub-elements for the wireframe debug section.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._buildWireframeElements = function () {
+        const container = this._cache.wireframeContainer;
+        container.innerHTML = `
+            <span class="dk-debug-line"><span class="dk-debug-label">Wireframe</span> <span class="dk-debug-value">ON</span></span>
+            <span class="dk-debug-line"><span class="dk-debug-label">  Bedrock</span> <span class="dk-debug-value wf-bedrock">show</span></span>
+            <span class="dk-debug-line"><span class="dk-debug-label">  Clouds</span> <span class="dk-debug-value wf-clouds">show</span></span>
+            <span class="dk-debug-line"><span class="dk-debug-label">  Solid</span> <span class="dk-debug-value wf-solid">show</span></span>
+        `;
+        this._cache.wfBedrock = container.querySelector('.wf-bedrock');
+        this._cache.wfClouds = container.querySelector('.wf-clouds');
+        this._cache.wfSolid = container.querySelector('.wf-solid');
     };
 
     /**
      * update — updates all data, renders DOM, and emits a debug event.
-     * @param {Object} [player] - Optional player override (does not persist internally).
-     * @param {Object} [chunkManager] - Optional chunk manager override (does not persist internally).
+     * @param {Object} [player] - Optional player override.
+     * @param {Object} [chunkManager] - Optional chunk manager override.
      */
     Donkeycraft.DebugOverlay.prototype.update = function (player, chunkManager) {
         if (!this._ensureDOM()) return;
 
-        var data = this.collectData();
-
-        // Render directly to DOM
+        const data = this.collectData();
         this._renderDOM(data);
 
-        // Also emit debug event for any external consumers
         if (this._eventBus) {
             try {
                 this._eventBus.emit('debug:update', data);
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to emit debug:update event: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to emit debug:update event: ${e.message}`);
             }
         }
     };
 
     /**
      * startListening — starts auto-updating on each render frame.
-     *
-     * FPS counter increments each frame and updates every 1000ms. The first FPS sample
-     * waits a full second from the first frame so early frames do not produce a
-     * misleading spike.
-     *
-     * Note: The FPS value emitted in collectData() may be 1 frame behind because the
-     * FPS calculation happens before data collection in the render loop.
      */
     Donkeycraft.DebugOverlay.prototype.startListening = function () {
         if (this._unsubscribeRender) return;
 
-        var self = this;
-
-        // Try to get an onRender callback from the timer first.
+        const self = this;
         if (this._timer && typeof this._timer.onRender === 'function') {
             try {
-                this._unsubscribeRender = this._timer.onRender(function (timestamp) {
+                this._unsubscribeRender = this._timer.onRender((timestamp) => {
                     self._onRenderFrame(timestamp);
                 });
                 return;
             } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to subscribe to timer.onRender: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to subscribe to timer.onRender: ${e.message}`);
             }
         }
 
-        // Fallback: use requestAnimationFrame if timer has no onRender.
         try {
-            var rafId = { value: 0 };
-            var loop = function (ts) {
+            let rafId = requestAnimationFrame((ts) => self._onRenderFrame(ts));
+            const loop = (ts) => {
+                rafId = requestAnimationFrame(loop);
                 self._onRenderFrame(ts);
-                rafId.value = requestAnimationFrame(loop);
             };
-            rafId.value = requestAnimationFrame(loop);
-
-            // Return a cleanup function that cancels the rAF.
-            this._unsubscribeRender = function () {
-                cancelAnimationFrame(rafId.value);
-            };
+            this._unsubscribeRender = () => cancelAnimationFrame(rafId);
         } catch (e) {
-            Donkeycraft.Logger.error('DebugOverlay', 'Failed to start render loop: ' + e.message);
+            Donkeycraft.Logger.error('DebugOverlay', `Failed to start render loop: ${e.message}`);
         }
     };
 
     /**
-     * _onRenderFrame — internal callback invoked each render frame for FPS counting and debug updates.
+     * _onRenderFrame — internal callback for FPS counting and debug updates.
      * @private
      * @param {number} timestamp - High-resolution timestamp in ms.
      */
     Donkeycraft.DebugOverlay.prototype._onRenderFrame = function (timestamp) {
-        // Update FPS counter
         this._frameCount++;
 
-        // Initialize the baseline timestamp on first frame only.
         if (!this._fpsBaselineSet) {
             this._lastFpsUpdate = timestamp;
             this._fpsBaselineSet = true;
-            return; // Don't update debug data on first frame — wait for first FPS sample
+            return;
         }
 
         if (timestamp - this._lastFpsUpdate >= 1000) {
@@ -680,7 +719,6 @@
             this._lastFpsUpdate = timestamp;
         }
 
-        // Update debug data using internal references
         if (this._player && this._chunkManager) {
             this.update(this._player, this._chunkManager);
         }
@@ -692,29 +730,20 @@
     Donkeycraft.DebugOverlay.prototype.stopListening = function () {
         if (this._unsubscribeRender) {
             try { this._unsubscribeRender(); } catch (e) {
-                Donkeycraft.Logger.warn('DebugOverlay', 'Failed to stop render loop: ' + e.message);
+                Donkeycraft.Logger.warn('DebugOverlay', `Failed to stop render loop: ${e.message}`);
             }
             this._unsubscribeRender = null;
         }
     };
 
     /**
-     * destroy — cleans up resources. Call when the game is destroyed.
+     * destroy — cleans up resources.
      */
     Donkeycraft.DebugOverlay.prototype.destroy = function () {
         this.stopListening();
-
-        // Null out all references to allow garbage collection
-        this._eventBus = null;
-        this._config = null;
-        this._player = null;
-        this._chunkManager = null;
-        this._biome = null;
-        this._wireframeRenderer = null;
-        this._terrainRenderer = null;
-        this._timer = null;
-        this._game = null;
-        this._element = null;
+        this._eventBus = this._player = this._chunkManager = this._biome = 
+        this._wireframeRenderer = this._terrainRenderer = this._timer = 
+        this._game = this._element = null;
     };
 
 })();

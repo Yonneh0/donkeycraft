@@ -413,9 +413,16 @@
     vertical-align: middle;
 }
 
-.dk-debug-info .dk-renderer-toggles,
+.dk-debug-info .dk-renderer-toggles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .dk-toggle-line {
     pointer-events: auto;
+    display: flex;
+    align-items: center;
 }
 
 .dk-scroll-container::-webkit-scrollbar-thumb:hover {
@@ -599,7 +606,6 @@
     line-height: 1.5;
     color: #fff;
     white-space: pre;
-    pointer-events: none;
     user-select: none;
     z-index: 100;
     display: none;
