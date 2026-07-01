@@ -138,11 +138,9 @@
     Donkeycraft.TerrainRenderer.prototype.updateChunks = function (playerChunkX, playerChunkZ) {
         var gl = this._gl;
         if (!gl || !this._getBlockFunc) {
-            Donkeycraft.Logger.warn('TerrainRenderer', 'updateChunks skipped: gl=' + (gl ? 'ok' : 'null') + ', _getBlockFunc=' + (this._getBlockFunc ? 'ok' : 'null'));
+            Donkeycraft.Logger.error('TerrainRenderer', 'updateChunks skipped: gl=' + (gl ? 'ok' : 'null') + ', _getBlockFunc=' + (this._getBlockFunc ? 'ok' : 'null'));
             return;
         }
-
-        // Donkeycraft.Logger.info('TerrainRenderer', 'updateChunks called: playerChunk=(' + playerChunkX + ',' + playerChunkZ + '), renderDistance=' + this._renderDistance);
 
         // First, process any pending meshes (deferred from previous frames)
         this._processPendingMeshes();
@@ -192,7 +190,6 @@
             return;
         }
 
-        // Donkeycraft.Logger.info('TerrainRenderer', 'Creating chunk mesh at (' + chunkX + ',' + chunkZ + ')...');
         if (!this._getBlockFunc) {
             Donkeycraft.Logger.warn('TerrainRenderer', '_getBlockFunc not set — cannot create chunk mesh');
             return;
@@ -209,8 +206,6 @@
 
         // Build geometry (face culling already done during build)
         var geometry = this._geometryBuilder.buildChunk(chunkX, chunkZ, localGetBlock);
-
-        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] geometry: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
 
         // If geometry is empty (all air), defer mesh building.
         // The chunk may not have terrain data yet — it will be built on the next frame.
@@ -230,16 +225,7 @@
 
         // Run MeshOptimizer for vertex deduplication and back-face culling
         var cameraPos = this._camera ? this._camera.getPosition() : null;
-
-        // Log pre-optimization state (one-time per chunk)
-        Donkeycraft.Logger.info('TerrainRenderer',
-            'Chunk [' + chunkX + ',' + chunkZ + '] before optimize: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
-
         geometry = this._meshOptimizer.optimize(geometry, cameraPos, this._cullBackFaces);
-
-        // Log post-optimization state (one-time per chunk)
-        Donkeycraft.Logger.info('TerrainRenderer',
-            'Chunk [' + chunkX + ',' + chunkZ + '] after optimize: vertexCount=' + geometry.vertexCount + ', indexCount=' + geometry.indexCount);
 
         // Create chunk mesh object
         var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -250,8 +236,6 @@
         var key = chunkX + ',' + chunkZ;
         this._chunks[key] = chunkMesh;
         this._chunkCount++;
-
-        // Donkeycraft.Logger.info('TerrainRenderer', 'Chunk [' + chunkX + ',' + chunkZ + '] created successfully. Total chunks: ' + this._chunkCount);
     };
 
     /**
@@ -457,8 +441,6 @@
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
 
-        // Donkeycraft.Logger.info('TerrainRenderer', 'render called: chunks=' + this._chunkCount);
-
         if (!this._shaderManager.use('terrain')) {
             Donkeycraft.Logger.error('TerrainRenderer', 'terrain shader program not available!');
             return;
@@ -537,7 +519,6 @@
             this._drawChunk(chunkMesh);
             drawnCount++;
         }
-        // Donkeycraft.Logger.info('TerrainRenderer', 'render complete: drew ' + drawnCount + '/' + this._chunkCount + ' chunks');
     };
 
     /**

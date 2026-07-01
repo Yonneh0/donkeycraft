@@ -72,17 +72,21 @@ void main() {
 var SKY_VERTEX_SHADER = `
 attribute vec3 aPosition;
 attribute vec2 aUV;
+attribute vec4 aColor;
 
 uniform mat4 uProjection;
 uniform mat4 uView;
+uniform mat4 uModel;
 
 varying vec2 vUV;
 varying vec3 vWorldPos;
+varying vec4 vColor;
 
 void main() {
-    gl_Position = uProjection * uView * vec4(aPosition, 1.0);
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
     vUV = aUV;
     vWorldPos = aPosition;
+    vColor = aColor;
 }
 `;
 

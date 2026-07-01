@@ -88,14 +88,6 @@
 
         var colorSet = shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b);
         var densitySet = shaderManager.setFloat('uFogDensity', this._density);
-
-        if (!colorSet) {
-            Donkeycraft.Logger.warn('Fog', 'Failed to set uFogColor uniform — fog may not render correctly');
-        }
-        if (!densitySet) {
-            Donkeycraft.Logger.warn('Fog', 'Failed to set uFogDensity uniform — fog may not render correctly');
-        }
-
         return colorSet && densitySet;
     };
 

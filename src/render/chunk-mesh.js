@@ -35,9 +35,6 @@
         if (gl) {
             var ext = gl.getExtension('OES_element_index_uint');
             this._supportsUint32Indices = ext !== null;
-            if (!ext) {
-                Donkeycraft.Logger.warn('ChunkMesh', 'OES_element_index_uint extension not available — Uint32 indices will fall back to Uint16 (max 65535 indices)');
-            }
         }
 
         // Track whether this mesh uses Uint32 indices
@@ -122,13 +119,10 @@
         // Determine index type based on geometry data and extension support.
         var indexType = gl.UNSIGNED_SHORT;
         if (this._geometryUsesUint32) {
-            if (this._supportsUint32Indices) {
-                indexType = gl.UNSIGNED_INT;
-            } else {
-                // Geometry requires Uint32 but extension is unavailable — cannot draw safely.
-                Donkeycraft.Logger.error('ChunkMesh', 'Geometry uses Uint32 indices but OES_element_index_uint is not supported. Chunk will not render.');
+            if (!this._supportsUint32Indices) {
                 return false;
             }
+            indexType = gl.UNSIGNED_INT;
         }
 
         // Bind vertex buffer and set up attribute pointers.

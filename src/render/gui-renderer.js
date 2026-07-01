@@ -612,7 +612,7 @@
                 this.renderCrosshair(canvasWidth, canvasHeight);
             }
         } catch (e) {
-            Donkeycraft.Logger.error('GUIRenderer', 'renderAll error: ' + e.message);
+            // Silently fail — GUI errors should not break the game loop.
         }
     };
 

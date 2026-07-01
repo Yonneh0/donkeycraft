@@ -34,7 +34,6 @@
     Donkeycraft.ShaderManager.prototype.compileShader = function (source, type) {
         var gl = this._gl;
         if (!gl) {
-            Donkeycraft.Logger.error('ShaderManager', 'WebGL context not available');
             return null;
         }
 
@@ -42,7 +41,6 @@
         var shader = gl.createShader(shaderType);
 
         if (!shader) {
-            Donkeycraft.Logger.error('ShaderManager', 'Failed to create shader of type ' + type);
             return null;
         }
 
@@ -52,7 +50,6 @@
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             var errorMsg = gl.getShaderInfoLog(shader);
             gl.deleteShader(shader);
-            Donkeycraft.Logger.error('ShaderManager', type + ' shader compilation failed:\n' + source + '\nError: ' + errorMsg);
             return null;
         }
 
@@ -74,7 +71,6 @@
 
         var program = gl.createProgram();
         if (!program) {
-            Donkeycraft.Logger.error('ShaderManager', 'Failed to create program');
             return null;
         }
 
@@ -92,7 +88,6 @@
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             var errorMsg = gl.getProgramInfoLog(program);
             gl.deleteProgram(program);
-            Donkeycraft.Logger.error('ShaderManager', 'Program linking failed:\nError: ' + errorMsg);
             return null;
         }
 
@@ -241,16 +236,10 @@
         if (!gl) return false;
 
         var prog = this._getActiveProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program active when setting uniform: ' + name);
-            return false;
-        }
+        if (!prog) return false;
 
         var loc = this._getUniformLocation(prog, name);
-        if (loc === null) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found in shader: ' + name);
-            return false;
-        }
+        if (loc === null) return false;
 
         // Extract arguments after 'name' and 'setter'
         var args = [];
@@ -268,10 +257,7 @@
      * @returns {boolean} True if uniform was set successfully.
      */
     Donkeycraft.ShaderManager.prototype.setMat4 = function (name, value) {
-        if (!value || typeof value.getData !== 'function') {
-            Donkeycraft.Logger.warn('ShaderManager', 'setMat4: invalid Matrix4 value for uniform "' + name + '"');
-            return false;
-        }
+        if (!value || typeof value.getData !== 'function') return false;
         var self = this;
         return this._setUniform(name, function (gl, loc, val) {
             if (loc) gl.uniformMatrix4fv(loc, false, val.getData());
@@ -345,17 +331,11 @@
         if (!gl) return false;
 
         var prog = this._getActiveProgram();
-        if (!prog) {
-            Donkeycraft.Logger.warn('ShaderManager', 'No program active when setting uniform: ' + name);
-            return false;
-        }
+        if (!prog) return false;
 
         unit = unit || 0;
         var loc = this._getUniformLocation(prog, name);
-        if (loc === null) {
-            Donkeycraft.Logger.warn('ShaderManager', 'Uniform not found in shader: ' + name);
-            return false;
-        }
+        if (loc === null) return false;
 
         gl.activeTexture(gl.TEXTURE0 + unit);
         gl.uniform1i(loc, unit);
@@ -437,21 +417,16 @@
      */
     Donkeycraft.ShaderManager.prototype.createProgram = function (name, vertSource, fragSource, attribLocations) {
         var vertShader = this.compileShader(vertSource, 'vertex');
-        if (!vertShader) {
-            Donkeycraft.Logger.error('ShaderManager', 'Failed to compile vertex shader for program "' + name + '"');
-            return null;
-        }
+        if (!vertShader) return null;
 
         var fragShader = this.compileShader(fragSource, 'fragment');
         if (!fragShader) {
             this._gl.deleteShader(vertShader);
-            Donkeycraft.Logger.error('ShaderManager', 'Failed to compile fragment shader for program "' + name + '"');
             return null;
         }
 
         var program = this.linkProgram(vertShader, fragShader, attribLocations);
         if (!program) {
-            Donkeycraft.Logger.error('ShaderManager', 'Failed to link program "' + name + '"');
             this._gl.deleteShader(vertShader);
             this._gl.deleteShader(fragShader);
             return null;
@@ -482,10 +457,7 @@
         var vertexScript = document.getElementById('dk-vertex-shaders');
         var fragmentScript = document.getElementById('dk-fragment-shaders');
 
-        if (!vertexScript || !fragmentScript) {
-            Donkeycraft.Logger.error('ShaderManager', 'Missing shader script tags (dk-vertex-shaders, dk-fragment-shaders)');
-            return null;
-        }
+        if (!vertexScript || !fragmentScript) return null;
 
         var vertexText = vertexScript.textContent || vertexScript.innerText;
         var fragmentText = fragmentScript.textContent || fragmentScript.innerText;
@@ -507,47 +479,32 @@
         var vertexShaders = extractShaders(vertexText);
         var fragmentShaders = extractShaders(fragmentText);
 
-        Donkeycraft.Logger.info('ShaderManager', 'Parsed ' + Object.keys(vertexShaders).length + ' vertex shaders, ' +
-            Object.keys(fragmentShaders).length + ' fragment shaders from DOM');
-
         // Create terrain program (terrain vertex + terrain fragment)
         var terrainVert = vertexShaders.TERRAIN_VERTEX_SHADER;
         var terrainFrag = fragmentShaders.TERRAIN_FRAGMENT_SHADER;
-        if (!terrainVert || !terrainFrag) {
-            Donkeycraft.Logger.error('ShaderManager', 'Missing terrain shader sources');
-        }
+        if (!terrainVert || !terrainFrag) return null;
         var terrainProg = this.createProgram('terrain', terrainVert, terrainFrag);
 
         // Create sky program (sky vertex + sky fragment)
         var skyVert = vertexShaders.SKY_VERTEX_SHADER;
         var skyFrag = fragmentShaders.SKY_FRAGMENT_SHADER;
-        if (!skyVert || !skyFrag) {
-            Donkeycraft.Logger.error('ShaderManager', 'Missing sky shader sources');
-        }
+        if (!skyVert || !skyFrag) return null;
         var skyProg = this.createProgram('sky', skyVert, skyFrag);
 
         // Create gui program (gui vertex + gui fragment)
         var guiVert = vertexShaders.GUI_VERTEX_SHADER;
         var guiFrag = fragmentShaders.GUI_FRAGMENT_SHADER;
-        if (!guiVert || !guiFrag) {
-            Donkeycraft.Logger.error('ShaderManager', 'Missing gui shader sources');
-        }
+        if (!guiVert || !guiFrag) return null;
         var guiProg = this.createProgram('gui', guiVert, guiFrag);
 
         // Create break program (break vertex + gui fragment — particles use GUI shader)
         var breakVert = vertexShaders.BREAK_VERTEX_SHADER;
-        if (!breakVert || !guiFrag) {
-            Donkeycraft.Logger.error('ShaderManager', 'Missing break shader sources');
-        }
+        if (!breakVert || !guiFrag) return null;
         var breakProg = this.createProgram('break', breakVert, guiFrag);
 
         // Verify all programs were created
-        if (!terrainProg || !skyProg || !guiProg || !breakProg) {
-            Donkeycraft.Logger.error('ShaderManager', 'One or more shader programs failed to compile/link');
-            return null;
-        }
+        if (!terrainProg || !skyProg || !guiProg || !breakProg) return null;
 
-        Donkeycraft.Logger.info('ShaderManager', 'All shader programs created successfully: terrain, sky, gui, break');
         return {
             terrain: terrainProg,
             sky: skyProg,

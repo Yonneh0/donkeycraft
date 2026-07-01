@@ -59,22 +59,12 @@
         var vertices = [];
         var indices = [];
 
-        // DEBUG: Counters for first chunk
-        var _debugBlockCount = 0;
-        var _debugFaceCount = 0;
-        var _debugSampledBlockId = null;
-
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var y = 0; y < WORLD_HEIGHT; y++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
                     var blockId = getBlockFunc(x, y, z);
 
                     if (blockId === 0) continue;
-
-                    // Count visible blocks (first chunk only for debug)
-                    if (chunkX === 0 && chunkZ === 0) {
-                        _debugBlockCount++;
-                    }
 
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldY = y;
@@ -89,18 +79,6 @@
                         var adjBlock = this._getBlockAt(nx, ny, nz, getBlockFunc, chunkX, chunkZ);
 
                         if (!this.isTransparent(adjBlock)) continue;
-
-                        _debugFaceCount++;
-
-                        // Sample UV for first visible block (first chunk)
-                        if (_debugSampledBlockId === null && chunkX === 0 && chunkZ === 0) {
-                            _debugSampledBlockId = blockId;
-                            var debugUV = this._getBlockUV(blockId, face.name);
-                            Donkeycraft.Logger.info('GeometryBuilder',
-                                'Chunk [0,0] DEBUG: First visible block=' + blockId +
-                                ', face=' + face.name +
-                                ', UV=[' + debugUV.u0.toFixed(4) + ',' + debugUV.v0.toFixed(4) + ']->[' + debugUV.u1.toFixed(4) + ',' + debugUV.v1.toFixed(4) + ']');
-                        }
 
                         var uvOffset = this._getBlockUV(blockId, face.name);
                         var dir = face.dir;
@@ -132,15 +110,6 @@
 
         var vertexCount = vertices.length / 9;
         var indexCount = indices.length;
-
-        // Debug log for first chunk
-        if (chunkX === 0 && chunkZ === 0) {
-            Donkeycraft.Logger.info('GeometryBuilder',
-                'Chunk [0,0] DEBUG: blocks=' + _debugBlockCount +
-                ', faces=' + _debugFaceCount +
-                ', vertices=' + vertexCount +
-                ', indices=' + indexCount);
-        }
 
         return {
             vertices: new Float32Array(vertices),

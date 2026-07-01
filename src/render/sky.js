@@ -267,7 +267,6 @@
         // Use the sky shader — it now supports uModel for sun/moon positioning.
         if (!this._shaderManager.use('sky')) {
             gl.depthMask(true);
-            Donkeycraft.Logger.warn('Sky', 'Sky shader unavailable — sun disc not rendered');
             return false;
         }
 
@@ -367,7 +366,6 @@
         // Use the sky shader — it now supports uModel and aColor for sun/moon.
         if (!this._shaderManager.use('sky')) {
             gl.depthMask(true);
-            Donkeycraft.Logger.warn('Sky', 'Sky shader unavailable — moon disc not rendered');
             return false;
         }
 
@@ -479,6 +477,8 @@
     /**
      * Render the sky dome, sun, moon, and stars using the sky shader program.
      * Depth write is disabled for the dome so terrain renders on top.
+     * Face culling is disabled because the camera is inside the sky dome —
+     * outward-facing triangles would otherwise be culled as back-faces.
      * @param {Camera} camera - The camera instance.
      * @param {Lighting} lighting - The lighting system instance.
      */
@@ -489,12 +489,17 @@
         // ---- Sky dome (always drawn first, depth write disabled) ----
         gl.depthMask(false);
 
+        // CRITICAL: Disable face culling — camera is inside the sky dome.
+        // Outward-facing normals + inside camera = all triangles appear as back-faces
+        // and would be culled by gl.CULL_FACE, making the sky invisible.
+        var cullWasEnabled = gl.isContextLost ? false : gl.isEnabled(gl.CULL_FACE);
+        gl.disable(gl.CULL_FACE);
+
         if (!this._shaderManager.use('sky')) {
             // CRITICAL: Always restore depth writes even on shader failure.
             // If we return with depthMask(false), terrain/particles/hand/GUI
             // cannot write to the depth buffer and will silently depth-fail.
             gl.depthMask(true);
-            Donkeycraft.Logger.error('Sky', 'Sky shader unavailable — sky dome and stars not rendered');
             return;
         }
 
@@ -529,9 +534,12 @@
 
         this._shaderManager.setFloat('uHorizon', 0.1);
 
-        // Draw sky dome
+        // Draw sky dome — only aPosition is needed since uHasColorOverlay=0 uses gradient.
+        // The aColor attribute will have default [0,0,0,1] when not enabled, which is fine
+        // because the fragment shader ignores vColor when uHasColorOverlay=0.
         gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
         var posLoc = this._shaderManager.getAttribute('aPosition');
+
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 3 * 4, 0);
@@ -541,6 +549,9 @@
         gl.drawElements(gl.TRIANGLES, this._skyDomeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
 
         if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+
+        // Restore face culling for terrain rendering (sky is opaque at this point).
+        if (cullWasEnabled) gl.enable(gl.CULL_FACE);
 
         // ---- Sun disc (visible during day) — translucent overlay, depth write disabled ----
         if (this._sunMoonVisible && sunIntensity > 0.1) {
@@ -564,7 +575,6 @@
 
             // Re-ensure sky shader is active for stars (uses same aPosition + aColor attributes).
             if (!this._shaderManager.use('sky')) {
-                Donkeycraft.Logger.warn('Sky', 'Failed to restore sky shader — stars will not render');
                 gl.depthMask(true);
                 return;
             }

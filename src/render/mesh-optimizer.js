@@ -169,23 +169,10 @@
      */
     Donkeycraft.MeshOptimizer.prototype.optimize = function (geometry, cameraPos, cullBackFaces) {
         var result = geometry;
-
-        // Log pre-index state
-        Donkeycraft.Logger.info('MeshOptimizer',
-            'optimize pre-index: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
-
         result = this.generateIndexBuffer(result);
-
-        // Log post-index state
-        Donkeycraft.Logger.info('MeshOptimizer',
-            'optimize post-index: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
 
         if (cullBackFaces !== false && cameraPos) {
             result = this.cullBackFaces(result, cameraPos);
-
-            // Log post-culling state
-            Donkeycraft.Logger.info('MeshOptimizer',
-                'optimize post-cull: vertexCount=' + result.vertexCount + ', indexCount=' + result.indexCount);
         }
 
         return result;

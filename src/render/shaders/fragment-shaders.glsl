@@ -84,9 +84,20 @@ uniform vec3 uTopColor;
 uniform vec3 uBottomColor;
 uniform float uHorizon;
 
+// When uHasColorOverlay == 1, use per-vertex color (for sun/moon rendering).
+// When 0, use the sky gradient.
+uniform int uHasColorOverlay;
+
 void main() {
     float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);
-    gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);
+    vec3 color = mix(uBottomColor, uTopColor, t);
+
+    // Color overlay mode: use per-vertex color for sun/moon/stars.
+    if (uHasColorOverlay == 1) {
+        color = vColor.rgb;
+    }
+
+    gl_FragColor = vec4(color, 1.0);
 }
 `;
 
