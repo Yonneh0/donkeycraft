@@ -645,7 +645,7 @@ void main() {
                             game._debugOverlay.stopListening();
                         }
                     }
-                    // Escape — close GUI first, then time dial slider, then exit pointer lock
+                    // Escape — close GUI first, then time dial slider, then full map, then exit pointer lock
                     if (e.code === 'Escape') {
                         e.preventDefault();
                         var guiMgr = game._guiManager;
@@ -653,6 +653,8 @@ void main() {
                             guiMgr.closeTopScreen();
                         } else if (game._mapRenderer && game._mapRenderer.isSliderVisible && game._mapRenderer.isSliderVisible()) {
                             game._mapRenderer.hideSlider();
+                        } else if (game._mapRenderer && game._mapRenderer.isVisible && game._mapRenderer.isVisible()) {
+                            game._mapRenderer.hideMap();
                         } else {
                             game.exitPointerLock();
                         }
@@ -681,6 +683,13 @@ void main() {
                             if (flyingSys) {
                                 flyingSys.toggleFlyMode();
                             }
+                        }
+                    }
+                    // M — toggle map view
+                    if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        if (game._mapRenderer && game._mapRenderer.toggleMap) {
+                            game._mapRenderer.toggleMap();
                         }
                     }
                 });
@@ -1211,20 +1220,7 @@ void main() {
                                     }
                                 });
 
-                                // Wire M key to toggle map
-                                var origKeydownHandler = document.querySelector('body') ? null : null;
-                                // Add M key listener on document
-                                var mapToggleHandler = function (e) {
-                                    if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                                        // Don't trigger if typing in an input
-                                        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-                                        e.preventDefault();
-                                        mapRenderer.toggleMap();
-                                    }
-                                };
-                                document.addEventListener('keydown', mapToggleHandler);
-
-                                // Handle window resize
+                                // Handle window resize — M-key toggle is handled in the main keydown listener
                                 window.addEventListener('resize', function () {
                                     if (mapRenderer && mapRenderer.onWindowResize) {
                                         mapRenderer.onWindowResize();

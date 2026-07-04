@@ -6,8 +6,8 @@
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var Config = Donkeycraft.Config;
-    var CHUNK_SIZE = Config.CHUNK_SIZE; // 16
+    var Config = window.Donkeycraft && window.Donkeycraft.Config;
+    var CHUNK_SIZE = Config ? Config.CHUNK_SIZE : 16; // 16
 
     // ============================================================
     // Block Color Lookup Table (module-level singleton)
@@ -312,18 +312,11 @@
         this._dragLastY = 0;
 
         /**
-         * Base pixel size for a block at zoom=1. Scaled by current zoom.
-         * @type {number}
-         * @private
-         */
-        this._blockPixelSize = 2;
-
-        /**
          * Minimap radius in blocks (shows this many blocks around player in each direction).
          * @type {number}
          * @private
          */
-        this._minimapRadius = Config.MAP_MINIMAP_RADIUS || 32;
+        this._minimapRadius = Config && Config.MAP_MINIMAP_RADIUS ? Config.MAP_MINIMAP_RADIUS : 32;
 
         /**
          * Dimension name for display overlay.
@@ -409,6 +402,18 @@
         this._idleCheckTimer = null;
         /** @type {number} @private */
         this._lastInteractionTime = 0;
+
+        // Position tracking — only re-center when player moves
+        /** @type {number|null} @private */
+        this._lastCenterX = null;
+        /** @type {number|null} @private */
+        this._lastCenterZ = null;
+        /** @type {number} @private */
+        this._centerThreshold = 0.15; // Minimum player movement to trigger re-centering
+
+        // Auto-zoom throttling — only recalculate when chunk count changes
+        /** @type {number|null} @private */
+        this._lastChunkCount = -1;
 
         // Named handler references for proper event listener cleanup (Bug #2 fix)
         this._handlers = {
@@ -599,7 +604,7 @@
 
         // Set minimap internal dimensions to match config size
         if (this._minimapCanvas) {
-            var minimapSize = Config.MAP_MINIMAP_SIZE || 150;
+            var minimapSize = Config && Config.MAP_MINIMAP_SIZE ? Config.MAP_MINIMAP_SIZE : 150;
             this._minimapCanvas.width = minimapSize;
             this._minimapCanvas.height = minimapSize;
         } else {
@@ -678,7 +683,9 @@
 
         // Apply zoom factor, clamped to config limits
         var newZoom = this._zoom * zoomFactor;
-        newZoom = Math.max(Config.MAP_ZOOM_MIN, Math.min(Config.MAP_ZOOM_MAX, newZoom));
+        var zoomMin = Config && Config.MAP_ZOOM_MIN ? Config.MAP_ZOOM_MIN : 0.05;
+        var zoomMax = Config && Config.MAP_ZOOM_MAX ? Config.MAP_ZOOM_MAX : 4.0;
+        newZoom = Math.max(zoomMin, Math.min(zoomMax, newZoom));
 
         // Adjust offset to keep the world coordinate under the mouse stable
         this._offsetX = worldXBefore - (mouseX / canvasWidth) * (canvasWidth / newZoom);
@@ -695,13 +702,23 @@
 
     /**
      * Center the map view on a world position.
-     * This is called every frame to keep the player centered.
+     * Only updates offset when player moves beyond threshold to avoid unnecessary redraws.
      * @param {number} worldX - World X coordinate to center on.
      * @param {number} worldZ - World Z coordinate to center on.
      * @private
      */
     Donkeycraft.MapRenderer.prototype._centerOnPosition = function (worldX, worldZ) {
         if (!this._fullMapCanvas) return;
+
+        // Skip re-centering if player hasn't moved beyond threshold
+        var lastX = this._lastCenterX;
+        var lastZ = this._lastCenterZ;
+        if (lastX !== null && lastZ !== null) {
+            var dx = Math.abs(worldX - lastX);
+            var dz = Math.abs(worldZ - lastZ);
+            var threshold = this._centerThreshold;
+            if (dx < threshold && dz < threshold) return;
+        }
 
         var canvasWidth = this._fullMapCanvas.width;
         var canvasHeight = this._fullMapCanvas.height;
@@ -710,11 +727,16 @@
         // Center the view on the given world position
         this._offsetX = worldX - (canvasWidth / 2) / zoom;
         this._offsetY = worldZ - (canvasHeight / 2) / zoom;
+
+        // Update last tracked position
+        this._lastCenterX = worldX;
+        this._lastCenterZ = worldZ;
     };
 
     /**
      * Calculate the auto-zoom level to fit all loaded chunks within the canvas.
      * Centers the view on the loaded chunk bounding box.
+     * Only recalculates when chunk count changes (throttled).
      * @private
      */
     Donkeycraft.MapRenderer.prototype._calculateAutoZoom = function () {
@@ -722,6 +744,11 @@
 
         var chunks = this._chunkManager.getAllChunks();
         if (!chunks || chunks.length === 0) return;
+
+        // Throttle: only recalculate when chunk count changes
+        var currentCount = chunks.length;
+        if (currentCount === this._lastChunkCount) return;
+        this._lastChunkCount = currentCount;
 
         // Find bounding box of loaded chunks
         var minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -747,7 +774,9 @@
         var newZoom = Math.min(zoomX, zoomY);
 
         // Clamp zoom
-        newZoom = Math.max(Config.MAP_ZOOM_MIN, Math.min(Config.MAP_ZOOM_MAX, newZoom));
+        var zoomMin = Config && Config.MAP_ZOOM_MIN ? Config.MAP_ZOOM_MIN : 0.05;
+        var zoomMax = Config && Config.MAP_ZOOM_MAX ? Config.MAP_ZOOM_MAX : 4.0;
+        newZoom = Math.max(zoomMin, Math.min(zoomMax, newZoom));
 
         // Only update if significantly different (avoid jitter)
         if (Math.abs(newZoom - this._zoom) > 0.01) {
@@ -770,7 +799,7 @@
     /**
      * Get the highest surface block at a given world X,Z position.
      * Reads from the chunk's pre-built surface map for O(1) lookup.
-     * Falls back to scanning only if the surface map hasn't been built yet.
+     * Falls back to scanning from top to bottom if the surface map hasn't been built yet.
      * Always returns a valid block ID — never 0 (air).
      * @param {Donkeycraft.ChunkManager} chunkManager - The chunk manager to query.
      * @param {number} wx - World X coordinate.
@@ -795,19 +824,18 @@
         // Read from pre-built surface map — O(1) lookup
         var surfaceMap = chunk._mapSurfaceMap;
         if (surfaceMap && surfaceMap[localX] && surfaceMap[localX][localZ]) {
-            return surfaceMap[localX][localZ].blockId;
+            return surfaceMap[localX][localZ];
         }
 
         // Surface map not built — scan from top to bottom and build it
-        var worldHeight = Config.WORLD_HEIGHT;
+        var worldHeight = Config && Config.WORLD_HEIGHT ? Config.WORLD_HEIGHT : 256;
         var surfaceY = -1;
         var surfaceBlockId = 1; // Default: stone
         try {
             for (var y = worldHeight - 1; y >= 0; y--) {
                 var blockId = chunk.getBlock(localX, y, localZ);
                 if (blockId === 0) continue; // Air
-                if (blockId === 13) continue; // Water
-
+                // Accept all non-air blocks including water
                 surfaceY = y;
                 surfaceBlockId = blockId;
                 break;
@@ -825,8 +853,9 @@
             }
         }
 
-        chunk._mapSurfaceMap[localX][localZ] = (surfaceY >= 0) ? { y: surfaceY, blockId: surfaceBlockId } : null;
-        return surfaceBlockId;
+        var result = (surfaceY >= 0) ? surfaceBlockId : 1;
+        chunk._mapSurfaceMap[localX][localZ] = result;
+        return result;
     };
 
     /**
@@ -980,8 +1009,8 @@
                     entry = surfaceMap[lx][lz];
                 }
 
-                var blockId = entry ? entry.blockId : 1; // Stone fallback
-                if (blockId === 0 || blockId === 13) continue; // Skip air and water
+                var blockId = entry ? entry : 1; // Stone fallback
+                if (blockId === 0) continue; // Skip air
 
                 var color = _getBlockColor(blockId);
                 ctx.fillStyle = color || '#555';
@@ -1058,6 +1087,9 @@
         var canvasX = (playerPos.x - this._offsetX) * zoom;
         var canvasY = (playerPos.z - this._offsetY) * zoom;
 
+        // Skip drawing if off-screen
+        if (canvasX < -20 || canvasX > w + 20 || canvasY < -20 || canvasY > h + 20) return;
+
         // Player dot
         ctx.fillStyle = '#ffffff';
         ctx.strokeStyle = '#000000';
@@ -1127,8 +1159,7 @@
 
     /**
      * Render the rotating minimap (top-left, "up" = player forward direction).
-     * Rotates 180 degrees offset from north. Static player dot at center;
-     * terrain rotates around the player based on yaw.
+     * Terrain rotates around a static player dot based on yaw.
      * @param {Object} playerPos - Player world position {x, y, z}.
      * @param {number} yaw - Player yaw in radians.
      * @param {number} pitch - Player pitch (unused, for API compatibility).
@@ -1148,7 +1179,8 @@
         if (size === 0 || radius <= 0) return;
 
         // Calculate blocks per pixel for minimap scale
-        var blocksPerPixel = this._minimapRadius * 2 / radius;
+        var minimapRadius = this._minimapRadius;
+        var blocksPerPixel = minimapRadius * 2 / radius;
 
         // Clear and draw background
         ctx.clearRect(0, 0, size, size);
@@ -1162,15 +1194,15 @@
         ctx.clip();
 
         // Rotate context so player's forward direction is "up" on screen.
-        // Add PI (180 degrees) to offset the rotation as requested.
+        // The terrain rotates around the player based on yaw.
         ctx.translate(halfSize, halfSize);
-        ctx.rotate(-yaw + Math.PI + Math.PI); // -yaw + 2*PI = same as -yaw, but user wants +180 deg offset
+        ctx.rotate(-yaw + Math.PI); // -yaw rotates terrain, +PI flips 180 degrees as specified
 
         // Draw terrain tiles around the player using the SAME surface data as full map
         var tileWorldSize = blocksPerPixel * this._blockPixelSize;
         if (tileWorldSize < 0.3) tileWorldSize = 0.3; // Minimum tile size for visibility
 
-        var halfWorld = this._minimapRadius;
+        var halfWorld = minimapRadius;
         var startBlockX = Math.floor(-halfWorld);
         var endBlockX = Math.ceil(halfWorld);
         var startBlockZ = Math.floor(-halfWorld);
@@ -1186,7 +1218,7 @@
                 var worldZ = playerIntZ + bz;
                 var blockId = Donkeycraft.MapRenderer._getSurfaceBlock(this._chunkManager, worldX, worldZ);
 
-                if (blockId === 0 || blockId === 13) continue; // Skip air and water
+                if (blockId === 0) continue; // Skip air only
 
                 var color = _getBlockColor(blockId);
                 ctx.fillStyle = color || '#555';
@@ -1301,8 +1333,8 @@
         // Resize canvases to fit their containers
         this._resizeCanvases();
 
-        // Calculate auto-zoom to fit all loaded chunks
-        this._calculateAutoZoom();
+        // Reset auto-zoom tracking so it recalculates on next show
+        this._lastChunkCount = -1;
     };
 
     /**
@@ -1348,7 +1380,7 @@
 
         // Minimap canvas — use config size
         if (this._minimapCanvas) {
-            var minimapSize = Config.MAP_MINIMAP_SIZE || 150;
+            var minimapSize = Config && Config.MAP_MINIMAP_SIZE ? Config.MAP_MINIMAP_SIZE : 150;
             this._minimapCanvas.width = minimapSize;
             this._minimapCanvas.height = minimapSize;
         }
@@ -1360,6 +1392,7 @@
     Donkeycraft.MapRenderer.prototype.onWindowResize = function () {
         this._resizeCanvases();
         if (this._visible) {
+            this._lastChunkCount = -1; // Force auto-zoom recalculation
             this._calculateAutoZoom();
         }
     };
@@ -1378,6 +1411,7 @@
         }
         // Recalculate auto-zoom if visible
         if (this._visible) {
+            this._lastChunkCount = -1;
             this._calculateAutoZoom();
         }
     };
