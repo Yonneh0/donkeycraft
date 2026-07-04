@@ -645,12 +645,14 @@ void main() {
                             game._debugOverlay.stopListening();
                         }
                     }
-                    // Escape — close GUI first, then exit pointer lock
+                    // Escape — close GUI first, then time dial slider, then exit pointer lock
                     if (e.code === 'Escape') {
                         e.preventDefault();
                         var guiMgr = game._guiManager;
                         if (guiMgr && guiMgr.hasOpenScreens) {
                             guiMgr.closeTopScreen();
+                        } else if (game._mapRenderer && game._mapRenderer.isSliderVisible && game._mapRenderer.isSliderVisible()) {
+                            game._mapRenderer.hideSliderPopup();
                         } else {
                             game.exitPointerLock();
                         }
@@ -1182,6 +1184,17 @@ void main() {
                             if (mapInitOk) {
                                 // Store reference on game for render loop access
                                 game2._mapRenderer = mapRenderer;
+
+                                // Wire up time dial slider callback — syncs creative mode time changes to the game
+                                mapRenderer.setOnTimeSet(function (timeOfDay) {
+                                    if (timeOfDay === null) {
+                                        // Return to natural time flow
+                                        game2.setFrozenTime(null);
+                                    } else {
+                                        // Set frozen time
+                                        game2.setFrozenTime(timeOfDay);
+                                    }
+                                });
 
                                 // Wire M key to toggle map
                                 var origKeydownHandler = document.querySelector('body') ? null : null;

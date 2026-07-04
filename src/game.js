@@ -19,6 +19,9 @@
         this._renderDistance = options.renderDistance || Config.RENDER_DISTANCE;
         this._gameMode = options.gameMode || 'survival';
 
+        // Time-of-day state for creative mode freezing
+        this._frozenTimeOfDay = null;
+
         // Core WebGL systems
         this._canvas = null;
         this._gl = null;
@@ -1479,9 +1482,34 @@
      * @returns {number} Time of day in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
      */
     Donkeycraft.Game.prototype._getTimeOfDay = function () {
+        // Check for frozen time first (set via creative mode time dial)
+        if (this._frozenTimeOfDay !== null && typeof this._frozenTimeOfDay === 'number') {
+            return this._frozenTimeOfDay;
+        }
         var tickCount = this.getTickCount();
         var ticksPerDay = Config.WORLD_TIME_SCALE * 60; // 60-second full day cycle
         return ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay;
+    };
+
+    /**
+     * Set a frozen time of day value. When set, the game will display this time
+     * instead of advancing naturally. Used by the creative mode time dial slider.
+     * @param {number|null} frozenTimeOfDay - Time of day in [0, 1) to freeze at, or null to resume natural flow.
+     */
+    Donkeycraft.Game.prototype.setFrozenTime = function (frozenTimeOfDay) {
+        if (frozenTimeOfDay === null) {
+            this._frozenTimeOfDay = null;
+        } else if (typeof frozenTimeOfDay === 'number' && !isNaN(frozenTimeOfDay)) {
+            this._frozenTimeOfDay = ((frozenTimeOfDay % 1) + 1) % 1;
+        }
+    };
+
+    /**
+     * Get whether the time is currently frozen.
+     * @returns {boolean} True if time is frozen.
+     */
+    Donkeycraft.Game.prototype.isTimeFrozen = function () {
+        return this._frozenTimeOfDay !== null;
     };
 
     /**
@@ -2102,6 +2130,15 @@
             try {
                 var playerPos = this._player.getPosition();
                 var playerRot = this._player.getRotation();
+
+                // Update time of day on the map renderer for the time dial display
+                var timeOfDay = this._getTimeOfDay();
+                this._mapRenderer.setTimeOfDay(timeOfDay);
+
+                // Update game mode on the map renderer for interactive time dial
+                var playerGameMode = this._player.getGameMode ? this._player.getGameMode() : null;
+                this._mapRenderer.setGameMode(playerGameMode);
+
                 this._mapRenderer.renderFullMap(playerPos, playerRot.yaw, playerRot.pitch);
                 this._mapRenderer.renderMinimap(playerPos, playerRot.yaw, playerRot.pitch);
             } catch (e) {
