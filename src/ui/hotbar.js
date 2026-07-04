@@ -1,13 +1,16 @@
 // Donkeycraft — Hotbar
 // Hotbar UI: slot rendering, number keys 1-9, scroll wheel selection.
+// Includes StaminaBar — a semi-transparent yellow progress bar displayed behind the hotbar.
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
+    var EventBus = Donkeycraft.EventBus;
 
     /**
      * Hotbar — manages the player's hotbar display and selection.
      * Integrates with Phase 2's GUIRenderer for WebGL slot highlighting.
+     * Includes an integrated StaminaBar displayed behind the hotbar slots.
      * @param {HTMLElement} container - DOM container for hotbar elements.
      * @param {Donkeycraft.GUIRenderer} [guiRenderer=null] - Optional WebGL GUI renderer for highlight overlay.
      * @param {HTMLCanvasElement} [canvas=null] - Canvas element for WebGL rendering context.
@@ -28,6 +31,12 @@
             onSelectedChange: []
         };
 
+        // Stamina bar references (set by _buildStaminaBar)
+        this._staminaFill = null;
+        this._staminaPulse = null;
+        this._prevStamina = -1;
+        this._pulseTimeout = null;
+
         // Build DOM if container provided
         if (this._container) {
             this._buildDOM();
@@ -35,18 +44,22 @@
     };
 
     /**
-     * _buildDOM — creates the hotbar slot elements in the container.
+     * _buildDOM — creates the hotbar slot elements and stamina bar inside the container.
+     * The stamina bar is inserted as the first child so it renders behind the slots.
      * @private
      */
     Donkeycraft.Hotbar.prototype._buildDOM = function () {
         var self = this;
-        this._container.className = 'dk-hotbar';
-        this._container.style.cssText = 'display: flex; justify-content: center; gap: 2px; padding: 4px; background: rgba(0,0,0,0.5); border-radius: 4px;';
+        this._container.style.cssText = 'display: flex; justify-content: center; gap: 2px; padding: 4px; position: absolute; background: rgba(0,0,0,0.5); border-radius: 4px; overflow: visible; bottom: 8px; left: 50%; transform: translateX(-50%);';
+
+        // Build the stamina bar behind the slots
+        this._buildStaminaBar();
 
         for (var i = 0; i < 9; i++) {
             var slotEl = document.createElement('div');
             slotEl.className = 'dk-hotbar-slot';
-            slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,100,100,0.6); border: 2px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; position: relative;';
+            // z-index: 1 ensures slots render above the stamina bar wrapper (z-index: 0)
+            slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,100,100,0.6); border: 2px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;';
             slotEl.dataset.slotIndex = i;
 
             // Number indicator — positioned top-left per CSS .dk-slot-number convention
@@ -78,6 +91,127 @@
         }
 
         this._updateSelectionHighlight();
+    };
+
+    /**
+     * _buildStaminaBar — creates the stamina bar DOM elements inside the hotbar container.
+     * The stamina bar is inserted as the first child so it renders behind the hotbar slots,
+     * showing through the gaps and edges without affecting layout.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._buildStaminaBar = function () {
+        if (!this._container) return;
+
+        // Wrapper positioned absolutely behind the slot row — z-index: 0 ensures it stays below slots
+        // Height set to 24px to fully cover the background area behind the hotbar slots
+        var wrapper = document.createElement('div');
+        wrapper.className = 'dk-stamina-bar-wrapper';
+        wrapper.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 24px; pointer-events: none; z-index: 0;';
+
+        // Background track — dark fill visible through gaps
+        var bg = document.createElement('div');
+        bg.className = 'dk-stamina-bar-bg';
+        bg.style.cssText = 'position: absolute; bottom: 2px; left: 2px; right: 2px; height: 100%; background: rgba(0, 0, 0, 0.5); border-radius: 4px; overflow: hidden;';
+
+        // Animated fill — yellow progress bar with smooth width transition
+        var fill = document.createElement('div');
+        fill.className = 'dk-stamina-bar-fill';
+        fill.style.cssText = 'position: absolute; bottom: 2px; left: 2px; height: 100%; width: 100%; background: linear-gradient(90deg, rgba(255, 210, 50, 0.8), rgba(255, 180, 30, 0.7)); border-radius: 4px; transition: width 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94); box-shadow: 0 0 8px rgba(255, 210, 50, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);';
+
+        // Pulse overlay — brief brightness boost on stamina change
+        // Width matches the fill to only pulse over the filled portion
+        var pulse = document.createElement('div');
+        pulse.className = 'dk-stamina-bar-pulse';
+        pulse.style.cssText = 'position: absolute; bottom: 2px; left: 2px; height: 100%; width: 100%; background: linear-gradient(90deg, rgba(255, 230, 80, 0.5), rgba(255, 200, 60, 0.4)); border-radius: 4px; opacity: 0; pointer-events: none; transition: width 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 100ms ease-out;';
+
+        bg.appendChild(fill);
+        wrapper.appendChild(bg);
+        wrapper.appendChild(pulse);
+
+        // Insert as first child so it renders behind slot elements (which come after in DOM order)
+        if (this._container.firstChild) {
+            this._container.insertBefore(wrapper, this._container.firstChild);
+        } else {
+            this._container.appendChild(wrapper);
+        }
+
+        this._staminaFill = fill;
+        this._staminaPulse = pulse;
+
+        // Subscribe to stamina:changed events
+        this._subscribeToStaminaEvents();
+    };
+
+    /**
+     * _subscribeToStaminaEvents — listen for stamina:changed events from the EventBus.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._subscribeToStaminaEvents = function () {
+        var self = this;
+        this._onStaminaChanged = function (data) { self._onStaminaUpdate(data); };
+
+        var globalBus = EventBus && EventBus._global;
+        if (globalBus) {
+            try {
+                globalBus.on('stamina:changed', this._onStaminaChanged);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Hotbar', 'Failed to subscribe to stamina:changed: ' + e.message);
+            }
+        } else {
+            Donkeycraft.Logger.warn('Hotbar', 'No global EventBus instance available — stamina bar will not receive updates');
+        }
+    };
+
+    /**
+     * _onStaminaUpdate — called on stamina:changed events to update the visual bar.
+     * @private
+     * @param {Object} data - Stamina change data { stamina, maxStamina, delta }.
+     */
+    Donkeycraft.Hotbar.prototype._onStaminaUpdate = function (data) {
+        var stamina = Math.max(0, Math.round(data.stamina || 0));
+        var maxStamina = data.maxStamina || 100;
+
+        // Calculate fill percentage and clamp to [0, 100]
+        var pct = Math.min(100, Math.max(0, (stamina / maxStamina) * 100));
+
+        // Update fill width with CSS transition
+        this._staminaFill.style.width = pct + '%';
+
+        // Trigger pulse animation on change
+        if (this._prevStamina >= 0 && this._prevStamina !== stamina) {
+            this._triggerStaminaPulse();
+        }
+
+        this._prevStamina = stamina;
+    };
+
+    /**
+     * _triggerStaminaPulse — briefly flash the pulse overlay for visual feedback.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._triggerStaminaPulse = function () {
+        if (!this._staminaPulse) return;
+
+        // Clear any existing pulse timeout to prevent overlapping animations
+        if (this._pulseTimeout) {
+            clearTimeout(this._pulseTimeout);
+        }
+
+        // Match pulse width to current fill width for smooth visual feedback
+        if (this._staminaFill) {
+            this._staminaPulse.style.width = this._staminaFill.style.width;
+        }
+
+        // Show pulse
+        this._staminaPulse.style.opacity = '1';
+
+        // Fade out after a brief flash
+        var self = this;
+        this._pulseTimeout = setTimeout(function () {
+            if (self._staminaPulse) {
+                self._staminaPulse.style.opacity = '0';
+            }
+        }, 120);
     };
 
     /**
@@ -296,17 +430,38 @@
     };
 
     /**
-     * destroy — cleans up resources.
+     * destroy — cleans up all DOM elements, event listeners, and timers.
+     * Unsubscribes from stamina:changed events and nulls all internal references.
      */
     Donkeycraft.Hotbar.prototype.destroy = function () {
+        // Clear pulse timeout
+        if (this._pulseTimeout) {
+            clearTimeout(this._pulseTimeout);
+            this._pulseTimeout = null;
+        }
+
+        // Unsubscribe from stamina events
+        var globalBus = EventBus && EventBus._global;
+        if (globalBus && this._onStaminaChanged) {
+            try {
+                globalBus.off('stamina:changed', this._onStaminaChanged);
+            } catch (e) { }
+        }
+
+        // Clear DOM
         if (this._container) {
             while (this._container.firstChild) {
                 this._container.removeChild(this._container.firstChild);
             }
         }
+
+        // Null out references
         this._slotElements = [];
         this._slots = [];
         this._listeners = {};
+        this._staminaFill = null;
+        this._staminaPulse = null;
+        this._onStaminaChanged = null;
     };
 
 })();

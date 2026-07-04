@@ -34,7 +34,7 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Sky rendering** — Day/night gradient with sun, moon, stars, and cloud layer
 - **First-person hand** — Held item rendered in bottom-right corner
 - **Block breaking particles** — Animated sprites with fade-out
-- **HUD overlay** — Crosshair, hotbar, health/hunger bars, XP bar
+- **HUD overlay** — Crosshair, hotbar, health/hunger bars, XP bar, stamina bar
 - **Game mode badge** — Top-right corner indicator (SURVIVAL/CREATIVE) with click-to-swap between modes
 - **Speed indicator** — Top-right button bar showing 🐌 sneak, 🚶 walk, 🏃 run states; ⚡ turbo in creative; click-to-lock crouch/run modes
 - **Debug screen (F3)** — FPS, chunk info, biome, coordinates, light levels
@@ -44,6 +44,7 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 
 ### Player & Movement
 - **WASD movement** — Walking, sprinting, swimming with game-mode-specific speed modifiers
+- **Stamina system** — 10-point yellow health bar (5 hearts) that absorbs damage before health; depleted by physical attacks, fall damage, and fire; restored via hunger-based auto-regeneration when food > 18
 - **First-person camera** — Pointer lock mouse look with pitch clamping
 - **Collision detection** — AABB axis-separated collision resolution with wall sliding
 - **Jump mechanics** — Ground detection, cooldown timer, water swimming
@@ -175,7 +176,7 @@ src/
     collision.js          # AABB collision detection
     jumping.js            # Jump mechanics
     flying.js             # Creative/spectator flying
-    damage.js             # Hitbox, damage, knockback, fall damage
+    damage.js             # Hitbox, damage, knockback, fall damage, stamina management
     game-mode.js          # Survival/Creative/Spectator modes
     stats.js              # Achievements and statistics
     hunger.js             # Food, hydration, starvation
@@ -238,6 +239,7 @@ src/
     health-bar.js           # Health HUD overlay
     hunger-bar.js           # Hunger HUD overlay
     xp-bar.js               # XP level bar
+    hotbar.js               # Hotbar UI with integrated stamina bar (yellow progress, semi-transparent, animated)
     keybindings-panel.js    # Keybind configuration UI
     gamemode-badge.js       # Game mode badge (SURVIVAL/CREATIVE) with click-to-swap
     speed-indicator.js      # Speed indicator/control (sneak/walk/run/turbo buttons)

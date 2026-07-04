@@ -916,16 +916,16 @@
                 var newAbs = currentAbs;
 
                 if (parsedArgs === 'full') {
-                    // Default to 5 stamina hearts (10 points) when "FULL"
-                    newAbs = 10;
+                    // Set to max stamina (100 points)
+                    newAbs = hurtBox.maxStamina || 100;
                 } else if (parsedArgs === 'empty') {
                     newAbs = 0;
                 } else if (typeof parsedArgs === 'number') {
                     newAbs = currentAbs + parsedArgs;
                 }
 
-                // Clamp to >= 0 (no upper limit on stamina)
-                newAbs = Math.max(0, Math.round(newAbs));
+                // Clamp to [0, maxStamina]
+                newAbs = Math.min(hurtBox.maxStamina || 100, Math.max(0, Math.round(newAbs)));
 
                 hurtBox.setStamina(newAbs);
                 refreshDebug();

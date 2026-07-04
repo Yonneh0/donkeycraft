@@ -27,11 +27,24 @@
         this.maxHealth = 20;
 
         /**
-         * Current stamina hearts (yellow health).
+         * Maximum stamina points (yellow health). Always capped at 100.
+         * @type {number}
+         */
+        this.maxStamina = 100;
+
+        /**
+         * Current stamina points (yellow health). Starts at full capacity (100 points).
          * @type {number}
          * @private
          */
-        this._stamina = 0;
+        this._stamina = 100;
+
+        /**
+         * Stamina regeneration timer (seconds since last regeneration).
+         * @type {number}
+         * @private
+         */
+        this._staminaRegenTimer = 0;
 
         /**
          * Current hydration level for auto-regeneration.
@@ -94,11 +107,26 @@
     };
 
     /**
-     * Set the stamina health value.
+     * Set the stamina health value and emit a stamina:changed event for UI updates.
      * @param {number} amount - Stamina points to set.
      */
     Donkeycraft.HurtBox.prototype.setStamina = function (amount) {
-        this._stamina = Math.max(0, amount);
+        var oldStamina = this._stamina;
+        // Clamp stamina to [0, maxStamina] — always capped at 100
+        this._stamina = Math.min(this.maxStamina, Math.max(0, amount));
+
+        // Emit stamina:changed event for UI systems
+        if (this._stamina !== oldStamina && Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('stamina:changed', {
+                    stamina: this._stamina,
+                    maxStamina: this.maxStamina,
+                    delta: this._stamina - oldStamina
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('HurtBox', 'Failed to emit stamina:changed event: ' + e.message);
+            }
+        }
     };
 
     /**
@@ -164,8 +192,22 @@
 
         if (this._stamina > 0) {
             var absorbed = Math.min(this._stamina, remainingDamage);
+            var oldStaminaForDamage = this._stamina;
             this._stamina -= absorbed;
             remainingDamage -= absorbed;
+
+            // Emit stamina:changed event for UI systems (only if stamina was actually consumed)
+            if (absorbed > 0 && Donkeycraft.EventBus) {
+                try {
+                    Donkeycraft.EventBus.emitSafe('stamina:changed', {
+                        stamina: this._stamina,
+                        maxStamina: this.maxStamina,
+                        delta: -(oldStaminaForDamage - this._stamina)  // negative = stamina consumed
+                    });
+                } catch (e) {
+                    Donkeycraft.Logger.warn('HurtBox', 'Failed to emit stamina:changed event: ' + e.message);
+                }
+            }
         }
 
         if (remainingDamage > 0) {
@@ -361,8 +403,7 @@
     };
 
     /**
-     * Tick the hurt box system — handles fire damage only.
-     * Auto-regeneration is handled by Hunger.tick() to avoid duplicate healing.
+     * Tick the hurt box system — handles fire damage and stamina regeneration.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.HurtBox.prototype.tick = function (deltaTime) {
@@ -371,11 +412,6 @@
         }
 
         var gameMode = this._player.getGameMode();
-
-        // Creative mode: no tick-based damage
-        if (gameMode === 'creative') {
-            return;
-        }
 
         // Fire damage — 1 HP every 0.5 seconds while on fire (matches vanilla Minecraft).
         if (this._onFire) {
@@ -387,14 +423,25 @@
         } else {
             this._fireDamageTimer = 0;
         }
+
+        // Stamina regeneration: +1 stamina per 2 seconds when below max (all game modes).
+        if (this._stamina < this.maxStamina) {
+            this._staminaRegenTimer += deltaTime;
+            if (this._staminaRegenTimer >= 2.0) {
+                this._staminaRegenTimer = 0;
+                this.setStamina(this._stamina + 1);
+            }
+        }
     };
 
     /**
-     * Reset the hurt box to full health.
+     * Reset the hurt box to full health and stamina.
+     * Restores health to maxHealth, stamina to full (maxStamina), and clears all status effects.
      */
     Donkeycraft.HurtBox.prototype.reset = function () {
         this._health = this.maxHealth;
-        this._stamina = 0;
+        this._stamina = this.maxStamina; // Full stamina on reset (100)
+        this._staminaRegenTimer = 0;
         this._hydration = 0;
         this._onFire = false;
         this._fireDamageTimer = 0;
