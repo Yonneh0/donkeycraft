@@ -255,8 +255,11 @@
                     { label: 'RESET', action: 'xpPoints', args: 'reset' },
                     { label: '+1', action: 'xpPoints', args: 1 },
                     { label: '+10', action: 'xpPoints', args: 10 },
-                    { label: '+100', action: 'xpPoints', args: 100 },
-                    { label: '+1K', action: 'xpPoints', args: 1000 }
+                    { label: '+750', action: 'xpPoints', args: 750 },
+                    { label: '+10K', action: 'xpPoints', args: 10000 },
+                    { label: '+250K', action: 'xpPoints', args: 250000 },
+                    { label: '+1M', action: 'xpPoints', args: 1000000 },
+                    { label: '+50M', action: 'xpPoints', args: 50000000 }
                 ]
             },
             {
@@ -931,18 +934,13 @@
 
             case 'xpPoints': {
                 if (!xp) { Donkeycraft.Logger.warn('DebugOverlay', 'Experience system not available'); break; }
-                var currentLevel = xp.getLevel();
 
                 if (parsedArgs === 'reset') {
                     // Reset points to 0, keep level as-is
                     xp.setPoints(0);
                 } else if (typeof parsedArgs === 'number' && parsedArgs > 0) {
-                    // Clamp: no XP gain possible at level 100
-                    if (currentLevel < 100) {
-                        xp.addXP(parsedArgs);
-                    } else {
-                        Donkeycraft.Logger.info('DebugOverlay', 'XP gain blocked at level 100');
-                    }
+                    // Add XP — the experience system handles clamping at max level
+                    xp.addXP(parsedArgs);
                 }
                 refreshDebug();
                 break;
@@ -952,9 +950,10 @@
                 if (!xp) { Donkeycraft.Logger.warn('DebugOverlay', 'Experience system not available'); break; }
 
                 if (parsedArgs === 'reset') {
-                    // Reset to initial level (1) and clear XP points
+                    // Reset to level 1 with 0 XP points
                     xp.setLevelToZero(1);
                 } else if (typeof parsedArgs === 'number' && parsedArgs > 0) {
+                    // Set level — the experience system handles clamping to [1, MAX_LEVEL]
                     xp.setLevel(xp.getLevel() + parsedArgs);
                 }
                 refreshDebug();

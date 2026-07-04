@@ -1,6 +1,7 @@
 // Donkeycraft — XP Bar UI
 // Animated XP progress bar with progressive level badge visualization.
 // Listens to xp:changed events and updates DOM with effects.
+// At max level (100), displays the level 99 badge with a full XP bar.
 (function () {
     'use strict';
 
@@ -53,6 +54,7 @@
 
     /**
      * LEVEL_TIERS — static configuration for progressive badge styles.
+     * Level 100 (max) uses the same tier as level 99 (rainbow) with "MAX" text.
      * @private
      */
     Donkeycraft.XPBar.LEVEL_TIERS = [
@@ -61,8 +63,7 @@
         { min: 25, max: 49, text: '#b44aff', bg: 'rgba(150,50,255,0.5)', glow: 'rgba(150,50,255,0.6)', size: 42, hasText: true, ambient: 'ring-rotate', sparkColor: '#b44aff' },
         { min: 50, max: 74, text: '#ffd700', bg: 'rgba(255,200,0,0.6)', glow: 'rgba(255,200,0,0.8)', size: 48, hasText: true, ambient: 'spark-float', sparkColor: '#ffd700' },
         { min: 75, max: 98, text: '#ff4422', bg: 'rgba(255,80,0,0.7)', glow: 'rgba(255,80,0,0.9)', size: 52, hasText: true, ambient: 'intensified-pulse', sparkColor: '#ff4422' },
-        { min: 99, max: 99, text: '#ff66cc', bg: 'linear-gradient(45deg,#f00,#ff0,#0f0,#0ff,#00f,#f00)', glow: 'multi-color', size: 56, hasText: true, textOverride: 'MAX', ambient: 'rainbow-shift', sparkColor: '#ff66cc' },
-        { min: 100, max: 100, text: null, bg: 'rgba(255,215,0,0.8)', glow: 'rgba(255,215,0,0.9)', size: 64, hasText: false, textOverride: 'DONE', ambient: 'golden-spectacle', sparkColor: '#ffd700' }
+        { min: 99, max: 100, text: '#ff66cc', bg: 'linear-gradient(45deg,#f00,#ff0,#0f0,#0ff,#00f,#f00)', glow: 'multi-color', size: 56, hasText: true, textOverride: 'MAX', ambient: 'rainbow-shift', sparkColor: '#ff66cc' }
     ];
 
     /**
@@ -75,8 +76,7 @@
         'linear-gradient(90deg, #7b2fff, #b44aff)',    // Tier 3: purple
         'linear-gradient(90deg, #cc9900, #ffd700)',    // Tier 4: gold
         'linear-gradient(90deg, #cc3300, #ff6644)',    // Tier 5: red-orange
-        'linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff0000)', // Tier 6: rainbow
-        'linear-gradient(90deg, #ffd700, #ffaa00, #ffd700)' // Tier 7: golden
+        'linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff0000)'  // Tier 6: rainbow (levels 99-100)
     ];
 
     /**
@@ -218,8 +218,8 @@
         // 4. Update static badge properties every time (handles initial load)
         this._updateBadgeStatic(newLevel, newTier);
 
-        // 4b. Show/hide XP bar based on visibility
-        this._updateVisibility(newLevel, newPoints);
+        // 4b. Show/hide XP bar based on level visibility
+        this._updateVisibility(newLevel);
 
         // 5. Update state tracking
         this._prevLevel = newLevel;
@@ -232,6 +232,7 @@
 
     /**
      * _getTier — find the tier config for a given level.
+     * Levels 99-100 both map to the rainbow "MAX" tier.
      * @private
      * @param {number} level - XP level.
      * @returns {Object} Tier configuration.
@@ -243,7 +244,8 @@
                 return tiers[i];
             }
         }
-        return tiers[0]; // default to tier 1
+        // Default to tier 1 for any unexpected level values
+        return tiers[0];
     };
 
     /**
@@ -587,16 +589,15 @@
     };
 
     /**
-     * _updateVisibility — show/hide XP bar based on level and points.
+     * _updateVisibility — show/hide XP bar based on level.
+     * Always visible for levels ≥ 1 (including max level 100).
      * @private
      * @param {number} level - Current level.
-     * @param {number} points - Current points.
      */
-    Donkeycraft.XPBar.prototype._updateVisibility = function (level, points) {
+    Donkeycraft.XPBar.prototype._updateVisibility = function (level) {
         if (!this._container) return;
 
-        var hasXP = (level > 0 || points > 0);
-        if (hasXP) {
+        if (level >= 1) {
             this._container.classList.add('dk-visible');
         } else {
             this._container.classList.remove('dk-visible');
