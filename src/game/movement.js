@@ -456,12 +456,6 @@
         if (this._hungerSystem && this._distanceAccumulator >= 0.5) {
             var distanceSinceLastDeg = this._distanceAccumulator;
             this._distanceAccumulator = 0;
-
-            if (isSprinting) {
-                this._hungerSystem.applySprintDegradation(distanceSinceLastDeg);
-            } else {
-                this._hungerSystem.applyWalkDegradation(distanceSinceLastDeg);
-            }
         }
 
         // Clear speed lock only if the key press would result in a DIFFERENT mode than the locked one.

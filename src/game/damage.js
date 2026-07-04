@@ -47,13 +47,6 @@
         this._staminaRegenTimer = 0;
 
         /**
-         * Current hydration level for auto-regeneration.
-         * @type {number}
-         * @private
-         */
-        this._hydration = 0;
-
-        /**
          * Whether the player is currently on fire.
          * @type {boolean}
          * @private
@@ -127,22 +120,6 @@
                 Donkeycraft.Logger.warn('HurtBox', 'Failed to emit stamina:changed event: ' + e.message);
             }
         }
-    };
-
-    /**
-     * Get the current hydration level.
-     * @returns {number}
-     */
-    Donkeycraft.HurtBox.prototype.getHydration = function () {
-        return this._hydration;
-    };
-
-    /**
-     * Set the hydration level.
-     * @param {number} amount - Hydration value to set.
-     */
-    Donkeycraft.HurtBox.prototype.setHydration = function (amount) {
-        this._hydration = Math.max(0, amount);
     };
 
     /**
@@ -442,7 +419,6 @@
         this._health = this.maxHealth;
         this._stamina = this.maxStamina; // Full stamina on reset (100)
         this._staminaRegenTimer = 0;
-        this._hydration = 0;
         this._onFire = false;
         this._fireDamageTimer = 0;
         this._starvationTimer = 0;

@@ -50,7 +50,7 @@
      */
     Donkeycraft.Hotbar.prototype._buildDOM = function () {
         var self = this;
-        this._container.style.cssText = 'display: flex; justify-content: center; gap: 2px; padding: 4px; position: absolute; background: rgba(0,0,0,0.5); border-radius: 4px; overflow: visible; bottom: 8px; left: 50%; transform: translateX(-50%);';
+        this._container.className = 'dk-hotbar';
 
         // Build the stamina bar behind the slots
         this._buildStaminaBar();
@@ -58,27 +58,22 @@
         for (var i = 0; i < 9; i++) {
             var slotEl = document.createElement('div');
             slotEl.className = 'dk-hotbar-slot';
-            // z-index: 1 ensures slots render above the stamina bar wrapper (z-index: 0)
-            slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,100,100,0.6); border: 2px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;';
             slotEl.dataset.slotIndex = i;
 
             // Number indicator — positioned top-left per CSS .dk-slot-number convention
             var numEl = document.createElement('span');
             numEl.className = 'dk-slot-number';
-            numEl.style.cssText = 'position: absolute; top: 1px; left: 3px; font-size: 10px; color: #aaa; text-shadow: 1px 1px 1px #000;';
             numEl.textContent = (i + 1);
             slotEl.appendChild(numEl);
 
             // Item display area
             var itemEl = document.createElement('div');
             itemEl.className = 'dk-slot-item';
-            itemEl.style.cssText = 'font-size: 24px; text-align: center;';
             slotEl.appendChild(itemEl);
 
             // Count overlay
             var countEl = document.createElement('span');
             countEl.className = 'dk-slot-count';
-            countEl.style.cssText = 'position: absolute; bottom: 1px; left: 3px; font-size: 11px; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000;';
             slotEl.appendChild(countEl);
 
             this._slotElements.push(slotEl);
@@ -106,23 +101,19 @@
         // Height set to 24px to fully cover the background area behind the hotbar slots
         var wrapper = document.createElement('div');
         wrapper.className = 'dk-stamina-bar-wrapper';
-        wrapper.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 24px; pointer-events: none; z-index: 0;';
 
         // Background track — dark fill visible through gaps
         var bg = document.createElement('div');
         bg.className = 'dk-stamina-bar-bg';
-        bg.style.cssText = 'position: absolute; bottom: 2px; left: 2px; right: 2px; height: 100%; background: rgba(0, 0, 0, 0.5); border-radius: 4px; overflow: hidden;';
 
         // Animated fill — yellow progress bar with smooth width transition
         var fill = document.createElement('div');
         fill.className = 'dk-stamina-bar-fill';
-        fill.style.cssText = 'position: absolute; bottom: 2px; left: 2px; height: 100%; width: 100%; background: linear-gradient(90deg, rgba(255, 210, 50, 0.8), rgba(255, 180, 30, 0.7)); border-radius: 4px; transition: width 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94); box-shadow: 0 0 8px rgba(255, 210, 50, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);';
 
         // Pulse overlay — brief brightness boost on stamina change
         // Width matches the fill to only pulse over the filled portion
         var pulse = document.createElement('div');
         pulse.className = 'dk-stamina-bar-pulse';
-        pulse.style.cssText = 'position: absolute; bottom: 2px; left: 2px; height: 100%; width: 100%; background: linear-gradient(90deg, rgba(255, 230, 80, 0.5), rgba(255, 200, 60, 0.4)); border-radius: 4px; opacity: 0; pointer-events: none; transition: width 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 100ms ease-out;';
 
         bg.appendChild(fill);
         wrapper.appendChild(bg);
