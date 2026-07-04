@@ -1,0 +1,29 @@
+# Build artifacts
+*.min.js
+*.min.css
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if ever used for tooling)
+node_modules/
+package-lock.json
+package.json
+
+# Assets (large binary files — use separate asset repo or generate procedurally)
+assets/textures/*.png
+assets/sounds/*.ogg
+assets/sounds/*.mp3
+
+# Local config
+.local
+changes.diff
+ref/

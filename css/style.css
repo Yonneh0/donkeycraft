@@ -1,0 +1,974 @@
+/* Donkeycraft — Base Styles */
+/* Full-screen canvas, overlay positioning, cursor, scrollbar hiding */
+
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: #000;
+    color: #e0e0e0;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* WebGL Canvas */
+#dk-canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* Pointer lock cursor hiding — controlled via JS by toggling .dk-pointer-locked class on body.
+   CSS-only approaches (:focus-within, :has) are unreliable because pointer lock is independent
+   of DOM focus state. */
+body.dk-pointer-locked #dk-canvas {
+    cursor: none;
+}
+
+/* Also hide cursor on overlay elements when locked */
+body.dk-pointer-locked #dk-overlay * {
+    cursor: none !important;
+}
+
+/* Hide cursor for canvas container too */
+body.dk-pointer-locked #dk-canvas-container {
+    cursor: none;
+}
+
+/* Also hide cursor when overlay has focus (fallback for browsers that support it) */
+#dk-overlay:focus-within {
+    cursor: none;
+}
+
+/* Game overlay container — sits on top of canvas */
+#dk-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Overlay elements that need to receive mouse events */
+#dk-overlay .dk-interactive {
+    pointer-events: auto;
+}
+
+/* Crosshair — centered on screen */
+#dk-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 24px;
+    z-index: 20;
+}
+
+#dk-crosshair::before,
+#dk-crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+#dk-crosshair::before {
+    top: 50%;
+    left: 2px;
+    right: 2px;
+    height: 2px;
+    transform: translateY(-50%);
+}
+
+#dk-crosshair::after {
+    left: 50%;
+    top: 2px;
+    bottom: 2px;
+    width: 2px;
+    transform: translateX(-50%);
+}
+
+/* Debug overlay (F3) */
+#dk-debug-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 12px;
+    border-radius: 4px;
+    white-space: pre;
+    display: none;
+    max-width: 400px;
+}
+
+#dk-debug-overlay.visible {
+    display: block;
+}
+
+/* Debug overlay renderer toggles — interactive section */
+.dk-debug-info .dk-renderer-toggles {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(100, 100, 100, 0.5);
+}
+
+.dk-debug-info .dk-toggle-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.dk-debug-info .dk-renderer-toggle {
+    pointer-events: auto;
+    /* Override parent's pointer-events: none */
+    cursor: pointer;
+    margin: 0;
+    accent-color: #aaa;
+}
+
+.dk-debug-info .dk-renderer-toggle:checked {
+    accent-color: #5f5;
+}
+
+/* Debug controls section — interactive stat manipulation buttons */
+.dk-debug-info .dk-debug-controls {
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(100, 100, 100, 0.5);
+}
+
+/* Stat group labels */
+.dk-debug-line.dk-ctrl-label {
+    display: block;
+    color: #f39c12;
+    font-weight: bold;
+    margin-top: 4px;
+    margin-bottom: 1px;
+    padding-left: 2px;
+    font-size: 11px;
+}
+
+/* Button rows — aligned under each label */
+.dk-debug-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding-left: 2px;
+    margin-top: 1px;
+}
+
+.dk-debug-ctrl-btn {
+    display: inline-block;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 5px;
+    min-width: 32px;
+    text-align: center;
+    background: rgba(40, 40, 40, 0.8);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.dk-debug-ctrl-btn:hover {
+    background: rgba(60, 60, 60, 0.9);
+    color: #fff;
+    border-color: #888;
+}
+
+.dk-debug-ctrl-btn:active {
+    background: rgba(80, 80, 80, 0.95);
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+/* Special styling for FULL/EMPTY/RESET buttons */
+.dk-debug-ctrl-btn-special {
+    color: #f39c12;
+    border-color: rgba(243, 156, 18, 0.4);
+}
+
+.dk-debug-ctrl-btn-special:hover {
+    color: #f1c40f;
+    border-color: rgba(243, 156, 18, 0.7);
+}
+
+.dk-debug-ctrl-btn-special:active {
+    color: #e67e22;
+    border-color: #f39c12;
+}
+
+/* Loading screen */
+#dk-loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #2c1e0f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+#dk-loading-screen .dk-loading-title {
+    font-size: 2em;
+    color: #f1c40f;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#dk-loading-screen .dk-progress-bar-container {
+    width: 300px;
+    height: 20px;
+    background: #1a1a1a;
+    border: 2px solid #555;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+#dk-loading-screen .dk-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2ecc71, #27ae60);
+    transition: width 0.3s ease;
+}
+
+#dk-loading-screen .dk-progress-text {
+    font-size: 0.9em;
+    color: #ccc;
+    margin-bottom: 16px;
+}
+
+#dk-loading-screen .dk-tip {
+    font-size: 0.85em;
+    color: #888;
+    font-style: italic;
+    max-width: 300px;
+    text-align: center;
+}
+
+#dk-loading-screen .dk-error {
+    color: #e74c3c;
+    font-size: 0.9em;
+    margin-top: 12px;
+    display: none;
+}
+
+#dk-loading-screen .dk-error.visible {
+    display: block;
+}
+
+/* GUI modal backdrop */
+#dk-gui-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    z-index: 30;
+}
+
+#dk-gui-backdrop.visible {
+    display: block;
+}
+
+/* Scrollbar hiding */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Selection prevention */
+#dk-overlay * {
+    -webkit-touch-callout: none;
+}
+
+/* Error screen */
+#dk-error-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #1a0a0a;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+#dk-error-screen.visible {
+    display: flex;
+}
+
+#dk-error-screen .dk-error-title {
+    color: #e74c3c;
+    font-size: 1.5em;
+    margin-bottom: 12px;
+}
+
+#dk-error-screen .dk-error-message {
+    color: #ccc;
+    font-size: 0.9em;
+    max-width: 500px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+#dk-error-screen .dk-retry-btn {
+    margin-top: 20px;
+    padding: 10px 30px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+#dk-error-screen .dk-retry-btn:hover {
+    background: #c0392b;
+}
+
+/* ============================================================
+   XP BAR ANIMATIONS
+   ============================================================ */
+
+/* 1. Watermark flash — fade in, scale up, settle at fill edge */
+@keyframes watermark-flash {
+    0% {
+        opacity: 0;
+        transform: translateX(-4px) scale(0.9);
+    }
+
+    60% {
+        opacity: 1;
+        transform: translateX(0) scale(1.1);
+    }
+
+    100% {
+        opacity: 0.7;
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* 2. Badge spin morph — Y-axis spin + scale bounce on level change */
+@keyframes badge-spin-scale {
+    0% {
+        transform: rotateY(0deg) scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: rotateY(180deg) scale(0.7);
+        opacity: 0.5;
+    }
+
+    75% {
+        transform: rotateY(270deg) scale(1.1);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: rotateY(360deg) scale(1);
+        opacity: 1;
+    }
+}
+
+/* 3. Badge pulse glow — aura breathing (tiers 2, 5) */
+@keyframes badge-pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 4px var(--glow-color, rgba(0, 150, 255, 0.8)), 0 0 8px var(--glow-color, rgba(0, 150, 255, 0.4));
+    }
+
+    50% {
+        box-shadow: 0 0 8px var(--glow-color, rgba(0, 150, 255, 0.9)), 0 0 16px var(--glow-color, rgba(0, 150, 255, 0.6)), 0 0 24px var(--glow-color, rgba(0, 150, 255, 0.3));
+    }
+}
+
+/* 4. Badge ring rotate — outer ring rotation (tier 3) */
+@keyframes badge-ring-rotate {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 5. Spark float — sparks orbiting badge (tier 4) */
+@keyframes spark-float {
+    0% {
+        transform: rotate(0deg) translateX(0) rotate(0deg);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: rotate(360deg) translateX(var(--spark-radius, 28px)) rotate(-360deg);
+        opacity: 0;
+    }
+}
+
+/* 6. Level burst — expanding ring from badge center */
+@keyframes level-burst {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 1;
+        border-width: 4px;
+    }
+
+    100% {
+        width: 200px;
+        height: 200px;
+        opacity: 0;
+        border-width: 1px;
+    }
+}
+
+/* 7. Screen shake — DOM shake for high-level gains (tiers 5+) */
+@keyframes screen-shake {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    10% {
+        transform: translate(-1.5px, 1px);
+    }
+
+    20% {
+        transform: translate(1.5px, -1px);
+    }
+
+    30% {
+        transform: translate(-1px, 1.5px);
+    }
+
+    40% {
+        transform: translate(1px, -1.5px);
+    }
+
+    50% {
+        transform: translate(-1.5px, -1px);
+    }
+
+    60% {
+        transform: translate(1.5px, 1px);
+    }
+
+    70% {
+        transform: translate(-1px, -1.5px);
+    }
+
+    80% {
+        transform: translate(1px, 1.5px);
+    }
+
+    90% {
+        transform: translate(-1px, -1px);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}
+
+/* 8. Rainbow shift — continuous hue rotation (tier 6) */
+@keyframes rainbow-shift {
+    0% {
+        filter: hue-rotate(0deg);
+    }
+
+    100% {
+        filter: hue-rotate(360deg);
+    }
+}
+
+/* 9. Particle fall — gravity particle trajectory */
+@keyframes particle-fall {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--dx, 30px), var(--dy, -60px)) scale(0.2);
+        opacity: 0;
+    }
+}
+
+/* 10. XP color flash — brightness flash on XP change */
+@keyframes xp-color-flash {
+    0% {
+        filter: brightness(2);
+    }
+
+    100% {
+        filter: brightness(1);
+    }
+}
+
+/* 11. Badge bounce — scale entrance bounce */
+@keyframes badge-bounce {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    70% {
+        transform: scale(0.9);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 12. Golden spectacle — multi-effect composite (tier 7) */
+@keyframes golden-spectacle {
+
+    0%,
+    100% {
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.4), 0 0 40px rgba(255, 215, 0, 0.2);
+        filter: hue-rotate(0deg) brightness(1.1);
+    }
+
+    33% {
+        box-shadow: 0 0 15px rgba(255, 165, 0, 0.9), 0 0 30px rgba(255, 165, 0, 0.5), 0 0 50px rgba(255, 165, 0, 0.3);
+        filter: hue-rotate(120deg) brightness(1.2);
+    }
+
+    66% {
+        box-shadow: 0 0 15px rgba(255, 255, 0, 0.9), 0 0 30px rgba(255, 255, 0, 0.5), 0 0 50px rgba(255, 255, 0, 0.3);
+        filter: hue-rotate(240deg) brightness(1.2);
+    }
+}
+
+/* 13. Intensified pulse — tier 5 ambient effect */
+@keyframes intensified-pulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 6px rgba(255, 80, 0, 0.8), 0 0 12px rgba(255, 80, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 0 12px rgba(255, 80, 0, 1), 0 0 24px rgba(255, 80, 0, 0.7), 0 0 36px rgba(255, 80, 0, 0.3);
+        transform: scale(1.05);
+    }
+}
+
+/* 14. Badge shake — subtle scale/rotate shake for level-up on levels 75+ (no translate to avoid layout shift) */
+@keyframes badge-shake {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+
+    10% {
+        transform: scale(1.08) rotate(-2deg);
+    }
+
+    20% {
+        transform: scale(0.95) rotate(2deg);
+    }
+
+    30% {
+        transform: scale(1.06) rotate(-1deg);
+    }
+
+    40% {
+        transform: scale(0.97) rotate(1deg);
+    }
+
+    50% {
+        transform: scale(1.04) rotate(-1deg);
+    }
+
+    60% {
+        transform: scale(0.98) rotate(0.5deg);
+    }
+
+    70% {
+        transform: scale(1.02) rotate(-0.5deg);
+    }
+
+    80% {
+        transform: scale(0.99) rotate(0.3deg);
+    }
+
+    90% {
+        transform: scale(1.01) rotate(-0.3deg);
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+/* ============================================================
+   HEALTH BAR ANIMATIONS
+   ============================================================ */
+
+/* 14. Health shake — rapid jitter on damage taken */
+@keyframes health-shake {
+    0% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+
+    10% {
+        transform: translate(-2px, 1px) rotate(-0.5deg);
+    }
+
+    20% {
+        transform: translate(2px, -1px) rotate(0.5deg);
+    }
+
+    30% {
+        transform: translate(-2px, 2px) rotate(-0.3deg);
+    }
+
+    40% {
+        transform: translate(1px, -1px) rotate(0.3deg);
+    }
+
+    50% {
+        transform: translate(-1px, 1px) rotate(-0.5deg);
+    }
+
+    60% {
+        transform: translate(2px, 1px) rotate(0.5deg);
+    }
+
+    70% {
+        transform: translate(-1px, -2px) rotate(-0.3deg);
+    }
+
+    80% {
+        transform: translate(2px, 1px) rotate(0.3deg);
+    }
+
+    90% {
+        transform: translate(-1px, -1px) rotate(-0.5deg);
+    }
+
+    100% {
+        transform: translate(0, 0) rotate(0deg);
+    }
+}
+
+/* 15. Screen shake on critical health (below 3 hearts) */
+@keyframes screen-shake-health {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    10% {
+        transform: translate(-3px, 2px);
+    }
+
+    20% {
+        transform: translate(3px, -2px);
+    }
+
+    30% {
+        transform: translate(-2px, 3px);
+    }
+
+    40% {
+        transform: translate(2px, -3px);
+    }
+
+    50% {
+        transform: translate(-3px, -2px);
+    }
+
+    60% {
+        transform: translate(3px, 2px);
+    }
+
+    70% {
+        transform: translate(-2px, -3px);
+    }
+
+    80% {
+        transform: translate(2px, 3px);
+    }
+
+    90% {
+        transform: translate(-2px, -2px);
+    }
+
+    100% {
+        transform: translate(0, 0);
+    }
+}
+
+/* 16. Heart damage flash — bright red pulse */
+@keyframes heart-damage-flash {
+    0% {
+        filter: brightness(1) drop-shadow(0 0 2px rgba(231, 76, 60, 0.5));
+    }
+
+    30% {
+        filter: brightness(2) drop-shadow(0 0 8px rgba(255, 0, 0, 0.9));
+    }
+
+    100% {
+        filter: brightness(1) drop-shadow(0 0 2px rgba(231, 76, 60, 0.5));
+    }
+}
+
+/* 17. Heart heal flash — green glow pulse */
+@keyframes heart-heal-flash {
+    0% {
+        filter: brightness(1) drop-shadow(0 0 2px rgba(46, 204, 113, 0.3));
+    }
+
+    40% {
+        filter: brightness(1.5) drop-shadow(0 0 6px rgba(46, 204, 113, 0.8));
+    }
+
+    100% {
+        filter: brightness(1) drop-shadow(0 0 2px rgba(46, 204, 113, 0.3));
+    }
+}
+
+/* 18. Float text up — floating +/- HP text */
+@keyframes float-text-up {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: translateX(-50%) translateY(-15px) scale(1.1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-30px) scale(0.8);
+    }
+}
+
+/* ============================================================
+   HUNGER BAR ANIMATIONS
+   ============================================================ */
+
+/* 19. Drumstick eat pulse — green glow on eaten drumsticks */
+@keyframes drumstick-eat-pulse {
+    0% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+
+    30% {
+        filter: brightness(1.4) drop-shadow(0 0 6px rgba(46, 204, 113, 0.7));
+        transform: scale(1.15);
+    }
+
+    100% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+}
+
+/* 20. Drumstick dim — fade to dark on depletion */
+@keyframes drumstick-dim {
+    0% {
+        filter: brightness(1) saturate(1);
+        opacity: 1;
+    }
+
+    50% {
+        filter: brightness(0.5) saturate(0.3);
+        opacity: 0.6;
+    }
+
+    100% {
+        filter: brightness(1) saturate(1);
+        opacity: 1;
+    }
+}
+
+/* ============================================================
+   FLOATING +/- TEXT (shared by health and hunger bars)
+   ============================================================ */
+
+/* Ensure the float-text-up animation works for both health and hunger text */
+@keyframes float-text-up {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    50% {
+        opacity: 0.85;
+        transform: translateX(-50%) translateY(-12px) scale(1.1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-28px) scale(0.85);
+    }
+}
+
+/* ============================================================
+   MAP VIEW — Full map panel + Minimap + Toggle button
+   ============================================================ */
+
+/* Map View Toggle Button — bottom-left corner */
+#dk-map-toggle-btn {
+    position: fixed;
+    left: 12px;
+    bottom: 80px;
+    z-index: 500;
+    display: none;
+    /* Hidden when map is open */
+    background: rgba(30, 30, 30, 0.75);
+    color: #aaffaa;
+    border: 1px solid rgba(100, 200, 100, 0.4);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+}
+
+#dk-map-toggle-btn:hover {
+    background: rgba(50, 50, 50, 0.9);
+    border-color: rgba(100, 255, 100, 0.7);
+}
+
+/* Map View Panel — top-right 2/3 of screen */
+#dk-map-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 66.66vw;
+    height: 66.66vh;
+    z-index: 400;
+    display: none;
+    background: rgba(10, 15, 20, 0.92);
+    border-bottom-left-radius: 8px;
+    box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+#dk-map-panel.dk-visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Close button on map panel */
+#dk-map-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    z-index: 410;
+    background: rgba(200, 50, 50, 0.7);
+    color: #fff;
+    border: 1px solid rgba(255, 100, 100, 0.5);
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    line-height: 1;
+}
+
+#dk-map-close-btn:hover {
+    background: rgba(240, 60, 60, 0.9);
+}
+
+/* Full map canvas */
+#dk-map-canvas {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    display: block;
+}
+
+#dk-map-canvas:active {
+    cursor: grabbing;
+}
+
+/* Minimap — top-left corner, circular */
+#dk-minimap-canvas {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 350;
+    width: var(--minimap-size, 160px);
+    height: var(--minimap-size, 160px);
+    border-radius: 50%;
+    border: 2px solid rgba(100, 200, 100, 0.4);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+    display: block;
+    background: rgba(10, 15, 20, 0.85);
+}
+
+/* Hide minimap when full map view is open */
+body.dk-map-open #dk-minimap-canvas {
+    display: none !important;
+}
