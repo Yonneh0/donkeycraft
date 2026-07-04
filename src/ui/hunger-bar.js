@@ -258,17 +258,23 @@
         var clipId = this._hungerClipId;
 
          if (state === 'half') {
-             // Body fills clipped to bottom half. Bone, outline, detail, eye, and dots fully visible.
-             // References clipPath defined in defs SVG (injected during _buildDOM).
+             // Pattern matches health-bar.js: outline/body paths drawn FIRST as background,
+             // then colored body fills clipped to bottom half drawn on top.
+             // This shows the full outline/empty state as base, with meat colors appearing only in bottom half.
              return '<svg viewBox="0 0 1024 1024" class="dk-drumstick dk-drumstick-half">' +
-                 // Bone — identical in all states, fully visible
+                 '<defs>' +
+                 '<clipPath id="' + clipId + '">' +
+                 '<rect x="0" y="512" width="1024" height="512"/>' +
+                 '</clipPath>' +
+                 '</defs>' +
+                 // Bone — identical in all states, fully visible (DRAWN FIRST = background)
                  '<path d="' + bone + '" fill="#F2F5FB" stroke="#004364" stroke-width="3"/>' +
-                 // Outline/detail layers — fully visible (not clipped)
+                 // Outline/detail/eye layers — fully visible as base background (DRAWN SECOND)
                  '<path d="' + outlinePath + '" fill="#004364"/>' +
                  '<path d="' + detailPath + '" fill="#004364"/>' +
                  '<path d="' + eye + '" fill="#004364"/>' +
                  eyeDots +
-                 // Body fills — clipped to bottom half only
+                 // Body fills — clipped to bottom half only (DRAWN LAST = on top, showing meat colors in bottom half)
                  '<g clip-path="url(#' + clipId + ')">' +
                  '<path d="' + meatFill + '" fill="#DEEAF4"/>' +
                  '<path d="' + mainBody + '" fill="#DD9121"/>' +
@@ -348,14 +354,20 @@
         var clipId = this._hydrationClipId;
 
         if (state === 'half') {
-            // Outline + highlight fully visible, body fills clipped to bottom half.
-            // References clipPath defined in defs SVG (injected during _buildDOM).
+            // Pattern matches health-bar.js: outline drawn FIRST as background,
+            // then colored body fill clipped to bottom half drawn on top.
+            // This shows the full outline/empty state as base, with blue fill appearing only in bottom half.
             return '<svg viewBox="0 0 18 20" class="dk-drop dk-drop-half">' +
-                // Outline — always visible
+                '<defs>' +
+                '<clipPath id="' + clipId + '">' +
+                '<rect x="0" y="10" width="18" height="10"/>' +
+                '</clipPath>' +
+                '</defs>' +
+                // Outline — drawn FIRST as background (the "empty" appearance)
                 '<path d="' + dropPath + '" fill="none" stroke="#4a90d9" stroke-width="1.2" stroke-linejoin="round"/>' +
-                // Highlight/reflection — fully visible
+                // Highlight/reflection — fully visible on top of outline
                 '<path d="' + highlightPath + '" fill="rgba(255,255,255,0.3)"/>' +
-                // Body fill — clipped to bottom half (water level at middle)
+                // Body fill — clipped to bottom half only (DRAWN LAST = on top, showing blue in bottom half)
                 '<g clip-path="url(#' + clipId + ')">' +
                 '<path d="' + dropPath + '" fill="#3498db"/>' +
                 '</g>' +
