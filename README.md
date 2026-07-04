@@ -38,9 +38,9 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Game mode badge** — Top-right corner indicator (SURVIVAL/CREATIVE) with click-to-swap between modes
 - **Speed indicator** — Top-right button bar showing 🐌 sneak, 🚶 walk, 🏃 run states; ⚡ turbo in creative; click-to-lock crouch/run modes
 - **Debug screen (F3)** — FPS, chunk info, biome, coordinates, light levels
-- **Minimap** — Rotating 2D overhead view with compass markers, player indicator, and time-of-day dial widget in the top-left corner (overlapping the rim with soft semi-transparent background)
+- **Minimap** — Rotating 2D top-down view showing terrain tiles around the player, green directional triangle, compass ring (N/E/S/W fixed markers), and circular border; uses per-block surface cache for accurate terrain colors
 - **Time-of-day dial** — Small circular dial showing partial arc ring (sunrise → day → sunset), animated sun/moon pointer, star dots at night, hour tick marks, and digital clock; creative mode click opens time slider with freeze/unfreeze controls
-- **2D map view** — Full-screen panning/zooming map with chunk grid lines and player direction indicator
+- **2D map view** — Full-screen panning/zooming map (press M) with chunk grid lines, block borders at close zoom, 64-block orientation grid, player dot with red direction arrow, dimension label, zoom level, and chunk count overlay; mousewheel zooms toward cursor, left-click drag pans
 
 ### Player & Movement
 - **WASD movement** — Walking, sprinting, swimming with game-mode-specific speed modifiers
@@ -111,6 +111,7 @@ No server, no installation, no dependencies.
 | E | Open creative inventory |
 | F3 | Debug screen |
 | F | Toggle fly mode (Creative) |
+| M | Toggle full-screen 2D map view (pan with drag, zoom with scroll) |
 | Click game mode badge | Swap between Survival and Creative modes |
 
 ## Project Structure
@@ -219,7 +220,7 @@ src/
     break-particles.js    # Block breaking particles
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     weather.js            # Weather particle effects
-    map-renderer.js       # Map/minimap rendering
+    map-renderer.js       # 2D overhead map, rotating minimap, time-of-day dial, surface cache
   ui/                 # Inventory, HUD, GUI screens (19 files, ~7,800 lines)
     item-stack.js           # Item stacks with NBT-like tags
     inventory.js            # Multi-slot inventories

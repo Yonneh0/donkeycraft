@@ -86,6 +86,18 @@
             _currentDimension = dimensionType;
             _chunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(dimensionType);
             _resolvePortalBlockIds();
+
+            // Notify map renderer of dimension change (clears surface maps, updates label)
+            if (Donkeycraft.MapRenderer && Donkeycraft.MapRenderer.prototype.onDimensionChange) {
+                var dimName = Donkeycraft.Dimensions.getCurrentDimensionName ? Donkeycraft.Dimensions.getCurrentDimensionName() : 'Unknown';
+                try {
+                    var gameRef = window._dkGame;
+                    if (gameRef && gameRef._mapRenderer && typeof gameRef._mapRenderer.onDimensionChange === 'function') {
+                        gameRef._mapRenderer.onDimensionChange(dimName);
+                    }
+                } catch (e) { /* ignore */ }
+            }
+
             Donkeycraft.Logger.info('Portal', 'Switched to dimension: ' + dimensionType);
         }
 

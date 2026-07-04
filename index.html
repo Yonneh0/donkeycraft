@@ -92,7 +92,7 @@
     <div id="dk-map-panel">
         <canvas id="dk-map-canvas"></canvas>
     </div>
-    <canvas id="dk-minimap-canvas" width="160" height="160"></canvas>
+    <canvas id="dk-minimap-canvas" width="150" height="150"></canvas>
 
     <!-- ============================================================
      Load project scripts in dependency order
@@ -1181,6 +1181,21 @@ void main() {
 
                             // Initialize (creates panel, toggle button, event listeners)
                             var mapInitOk = mapRenderer.init();
+
+                            // Wire up chunk dirty callback — invalidate surface maps when blocks change
+                            var cm = game2._chunkManager;
+                            if (cm && mapInitOk) {
+                                var existingChunksChanged = cm.onChunksChanged;
+                                cm.onChunksChanged = function () {
+                                    if (existingChunksChanged) existingChunksChanged();
+                                    // Invalidate surface maps for all dirty chunks
+                                    var dirty = cm.getDirtyChunks();
+                                    for (var i = 0; i < dirty.length; i++) {
+                                        Donkeycraft.MapRenderer.invalidateChunkSurfaceMap(dirty[i].chunkX, dirty[i].chunkZ);
+                                    }
+                                };
+                            }
+
                             if (mapInitOk) {
                                 // Store reference on game for render loop access
                                 game2._mapRenderer = mapRenderer;

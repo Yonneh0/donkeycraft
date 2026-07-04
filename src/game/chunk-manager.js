@@ -499,9 +499,48 @@
             try { Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, chunk.biomeId, heightmap); } catch (e) { /* skip */ }
         }
 
+        // Build surface map for map renderer (O(1) block lookup per frame)
+        _buildChunkSurfaceMap(chunk);
+
         // Mark chunk as needing mesh regeneration
         chunk._dirty = true;
         chunk.generated = true;
+    }
+
+    /**
+     * Build the surface map for a chunk — scans each (x,z) column once.
+     * Stores result on chunk._mapSurfaceMap[localX][localZ] = {y, blockId|null}.
+     * Called after terrain generation so the map renderer can do O(1) lookups.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to build the surface map for.
+     * @private
+     */
+    function _buildChunkSurfaceMap(chunk) {
+        if (!chunk || chunk._mapSurfaceMapBuilt) return;
+
+        var map = new Array(CHUNK_SIZE);
+        var worldHeight = Donkeycraft.Config.WORLD_HEIGHT;
+
+        for (var lx = 0; lx < CHUNK_SIZE; lx++) {
+            map[lx] = new Array(CHUNK_SIZE);
+            for (var lz = 0; lz < CHUNK_SIZE; lz++) {
+                // Scan from top to bottom for the first visible block
+                var surfaceY = -1;
+                var surfaceBlockId = 0;
+                for (var y = worldHeight - 1; y >= 0; y--) {
+                    var blockId = chunk.getBlock(lx, y, lz);
+                    if (blockId === 0) continue; // Air
+                    if (blockId === 13) continue; // Water
+
+                    surfaceY = y;
+                    surfaceBlockId = blockId;
+                    break;
+                }
+                map[lx][lz] = (surfaceY >= 0) ? { y: surfaceY, blockId: surfaceBlockId } : null;
+            }
+        }
+
+        chunk._mapSurfaceMap = map;
+        chunk._mapSurfaceMapBuilt = true;
     }
 
     // ============================================================
@@ -530,11 +569,14 @@
         } catch (e) {
             Donkeycraft.Logger.error('ChunkManager', 'Nether terrain generation failed: ' + e.message);
         }
+
+        // Build surface map for map renderer
+        _buildChunkSurfaceMap(chunk);
     }
 
     /**
      * Generate End terrain for a chunk.
-     * Kept for backward compatibility — primary wiring is in dimension.js.
+     * Kept for backward compatibility — primary wiring is in dimension.js via onChunkLoad callbacks.
      * @param {Donkeycraft.ChunkManager} manager - The ChunkManager.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -553,6 +595,9 @@
         } catch (e) {
             Donkeycraft.Logger.error('ChunkManager', 'End terrain generation failed: ' + e.message);
         }
+
+        // Build surface map for map renderer
+        _buildChunkSurfaceMap(chunk);
     }
 
 })();
