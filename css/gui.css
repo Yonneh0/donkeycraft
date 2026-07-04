@@ -1161,8 +1161,8 @@
     pointer-events: none;
 }
 
-/* Row container for drumstick slots (right-aligned) — soft shadow behind to blend with background */
-.dk-hunger-bar-row {
+/* Unified hunger + hydration bar — single row for all 9 icons (6 drumsticks + 3 water drops) */
+.dk-hunger-hydration-bar {
     display: flex;
     gap: 2px;
     align-items: center;
@@ -1174,8 +1174,8 @@
         0 2px 8px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.06),
         inset 0 -1px 2px rgba(0, 0, 0, 0.15);
-    /* Subtle gradient background for depth */
-    background: linear-gradient(180deg, rgba(40, 35, 25, 0.45) 0%, rgba(20, 18, 12, 0.55) 100%);
+    /* Subtle gradient background blending hunger brown with hydration blue */
+    background: linear-gradient(180deg, rgba(32, 32, 30, 0.45) 0%, rgba(16, 18, 20, 0.55) 100%);
     overflow: visible;
     /* Allow floating +/- text to render outside row bounds */
 }
@@ -1225,6 +1225,59 @@
 /* Full-screen brown overlay for low hunger — more opaque */
 .dk-hunger-overlay {
     background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
+}
+
+
+/* Individual water drop container — no border, subtle glow */
+.dk-drop-container {
+    width: 18px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 150ms ease, transform 150ms ease;
+    position: relative;
+    border: none;
+    box-shadow: none;
+}
+
+/* Water drop SVG base styles */
+.dk-drop-container svg {
+    width: 18px;
+    height: 20px;
+    display: block;
+}
+
+/* Full water drop — blue fill with glow */
+.dk-drop-full .dk-drop {
+    filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.5));
+}
+
+/* Water drop drink pulse animation (on hydration gain) */
+.dk-drop-drink-pulse {
+    animation: drop-drink-pulse 400ms ease-out;
+}
+
+/* Water drop dim animation on dehydration */
+.dk-drop-dim {
+    animation: drop-dim 300ms ease-out;
+}
+
+/* Floating +/- text for hydration */
+.dk-hydration-text {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    pointer-events: none;
+    animation: float-text-up 800ms ease-out forwards;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+    z-index: 10;
+}
+
+/* Full-screen blue overlay for low hydration — more opaque */
+.dk-hydration-overlay {
+    background: radial-gradient(ellipse at center, rgba(0, 100, 200, 0.3) 0%, rgba(0, 60, 120, 0.6) 100%);
 }
 
 /* ============================================================
@@ -1472,4 +1525,116 @@
 /* Badge swap transition — smooth background/border color crossfade */
 .dk-gamemode-badge.dk-swapping {
     transition: background 350ms ease, border-color 350ms ease, box-shadow 350ms ease !important;
+}
+
+/* ============================================================
+   HUNGER/HYDRATION BAR ANIMATIONS — @keyframes definitions
+   ============================================================ */
+
+/* Drumstick eat pulse — brief scale-up + glow on hydration gain */
+@keyframes drumstick-eat-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(221, 145, 33, 0.7));
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+/* Drumstick dim — fade + desaturate on food depletion */
+@keyframes drumstick-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}
+
+/* Water drop drink pulse — brief scale-up + blue glow on hydration gain */
+@keyframes drop-drink-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+/* Water drop dim — fade + desaturate on dehydration */
+@keyframes drop-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}
+
+/* Floating text — rise and fade for +/- indicators */
+@keyframes float-text-up {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-24px);
+    }
+}
+
+/* Heart damage flash — brief red flash on health loss */
+@keyframes heart-damage-flash {
+    0% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+    30% {
+        filter: brightness(2) saturate(0);
+        transform: scale(1.2);
+    }
+    100% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+}
+
+/* Heart heal flash — brief green glow on health gain */
+@keyframes heart-heal-flash {
+    0% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
+    40% {
+        filter: brightness(1.3) drop-shadow(0 0 4px rgba(46, 204, 113, 0.6));
+        transform: scale(1.15);
+    }
+    100% {
+        filter: brightness(1);
+        transform: scale(1);
+    }
 }

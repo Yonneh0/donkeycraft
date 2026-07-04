@@ -872,15 +872,15 @@
                 var newFood = currentFood;
 
                 if (parsedArgs === 'full') {
-                    newFood = 20;
+                    newFood = 12;
                 } else if (parsedArgs === 'empty') {
                     newFood = 0;
                 } else if (typeof parsedArgs === 'number') {
                     newFood = currentFood + parsedArgs;
                 }
 
-                // Clamp to [0, 20]
-                newFood = Math.max(0, Math.min(20, Math.round(newFood)));
+                // Clamp to [0, 12] (max food level)
+                newFood = Math.max(0, Math.min(12, Math.round(newFood)));
 
                 hunger.setFoodLevel(newFood);
                 refreshDebug();
@@ -889,23 +889,21 @@
 
             case 'hydration': {
                 if (!hunger) { Donkeycraft.Logger.warn('DebugOverlay', 'Hunger system not available'); break; }
-                var currentSat = hunger.getHydration();
-                var foodLevel = hunger.getFoodLevel();
-                var maxHydration = foodLevel * 2;
-                var newSat = currentSat;
+                var currentHydration = hunger.getHydration();
+                var newHydration = currentHydration;
 
                 if (parsedArgs === 'full') {
-                    newSat = maxHydration;
+                    newHydration = 6;
                 } else if (parsedArgs === 'empty') {
-                    newSat = 0;
+                    newHydration = 0;
                 } else if (typeof parsedArgs === 'number') {
-                    newSat = currentSat + parsedArgs;
+                    newHydration = currentHydration + parsedArgs;
                 }
 
-                // Clamp to [0, foodLevel * 2]
-                newSat = Math.max(0, Math.min(maxHydration, Math.round(newSat * 10) / 10));
+                // Clamp to [0, 6] (max hydration cap)
+                newHydration = Math.max(0, Math.min(6, Math.round(newHydration * 10) / 10));
 
-                hunger.setHydration(newSat);
+                hunger.setHydration(newHydration);
                 refreshDebug();
                 break;
             }
