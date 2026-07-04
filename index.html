@@ -652,7 +652,7 @@ void main() {
                         if (guiMgr && guiMgr.hasOpenScreens) {
                             guiMgr.closeTopScreen();
                         } else if (game._mapRenderer && game._mapRenderer.isSliderVisible && game._mapRenderer.isSliderVisible()) {
-                            game._mapRenderer.hideSliderPopup();
+                            game._mapRenderer.hideSlider();
                         } else {
                             game.exitPointerLock();
                         }
@@ -1186,13 +1186,13 @@ void main() {
                                 game2._mapRenderer = mapRenderer;
 
                                 // Wire up time dial slider callback — syncs creative mode time changes to the game
-                                mapRenderer.setOnTimeSet(function (timeOfDay) {
+                                mapRenderer.setOnTimeChange(function (timeOfDay) {
                                     if (timeOfDay === null) {
                                         // Return to natural time flow
-                                        game2.setFrozenTime(null);
+                                        game2._frozenTimeOfDay = null;
                                     } else {
                                         // Set frozen time
-                                        game2.setFrozenTime(timeOfDay);
+                                        game2._frozenTimeOfDay = ((timeOfDay % 1) + 1) % 1;
                                     }
                                 });
 
