@@ -94,44 +94,6 @@ new Donkeycraft.ShaderManager(gl)
 
 ---
 
-## shaders/ Directory
-
-GLSL shader source strings stored in JavaScript template literals.
-
-### fragment-shaders.glsl
-
-| Shader Variable | Usage |
-|-----------------|-------|
-| `TERRAIN_FRAGMENT_SHADER` | Terrain lighting, fog, texture sampling |
-| `FOG_FRAGMENT_SHADER` | Solid color fog pass |
-| `GUI_FRAGMENT_SHADER` | HUD, particles |
-| `SKY_FRAGMENT_SHADER` | Sky dome gradient |
-| `HAND_FRAGMENT_SHADER` | Reserved for future hand/item rendering |
-| `PARTICLE_FRAGMENT_SHADER` | Reserved for future particle rendering |
-
-### vertex-shaders.glsl
-
-| Shader Variable | Usage |
-|-----------------|-------|
-| `TERRAIN_VERTEX_SHADER` | Terrain vertex transformation, fog depth |
-| `BREAK_VERTEX_SHADER` | Block breaking particles (billboard quads) |
-| `GUI_VERTEX_SHADER` | HUD overlay rendering |
-| `SKY_VERTEX_SHADER` | Sky dome positioning |
-| `HAND_VERTEX_SHADER` | Reserved for future hand/item rendering |
-
-### Common Uniforms
-
-**Terrain program:** `uProjection`, `uView`, `uModel`, `uTexture`, `uFogColor`, `uFogDensity`, `uLightFactor`
-**GUI/Break program:** `uProjection`, `uView`, `uModel`, `uTexture`, `uHasTexture`
-**Sky program:** `uProjection`, `uView`, `uTopColor`, `uBottomColor`, `uHorizon`
-
-### Common Attributes
-
-**Terrain:** `aPosition`, `aUV`, `aNormal`, `aLight`
-**GUI/Break:** `aPosition`, `aUV`, `aColor`
-
----
-
 ## camera.js
 
 **First-person camera** with position, rotation, and projection matrix.
@@ -574,22 +536,16 @@ new Donkeycraft.WeatherRenderer(gl, shaderManager)
 
 ```
 game.js
-  │
   ├─ GLContext          → WebGL 1 context wrapper
   ├─ ShaderManager      → Compiles terrain/sky/gui/break programs
-  │     └─ shaders/     → GLSL source strings
-  │
   ├─ Camera             → Position, rotation, projection
-  │
   ├─ TerrainRenderer    → Chunk iteration, frustum culling, batched draws
   │     ├─ ChunkMesh    → Per-chunk buffers (VAO-free attribute binding)
   │     ├─ GeometryBuilder → Vertex data generation
   │     └─ MeshOptimizer → Face culling + vertex deduplication
-  │
   ├─ Fog                → Exponential distance fog uniforms
   ├─ Lighting           → Time-of-day sun/ambient/sky color
   ├─ Sky                → Dome, sun, moon, stars
-  │
   ├─ GUIRenderer        → HUD overlay (crosshair, hotbar, hearts, hunger)
   ├─ HandRenderer       → First-person held item
   ├─ BreakParticles     → Block breaking VFX

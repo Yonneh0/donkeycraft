@@ -204,9 +204,6 @@ src/
   render/           # WebGL rendering engine (16 files, ~3,940 lines)
     gl-context.js           # WebGL 1 context creation
     shader-manager.js       # Shader compilation and caching
-    shaders/
-      vertex-shaders.glsl       # Vertex shader sources (100 lines)
-      fragment-shaders.glsl     # Fragment shader sources (94 lines)
     geometry-builder.js   # Vertex buffer generation
     mesh-optimizer.js     # Face culling and index buffers
     chunk-mesh.js         # Per-chunk GPU buffer management
@@ -258,7 +255,7 @@ README.md           # This file
 | WebGL Rendering Engine | 16 | ~3,940 |
 | Inventory & GUI System | 19 | ~7,800 |
 | Main Entry Point | 1 | 1,639 |
-| **TOTAL** | **108 files** | **~40,140 lines of JS/GLSL** |
+| **TOTAL** | **108 files** | **~40,140 lines of JS** |
 
 ## Technical Risks & Mitigations
 
