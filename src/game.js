@@ -1604,7 +1604,7 @@
         // 2. Movement — physics, gravity, swimming, collision resolution, fall damage
         // 3. Jumping — jump input, cooldown, water swimming boost
         // 4. HurtBox — fire damage tick (applied BEFORE hunger to prevent double-heal)
-        // 5. Hunger — starvation, saturation drain, food-based regeneration
+        // 5. Hunger — starvation, hydration drain, food-based regeneration
         if (this._flyingSystem) {
             try { this._flyingSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Flying tick error: ' + e.message); }
         }

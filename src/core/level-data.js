@@ -91,7 +91,7 @@
                 gameMode: this._gameMode,
                 inventory: [],
                 hunger: 20,
-                saturation: 0,
+                hydration: 0,
                 experience: { levels: 0, points: 0 },
                 fallDistance: 0,
                 alive: true
@@ -226,7 +226,7 @@
                 gameMode: data.gameMode || this._gameMode,
                 inventory: data.inventory || [],
                 hunger: data.hunger !== undefined ? data.hunger : 20,
-                saturation: data.saturation || 0,
+                hydration: data.hydration || 0,
                 experience: data.experience || { levels: 0, points: 0 },
                 fallDistance: data.fallDistance || 0,
                 alive: data.alive !== undefined ? data.alive : true
@@ -251,7 +251,7 @@
             gameMode: this._playerData.gameMode,
             inventory: this._playerData.inventory ? this._playerData.inventory.slice() : [],
             hunger: this._playerData.hunger,
-            saturation: this._playerData.saturation,
+            hydration: this._playerData.hydration,
             experience: { levels: this._playerData.experience.levels, points: this._playerData.experience.points },
             fallDistance: this._playerData.fallDistance,
             alive: this._playerData.alive
@@ -346,20 +346,20 @@
     };
 
     /**
-     * Update saturation level.
-     * @param {number} saturation — Saturation value (0-hunger).
+     * Update hydration level.
+     * @param {number} hydration — Hydration value (0-hunger).
      */
-    Donkeycraft.LevelData.prototype.setSaturation = function (saturation) {
+    Donkeycraft.LevelData.prototype.setHydration = function (hydration) {
         this._ensurePlayerData();
-        this._playerData.saturation = Donkeycraft.clamp(saturation || 0, 0, this._playerData.hunger);
+        this._playerData.hydration = Donkeycraft.clamp(hydration || 0, 0, this._playerData.hunger);
     };
 
     /**
-     * Get saturation level.
-     * @returns {number} Saturation value.
+     * Get hydration level.
+     * @returns {number} Hydration value.
      */
-    Donkeycraft.LevelData.prototype.getSaturation = function () {
-        return this._playerData ? this._playerData.saturation : 0;
+    Donkeycraft.LevelData.prototype.getHydration = function () {
+        return this._playerData ? this._playerData.hydration : 0;
     };
 
     /**
@@ -473,7 +473,7 @@
                 gameMode: data.playerData.gameMode || this._gameMode,
                 inventory: data.playerData.inventory || [],
                 hunger: data.playerData.hunger !== undefined ? data.playerData.hunger : 20,
-                saturation: data.playerData.saturation || 0,
+                hydration: data.playerData.hydration || 0,
                 experience: data.playerData.experience || { levels: 0, points: 0 },
                 fallDistance: data.playerData.fallDistance || 0,
                 alive: data.playerData.alive !== undefined ? data.playerData.alive : true

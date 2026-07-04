@@ -55,7 +55,7 @@
             }
 
             // Default opacity based on block type.
-            // Liquids have partial opacity (1) to simulate light absorption through water/lava columns.
+            // Liquids have partial opacity (1) to simulate light stamina through water/lava columns.
             try {
                 if (Donkeycraft.BlockRegistry.isReplaceable && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return 0;
                 if (Donkeycraft.BlockRegistry.isLiquid && Donkeycraft.BlockRegistry.isLiquid(blockId)) return 1;

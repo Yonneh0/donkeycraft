@@ -27,18 +27,18 @@
         this.maxHealth = 20;
 
         /**
-         * Current absorption hearts (yellow health).
+         * Current stamina hearts (yellow health).
          * @type {number}
          * @private
          */
-        this._absorption = 0;
+        this._stamina = 0;
 
         /**
-         * Current saturation level for auto-regeneration.
+         * Current hydration level for auto-regeneration.
          * @type {number}
          * @private
          */
-        this._saturation = 0;
+        this._hydration = 0;
 
         /**
          * Whether the player is currently on fire.
@@ -86,35 +86,35 @@
     };
 
     /**
-     * Get the current absorption (yellow health) points.
+     * Get the current stamina (yellow health) points.
      * @returns {number}
      */
-    Donkeycraft.HurtBox.prototype.getAbsorption = function () {
-        return this._absorption;
+    Donkeycraft.HurtBox.prototype.getStamina = function () {
+        return this._stamina;
     };
 
     /**
-     * Set the absorption health value.
-     * @param {number} amount - Absorption points to set.
+     * Set the stamina health value.
+     * @param {number} amount - Stamina points to set.
      */
-    Donkeycraft.HurtBox.prototype.setAbsorption = function (amount) {
-        this._absorption = Math.max(0, amount);
+    Donkeycraft.HurtBox.prototype.setStamina = function (amount) {
+        this._stamina = Math.max(0, amount);
     };
 
     /**
-     * Get the current saturation level.
+     * Get the current hydration level.
      * @returns {number}
      */
-    Donkeycraft.HurtBox.prototype.getSaturation = function () {
-        return this._saturation;
+    Donkeycraft.HurtBox.prototype.getHydration = function () {
+        return this._hydration;
     };
 
     /**
-     * Set the saturation level.
-     * @param {number} amount - Saturation value to set.
+     * Set the hydration level.
+     * @param {number} amount - Hydration value to set.
      */
-    Donkeycraft.HurtBox.prototype.setSaturation = function (amount) {
-        this._saturation = Math.max(0, amount);
+    Donkeycraft.HurtBox.prototype.setHydration = function (amount) {
+        this._hydration = Math.max(0, amount);
     };
 
     /**
@@ -159,12 +159,12 @@
         // Track health before damage for delta calculation
         var healthBeforeDamage = this._health;
 
-        // Apply damage to absorption first, then health
+        // Apply damage to stamina first, then health
         var remainingDamage = amount;
 
-        if (this._absorption > 0) {
-            var absorbed = Math.min(this._absorption, remainingDamage);
-            this._absorption -= absorbed;
+        if (this._stamina > 0) {
+            var absorbed = Math.min(this._stamina, remainingDamage);
+            this._stamina -= absorbed;
             remainingDamage -= absorbed;
         }
 
@@ -394,8 +394,8 @@
      */
     Donkeycraft.HurtBox.prototype.reset = function () {
         this._health = this.maxHealth;
-        this._absorption = 0;
-        this._saturation = 0;
+        this._stamina = 0;
+        this._hydration = 0;
         this._onFire = false;
         this._fireDamageTimer = 0;
         this._starvationTimer = 0;

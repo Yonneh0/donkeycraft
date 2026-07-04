@@ -126,8 +126,8 @@
             registerEffect(new Donkeycraft.PotionEffect(18, 'HeroOfTheVillage', 255, 255, 255, 1200, 3600, 0));
             // Additional effects needed for potions
             registerEffect(new Donkeycraft.PotionEffect(19, 'Weakness', 50, 50, 50, 300, 900, 4));
-            registerEffect(new Donkeycraft.PotionEffect(20, 'Absorption', 248, 192, 60, 600, 1800, 4));
-            registerEffect(new Donkeycraft.PotionEffect(21, 'Saturation', 248, 160, 60, 300, 600, 0));
+            registerEffect(new Donkeycraft.PotionEffect(20, 'Stamina', 248, 192, 60, 600, 1800, 4));
+            registerEffect(new Donkeycraft.PotionEffect(21, 'Hydration', 248, 160, 60, 300, 600, 0));
             return Object.keys(_effects).length;
         }
 
@@ -265,16 +265,16 @@
             registerPotion(new Donkeycraft.Potion(37, 'Potion of Healing II', 236, 36,
                 [{ effectId: 7, amplifier: 1, duration: 1 }], true, 'FF6B4D'));
 
-            // Absorption: Gold Ingot (247) + Awkward (2)
-            registerPotion(new Donkeycraft.Potion(38, 'Potion of Absorption', 247, 2,
+            // Stamina: Gold Ingot (247) + Awkward (2)
+            registerPotion(new Donkeycraft.Potion(38, 'Potion of Stamina', 247, 2,
                 [{ effectId: 20, amplifier: 0, duration: 900 }], false, 'F8C848'));
 
-            // Absorption II: Magma Cream (236) + Absorption (38)
-            registerPotion(new Donkeycraft.Potion(39, 'Potion of Absorption II', 236, 38,
+            // Stamina II: Magma Cream (236) + Stamina (38)
+            registerPotion(new Donkeycraft.Potion(39, 'Potion of Stamina II', 236, 38,
                 [{ effectId: 20, amplifier: 1, duration: 450 }], false, 'D0A030'));
 
-            // Saturation: Golden Carrot (245) + Awkward (2)
-            registerPotion(new Donkeycraft.Potion(40, 'Potion of Saturation', 245, 2,
+            // Hydration: Golden Carrot (245) + Awkward (2)
+            registerPotion(new Donkeycraft.Potion(40, 'Potion of Hydration', 245, 2,
                 [{ effectId: 21, amplifier: 0, duration: 300 }], false, 'F8A848'));
 
             return Object.keys(_potions).length;

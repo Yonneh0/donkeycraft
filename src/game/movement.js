@@ -311,7 +311,7 @@
         // incorrectly get swimming physics applied, then collision snaps them back to ground.
         var eyesInWater = this._collision.isBlockLiquid(pos.x, Math.floor(pos.y + Config.PLAYER_EYE_HEIGHT), pos.z);
 
-        // Check if ANY part of the player's body is in water (for fall damage absorption).
+        // Check if ANY part of the player's body is in water (for fall damage stamina).
         var anyInWater = this._isPlayerInLiquid(pos, dimensions);
 
         // Check if specifically in lava (does NOT absorb fall damage, unlike water).
@@ -792,7 +792,7 @@
      * 3. Near head (`pos.y + height - 0.1`)
      * 
      * If ANY sample point is in a lava block, returns `true`.
-     * Used to distinguish lava from water for fall damage absorption:
+     * Used to distinguish lava from water for fall damage stamina:
      * only water absorbs/cancels fall impact; lava does NOT.
      * 
      * @param {Donkeycraft.Vector3} pos - Player center position.

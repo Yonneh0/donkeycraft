@@ -207,50 +207,46 @@
             {
                 label: 'Health',
                 buttons: [
-                    { label: '+1', action: 'health', args: 1 },
-                    { label: '+5', action: 'health', args: 5 },
-                    { label: '+10', action: 'health', args: 10 },
                     { label: 'FULL', action: 'health', args: 'full' },
+                    { label: '+5', action: 'health', args: 5 },
+                    { label: '+1', action: 'health', args: 1 },
                     { label: '-1', action: 'health', args: -1 },
                     { label: '-5', action: 'health', args: -5 },
-                    { label: '-10', action: 'health', args: -10 },
                     { label: 'EMPTY', action: 'health', args: 'empty' }
                 ]
             },
             {
                 label: 'Hunger',
                 buttons: [
-                    { label: '+1', action: 'hunger', args: 1 },
-                    { label: '+5', action: 'hunger', args: 5 },
-                    { label: '+10', action: 'hunger', args: 10 },
                     { label: 'FULL', action: 'hunger', args: 'full' },
+                    { label: '+5', action: 'hunger', args: 5 },
+                    { label: '+1', action: 'hunger', args: 1 },
                     { label: '-1', action: 'hunger', args: -1 },
                     { label: '-5', action: 'hunger', args: -5 },
-                    { label: '-10', action: 'hunger', args: -10 },
                     { label: 'EMPTY', action: 'hunger', args: 'empty' }
                 ]
             },
             {
-                label: 'Saturation',
+                label: 'Hydration',
                 buttons: [
-                    { label: '+1', action: 'saturation', args: 1 },
-                    { label: '+5', action: 'saturation', args: 5 },
-                    { label: 'FULL', action: 'saturation', args: 'full' },
-                    { label: '-1', action: 'saturation', args: -1 },
-                    { label: '-5', action: 'saturation', args: -5 },
-                    { label: 'EMPTY', action: 'saturation', args: 'empty' }
+                    { label: 'FULL', action: 'hydration', args: 'full' },
+                    { label: '+5', action: 'hydration', args: 5 },
+                    { label: '+1', action: 'hydration', args: 1 },
+                    { label: '-1', action: 'hydration', args: -1 },
+                    { label: '-5', action: 'hydration', args: -5 },
+                    { label: 'EMPTY', action: 'hydration', args: 'empty' }
                 ]
             },
             {
-                label: 'Absorption',
+                label: 'Stamina',
                 buttons: [
-                    { label: '+1', action: 'absorption', args: 1 },
-                    { label: '+5', action: 'absorption', args: 5 },
-                    { label: '+10', action: 'absorption', args: 10 },
-                    { label: 'FULL(5)', action: 'absorption', args: 'full' },
-                    { label: '-1', action: 'absorption', args: -1 },
-                    { label: '-5', action: 'absorption', args: -5 },
-                    { label: 'EMPTY', action: 'absorption', args: 'empty' }
+                    { label: 'FULL(100)', action: 'stamina', args: 'full' },
+                    { label: '+10', action: 'stamina', args: 10 },
+                    { label: '+5', action: 'stamina', args: 5 },
+                    { label: '+1', action: 'stamina', args: 1 },
+                    { label: '-1', action: 'stamina', args: -1 },
+                    { label: '-5', action: 'stamina', args: -5 },
+                    { label: 'EMPTY', action: 'stamina', args: 'empty' }
                 ]
             },
             {
@@ -778,9 +774,9 @@
 
     /**
      * _onDebugControlClick — handles clicks on debug control buttons.
-     * Modifies player stats (health, hunger, saturation, absorption, XP, level) with proper clamping.
+     * Modifies player stats (health, hunger, hydration, stamina, XP, level) with proper clamping.
      * @private
-     * @param {string} action - The stat to modify ('health', 'hunger', 'saturation', 'absorption', 'xpPoints', 'level').
+     * @param {string} action - The stat to modify ('health', 'hunger', 'hydration', 'stamina', 'xpPoints', 'level').
      * @param {string|number} args - The argument: a number for +/-, or 'full'/'empty'/'reset'.
      */
     Donkeycraft.DebugOverlay.prototype._onDebugControlClick = function (action, args) {
@@ -888,15 +884,15 @@
                 break;
             }
 
-            case 'saturation': {
+            case 'hydration': {
                 if (!hunger) { Donkeycraft.Logger.warn('DebugOverlay', 'Hunger system not available'); break; }
-                var currentSat = hunger.getSaturation();
+                var currentSat = hunger.getHydration();
                 var foodLevel = hunger.getFoodLevel();
-                var maxSaturation = foodLevel * 2;
+                var maxHydration = foodLevel * 2;
                 var newSat = currentSat;
 
                 if (parsedArgs === 'full') {
-                    newSat = maxSaturation;
+                    newSat = maxHydration;
                 } else if (parsedArgs === 'empty') {
                     newSat = 0;
                 } else if (typeof parsedArgs === 'number') {
@@ -904,20 +900,20 @@
                 }
 
                 // Clamp to [0, foodLevel * 2]
-                newSat = Math.max(0, Math.min(maxSaturation, Math.round(newSat * 10) / 10));
+                newSat = Math.max(0, Math.min(maxHydration, Math.round(newSat * 10) / 10));
 
-                hunger.setSaturation(newSat);
+                hunger.setHydration(newSat);
                 refreshDebug();
                 break;
             }
 
-            case 'absorption': {
+            case 'stamina': {
                 if (!hurtBox) { Donkeycraft.Logger.warn('DebugOverlay', 'HurtBox not available'); break; }
-                var currentAbs = hurtBox.getAbsorption();
+                var currentAbs = hurtBox.getStamina();
                 var newAbs = currentAbs;
 
                 if (parsedArgs === 'full') {
-                    // Default to 5 absorption hearts (10 points) when "FULL"
+                    // Default to 5 stamina hearts (10 points) when "FULL"
                     newAbs = 10;
                 } else if (parsedArgs === 'empty') {
                     newAbs = 0;
@@ -925,10 +921,10 @@
                     newAbs = currentAbs + parsedArgs;
                 }
 
-                // Clamp to >= 0 (no upper limit on absorption)
+                // Clamp to >= 0 (no upper limit on stamina)
                 newAbs = Math.max(0, Math.round(newAbs));
 
-                hurtBox.setAbsorption(newAbs);
+                hurtBox.setStamina(newAbs);
                 refreshDebug();
                 break;
             }

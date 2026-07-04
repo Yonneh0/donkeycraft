@@ -633,7 +633,7 @@
     /**
      * Check if a block at global coordinates is specifically lava (not water).
      *
-     * Used to distinguish lava from water for fall damage absorption:
+     * Used to distinguish lava from water for fall damage stamina:
      * only water absorbs/cancels fall impact; lava does NOT.
      *
      * In unloaded chunks, returns `false` — no chunk means no blocks detected.

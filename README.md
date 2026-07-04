@@ -60,7 +60,7 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Anvil** — Rename items, combine/repair with durability averaging, enchantment merging
 - **Enchanting** — 3 random enchantment options from 24 vanilla enchantments with level cost validation
 - **Potions** — 18 effects, 40 potions, brewing recipe system with awkward base potion
-- **Hunger & starvation** — Food consumption, saturation mechanics, auto-regeneration, starvation damage
+- **Hunger & starvation** — Food consumption, hydration mechanics, auto-regeneration, starvation damage
 - **Experience** — XP levels, orb pickup, spending on enchanting/anvil
 
 ### Entities & Mobs
@@ -178,7 +178,7 @@ src/
     damage.js             # Hitbox, damage, knockback, fall damage
     game-mode.js          # Survival/Creative/Spectator modes
     stats.js              # Achievements and statistics
-    hunger.js             # Food, saturation, starvation
+    hunger.js             # Food, hydration, starvation
     experience.js         # XP levels and orbs
     # Interaction
     raycast.js            # DDA voxel raycasting

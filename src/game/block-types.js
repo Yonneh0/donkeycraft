@@ -251,7 +251,7 @@
 
         /**
          * Check if a block ID is specifically lava (not water).
-         * Used to distinguish lava from water for fall damage absorption:
+         * Used to distinguish lava from water for fall damage stamina:
          * only water absorbs/cancels fall impact; lava does NOT.
          * @param {number} id - Block ID.
          * @returns {boolean}
