@@ -38,8 +38,8 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Game mode badge** — Top-right corner indicator (SURVIVAL/CREATIVE) with click-to-swap between modes
 - **Speed indicator** — Top-right button bar showing 🐌 sneak, 🚶 walk, 🏃 run states; ⚡ turbo in creative; click-to-lock crouch/run modes
 - **Debug screen (F3)** — FPS, chunk info, biome, coordinates, light levels
-- **Minimap** — Rotating 2D overhead view with compass markers, player indicator, and time-of-day dial ring
-- **Time-of-day dial** — Animated ring on minimap rim showing sun/moon pointer, day/night arc segments, hour markers, and digital clock; creative mode click opens time slider with freeze/unfreeze controls
+- **Minimap** — Rotating 2D overhead view with compass markers, player indicator, and time-of-day dial widget in the top-left corner (overlapping the rim with soft semi-transparent background)
+- **Time-of-day dial** — Small circular dial showing partial arc ring (sunrise → day → sunset), animated sun/moon pointer, star dots at night, hour tick marks, and digital clock; creative mode click opens time slider with freeze/unfreeze controls
 - **2D map view** — Full-screen panning/zooming map with chunk grid lines and player direction indicator
 
 ### Player & Movement
