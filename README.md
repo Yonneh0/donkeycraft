@@ -72,7 +72,7 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Passive mobs** — Cow, pig, sheep, chicken with wandering, fleeing, and item drops
 - **Hostile mobs** — Zombie, skeleton, spider, creeper (proximity ignition/explosion), enderman
 - **Boss mobs** — Ender Dragon and Wither with phase-based behavior (fly/land/breath/attack/death)
-- **Mob AI** — A* pathfinding on block grid, line-of-sight raycasting, chase/flee logic
+- **Mob AI** — A* pathfinding on 3D grid navmesh, configurable behavior profiles per mob type, line-of-sight DDA raycasting, chase/flee/ambush/patrol/stalk state machine, ranged and melee attack with cooldowns, health-aware flee triggers, and navmesh-based obstacle avoidance (src/game/entity-ai.js)
 - **Projectiles** — Arrows, snowballs, ender pearls, dragon breath with gravity and impact behavior
 - **Animal breeding** — Food-based breeding with love mode, cooldowns, and baby speed multiplier
 - **Mob spawning** — Chunk/light/biome checks with per-type and global mob caps
@@ -160,7 +160,7 @@ src/                # Sauce
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
     entity.js             # Base entity class with animation and bone support
-    entity-ai.js          # A* pathfinding, line-of-sight
+    entity-ai.js          # A* 3D pathfinding on navmesh, configurable behavior profiles, state machine (idle/wander/chase/flee/ambush/attack/follow/patrol/hurt), DDA line-of-sight raycasting, attack cooldowns, health-aware flee triggers, navmesh obstacle avoidance
     entity-engine.js      # Animation clips, skeletal animation, kinematics, skeleton templates
     entity-manager.js     # Entity lifecycle, spatial hash, awareness tiers
     experience.js         # XP levels and orbs
