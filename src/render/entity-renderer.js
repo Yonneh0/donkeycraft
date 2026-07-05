@@ -673,6 +673,22 @@
     };
 
     /**
+     * setGL — Set the WebGL rendering context (alternative to constructor injection).
+     * @param {WebGLRenderingContext} gl - WebGL 1.0 context.
+     */
+    Donkeycraft.EntityRenderer.prototype.setGL = function (gl) {
+        this._gl = gl || null;
+    };
+
+    /**
+     * setShaderManager — Set the shader manager reference.
+     * @param {Object} shaderManager - ShaderManager instance.
+     */
+    Donkeycraft.EntityRenderer.prototype.setShaderManager = function (shaderManager) {
+        this._shaderManager = shaderManager || null;
+    };
+
+    /**
      * setEntityManager — Set the entity manager reference for awareness queries.
      * @param {Donkeycraft.EntityManager} entityManager - EntityManager instance.
      */

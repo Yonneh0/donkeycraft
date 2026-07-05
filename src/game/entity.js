@@ -46,9 +46,10 @@
         this.type = config.type || 'generic';
 
         /** Entity position as a Vector3. */
+        var defaultY = (Donkeycraft.Config && Donkeycraft.Config.WORLD_HEIGHT) ? Donkeycraft.Config.WORLD_HEIGHT / 2 : 64;
         this._position = new Donkeycraft.Vector3(
             config.x !== undefined ? config.x : 0,
-            config.y !== undefined ? config.y : Config.WORLD_HEIGHT / 2,
+            config.y !== undefined ? config.y : defaultY,
             config.z !== undefined ? config.z : 0
         );
 

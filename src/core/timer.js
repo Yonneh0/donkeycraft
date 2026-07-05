@@ -54,6 +54,9 @@
 
         /** @type {number|null} — requestAnimationFrame handle for the main loop. */
         this._animationFrameId = null;
+
+        /** @type {number} — Total elapsed time in seconds since timer started. */
+        this._elapsed = 0;
     };
 
     /**
@@ -98,6 +101,7 @@
         if (this._running) return;
         this._running = true;
         this._lastFrameTime = performance.now();
+        this._elapsed = 0;
         var self = this;
         this._animationFrameId = requestAnimationFrame(function (ts) { self._loop(ts); });
     };
@@ -112,6 +116,15 @@
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
         }
+    };
+
+    /**
+     * Get the total elapsed time in seconds since the timer started.
+     * Returns 0 if called before `start()` or after `stop()`.
+     * @returns {number} Total elapsed time in seconds.
+     */
+    Donkeycraft.Timer.prototype.getElapsed = function () {
+        return this._elapsed || 0;
     };
 
     /**
@@ -164,6 +177,7 @@
         this._frameCount = 0;
         this._fps = 0;
         this._fpsTimer = 0;
+        this._elapsed = 0;
         this._running = false;
     };
 
@@ -188,6 +202,11 @@
         var safeDelta = Math.max(0, Math.min(rawDelta, 0.1));
         this._deltaTime = safeDelta;
         this._lastFrameTime = currentTime;
+
+        // Track total elapsed time in seconds
+        if (this._elapsed !== undefined) {
+            this._elapsed += safeDelta;
+        }
 
         // FPS counter — reset timer to zero after each update for accurate measurement
         this._frameCount++;

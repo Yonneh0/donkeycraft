@@ -1050,6 +1050,30 @@
     };
 
     /**
+     * setState — Set the current animation state by name.
+     * Delegates to the internal animation state machine.
+     * @param {string} name - State name (e.g., 'idle', 'walk').
+     * @param {number} [transitionDuration=0.2] - Transition time in seconds.
+     */
+    Donkeycraft.EntityAnimationController.prototype.setState = function (name, transitionDuration) {
+        if (this._stateMachine) {
+            this._stateMachine.setState(name, transitionDuration);
+        }
+    };
+
+    /**
+     * getState — Get the current animation state name.
+     * Delegates to the internal animation state machine.
+     * @returns {string|null} Current state name or null.
+     */
+    Donkeycraft.EntityAnimationController.prototype.getState = function () {
+        if (this._stateMachine) {
+            return this._stateMachine.getState();
+        }
+        return null;
+    };
+
+    /**
      * registerAnimations — Register all animation states for an entity type.
      * @param {Array<Donkeycraft.AnimationClip>} clips - Array of AnimationClip objects to register.
      */
@@ -1371,6 +1395,298 @@
             height: 0.25,
             width: 0.25
         }
+    };
+
+    // ============================================================
+    // EntityEngine — Game Loop Integration Layer
+    // ============================================================
+
+    /**
+     * EntityEngine — High-level API for the entity system.
+     *
+     * This class owns a shared EntityManager instance and provides a simple
+     * interface for the game loop to tick, spawn, and query entities.
+     * It acts as the bridge between game.js and the lower-level entity modules.
+     *
+     * @constructor
+     * @param {Object} [options] - Configuration options.
+     * @param {number} [options.maxEntities=1000] - Maximum number of entities.
+     * @param {number} [options.renderDistance=16] - Render distance in blocks.
+     * @param {number} [options.awarenessRadius=32] - Awareness radius for culling.
+     */
+    Donkeycraft.EntityEngine = function (options) {
+        options = options || {};
+
+        /**
+         * Maximum number of entities allowed.
+         * @type {number}
+         */
+        this.maxEntities = options.maxEntities || 1000;
+
+        /**
+         * Render distance in blocks (synced with entity renderer).
+         * @type {number}
+         */
+        this.renderDistance = options.renderDistance || 16;
+
+        /**
+         * Internal EntityManager instance.
+         * @type {Donkeycraft.EntityManager}
+         * @private
+         */
+        this._entityManager = null;
+
+        /**
+         * Timer reference for entity spawning (set by game.js).
+         * @type {Object|null}
+         * @private
+         */
+        this._timer = null;
+
+        /**
+         * Whether the engine is enabled.
+         * @type {boolean}
+         */
+        this.enabled = true;
+
+        /**
+         * Example entity spawn timer (for proof-of-concept demo).
+         * @type {number}
+         */
+        this._spawnTimer = 0;
+
+        /**
+         * Whether example entities have been spawned.
+         * @type {boolean}
+         */
+        this._examplesSpawned = false;
+    };
+
+    /**
+     * initialize — Create the internal EntityManager.
+     * Must be called before spawn() or tick().
+     * @returns {Donkeycraft.EntityManager} The created EntityManager instance.
+     */
+    Donkeycraft.EntityEngine.prototype.initialize = function () {
+        if (this._entityManager) return this._entityManager;
+
+        this._entityManager = new Donkeycraft.EntityManager();
+        this._entityManager.maxEntities = this.maxEntities;
+        return this._entityManager;
+    };
+
+    /**
+     * setTimer — Set the timer reference for entity spawning.
+     * @param {Object} timer - Timer object with getElapsed() method.
+     */
+    Donkeycraft.EntityEngine.prototype.setTimer = function (timer) {
+        this._timer = timer || null;
+    };
+
+    /**
+     * setBlockIdFunction — Set the block ID query callback used for ground scanning during example spawning.
+     * @param {Function} getBlockId - Callback(x, y, z) → blockId.
+     */
+    Donkeycraft.EntityEngine.prototype.setBlockIdFunction = function (getBlockId) {
+        this._getBlockIdFn = getBlockId;
+    };
+
+    /**
+     * setEventBus — Set the event bus for entity lifecycle events.
+     * @param {Object} eventBus - EventBus instance.
+     */
+    Donkeycraft.EntityEngine.prototype.setEventBus = function (eventBus) {
+        if (!this.initialize()) return;
+        // The EntityManager will use the global Donkeycraft.EventBus if available
+        // This is a no-op since EntityManager accesses Donkeycraft.EventBus directly
+    };
+
+    /**
+     * setBlockQuery — Set the block ID query callback for AI navigation.
+     * @param {Function} getBlockId - Callback(x, y, z) → blockId.
+     */
+    Donkeycraft.EntityEngine.prototype.setBlockQuery = function (getBlockId) {
+        if (!this.initialize()) return;
+        this._entityManager.setBlockQuery(getBlockId);
+    };
+
+    /**
+     * setPlayerEntity — Set the player entity reference for AI targeting.
+     * @param {Donkeycraft.Entity} player - The player entity.
+     */
+    Donkeycraft.EntityEngine.prototype.setPlayerEntity = function (player) {
+        if (!this.initialize()) return;
+        this._entityManager.setPlayerEntity(player);
+    };
+
+    /**
+     * getEntityManager — Get the internal EntityManager instance.
+     * @returns {Donkeycraft.EntityManager} EntityManager.
+     */
+    Donkeycraft.EntityEngine.prototype.getEntityManager = function () {
+        return this.initialize();
+    };
+
+    /**
+     * spawn — Spawn a new entity.
+     * @param {Donkeycraft.Entity} entity - Entity to spawn.
+     * @returns {number|null} Entity ID, or null if spawn failed.
+     */
+    Donkeycraft.EntityEngine.prototype.spawn = function (entity) {
+        if (!this.initialize()) return null;
+        return this._entityManager.spawn(entity);
+    };
+
+    /**
+     * getEntity — Get an entity by ID.
+     * @param {number} id - Entity ID.
+     * @returns {Donkeycraft.Entity|null} The entity, or null.
+     */
+    Donkeycraft.EntityEngine.prototype.getEntity = function (id) {
+        if (!this.initialize()) return null;
+        return this._entityManager.getEntity(id);
+    };
+
+    /**
+     * tick — Tick all entities and update the EntityManager.
+     *
+     * Calls entityManager.tick() with player position for awareness updates
+     * and a ground detection callback that queries the world.
+     *
+     * @param {number} dt - Delta time in seconds.
+     * @param {Function} [groundCheck] - Optional ground detection callback.
+     */
+    Donkeycraft.EntityEngine.prototype.tick = function (dt, groundCheck) {
+        if (!this.enabled || !this._entityManager) return;
+
+        // Tick the entity manager — this handles awareness updates, spatial hash, and entity ticks
+        try {
+            this._entityManager.tick(dt);
+        } catch (e) {
+            if (typeof console !== 'undefined' && typeof console.error === 'function') {
+                console.error('[EntityEngine] EntityManager tick error:', e);
+            }
+        }
+
+        // Auto-spawn example entities on first tick (proof-of-concept demo)
+        this._spawnExamples(dt, groundCheck);
+    };
+
+    /**
+     * _spawnExamples — Spawn proof-of-concept example entities near the player.
+     * @private
+     * @param {number} dt - Delta time.
+     * @param {Function} [groundCheck] - Ground detection callback.
+     */
+    Donkeycraft.EntityEngine.prototype._spawnExamples = function (dt, groundCheck) {
+        if (this._examplesSpawned || !this._entityManager) return;
+
+        // Spawn after ~2 seconds of gameplay
+        var elapsed = this._timer ? this._timer.getElapsed() : 0;
+        if (elapsed < 2.0) return;
+
+        this._examplesSpawned = true;
+
+        // Get player position for offset-based spawning
+        var entityManager = this._entityManager;
+        var entities = entityManager.getAllEntities();
+        var playerPos = null;
+        for (var p = 0; p < entities.length; p++) {
+            if (entities[p].type === 'player') {
+                playerPos = entities[p].getPosition();
+                break;
+            }
+        }
+        // Fallback to origin if no player found
+        var worldHeight = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 64;
+        if (!playerPos) {
+            playerPos = { x: 0, y: worldHeight / 2, z: 0 };
+        }
+
+        // Define example entities to spawn near the player
+        var examples = [
+            { type: 'cow', offsetX: 5, offsetY: 0, offsetZ: 3, anim: 'quadrupedWalk' },
+            { type: 'chicken', offsetX: -4, offsetY: 0, offsetZ: 5, anim: 'chickenBob' },
+            { type: 'zombie', offsetX: 7, offsetY: 0, offsetZ: -3, anim: 'walk' },
+            { type: 'donkey', offsetX: -6, offsetY: 0, offsetZ: -4, anim: 'quadrupedWalk' },
+            { type: 'sign_post', offsetX: 3, offsetY: 0, offsetZ: -7, anim: null },
+            { type: 'door', offsetX: -3, offsetY: 0, offsetZ: 8, anim: null }
+        ];
+
+        var self = this;
+        for (var i = 0; i < examples.length; i++) {
+            (function () {
+                var ex = examples[i];
+
+                // Calculate spawn position relative to player
+                var spawnX = Math.floor(playerPos.x + ex.offsetX);
+                var spawnY = Math.floor(playerPos.y + ex.offsetY);
+                var spawnZ = Math.floor(playerPos.z + ex.offsetZ);
+
+                // Find ground level at spawn position using downward scan
+                var groundY = null;
+                if (self._getBlockIdFn) {
+                    for (var gy = spawnY + 20; gy >= 0; gy--) {
+                        var bid = self._getBlockIdFn(spawnX, gy, spawnZ);
+                        if (bid && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(bid)) {
+                            groundY = gy + 1;
+                            break;
+                        }
+                    }
+                }
+                // Fallback: place above world height / 2
+                if (groundY === null) {
+                    groundY = worldHeight - 10;
+                }
+
+                // Create entity with proper position
+                var entity = new Donkeycraft.Entity({
+                    type: ex.type,
+                    x: spawnX + 0.5,
+                    y: groundY,
+                    z: spawnZ + 0.5
+                });
+
+                var id = entityManager.spawn(entity);
+
+                if (id && groundCheck) {
+                    // Set ground detection for physics
+                    entity.setGroundCheck(groundCheck);
+                }
+
+                // Play initial animation via the animation controller
+                if (ex.anim && entity._animationController) {
+                    entity._animationController.playAnimation(ex.anim);
+                }
+
+                if (typeof console !== 'undefined' && typeof console.log === 'function') {
+                    console.log('[EntityEngine] Spawned ' + ex.type + ' at (' + spawnX + ',' + groundY + ',' + spawnZ + ') id=' + id);
+                }
+            })();
+        }
+    };
+
+    /**
+     * clear — Destroy all entities and reset state.
+     */
+    Donkeycraft.EntityEngine.prototype.clear = function () {
+        if (this._entityManager) {
+            this._entityManager.clear();
+        }
+        this._examplesSpawned = false;
+        this._spawnTimer = 0;
+    };
+
+    /**
+     * destroy — Clean up and free resources.
+     */
+    Donkeycraft.EntityEngine.prototype.destroy = function () {
+        if (this._entityManager) {
+            this._entityManager.destroy();
+            this._entityManager = null;
+        }
+        this._timer = null;
+        this.enabled = false;
     };
 
 })();
