@@ -76,3 +76,9 @@
     color: #4a9;
     font-weight: bold;
 }
+
+/* Placeholder text for empty slots */
+.dk-slot-placeholder {
+    color: #aaa;
+    font-size: 11px;
+}
