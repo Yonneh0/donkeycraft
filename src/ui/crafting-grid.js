@@ -47,16 +47,14 @@
     Donkeycraft.CraftingGrid.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-crafting-grid';
-        this._container.style.cssText = 'display: flex; align-items: center; gap: 16px; padding: 16px; background: rgba(30,30,30,0.95); border-radius: 6px;';
 
         // Grid container
         var gridDiv = document.createElement('div');
-        gridDiv.style.cssText = 'display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); gap: 2px;';
+        gridDiv.className = 'dk-crafting-grid-inner';
 
         for (var i = 0; i < 9; i++) {
             var slotEl = document.createElement('div');
             slotEl.className = 'dk-crafting-slot';
-            slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,100,100,0.6); border: 2px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
             slotEl.dataset.slotIndex = i;
 
             var itemEl = document.createElement('span');
@@ -73,13 +71,12 @@
 
         // Arrow between grid and result
         var arrow = document.createElement('div');
-        arrow.style.cssText = 'font-size: 24px; color: #aaa;';
+        arrow.className = 'dk-crafting-arrow';
         arrow.textContent = '→';
 
         // Result slot
         this._resultElement = document.createElement('div');
         this._resultElement.className = 'dk-crafting-result';
-        this._resultElement.style.cssText = 'width: 56px; height: 56px; background: rgba(80,80,80,0.8); border: 2px solid #888; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 28px; cursor: pointer;';
         this._resultElement.innerHTML = '<span class="dk-slot-item"></span>';
 
         this._resultElement.addEventListener('mousedown', (function () {
@@ -366,10 +363,10 @@
 
         if (this._resultStack && !this._resultStack.isEmpty()) {
             itemEl.textContent = this._getItemDisplayChar(this._resultStack.getItemId());
-            this._resultElement.style.borderColor = '#4a9';
+            this._resultElement.className = 'dk-crafting-result dk-crafting-result-valid';
         } else {
             itemEl.textContent = '';
-            this._resultElement.style.borderColor = '#888';
+            this._resultElement.className = 'dk-crafting-result';
         }
     };
 

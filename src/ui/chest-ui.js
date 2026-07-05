@@ -73,11 +73,10 @@
     Donkeycraft.ChestUI.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-chest-ui';
-        this._container.style.cssText = 'display: flex; flex-direction: column; padding: 16px; background: rgba(40,35,30,0.95); border-radius: 6px; user-select: none;';
 
         // Title bar
         var titleEl = document.createElement('div');
-        titleEl.style.cssText = 'font-size: 16px; font-weight: bold; color: #fff; text-align: center; margin-bottom: 12px; pointer-events: none;';
+        titleEl.className = 'dk-chest-title';
         titleEl.textContent = this._doubleChest ? 'Double Chest' : 'Chest';
         this._container.appendChild(titleEl);
         this._titleEl = titleEl;
@@ -87,24 +86,24 @@
         var cols = 9;
 
         this._gridEl = document.createElement('div');
-        this._gridEl.style.cssText = 'display: grid; grid-template-columns: repeat(' + cols + ', 48px); gap: 2px; justify-content: center;';
+        this._gridEl.className = 'dk-chest-grid';
+        this._gridEl.style.gridTemplateColumns = 'repeat(' + cols + ', 48px)';
 
         for (var i = 0; i < this._slotCount; i++) {
             var slotEl = document.createElement('div');
             slotEl.className = 'dk-chest-slot';
-            slotEl.style.cssText = 'width: 48px; height: 48px; background: rgba(100,90,70,0.6); border: 2px solid #776655; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; position: relative;';
             slotEl.dataset.slotIndex = i;
 
             // Item display span
             var itemEl = document.createElement('span');
             itemEl.className = 'dk-slot-item';
-            itemEl.style.cssText = 'pointer-events: none; line-height: 1;';
+            // class and styles from CSS already applied via dk-chest-slot-item
             slotEl.appendChild(itemEl);
 
             // Count overlay
             var countEl = document.createElement('span');
             countEl.className = 'dk-slot-count';
-            countEl.style.cssText = 'position: absolute; bottom: 1px; left: 3px; font-size: 10px; color: #fff; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: none; display: none;';
+            // class and styles from CSS already applied via dk-slot-count
             slotEl.appendChild(countEl);
 
             // Left-click handler — take item or start drag

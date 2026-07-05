@@ -51,55 +51,51 @@
     Donkeycraft.AnvilUI.prototype._buildDOM = function () {
         var self = this;
         this._container.className = 'dk-anvil-ui';
-        this._container.style.cssText = 'display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(35,35,45,0.95); border-radius: 6px;';
 
         // Left input slot
         this._leftSlotEl = document.createElement('div');
         this._leftSlotEl.className = 'dk-anvil-input';
-        this._leftSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,100,0.8); border: 2px solid #665588; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
-        this._leftSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Item</span>';
+        this._leftSlotEl.innerHTML = '<span class="dk-anvil-slot-label">Item</span>';
         this._container.appendChild(this._leftSlotEl);
 
         // Arrow
         var arrow1 = document.createElement('div');
-        arrow1.style.cssText = 'font-size: 20px; color: #aaa;';
+        arrow1.className = 'dk-anvil-arrow dk-anvil-plus';
         arrow1.textContent = '+';
         this._container.appendChild(arrow1);
 
         // Right input slot
         this._rightSlotEl = document.createElement('div');
         this._rightSlotEl.className = 'dk-anvil-input';
-        this._rightSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,100,0.8); border: 2px solid #665588; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
-        this._rightSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Item</span>';
+        this._rightSlotEl.innerHTML = '<span class="dk-anvil-slot-label">Item</span>';
         this._container.appendChild(this._rightSlotEl);
 
         // Arrow
         var arrow2 = document.createElement('div');
-        arrow2.style.cssText = 'font-size: 24px; color: #aaa;';
+        arrow2.className = 'dk-anvil-arrow dk-anvil-arrow-right';
         arrow2.textContent = '→';
         this._container.appendChild(arrow2);
 
         // Output slot
         this._outputSlotEl = document.createElement('div');
         this._outputSlotEl.className = 'dk-anvil-output';
-        this._outputSlotEl.style.cssText = 'width: 64px; height: 64px; background: rgba(80,70,100,0.8); border: 2px solid #8866aa; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 28px;';
-        this._outputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Result</span>';
+        this._outputSlotEl.innerHTML = '<span class="dk-anvil-slot-label">Result</span>';
         this._container.appendChild(this._outputSlotEl);
 
         // Right panel: rename + price
         var rightPanel = document.createElement('div');
-        rightPanel.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-left: 16px;';
+        rightPanel.className = 'dk-anvil-right-panel';
 
         // Rename input
         var renameLabel = document.createElement('div');
-        renameLabel.style.cssText = 'font-size: 12px; color: #aaa;';
+        renameLabel.className = 'dk-anvil-rename-label';
         renameLabel.textContent = 'Rename Item:';
         rightPanel.appendChild(renameLabel);
 
         this._renameInputEl = document.createElement('input');
         this._renameInputEl.type = 'text';
         this._renameInputEl.placeholder = 'New name...';
-        this._renameInputEl.style.cssText = 'width: 160px; padding: 6px 8px; background: #222; border: 1px solid #555; color: #ccc; border-radius: 3px; font-size: 12px;';
+        this._renameInputEl.className = 'dk-anvil-rename-input';
 
         this._renameInputEl.addEventListener('input', (function () {
             return function () { self._onRenameChange(); };
@@ -109,7 +105,7 @@
 
         // Price display
         this._priceEl = document.createElement('div');
-        this._priceEl.style.cssText = 'font-size: 14px; color: #4a9; font-weight: bold;';
+        this._priceEl.className = 'dk-anvil-price';
         this._priceEl.textContent = 'Level 0';
         rightPanel.appendChild(this._priceEl);
 
