@@ -904,7 +904,7 @@
                 // Clamp to [0, maxHealth] and apply directly to Player
                 newHealth = Math.max(0, Math.min(maxHealth, Math.round(newHealth)));
 
-                player.heal(newHealth - currentHealth); // heal() handles both healing and damage
+                player.adjustHealth(newHealth - currentHealth); // adjustHealth() handles both healing and damage
 
                 refreshDebug();
                 break;
