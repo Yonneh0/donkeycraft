@@ -59,6 +59,16 @@
 
         /** Cached ground check function reference to avoid redundant injection. */
         this._groundCheckRef = null;
+
+        // AI Navigation System
+        /** Shared NavMesh instance for entity pathfinding. */
+        this._navMesh = null;
+
+        /** Block ID query callback for world queries. */
+        this._getBlockIdFn = null;
+
+        /** Player entity reference for AI targeting. */
+        this._playerEntity = null;
     };
 
     /**
@@ -274,7 +284,146 @@
     };
 
     /**
-     * spawn — Spawn a new entity.
+     * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
+     * Skips injection if the same function was already injected last tick.
+     * @private
+     * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
+     */
+    Donkeycraft.EntityManager.prototype._injectGroundCheck = function (groundCheckFn) {
+        if (!groundCheckFn || typeof groundCheckFn !== 'function') return;
+        if (groundCheckFn === this._groundCheckRef) return;
+
+        var entities = this.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            if (entity.setGroundCheck) {
+                entity.setGroundCheck(groundCheckFn);
+            }
+        }
+
+        this._groundCheckRef = groundCheckFn;
+    };
+
+    /**
+     * _injectWorldQueries — Inject world query callbacks into all AI-enabled entities.
+     * Sets up navmesh, block queries, and target references for autonomous behavior.
+     * @private
+     */
+    Donkeycraft.EntityManager.prototype._injectWorldQueries = function () {
+        // Initialize shared NavMesh if not already created
+        if (!this._navMesh && Donkeycraft.NavMesh) {
+            this._navMesh = new Donkeycraft.NavMesh(1);
+        }
+
+        var entities = this.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+
+            // Skip player entities
+            if (entity.type === 'player') continue;
+
+            // Set navmesh reference
+            if (entity.setAINavMesh && this._navMesh) {
+                entity.setAINavMesh(this._navMesh);
+            }
+
+            // Set block query callback for navigation
+            if (entity.setAIBlockQuery && this._getBlockIdFn) {
+                entity.setAIBlockQuery(this._getBlockIdFn);
+            }
+
+            // Set player as default target for hostile entities
+            if (entity.setAITarget && this._playerEntity && this._playerEntity.isAlive()) {
+                var profile = entity.profile || {};
+                var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
+                var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
+
+                // Hostile entities (zombie, skeleton, spider, creeper) target the player
+                if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
+                    if (!entity.getAITarget || !entity.getAITarget()) {
+                        entity.setAITarget(this._playerEntity);
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     * getEntity — Get an entity by ID.
+     * @param {number} id - Entity ID.
+     * @returns {Donkeycraft.Entity|null} The entity, or null if not found.
+     */
+    Donkeycraft.EntityManager.prototype.getEntity = function (id) {
+        return this._entities[id] || null;
+    };
+
+    /**
+     * setBlockQuery — Set the world block ID query callback for AI navigation.
+     * This callback is used by the NavMesh to determine block walkability.
+     * @param {Function} getBlockId - Callback(x, y, z) → blockId (0 = air).
+     */
+    Donkeycraft.EntityManager.prototype.setBlockQuery = function (getBlockId) {
+        this._getBlockIdFn = getBlockId;
+
+        // Update shared navmesh if it exists
+        if (this._navMesh) {
+            this._navMesh.setBlockQuery(getBlockId);
+        }
+
+        // Update all entities with the new query
+        var entities = this.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            if (entity.setAIBlockQuery) {
+                entity.setAIBlockQuery(getBlockId);
+            }
+        }
+    };
+
+    /**
+     * setPlayerEntity — Set the player entity reference for AI targeting.
+     * Hostile mobs will automatically target the player.
+     * @param {Donkeycraft.Entity} player - The player entity.
+     */
+    Donkeycraft.EntityManager.prototype.setPlayerEntity = function (player) {
+        this._playerEntity = player || null;
+
+        // Update existing entities to target the new player
+        if (player && player.isAlive()) {
+            var entities = this.getAllEntities();
+            for (var i = 0; i < entities.length; i++) {
+                var entity = entities[i];
+                if (entity.type === 'player') continue;
+
+                var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
+                var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
+
+                // Hostile entities target the player
+                if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
+                    if (entity.setAITarget) {
+                        entity.setAITarget(player);
+                    }
+                }
+            }
+        }
+    };
+
+    /**
+     * getNavMesh — Get the shared navigation mesh for entity pathfinding.
+     * @returns {Donkeycraft.NavMesh|null} NavMesh instance or null.
+     */
+    Donkeycraft.EntityManager.prototype.getNavMesh = function () {
+        if (!this._navMesh && Donkeycraft.NavMesh) {
+            this._navMesh = new Donkeycraft.NavMesh(1);
+            if (this._getBlockIdFn) {
+                this._navMesh.setBlockQuery(this._getBlockIdFn);
+            }
+        }
+        return this._navMesh;
+    };
+
+    /**
+     * spawn — Spawn a new entity with AI navigation wiring.
      * @param {Donkeycraft.Entity} entity - Entity to spawn.
      * @returns {number|null} Entity ID, or null if spawn failed.
      */
@@ -303,6 +452,9 @@
             this._updateSpatialHash(id, pos);
         }
 
+        // Wire up AI navigation for the new entity
+        this._spawnAIIntegration(entity);
+
         if (EventBus) {
             try {
                 EventBus.emitSafe('entity:spawn', {
@@ -319,76 +471,32 @@
     };
 
     /**
-     * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
-     * Skips injection if the same function was already injected last tick.
+     * _spawnAIIntegration — Wire up AI navigation for a newly spawned entity.
      * @private
-     * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
+     * @param {Donkeycraft.Entity} entity - The spawned entity.
      */
-    Donkeycraft.EntityManager.prototype._injectGroundCheck = function (groundCheckFn) {
-        if (!groundCheckFn || typeof groundCheckFn !== 'function') return;
-        if (groundCheckFn === this._groundCheckRef) return;
-
-        var entities = this.getAllEntities();
-        for (var i = 0; i < entities.length; i++) {
-            var entity = entities[i];
-            if (entity.setGroundCheck) {
-                entity.setGroundCheck(groundCheckFn);
-            }
+    Donkeycraft.EntityManager.prototype._spawnAIIntegration = function (entity) {
+        // Initialize shared navmesh if needed
+        if (!this._navMesh && Donkeycraft.NavMesh) {
+            this._navMesh = new Donkeycraft.NavMesh(1);
         }
 
-        this._groundCheckRef = groundCheckFn;
-    };
-
-    /**
-     * getEntity — Get an entity by ID.
-     * @param {number} id - Entity ID.
-     * @returns {Donkeycraft.Entity|null} The entity, or null if not found.
-     */
-    Donkeycraft.EntityManager.prototype.getEntity = function (id) {
-        return this._entities[id] || null;
-    };
-
-    /**
-     * despawn — Remove an entity by ID from all indexes and mark as despawned.
-     * @param {number} id - Entity ID to despawn.
-     */
-    Donkeycraft.EntityManager.prototype.despawn = function (id) {
-        if (!this._entities[id]) return;
-
-        var entity = this._entities[id];
-        var entityId = parseInt(id, 10);
-        entity.despawn();
-
-        var type = entity.type;
-        if (this._byType[type]) {
-            var idx = this._byType[type].indexOf(entity);
-            if (idx !== -1) {
-                this._byType[type].splice(idx, 1);
-            }
-            if (this._byType[type].length === 0) {
-                delete this._byType[type];
-            }
+        // Set navmesh reference
+        if (entity.setAINavMesh && this._navMesh) {
+            entity.setAINavMesh(this._navMesh);
         }
 
-        this._removeFromSpatialHash(entityId);
-        delete this._entityAwareness[entityId];
+        // Set block query callback for navigation
+        if (entity.setAIBlockQuery && this._getBlockIdFn) {
+            entity.setAIBlockQuery(this._getBlockIdFn);
+        }
 
-        var nearIdx = this._nearEntities.indexOf(entityId);
-        if (nearIdx !== -1) this._nearEntities.splice(nearIdx, 1);
-        var farIdx = this._farEntities.indexOf(entityId);
-        if (farIdx !== -1) this._farEntities.splice(farIdx, 1);
-
-        delete this._entities[id];
-
-        if (EventBus) {
-            try {
-                EventBus.emitSafe('entity:despawn', {
-                    entity: entity,
-                    id: entityId,
-                    type: type
-                });
-            } catch (e) {
-                // EventBus may not be available in tests
+        // Set player target for hostile entities
+        if (entity.setAITarget && this._playerEntity && this._playerEntity.isAlive()) {
+            var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
+            var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
+            if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
+                entity.setAITarget(this._playerEntity);
             }
         }
     };
@@ -551,7 +659,7 @@
 
     /**
      * tick — Tick all alive entities.
-     * Updates spatial hash and awareness table based on player position.
+     * Updates spatial hash, awareness table, and AI navigation based on player position.
      * @param {number} deltaTime - Time since last tick in seconds.
      * @param {number} [playerX=0] - Player X coordinate for awareness tier calculation.
      * @param {number} [playerY=64] - Player Y coordinate for awareness tier calculation.
@@ -566,6 +674,9 @@
         if (groundCheckFn) {
             this._injectGroundCheck(groundCheckFn);
         }
+
+        // Inject world queries for AI navigation
+        this._injectWorldQueries();
 
         var toDespawn = [];
 

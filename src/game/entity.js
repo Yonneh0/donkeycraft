@@ -104,7 +104,15 @@
         /** Entity unique ID (assigned by EntityManager). */
         this._id = 0;
 
+        // AI Component System
+        /** AI component for autonomous behavior. */
+        this._aiComponent = null;
+
+        /** Whether AI is enabled for this entity. */
+        this._aiEnabled = false;
+
         this._initAnimationSystem();
+        this._initAIComponent();
     };
 
     /**
@@ -166,6 +174,32 @@
             if (clips.length > 0) {
                 this._animationController.setState('idle');
             }
+        }
+    };
+
+    /**
+     * _initAIComponent — Initialize the AI component for this entity.
+     * @private
+     */
+    Donkeycraft.Entity.prototype._initAIComponent = function () {
+        if (!Donkeycraft.AIComponent) return;
+
+        this._aiComponent = new Donkeycraft.AIComponent(this);
+
+        // Set default profile based on entity type
+        var profileName = this.type;
+        if (Donkeycraft.AIBehaviorProfiles[profileName]) {
+            this._aiComponent.setProfile(profileName);
+        } else if (Donkeycraft.AIBehaviorProfiles.generic) {
+            this._aiComponent.setProfile('generic');
+        }
+
+        // Enable AI by default for non-player entities
+        if (this.type !== 'player') {
+            this._aiEnabled = true;
+            this._aiComponent.enable();
+        } else {
+            this._aiComponent.disable();
         }
     };
 
@@ -498,20 +532,126 @@
     };
 
     // ============================================================
+    // AI API
+    // ============================================================
+
+    /**
+     * getAIComponent — Get the AI component for this entity.
+     * @returns {Donkeycraft.AIComponent|null} AI component or null.
+     */
+    Donkeycraft.Entity.prototype.getAIComponent = function () {
+        return this._aiComponent;
+    };
+
+    /**
+     * enableAI — Enable autonomous AI behavior for this entity.
+     */
+    Donkeycraft.Entity.prototype.enableAI = function () {
+        if (this._destroyed) return;
+        this._aiEnabled = true;
+        if (this._aiComponent) {
+            this._aiComponent.enable();
+        }
+    };
+
+    /**
+     * disableAI — Disable autonomous AI behavior for this entity.
+     */
+    Donkeycraft.Entity.prototype.disableAI = function () {
+        if (this._destroyed) return;
+        this._aiEnabled = false;
+        if (this._aiComponent) {
+            this._aiComponent.disable();
+        }
+    };
+
+    /**
+     * isAIEnabled — Check if AI is enabled for this entity.
+     * @returns {boolean} True if AI is enabled.
+     */
+    Donkeycraft.Entity.prototype.isAIEnabled = function () {
+        return this._aiEnabled && this._aiComponent && this._aiComponent.enabled;
+    };
+
+    /**
+     * setAIProfile — Set the behavior profile for this entity's AI.
+     * @param {string|Object} profile - Profile name (e.g., 'zombie', 'cow') or custom profile object.
+     */
+    Donkeycraft.Entity.prototype.setAIProfile = function (profile) {
+        if (!this._aiComponent || this._destroyed) return;
+        this._aiComponent.setProfile(profile);
+    };
+
+    /**
+     * setAITarget — Set the current AI target for this entity.
+     * @param {Donkeycraft.Entity|null} target - Target entity or null to clear.
+     */
+    Donkeycraft.Entity.prototype.setAITarget = function (target) {
+        if (!this._aiComponent || this._destroyed) return;
+        if (target) {
+            this._aiComponent.setTarget(target);
+        } else {
+            this._aiComponent.clearTarget();
+        }
+    };
+
+    /**
+     * getAITarget — Get the current AI target.
+     * @returns {Donkeycraft.Entity|null} Target entity or null.
+     */
+    Donkeycraft.Entity.prototype.getAITarget = function () {
+        if (!this._aiComponent) return null;
+        return this._aiComponent.target;
+    };
+
+    /**
+     * getAIState — Get the current AI state name.
+     * @returns {string|null} Current AI state or null.
+     */
+    Donkeycraft.Entity.prototype.getAIState = function () {
+        if (!this._aiComponent) return null;
+        return this._aiComponent.stateMachine.getState();
+    };
+
+    /**
+     * setAINavMesh — Set the navigation mesh for AI pathfinding.
+     * @param {Donkeycraft.NavMesh|null} navMesh - NavMesh instance or null.
+     */
+    Donkeycraft.Entity.prototype.setAINavMesh = function (navMesh) {
+        if (!this._aiComponent || this._destroyed) return;
+        this._aiComponent.setNavMesh(navMesh);
+    };
+
+    /**
+     * setAIBlockQuery — Set the block ID query callback for navigation.
+     * @param {Function|null} getBlockId - Callback(x, y, z) → blockId or null.
+     */
+    Donkeycraft.Entity.prototype.setAIBlockQuery = function (getBlockId) {
+        if (!this._aiComponent || this._destroyed) return;
+        this._aiComponent.setBlockQuery(getBlockId);
+    };
+
+    // ============================================================
     // Tick & Lifecycle API
     // ============================================================
 
     /**
      * tick — Called every game tick to update entity state.
-     * Update flow: 1) Update animation controller, 2) Apply velocity to position,
-     * 3) Notify tick subscribers.
+     * Update flow: 1) Update AI component, 2) Update animation controller,
+     * 3) Apply velocity to position, 4) Notify tick subscribers.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function (deltaTime) {
         if (this._destroyed || !this._position) return;
 
+        // 1) Update AI component first (it may modify velocity)
+        if (this._aiEnabled && this._aiComponent && this._aiComponent.enabled) {
+            this._aiComponent.tick(deltaTime);
+        }
+
         var groundCheck = this._groundCheck;
 
+        // 2) Update animation controller
         if (this._animationController) {
             var result = this._animationController.tick(deltaTime, groundCheck);
             var kinematics = result.kinematics;
@@ -522,10 +662,12 @@
             }
         }
 
+        // 3) Apply velocity to position
         this._position.x += this._velocity.x * deltaTime;
         this._position.y += this._velocity.y * deltaTime;
         this._position.z += this._velocity.z * deltaTime;
 
+        // 4) Notify tick subscribers
         for (var i = 0; i < this._subscribers.length; i++) {
             try {
                 this._subscribers[i](deltaTime);
@@ -617,6 +759,13 @@
         this._groundCheck = null;
         this.bones = null;
         this._animationController = null;
+
+        // Clean up AI component
+        if (this._aiComponent) {
+            this._aiComponent.destroy();
+            this._aiComponent = null;
+        }
+        this._aiEnabled = false;
     };
 
 })();
