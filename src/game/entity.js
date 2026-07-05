@@ -221,23 +221,10 @@
             }
         }
 
-        // If no skeleton but still want basic idle animation, create minimal system
-        if (!this.skeleton && !this._animationController) {
-            // Static entity — no animation needed.
-            // Create a single root bone with explicit zero vectors.
+        // Static entity without a skeleton — no animation system needed.
+        if (!this.skeleton) {
             this.useAnimation = false;
-            var BoneDef = Donkeycraft.BoneDefinition || function (name, config) {
-                this.name = name;
-                this.parent = config && config.parent ? config.parent : null;
-                this.offset = config && config.offset ? config.offset : new (Donkeycraft.Vector3 || function () {})();
-                this.pivot = config && config.pivot ? config.pivot : new (Donkeycraft.Vector3 || function () {})();
-            };
-            var Vec3 = Donkeycraft.Vector3 || function (x, y, z) { this.x = x || 0; this.y = y || 0; this.z = z || 0; };
-            Vec3.prototype.set = function (x, y, z) { this.x = x; this.y = y; this.z = z; };
-            this.bones = [new BoneDef('root', {
-                offset: new Vec3(0, 0, 0),
-                pivot: new Vec3(0, 0, 0)
-            })];
+            this.bones = null;
         }
     };
 
@@ -272,21 +259,6 @@
             // Set initial animation state to idle
             if (clips.length > 0) {
                 this._animationController.setState('idle');
-            }
-        }
-    };
-
-    /**
-     * _notifyTick — Internal tick notification for subscribers.
-     * @param {number} deltaTime - Time since last tick.
-     * @private
-     */
-    Donkeycraft.Entity.prototype._notifyTick = function (deltaTime) {
-        for (var i = 0; i < this._subscribers.length; i++) {
-            try {
-                this._subscribers[i](deltaTime);
-            } catch (e) {
-                // Error isolation
             }
         }
     };
@@ -354,6 +326,7 @@
     /**
      * Set the entity's rotation.
      * Yaw is normalized to [0, 2π). Pitch is clamped to [-π/2, π/2].
+     * Uses a built-in clamp fallback if Donkeycraft.clamp is not available.
      * @param {number} yaw - Yaw angle in radians.
      * @param {number} pitch - Pitch angle in radians.
      */
@@ -361,7 +334,11 @@
         if (this._destroyed) return;
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
-        this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
+        // Clamp pitch to [-π/2, π/2] with fallback if Donkeycraft.clamp is unavailable.
+        var clampFn = typeof Donkeycraft.clamp === 'function' ? Donkeycraft.clamp : null;
+        this._rotation.pitch = clampFn
+            ? clampFn(pitch, -Math.PI / 2, Math.PI / 2)
+            : Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
     };
 
     /**
@@ -375,6 +352,14 @@
     Donkeycraft.Entity.prototype.setGroundCheck = function (groundCheck) {
         if (this._destroyed) return;
         this._groundCheck = typeof groundCheck === 'function' ? groundCheck : null;
+    };
+
+    /**
+     * getGroundCheck — Get the current ground detection callback.
+     * @returns {Function|null} Ground check function or null.
+     */
+    Donkeycraft.Entity.prototype.getGroundCheck = function () {
+        return this._groundCheck;
     };
 
     // ============================================================
@@ -489,7 +474,10 @@
      */
     Donkeycraft.Entity.prototype.setHealth = function (health) {
         if (this._destroyed) return;
-        this.health = Math.floor(Donkeycraft.clamp(health, 0, this.maxHealth));
+        var clampFn = typeof Donkeycraft.clamp === 'function' ? Donkeycraft.clamp : null;
+        this.health = clampFn
+            ? Math.floor(clampFn(health, 0, this.maxHealth))
+            : Math.floor(Math.max(0, Math.min(this.maxHealth, health)));
         if (this.health <= 0) {
             this.setAlive(false);
         }
@@ -512,7 +500,11 @@
             return 0;
         }
 
-        this.health = Math.floor(Donkeycraft.clamp(this.health - amount, 0, this.maxHealth));
+        var clampFn = typeof Donkeycraft.clamp === 'function' ? Donkeycraft.clamp : null;
+        this.health = clampFn
+            ? Math.floor(clampFn(this.health - amount, 0, this.maxHealth))
+            : Math.floor(Math.max(0, Math.min(this.maxHealth, this.health - amount)));
+
         if (this.health <= 0) {
             this.setAlive(false);
         }
@@ -632,9 +624,12 @@
     // ============================================================
 
     /**
-     * Tick method — called every game tick. Override for entity-specific logic.
-     * Updates animation controller (if available), applies velocity to position,
-     * and notifies tick subscribers.
+     * tick — Called every game tick to update entity state.
+     *
+     * Update flow:
+     * 1. Update animation controller (if available), which synchronizes velocity from kinematics
+     * 2. Apply velocity to position using semi-implicit Euler integration
+     * 3. Notify tick subscribers with error isolation
      *
      * Velocity handling:
      * - If an EntityAnimationController exists, its kinematics module computes

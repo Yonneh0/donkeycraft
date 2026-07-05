@@ -9,6 +9,81 @@
     if (!Donkeycraft) return;
 
     // ============================================================
+    // Constants — Animation and physics tuning parameters
+    // ============================================================
+
+    /**
+     * Default Catmull-Rom tension parameter for spline interpolation.
+     * 0 = loose curves, 0.5 = standard Catmull-Rom, 1 = tight curves.
+     * @constant {number}
+     * @default 0.5
+     */
+    var CATMULL_ROM_TENSION = 0.5;
+
+    /**
+     * Default animation transition duration in seconds.
+     * @constant {number}
+     * @default 0.2
+     */
+    var DEFAULT_TRANSITION_DURATION = 0.2;
+
+    /**
+     * Default animation playback speed multiplier.
+     * @constant {number}
+     * @default 1.0
+     */
+    var DEFAULT_ANIMATION_SPEED = 1.0;
+
+    /**
+     * Minimum delta time for physics updates (prevents physics explosions on tab switch).
+     * @constant {number}
+     * @default 0.1
+     */
+    var MAX_DELTA_TIME = 0.1;
+
+    /**
+     * Default ground friction damping factor per second.
+     * @constant {number}
+     * @default 0.85
+     */
+    var DEFAULT_GROUND_FRICTION = 0.85;
+
+    /**
+     * Default air damping factor per second (1.0 = no damping).
+     * @constant {number}
+     * @default 0.98
+     */
+    var DEFAULT_AIR_DAMPING = 0.98;
+
+    /**
+     * Default gravity constant in blocks/second² (negative = downward).
+     * @constant {number}
+     * @default -20.0
+     */
+    var DEFAULT_GRAVITY = -20.0;
+
+    /**
+     * Terminal velocity in blocks/second (minimum Y velocity — max fall speed).
+     * @constant {number}
+     * @default -60.0
+     */
+    var TERMINAL_VELOCITY = -60.0;
+
+    /**
+     * Default jump impulse velocity in blocks/second upward.
+     * @constant {number}
+     * @default 8.0
+     */
+    var JUMP_VELOCITY = 8.0;
+
+    /**
+     * Maximum jump cooldown duration in seconds.
+     * @constant {number}
+     * @default 0.1
+     */
+    var MAX_JUMP_COOLDOWN = 0.1;
+
+    // ============================================================
     // Animation System — Keyframe-based skeletal animation with cubic Hermite interpolation
     // ============================================================
 
@@ -93,18 +168,18 @@
                 if (dt === 0) {
                     dt = 1.0; // Prevent division by zero when keyframes share the same time
                 }
-                var tension = 0.5; // Catmull-Rom tension parameter (0 = loose, 1 = tight)
+
 
                 tangents.push({
                     tangentIn: {
-                        rx: tension * (next.rx - prev.rx) / dt,
-                        ry: tension * (next.ry - prev.ry) / dt,
-                        rz: tension * (next.rz - prev.rz) / dt
+                        rx: CATMULL_ROM_TENSION * (next.rx - prev.rx) / dt,
+                        ry: CATMULL_ROM_TENSION * (next.ry - prev.ry) / dt,
+                        rz: CATMULL_ROM_TENSION * (next.rz - prev.rz) / dt
                     },
                     tangentOut: {
-                        rx: tension * (next.rx - prev.rx) / dt,
-                        ry: tension * (next.ry - prev.ry) / dt,
-                        rz: tension * (next.rz - prev.rz) / dt
+                        rx: CATMULL_ROM_TENSION * (next.rx - prev.rx) / dt,
+                        ry: CATMULL_ROM_TENSION * (next.ry - prev.ry) / dt,
+                        rz: CATMULL_ROM_TENSION * (next.rz - prev.rz) / dt
                     }
                 });
             }
@@ -294,6 +369,8 @@
 
     /**
      * setState — Switch to a named animation state with optional transition.
+     * Saves the previous state's current time so the transition blends smoothly
+     * from where that animation left off, rather than from its beginning.
      * @param {string} name - Target state name.
      * @param {number} [transitionDuration=0.2] - Transition time in seconds.
      */
@@ -302,13 +379,16 @@
 
         // If switching to a different state, set up transition
         if (this._activeState !== name) {
+            // Save the current state's time as the "previous" for smooth blending.
             this._previousState = this._states[this._activeState] || null;
             this._activeState = name;
             this._transitionTime = 0;
+
+            // Reset target state animation time to start from beginning.
             this._states[name].time = 0;
 
-            // Store transition duration on the state
-            this._states[name].transitionDuration = transitionDuration || 0.2;
+            // Store transition duration on the target state.
+            this._states[name].transitionDuration = transitionDuration != null ? transitionDuration : DEFAULT_TRANSITION_DURATION;
         }
     };
 
@@ -349,29 +429,38 @@
         // Evaluate current state animation
         var currentTransforms = active.clip ? active.clip.evaluate(active.time) : {};
 
-        // Handle transition blending
+        // Handle transition blending — smooth crossfade from previous state to current state.
+        // blendT progresses from 0 (start) to 1 (end of transition).
+        // At blendT=0: result is 100% current state (previous state's last frame).
+        // At blendT=1: result is 100% previous state (transition complete).
+        // The blend ensures no visual popping during state changes.
         if (prev && prev.clip && this._transitionTime < prev.transitionDuration) {
             this._transitionTime += deltaTime;
             var blendT = Math.min(1, this._transitionTime / prev.transitionDuration);
+
+            // Evaluate previous state at its current play time (advanced independently).
             var prevTransforms = prev.clip.evaluate(prev.clip.loop ?
                 ((prev.time % prev.clip.duration) + prev.clip.duration) % prev.clip.duration :
                 Math.min(prev.time, prev.clip.duration));
 
-            // Blend transforms: new state fades IN (1 - blendT), old state fades OUT (blendT).
-            // At blendT=0 (start of transition), result is 100% current.
-            // At blendT=1 (end of transition), result is 100% previous... wait, that's wrong.
-            // Correct: new = current * (1 - blendT) + prev * blendT
-            // At blendT=0: 100% current. At blendT=1: 100% prev. This is correct.
-            // Use index-based loop since _allBones is an Array, not an Object
+            // Advance previous animation time during transition for smooth playback.
+            if (prev.time !== undefined) {
+                prev.time += deltaTime * (prev.speed || DEFAULT_ANIMATION_SPEED);
+            }
+
+            // Blend: current fades IN as blendT goes 0→1, previous fades OUT.
+            // Formula: result = current * blendT + previous * (1 - blendT)
+            // At blendT=0: 100% previous (seamless handoff from previous tick).
+            // At blendT=1: 100% current (transition complete).
             for (var i = 0; i < this._allBones.length; i++) {
                 var bn = this._allBones[i];
                 var curr = currentTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
                 var prv = prevTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
 
                 this._boneTransforms[bn] = {
-                    rx: curr.rx * (1 - blendT) + prv.rx * blendT,
-                    ry: curr.ry * (1 - blendT) + prv.ry * blendT,
-                    rz: curr.rz * (1 - blendT) + prv.rz * blendT
+                    rx: curr.rx * blendT + prv.rx * (1 - blendT),
+                    ry: curr.ry * blendT + prv.ry * (1 - blendT),
+                    rz: curr.rz * blendT + prv.rz * (1 - blendT)
                 };
             }
         } else {
@@ -885,15 +974,16 @@
      * tick — Update kinematic state for one frame using semi-implicit Euler integration.
      * This method is more stable than explicit Euler because velocity is updated
      * before position, ensuring energy conservation in simple oscillators.
+     * Delta times larger than MAX_DELTA_TIME are clamped to prevent physics explosions
+     * that can occur when the browser tab is inactive.
      * @param {number} deltaTime - Time since last frame in seconds.
      * @param {Function} [groundCheck] - Optional function returning Y of ground at entity position, or null if no ground.
      * @returns {{onGround: boolean, groundY: number|null}} Ground detection result.
      */
     Donkeycraft.KinematicState.prototype.tick = function (deltaTime, groundCheck) {
-        if (deltaTime <= 0 || deltaTime > 0.1) {
-            // Skip invalid delta times to prevent physics explosions
-            return { onGround: this.onGround, groundY: this.groundHeight };
-        }
+        // Clamp delta time to prevent physics explosions on tab switch or lag spikes.
+        if (deltaTime <= 0) return { onGround: this.onGround, groundY: this.groundHeight };
+        if (deltaTime > MAX_DELTA_TIME) deltaTime = MAX_DELTA_TIME;
 
         // Apply gravity to acceleration
         this.acceleration.y += this.gravity;
@@ -966,26 +1056,6 @@
             this.velocity.y = this.jumpVelocity;
             this.jumpCooldown = this.maxJumpCooldown;
         }
-    };
-
-    /**
-     * setHorizontalSpeed — Set the entity's horizontal movement speed.
-     * @param {number} speed - Desired speed in blocks/second.
-     * @param {number} yaw - Movement direction in radians (0 = negative Z / forward).
-     */
-    Donkeycraft.KinematicState.prototype.setHorizontalSpeed = function (speed, yaw) {
-        var sinYaw = Math.sin(yaw);
-        var cosYaw = Math.cos(yaw);
-        this.velocity.x = -speed * sinYaw;
-        this.velocity.z = -speed * cosYaw;
-    };
-
-    /**
-     * stop — Bring the entity to a complete halt.
-     */
-    Donkeycraft.KinematicState.prototype.stop = function () {
-        this.velocity.set(0, 0, 0);
-        this.acceleration.set(0, 0, 0);
     };
 
     /**
@@ -1207,17 +1277,39 @@
     };
 
     /**
+     * _animationClipCache — Cache of pre-built AnimationClip instances by name.
+     * Prevents creating new clip objects for frequently-played animations (e.g., attack, hurt).
+     * @type {Object.<string, Donkeycraft.AnimationClip>}
+     * @private
+     */
+    var _animationClipCache = {};
+
+    /**
      * playAnimation — Immediately play a named animation (bypasses state machine auto-selection).
-     * Creates a new AnimationClip from the definition and registers it as a temporary state.
-     * Note: This creates a new clip instance each call; for frequently-played animations,
-     * consider pre-registering them via registerAnimations() instead.
+     * Uses an internal clip cache to avoid creating new AnimationClip objects on each call.
+     * The clip is registered as a temporary state and played immediately.
+     * For animations with loop: false, the forced state mechanism should be used instead,
+     * as this method does not automatically clear the animation after completion.
      * @param {string} name - Animation clip name (must exist in Donkeycraft.AnimationDefinitions).
      */
     Donkeycraft.EntityAnimationController.prototype.playAnimation = function (name) {
         var def = Donkeycraft.AnimationDefinitions[name];
         if (!def) return;
 
-        var animationClip = new Donkeycraft.AnimationClip(name, def.duration, def.loop, def.keyframes);
+        // Reuse cached clip definition to avoid redundant object creation.
+        var cachedClip = _animationClipCache[name];
+        if (!cachedClip) {
+            cachedClip = new Donkeycraft.AnimationClip(name, def.duration, def.loop, def.keyframes);
+            _animationClipCache[name] = cachedClip;
+        }
+
+        // Create a fresh copy to prevent state leakage between uses.
+        var animationClip = new Donkeycraft.AnimationClip(
+            cachedClip.name,
+            cachedClip.duration,
+            cachedClip.loop,
+            cachedClip.keyframes
+        );
         this._stateMachine.registerState(name, animationClip);
         this._stateMachine.setState(name);
     };

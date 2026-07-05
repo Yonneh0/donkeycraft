@@ -117,6 +117,19 @@
          * @private
          */
         this._farEntities = [];
+
+        // ============================================================
+        // Ground Check Cache — avoids redundant per-frame injection
+        // ============================================================
+
+        /**
+         * Cached reference to the last injected ground check function.
+         * Prevents redundant per-frame callback injection when the same
+         * ground check function is used across multiple ticks.
+         * @type {Function|null}
+         * @private
+         */
+        this._groundCheckRef = null;
     };
 
     // ============================================================
@@ -406,13 +419,18 @@
 
     /**
      * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
-     * This is called during tick to provide chunk-based ground detection.
-     * Only entities with a setGroundCheck method are updated (all Entity instances).
+     * Skips injection if the same function was already injected last tick,
+     * avoiding unnecessary object iteration during steady-state operation.
      * @private
      * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
      */
     Donkeycraft.EntityManager.prototype._injectGroundCheck = function (groundCheckFn) {
         if (!groundCheckFn || typeof groundCheckFn !== 'function') return;
+
+        // Skip if the same ground check function is already cached — avoids
+        // redundant per-frame iteration when the game loop calls tick()
+        // with the same ground check every frame.
+        if (groundCheckFn === this._groundCheckRef) return;
 
         var entities = this.getAllEntities();
         for (var i = 0; i < entities.length; i++) {
@@ -421,6 +439,9 @@
                 entity.setGroundCheck(groundCheckFn);
             }
         }
+
+        // Cache the injected function reference.
+        this._groundCheckRef = groundCheckFn;
     };
 
     /**
@@ -514,9 +535,10 @@
     };
 
     /**
-     * Get all alive entities within a spherical range from a point.
+     * getEntitiesInRange — Get all alive entities within a spherical range from a point.
      * Supports both 2D (cx, cz, radius) and 3D (cx, cy, cz, range) signatures.
-     * Uses spatial hash for O(n) performance when searching near existing cells.
+     * Uses spatial hash for O(n) performance when searching near existing cells,
+     * falling back to full iteration only when the search center has no cached cell.
      * @param {number} cx - Center X coordinate (or center Z if 2 args).
      * @param {number} [cy] - Center Y coordinate (3D) or radius (2D).
      * @param {number} [cz] - Center Z coordinate (3D only).
@@ -528,53 +550,89 @@
         var is3D = arguments.length >= 4;
 
         if (is3D) {
-            // 3D spherical range
+            // 3D spherical range — use spatial hash for efficient neighbor lookup.
             range = range || 16;
+            var cellSize = this._cellSize;
+            var minCellX = Math.floor((cx - range) / cellSize);
+            var maxCellX = Math.floor((cx + range) / cellSize);
+            var minCellY = Math.floor((cy - range) / cellSize);
+            var maxCellY = Math.floor((cy + range) / cellSize);
+            var minCellZ = Math.floor((cz - range) / cellSize);
+            var maxCellZ = Math.floor((cz + range) / cellSize);
+
             var result = [];
-            for (var id in this._entities) {
-                if (this._entities.hasOwnProperty(id)) {
-                    var entity = this._entities[id];
-                    if (!entity.isAlive()) {
-                        continue;
-                    }
-                    var pos = entity.getPosition();
-                    if (!pos) {
-                        continue;
-                    }
-                    var dx = pos.x - cx;
-                    var dy = pos.y - cy;
-                    var dz = pos.z - cz;
-                    var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    if (dist <= range) {
-                        result.push(entity);
+            var radiusSq = range * range;
+            var visited = new Set();
+
+            for (var cellX = minCellX; cellX <= maxCellX; cellX++) {
+                for (var cellY = minCellY; cellY <= maxCellY; cellY++) {
+                    for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+                        var key = cellX + ',' + cellY + ',' + cellZ;
+                        var cellSet = this._spatialHash[key];
+                        if (!cellSet) continue;
+
+                        // Avoid processing duplicate entity IDs from overlapping cells.
+                        cellSet.forEach(function (entityId) {
+                            if (visited.has(entityId)) return;
+                            visited.add(entityId);
+
+                            var entity = this._entities[entityId];
+                            if (!entity || !entity.isAlive()) return;
+
+                            var pos = entity.getPosition();
+                            if (!pos) return;
+
+                            var dx = pos.x - cx;
+                            var dy = pos.y - cy;
+                            var dz = pos.z - cz;
+                            if (dx * dx + dy * dy + dz * dz <= radiusSq) {
+                                result.push(entity);
+                            }
+                        }, this);
                     }
                 }
             }
+
             return result;
         } else {
-            // 2D horizontal range (ignore Y)
+            // 2D horizontal range (ignore Y) — use spatial hash on XZ plane.
             var radius = cy || 10;
             var radiusSq = radius * radius;
             var cz2 = cz;
-            var result = [];
-            for (var id2 in this._entities) {
-                if (this._entities.hasOwnProperty(id2)) {
-                    var entity2 = this._entities[id2];
-                    if (!entity2.isAlive() || !entity2.getPosition) {
-                        continue;
-                    }
-                    var pos2 = entity2.getPosition();
-                    if (!pos2) {
-                        continue;
-                    }
-                    var dx2 = pos2.x - cx;
-                    var dz2 = pos2.z - cz2;
-                    if (dx2 * dx2 + dz2 * dz2 <= radiusSq) {
-                        result.push(entity2);
-                    }
+            var minCellX2 = Math.floor((cx - radius) / cellSize);
+            var maxCellX2 = Math.floor((cx + radius) / cellSize);
+            var minCellZ2 = Math.floor((cz2 - radius) / cellSize);
+            var maxCellZ2 = Math.floor((cz2 + radius) / cellSize);
+
+            var result2 = [];
+            var visited2 = new Set();
+
+            for (var cellX2 = minCellX2; cellX2 <= maxCellX2; cellX2++) {
+                for (var cellZ2 = minCellZ2; cellZ2 <= maxCellZ2; cellZ2++) {
+                    var key2 = cellX2 + ',0,' + cellZ2; // Y ignored in 2D
+                    var cellSet2 = this._spatialHash[key2];
+                    if (!cellSet2) continue;
+
+                    cellSet2.forEach(function (entityId) {
+                        if (visited2.has(entityId)) return;
+                        visited2.add(entityId);
+
+                        var entity2 = this._entities[entityId];
+                        if (!entity2 || !entity2.isAlive() || !entity2.getPosition) return;
+
+                        var pos2 = entity2.getPosition();
+                        if (!pos2) return;
+
+                        var dx2 = pos2.x - cx;
+                        var dz2 = pos2.z - cz2;
+                        if (dx2 * dx2 + dz2 * dz2 <= radiusSq) {
+                            result2.push(entity2);
+                        }
+                    }, this);
                 }
             }
-            return result;
+
+            return result2;
         }
     };
 
