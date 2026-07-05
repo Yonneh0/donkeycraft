@@ -34,7 +34,7 @@
         // Stamina bar references (set by _buildStaminaBar)
         this._staminaFill = null;
         this._staminaPulse = null;
-        this._prevStamina = -1;
+        this._prevStamina = 100;  // Matches initial stamina value — prevents spurious pulse on first update
         this._pulseTimeout = null;
 
         // Build DOM if container provided
@@ -168,8 +168,8 @@
         // Update fill width with CSS transition
         this._staminaFill.style.width = pct + '%';
 
-        // Trigger pulse animation on change
-        if (this._prevStamina >= 0 && this._prevStamina !== stamina) {
+        // Trigger pulse animation whenever stamina changes from previous value
+        if (this._prevStamina !== stamina) {
             this._triggerStaminaPulse();
         }
 

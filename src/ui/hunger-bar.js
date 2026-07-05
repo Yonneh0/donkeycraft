@@ -190,21 +190,15 @@
      * @private
      */
     Donkeycraft.HungerBar.prototype._createOverlays = function () {
-        // Brown overlay for low hunger
+        // Brown overlay for low hunger (styling defined in css/gui.css .dk-hunger-overlay)
         var hungerOverlay = document.createElement('div');
         hungerOverlay.className = 'dk-hunger-overlay';
-        hungerOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-            'pointer-events:none;z-index:6;opacity:0;' +
-            'transition:opacity 300ms ease;';
         document.body.appendChild(hungerOverlay);
         this._hungerOverlay = hungerOverlay;
 
-        // Blue overlay for low hydration
+        // Blue overlay for low hydration (styling defined in css/gui.css .dk-hydration-overlay)
         var hydrationOverlay = document.createElement('div');
         hydrationOverlay.className = 'dk-hydration-overlay';
-        hydrationOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-            'pointer-events:none;z-index:6;opacity:0;' +
-            'transition:opacity 300ms ease;';
         document.body.appendChild(hydrationOverlay);
         this._hydrationOverlay = hydrationOverlay;
     };
@@ -472,19 +466,9 @@
             // Eating — pulse the drumsticks that were filled
             this._pulseEatenDrumsticks(delta, oldFood, newFood);
         } else if (delta < 0) {
-            // Starving — dim the drumsticks that were depleted
-            this._dimDepletedDrumsticks(-delta, oldFood, newFood);
+            // Starving — dim the drumsticks that were depleted (pass negative delta directly)
+            this._dimDepletedDrumsticks(delta, oldFood, newFood);
         }
-    };
-
-    /**
-     * _getBarRow — helper to get the unified bar row element.
-     * Used by animation methods that previously referenced _hungerRow or _hydrationRow.
-     * @private
-     * @returns {HTMLElement|null}
-     */
-    Donkeycraft.HungerBar.prototype._getBarRow = function () {
-        return this._barRow;
     };
 
     /**
@@ -536,7 +520,8 @@
      * @param {number} oldFood - Food level before starving.
      * @param {number} newFood - Food level after starving.
      */
-    Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function (foodLoss, oldFood, newFood) {
+    Donkeycraft.HungerBar.prototype._dimDepletedDrumsticks = function (delta, oldFood, newFood) {
+        // delta is negative (e.g., -1, -5). Use directly for text display.
         if (!this._barRow) return;
 
         var changedIndices = [];
@@ -562,10 +547,10 @@
             }).bind(this, container), 300);
         }
 
-        // Position text above the center of the changed range
+        // Position text above the center of the changed range (delta is already negative)
         if (changedIndices.length > 0) {
             var centerIdx = Math.round((changedIndices[0] + changedIndices[changedIndices.length - 1]) / 2);
-            this._spawnHungerTextAt(-foodLoss, centerIdx);
+            this._spawnHungerTextAt(delta, centerIdx);
         }
     };
 
@@ -655,8 +640,8 @@
             // Drinking — pulse the drops that were filled
             this._pulseDrankDrops(delta, oldHydration, newHydration);
         } else if (delta < 0) {
-            // Dehydrating — dim the drops that were depleted
-            this._dimDepletedDrops(-delta, oldHydration, newHydration);
+            // Dehydrating — dim the drops that were depleted (pass negative delta directly)
+            this._dimDepletedDrops(delta, oldHydration, newHydration);
         }
     };
 
@@ -709,7 +694,8 @@
      * @param {number} oldHydration - Hydration level before dehydrating.
      * @param {number} newHydration - Hydration level after dehydrating.
      */
-    Donkeycraft.HungerBar.prototype._dimDepletedDrops = function (hydrationLoss, oldHydration, newHydration) {
+    Donkeycraft.HungerBar.prototype._dimDepletedDrops = function (delta, oldHydration, newHydration) {
+        // delta is negative (e.g., -1, -5). Use directly for text display.
         if (!this._barRow) return;
 
         var changedIndices = [];
@@ -735,10 +721,10 @@
             }).bind(this, container), 300);
         }
 
-        // Position text above the center of the changed range
+        // Position text above the center of the changed range (delta is already negative)
         if (changedIndices.length > 0) {
             var centerIdx = Math.round((changedIndices[0] + changedIndices[changedIndices.length - 1]) / 2);
-            this._spawnHydrationTextAt(-hydrationLoss, centerIdx);
+            this._spawnHydrationTextAt(delta, centerIdx);
         }
     };
 
