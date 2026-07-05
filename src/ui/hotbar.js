@@ -35,8 +35,15 @@
         this._staminaFill = null;
         this._staminaPulse = null;
         this._prevStamina = 100;  // Matches initial stamina value — prevents spurious pulse on first update
-        this._pulseTimeout = null;
-        this._animationTimeout = null;
+        this._staminaPulseTimeout = null;
+        this._staminaAnimationTimeout = null;
+
+        // Mana bar references (set by _buildManaBar)
+        this._manaFill = null;
+        this._manaPulse = null;
+        this._prevMana = 100;  // Matches initial mana value — prevents spurious pulse on first update
+        this._manaPulseTimeout = null;
+        this._manaAnimationTimeout = null;
 
         // Build DOM if container provided
         if (this._container) {
@@ -132,6 +139,53 @@
 
         // Subscribe to stamina:changed events
         this._subscribeToStaminaEvents();
+
+        // Build the mana bar at the top of the hotbar
+        this._buildManaBar();
+    };
+
+    /**
+     * _buildManaBar — creates the mana bar DOM elements inside the hotbar container.
+     * The mana bar is inserted as the second child (after stamina bar) so it renders
+     * at the top 18px of the hotbar, above the stamina bar.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._buildManaBar = function () {
+        if (!this._container) return;
+
+        // Wrapper positioned absolutely at the top — z-index: 0 ensures it stays below slots
+        var wrapper = document.createElement('div');
+        wrapper.className = 'dk-mana-bar-wrapper';
+
+        // Background track — dark fill visible through gaps
+        var bg = document.createElement('div');
+        bg.className = 'dk-mana-bar-bg';
+
+        // Animated fill — blue progress bar with smooth width transition
+        var fill = document.createElement('div');
+        fill.className = 'dk-mana-bar-fill';
+
+        // Pulse overlay — brief brightness boost on mana change
+        var pulse = document.createElement('div');
+        pulse.className = 'dk-mana-bar-pulse';
+
+        bg.appendChild(fill);
+        wrapper.appendChild(bg);
+        wrapper.appendChild(pulse);
+
+        // Insert as second child (after stamina bar which is first)
+        var secondChild = this._container.childNodes[1];
+        if (secondChild) {
+            this._container.insertBefore(wrapper, secondChild);
+        } else {
+            this._container.appendChild(wrapper);
+        }
+
+        this._manaFill = fill;
+        this._manaPulse = pulse;
+
+        // Subscribe to mana:changed events
+        this._subscribeToManaEvents();
     };
 
     /**
@@ -218,8 +272,8 @@
         if (!this._staminaPulse) return;
 
         // Clear any existing pulse timeout to prevent overlapping animations
-        if (this._pulseTimeout) {
-            clearTimeout(this._pulseTimeout);
+        if (this._staminaPulseTimeout) {
+            clearTimeout(this._staminaPulseTimeout);
         }
 
         // Match pulse width to current fill width for smooth visual feedback
@@ -232,9 +286,114 @@
 
         // Fade out after a brief flash
         var self = this;
-        this._pulseTimeout = setTimeout(function () {
+        this._staminaPulseTimeout = setTimeout(function () {
             if (self._staminaPulse) {
                 self._staminaPulse.style.opacity = '0';
+            }
+        }, 120);
+    };
+
+    /**
+     * _subscribeToManaEvents — listen for mana:changed events from the EventBus.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._subscribeToManaEvents = function () {
+        var self = this;
+        this._onManaChanged = function (data) { self._onManaUpdate(data); };
+
+        var globalBus = EventBus && EventBus._global;
+        if (globalBus) {
+            try {
+                globalBus.on('mana:changed', this._onManaChanged);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Hotbar', 'Failed to subscribe to mana:changed: ' + e.message);
+            }
+        } else {
+            Donkeycraft.Logger.warn('Hotbar', 'No global EventBus instance available — mana bar will not receive updates');
+        }
+    };
+
+    /**
+     * _onManaUpdate — called on mana:changed events to update the visual bar.
+     * @private
+     * @param {Object} data - Mana change data { mana, maxMana, delta }.
+     */
+    Donkeycraft.Hotbar.prototype._onManaUpdate = function (data) {
+        var mana = Math.max(0, Math.round(data.mana || 0));
+        var maxMana = data.maxMana || 100;
+
+        // Calculate fill percentage and clamp to [0, 100]
+        var pct = Math.min(100, Math.max(0, (mana / maxMana) * 100));
+
+        // Determine if mana increased, decreased, or stayed the same
+        var delta = mana - this._prevMana;
+
+        // Update fill width with CSS transition
+        this._manaFill.style.width = pct + '%';
+
+        // Clear any existing animation timeout to prevent overlapping animations
+        if (this._manaAnimationTimeout) {
+            clearTimeout(this._manaAnimationTimeout);
+            this._manaAnimationTimeout = null;
+        }
+
+        // Remove any existing animation classes to reset state
+        this._manaFill.classList.remove('mana-filling', 'mana-draining');
+
+        // Trigger appropriate animation based on mana change direction
+        if (delta > 0) {
+            // Mana gained — trigger fill animation (brightness flash)
+            this._manaFill.classList.add('mana-filling');
+            this._manaAnimationTimeout = setTimeout(function () {
+                if (this._manaFill) {
+                    this._manaFill.classList.remove('mana-filling');
+                }
+                this._manaAnimationTimeout = null;
+            }.bind(this), 500);
+        } else if (delta < 0) {
+            // Mana lost — trigger drain animation (dimming pulse)
+            this._manaFill.classList.add('mana-draining');
+            this._manaAnimationTimeout = setTimeout(function () {
+                if (this._manaFill) {
+                    this._manaFill.classList.remove('mana-draining');
+                }
+                this._manaAnimationTimeout = null;
+            }.bind(this), 400);
+        }
+
+        // Trigger pulse overlay whenever mana changes from previous value
+        if (delta !== 0) {
+            this._triggerManaPulse();
+        }
+
+        this._prevMana = mana;
+    };
+
+    /**
+     * _triggerManaPulse — briefly flash the pulse overlay for visual feedback.
+     * @private
+     */
+    Donkeycraft.Hotbar.prototype._triggerManaPulse = function () {
+        if (!this._manaPulse) return;
+
+        // Clear any existing pulse timeout to prevent overlapping animations
+        if (this._manaPulseTimeout) {
+            clearTimeout(this._manaPulseTimeout);
+        }
+
+        // Match pulse width to current fill width for smooth visual feedback
+        if (this._manaFill) {
+            this._manaPulse.style.width = this._manaFill.style.width;
+        }
+
+        // Show pulse
+        this._manaPulse.style.opacity = '1';
+
+        // Fade out after a brief flash
+        var self = this;
+        this._manaPulseTimeout = setTimeout(function () {
+            if (self._manaPulse) {
+                self._manaPulse.style.opacity = '0';
             }
         }, 120);
     };
@@ -455,17 +614,25 @@
 
     /**
      * destroy — cleans up all DOM elements, event listeners, and timers.
-     * Unsubscribes from stamina:changed events and nulls all internal references.
+     * Unsubscribes from stamina:changed and mana:changed events and nulls all internal references.
      */
     Donkeycraft.Hotbar.prototype.destroy = function () {
         // Clear all timeouts
-        if (this._pulseTimeout) {
-            clearTimeout(this._pulseTimeout);
-            this._pulseTimeout = null;
+        if (this._staminaPulseTimeout) {
+            clearTimeout(this._staminaPulseTimeout);
+            this._staminaPulseTimeout = null;
         }
-        if (this._animationTimeout) {
-            clearTimeout(this._animationTimeout);
-            this._animationTimeout = null;
+        if (this._staminaAnimationTimeout) {
+            clearTimeout(this._staminaAnimationTimeout);
+            this._staminaAnimationTimeout = null;
+        }
+        if (this._manaPulseTimeout) {
+            clearTimeout(this._manaPulseTimeout);
+            this._manaPulseTimeout = null;
+        }
+        if (this._manaAnimationTimeout) {
+            clearTimeout(this._manaAnimationTimeout);
+            this._manaAnimationTimeout = null;
         }
 
         // Unsubscribe from stamina events
@@ -473,6 +640,13 @@
         if (globalBus && this._onStaminaChanged) {
             try {
                 globalBus.off('stamina:changed', this._onStaminaChanged);
+            } catch (e) { }
+        }
+
+        // Unsubscribe from mana events
+        if (globalBus && this._onManaChanged) {
+            try {
+                globalBus.off('mana:changed', this._onManaChanged);
             } catch (e) { }
         }
 
@@ -490,6 +664,9 @@
         this._staminaFill = null;
         this._staminaPulse = null;
         this._onStaminaChanged = null;
+        this._manaFill = null;
+        this._manaPulse = null;
+        this._onManaChanged = null;
     };
 
 })();

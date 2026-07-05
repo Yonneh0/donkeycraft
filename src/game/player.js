@@ -166,6 +166,26 @@
         this._staminaRegenTimer = 0;
 
         /**
+         * Maximum mana points.
+         * @type {number}
+         */
+        this.maxMana = 100;
+
+        /**
+         * Current mana points. Starts at full capacity (100 points).
+         * @type {number}
+         * @private
+         */
+        this._mana = 100;
+
+        /**
+         * Mana regeneration timer (seconds since last regeneration).
+         * @type {number}
+         * @private
+         */
+        this._manaRegenTimer = 0;
+
+        /**
          * Current food level (0-12, displayed as 6 drumstick icons).
          * Each icon represents 2 food points.
          * @type {number}
@@ -910,6 +930,75 @@
     };
 
     // ============================================================
+    // Mana — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Get the current mana points.
+     * 
+     * @returns {number}
+     */
+    Donkeycraft.Player.prototype.getMana = function () {
+        return this._mana;
+    };
+
+    /**
+     * Set the mana value with clamping and event emission.
+     * 
+     * Clamps to [0, maxMana] (always capped at 100).
+     * Emits `mana:changed` event via EventBus.
+     * 
+     * @param {number} amount - Mana points to set.
+     */
+    Donkeycraft.Player.prototype.setMana = function (amount) {
+        var oldMana = this._mana;
+        this._mana = Math.min(this.maxMana, Math.max(0, amount));
+
+        // Emit mana:changed event for UI systems
+        if (EventBus && this._mana !== oldMana) {
+            try {
+                EventBus.emitSafe('mana:changed', {
+                    mana: this._mana,
+                    maxMana: this.maxMana,
+                    delta: this._mana - oldMana
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Adjust the player's mana by a delta amount.
+     * 
+     * Positive values restore mana, negative values consume it.
+     * Clamps to [0, maxMana] and emits `mana:changed` event.
+     * 
+     * @param {number} delta - Mana change (positive = restore, negative = consume).
+     */
+    Donkeycraft.Player.prototype.adjustMana = function (delta) {
+        var oldMana = this._mana;
+        this.setMana(this._mana + delta);
+
+        if (EventBus && this._mana !== oldMana) {
+            try {
+                EventBus.emitSafe('mana:changed', {
+                    mana: this._mana,
+                    maxMana: this.maxMana,
+                    delta: this._mana - oldMana
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Get the maximum mana points.
+     * 
+     * @returns {number}
+     */
+    Donkeycraft.Player.prototype.getMaxMana = function () {
+        return this.maxMana;
+    };
+
+    // ============================================================
     // Food Level — Accessors & Mutators
     // ============================================================
 
@@ -1268,13 +1357,14 @@
     // ============================================================
 
     /**
-     * Tick all vitals: fire damage, stamina regeneration, starvation, natural healing.
+     * Tick all vitals: fire damage, stamina/mana regeneration, starvation, natural healing.
      * 
      * Called every game tick by the game loop. Handles:
      * 1. Fire damage (1 HP every 0.5s while on fire)
      * 2. Stamina regeneration (+1 per 2s when below max)
-     * 3. Starvation damage (1 HP every 4s when food = 0, only if health <= min(5, maxHealth/2))
-     * 4. Natural regeneration (heal 1 HP at ~25% per second when food > 10)
+     * 3. Mana regeneration (+1 per 2s when below max)
+     * 4. Starvation damage (1 HP every 4s when food = 0, only if health <= min(5, maxHealth/2))
+     * 5. Natural regeneration (heal 1 HP at ~25% per second when food > 10)
      * 
      * @param {number} deltaTime - Time since last tick in seconds.
      */
@@ -1300,6 +1390,15 @@
             if (this._staminaRegenTimer >= 2.0) {
                 this._staminaRegenTimer = 0;
                 this.setStamina(this._stamina + 1);
+            }
+        }
+
+        // Mana regeneration: +1 mana per 2 seconds when below max (all game modes)
+        if (this._mana < this.maxMana) {
+            this._manaRegenTimer += deltaTime;
+            if (this._manaRegenTimer >= 2.0) {
+                this._manaRegenTimer = 0;
+                this.setMana(this._mana + 1);
             }
         }
 
@@ -1468,18 +1567,20 @@
     /**
      * Reset all vitals to default values.
      * 
-     * Restores health to maxHealth, stamina to full (maxStamina), food to 12, hydration to 6.
-     * Clears fire status and resets all timers. Sets alive = true.
+     * Restores health to maxHealth, stamina to full (maxStamina), mana to full (maxMana),
+     * food to 12, hydration to 6. Clears fire status and resets all timers. Sets alive = true.
      */
     Donkeycraft.Player.prototype.resetVitals = function () {
         this._health = this.maxHealth;
         this._stamina = this.maxStamina;
+        this._mana = this.maxMana;
         this._foodLevel = 12;
         this._hydration = 6.0;
         this._onFire = false;
         this._fireDamageTimer = 0;
         this._starvationTimer = 0;
         this._staminaRegenTimer = 0;
+        this._manaRegenTimer = 0;
         this.alive = true;
         this.maxFallDistance = 0;
     };

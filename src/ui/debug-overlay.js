@@ -253,6 +253,18 @@
                 ]
             },
             {
+                label: 'Mana',
+                buttons: [
+                    { label: 'FULL(100)', action: 'mana', args: 'full' },
+                    { label: '+10', action: 'mana', args: 10 },
+                    { label: '+5', action: 'mana', args: 5 },
+                    { label: '+1', action: 'mana', args: 1 },
+                    { label: '-1', action: 'mana', args: -1 },
+                    { label: '-5', action: 'mana', args: -5 },
+                    { label: 'EMPTY', action: 'mana', args: 'empty' }
+                ]
+            },
+            {
                 label: 'XP Points',
                 buttons: [
                     { label: 'RESET', action: 'xpPoints', args: 'reset' },
@@ -294,8 +306,8 @@
                 btn.className = 'dk-debug-ctrl-btn';
                 btn.textContent = btnData.label;
 
-                // Add CSS class for special buttons (FULL/EMPTY/RESET)
-                if (btnData.label === 'FULL' || btnData.label === 'EMPTY' || btnData.label === 'RESET' || btnData.label === 'FULL(5)') {
+                // Add CSS class for first and last buttons
+                if (b === 0 || b === group.buttons.length - 1) {
                     btn.classList.add('dk-debug-ctrl-btn-special');
                 }
 
@@ -958,6 +970,28 @@
                 newAbs = Math.min(player.getMaxStamina() || 100, Math.max(0, Math.round(newAbs)));
 
                 player.setStamina(newAbs);
+                refreshDebug();
+                break;
+            }
+
+            case 'mana': {
+                if (!player) { Donkeycraft.Logger.warn('DebugOverlay', 'Player not available'); break; }
+                var currentMana = player.getMana();
+                var newMana = currentMana;
+
+                if (parsedArgs === 'full') {
+                    // Set to max mana (100 points)
+                    newMana = player.getMaxMana() || 100;
+                } else if (parsedArgs === 'empty') {
+                    newMana = 0;
+                } else if (typeof parsedArgs === 'number') {
+                    newMana = currentMana + parsedArgs;
+                }
+
+                // Clamp to [0, maxMana]
+                newMana = Math.min(player.getMaxMana() || 100, Math.max(0, Math.round(newMana)));
+
+                player.setMana(newMana);
                 refreshDebug();
                 break;
             }
