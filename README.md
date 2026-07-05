@@ -120,174 +120,130 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-src/
-  core/             # Core infrastructure (12 files, ~3,670 lines)
-    namespace.js        # Global Donkeycraft namespace object
-    eventbus.js         # Pub/sub event system
-    config.js           # Game configuration constants
-    logger.js           # Tiered logging (debug/info/warn/error)
-    timer.js            # Delta-time accumulator, tick scheduler
-    input.js            # Keyboard/mouse/pointer lock handler
-    math-utils.js       # Vector3, Matrix4, Quaternion, noise functions
-    audio.js            # Web Audio API wrapper
-    init-sequence.js    # Async initialization pipeline
-    world-store.js      # IndexedDB chunk storage
-    level-data.js       # Spawn, mode, time, player data, auto-save
-    cache.js            # Asset cache (texture atlases, sounds)
-  gen/              # Procedural generation (15 files, ~6,843 lines)
-    noise.js              # Permutation table, fade, lerp, grad, 2D Perlin, FBM, Mulberry32
-    terrain-generator.js  # Heightmap generation with Perlin noise layers
-    ore-generator.js      # Ore vein placement per biome/Y-level
+src/                   # Source.
+  core.css           # Base styles: full-screen canvas, overlay positioning
+  game.js             # Main game class: loop, init, pause/resume
+  core/                 # Core infrastructure
+    audio.js              # Web Audio API wrapper
+    cache.js              # Asset cache (texture atlases, sounds)
+    config.js             # Game configuration constants
+    eventbus.js           # Pub/sub event system
+    init-sequence.js      # Async initialization pipeline
+    input.js              # Keyboard/mouse/pointer lock handler
+    level-data.js         # Spawn, mode, time, player data, auto-save
+    logger.js             # Tiered logging (debug/info/warn/error)
+    math-utils.js         # Vector3, Matrix4, Quaternion, noise functions
+    namespace.js          # Global Donkeycraft namespace object
+    timer.js              # Delta-time accumulator, tick scheduler
+    world-store.js        # IndexedDB chunk storage
+  gen/                  # Procedural generation
     cave-generator.js     # 3D noise-based cave systems
-    water-generator.js    # Lake detection, surface water flow
-    structure-generator.js# Surface structures
-    nether-generator.js   # Nether terrain: bedrock, lava, basalt columns
     end-generator.js      # End terrain: island classification, end cities
     mob-spawning.js       # Spawn definitions, chunk/light/biome checks, mob caps
-    texture-core.js       # TextureGenerator core: canvas, cache, base generators
-    texture-terrain.js    # Terrain textures: sand, snow, ice, lava, bedrock
-    texture-blocks.js     # Block textures: ores, metals, concrete/wool families
-    texture-special.js    # Nether/end textures: basalt, ancient debris, magma
-    texture-decorative.js # Plants, redstone components, furniture, block mapping
+    nether-generator.js   # Nether terrain: bedrock, lava, basalt columns
+    noise.js              # Permutation table, fade, lerp, grad, 2D Perlin, FBM, Mulberry32
+    ore-generator.js      # Ore vein placement per biome/Y-level
     sound-manager.js      # SoundGenerator, AssetManager, AssetGenerator
-  game/             # Game logic (47 files, ~16,812 lines)
-    # Blocks & terrain
-    block.js              # Block definitions (257 blocks)
+    structure-generator.js# Surface structures
+    terrain-generator.js  # Heightmap generation with Perlin noise layers
+    texture-blocks.js     # Block textures: ores, metals, concrete/wool families
+    texture-core.js       # TextureGenerator core: canvas, cache, base generators
+    texture-decorative.js # Plants, redstone components, furniture, block mapping
+    texture-special.js    # Nether/end textures: basalt, ancient debris, magma
+    texture-terrain.js    # Terrain textures: sand, snow, ice, lava, bedrock
+    water-generator.js    # Lake detection, surface water flow
+  game/                 # Game logic
+    animals.js            # Animal breeding logic
+    biome.js              # Biome classification
+    block-action.js       # Block breaking with tool multipliers
+    block-models.js       # Face/texture models with AO
+    block-placement.js    # Block placement with collision checks
     block-state.js        # Block state variants (direction, color)
     block-types.js        # Block classification (solid, transparent, liquid)
-    texture-atlas.js      # 16×16 texture atlas compilation
-    block-models.js       # Face/texture models with AO
-    recipe-registry.js    # Crafting and smelt recipes (722 lines)
-    chunk.js              # 16×256×16 chunk volume
+    block.js              # Block definitions (257 blocks)
+    boss-mobs.js          # Ender Dragon, Wither
     chunk-manager.js      # Chunk loading/unloading
-    biome.js              # Biome classification
-    terrain-surface.js    # Biome surface layers
-    lighting-engine.js    # Block light propagation (BFS flood fill)
-    physics.js            # Gravity-affected blocks, liquid flow
-    world-utils.js        # Coordinate utilities
-    dimension.js          # Overworld/Nether/End dimension system
-    portal.js             # Inter-dimensional portals
-    time.js               # World time cycle
-    # Player & movement
-    player.js             # Player entity (position, velocity, rotation)
-    movement.js           # Walking, sprinting, swimming, flying speeds
+    chunk.js              # 16×256×16 chunk volume
     collision.js          # AABB collision detection
-    jumping.js            # Jump mechanics
-    flying.js             # Creative/spectator flying
     damage.js             # Hitbox, damage, knockback, fall damage, stamina management
-    game-mode.js          # Survival/Creative/Spectator modes
-    stats.js              # Achievements and statistics
-    hunger.js             # Food, hydration, starvation
+    dimension.js          # Overworld/Nether/End dimension system
+    enchantment.js        # 24 vanilla enchantments
+    entity-manager.js     # Spawn/despawn/tick management
+    entity.js             # Base entity class
     experience.js         # XP levels and orbs
-    # Interaction
-    raycast.js            # DDA voxel raycasting
-    block-action.js       # Block breaking with tool multipliers
-    block-placement.js    # Block placement with collision checks
+    flying.js             # Creative/spectator flying
+    game-mode.js          # Survival/Creative/Spectator modes
+    hostile-mobs.js       # Zombie, skeleton, spider, creeper
+    hunger.js             # Food, hydration, starvation
     interactable-blocks.js# Right-click interactions (doors, chests, etc.)
-    # Entities & mobs
-    entity.js               # Base entity class
-    entity-manager.js       # Spawn/despawn/tick management
-    passive-mobs.js         # Cow, pig, sheep, chicken
-    hostile-mobs.js         # Zombie, skeleton, spider, creeper
-    boss-mobs.js            # Ender Dragon, Wither
-    mob-ai.js               # A* pathfinding, line-of-sight
-    projectiles.js          # Arrows, snowballs, ender pearls
-    animals.js              # Animal breeding logic
-    # Redstone
-    redstone-engine.js      # Tick-based signal propagation
-    repeater-comparator.js  # Repeaters (1-4 ticks) and comparators
-    observers.js            # Observer blocks
-    pistons.js              # Pistons and sticky pistons
-    tnt.js                  # TNT explosions
-    wiring.js               # Redstone dust/wire
-    # Game systems
-    enchantment.js          # 24 vanilla enchantments
-    potion.js               # 18 effects, 40 potions
-    tool.js                 # 7 material tiers
-  render/           # WebGL rendering engine (16 files, ~3,940 lines)
-    gl-context.js           # WebGL 1 context creation
-    shader-manager.js       # Shader compilation and caching
-    geometry-builder.js   # Vertex buffer generation
-    mesh-optimizer.js     # Face culling and index buffers
-    chunk-mesh.js         # Per-chunk GPU buffer management
-    terrain-renderer.js   # Chunk rendering with frustum culling
-    camera.js             # First-person camera
-    fog.js                # Distance fog
-    sky.js                # Sky dome rendering
-    lighting.js           # Sun/ambient light
-    hand-renderer.js      # First-person held item
+    jumping.js            # Jump mechanics
+    lighting-engine.js    # Block light propagation (BFS flood fill)
+    mob-ai.js             # A* pathfinding, line-of-sight
+    movement.js           # Walking, sprinting, swimming, flying speeds
+    observers.js          # Observer blocks
+    passive-mobs.js       # Cow, pig, sheep, chicken
+    physics.js            # Gravity-affected blocks, liquid flow
+    pistons.js            # Pistons and sticky pistons
+    player.js             # Player entity (position, velocity, rotation)
+    portal.js             # Inter-dimensional portals
+    potion.js             # 18 effects, 40 potions
+    projectiles.js        # Arrows, snowballs, ender pearls
+    raycast.js            # DDA voxel raycasting
+    recipe-registry.js    # Crafting and smelt recipes
+    redstone-engine.js    # Tick-based signal propagation
+    repeater-comparator.js# Repeaters (1-4 ticks) and comparators
+    stats.js              # Achievements and statistics
+    terrain-surface.js    # Biome surface layers
+    texture-atlas.js      # 16×16 texture atlas compilation
+    time.js               # World time cycle
+    tnt.js                # TNT explosions
+    tool.js               # 7 material tiers
+    wiring.js             # Redstone dust/wire
+    world-utils.js        # Coordinate utilities
+  render/               # WebGL rendering engine
     break-particles.js    # Block breaking particles
+    camera.js             # First-person camera
+    chunk-mesh.js         # Per-chunk GPU buffer management
+    entity-renderer.js    # Bone-based skeletal animation, mesh caching, frustum culling, context loss recovery
+    fog.js                # Distance fog
+    geometry-builder.js   # Vertex buffer generation
+    gl-context.js         # WebGL 1 context creation
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
-    weather.js            # Weather particle effects
+    hand-renderer.js      # First-person held item
+    lighting.js           # Sun/ambient light
     map-renderer.js       # 2D overhead map, rotating minimap, time-of-day dial, surface cache
-    entity-renderer.js  # Bone-based skeletal animation, mesh caching, frustum culling, context loss recovery
-  ui/                 # Inventory, HUD, GUI screens (19 files, ~7,800 lines)
-    gui-core.css            # GUI styles: panels, tabs, slots, buttons
-    item-stack.js           # Item stacks with NBT-like tags
-    inventory.js            # Multi-slot inventories
-    gui-manager.js          # Screen open/close system
-    hotbar.js               # Hotbar UI (9 slots)
+    mesh-optimizer.js     # Face culling and index buffers
+    shader-manager.js     # Shader compilation and caching
+    sky.js                # Sky dome rendering
+    terrain-renderer.js   # Chunk rendering with frustum culling
+    weather.js            # Weather particle effects
+  ui/                   # Inventory, HUD, GUI screens
+    anvil-ui.js             # Anvil UI (rename/repair)
+    anvil-ui.css            # Anvil UI Styles
+    chest-ui.js             # Chest GUI
     crafting-grid.js        # 3×3 crafting table
     creative-inventory.js   # Creative item browser
-    furnace-ui.js           # Furnace GUI
-    chest-ui.js             # Chest GUI
-    anvil-ui.js             # Anvil rename/repair
-    enchanting-ui.js        # Enchanting GUI
     debug-overlay.js        # F3 debug screen
-    gui-elements.js         # DOM UI components (drag-drop, tabs, buttons)
-    loading-screen.js       # Loading screen UI
-    health-bar.js           # Health HUD overlay
-    hunger-bar.js           # Hunger HUD overlay
-    xp-bar.js               # XP level bar
-    hotbar.js               # Hotbar UI with integrated stamina bar (yellow progress, semi-transparent, animated)
-    keybindings-panel.js    # Keybind configuration UI
+    enchanting-ui.js        # Enchanting GUI
+    furnace-ui.js           # Furnace GUI
     gamemode-badge.js       # Game mode badge (SURVIVAL/CREATIVE) with click-to-swap
+    gui-core.css            # GUI styles: panels, tabs, slots, buttons
+    gui-elements.js         # DOM UI components (drag-drop, tabs, buttons)
+    gui-manager.js          # Screen open/close system
+    health-bar.js           # Health HUD overlay
+    hotbar.js               # Hotbar UI (9 slots)
+    hotbar.js               # Hotbar UI with integrated stamina bar (yellow progress, semi-transparent, animated)
+    hunger-bar.js           # Hunger HUD overlay
+    inventory.js            # Multi-slot inventories
+    item-stack.js           # Item stacks with NBT-like tags
+    keybindings-panel.js    # Keybind configuration UI
+    loading-screen.js       # Loading screen UI
     speed-indicator.js      # Speed indicator/control (sneak/walk/run/turbo buttons)
+    xp-bar.js               # XP level bar
     
-core.css           # Base styles: full-screen canvas, overlay positioning
-game.js             # Main game class: loop, init, pause/resume (1,639 lines)
 
-assets/
-  sounds/           # (Generated procedurally — no files needed)
-  textures/         # (Generated procedurally — no files needed)
 README.md           # This file
 ```
-
-## Code Statistics
-
-| Module Group | Files | Lines |
-|--------------|-------|-------|
-| Core Infrastructure | 12 | ~3,670 |
-| Asset & World Generation | 15 | ~6,843 |
-| Game Logic | 47 | ~16,812 |
-| WebGL Rendering Engine | 16 | ~3,940 |
-| Inventory & GUI System | 19 | ~7,800 |
-| Main Entry Point | 1 | 1,639 |
-| **TOTAL** | **108 files** | **~40,140 lines of JS** |
-
-## Technical Risks & Mitigations
-
-### WebGL 1.0 Batching Limitations
-WebGL 1.0 does not support `gl.drawElementsInstanced`. To batch chunk meshes, you must either merge all chunk vertex buffers into one massive buffer (extremely slow to update when a single block changes) or issue one draw call per chunk (256 draw calls per frame). 256 draw calls is acceptable for WebGL 1.0 but requires careful state management.
-
-### Runtime Texture Atlas Generation
-Compiling 285+ 16x16 textures into a single atlas at runtime will cause a significant hitch on load. The init-sequence module handles this with an async pipeline that generates textures procedurally during startup. Consider pre-generating the atlas as a single image file for production builds.
-
-### Async Chunk Loading
-IndexedDB is asynchronous. The chunk manager needs to handle missing chunks gracefully. If a chunk isn't loaded yet, the renderer must skip it or render a placeholder to prevent rendering gaps.
-
-### Audio Preloading
-AudioBuffers must be decoded asynchronously. The init-sequence module handles this with an async pipeline that ensures all sounds are ready before the game loop starts.
-
-### Pointer Lock
-`requestPointerLock()` must be called on an element that has focus and is in the foreground. Check `document.pointerLockElement` to verify lock state. Mouse delta (`movementX`/`movementY`) is only available when pointer lock is active.
-
-### File Protocol Limitations
-The `file:///` protocol may block XHR/Fetch for external assets. All textures are procedurally generated and all sounds use Web Audio API with programmatically generated buffers — no external file loading required at runtime.
-
-## Development
-
-See [.clinerules/QWEN.md](.clinerules/QWEN.md) for AI agent workflow rules and coding standards.
 
 ## License
 
