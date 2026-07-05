@@ -1,0 +1,20 @@
+/* ============================================================
+   CHEST UI
+   ============================================================ */
+
+.dk-chest-grid {
+    display: grid;
+    gap: 4px;
+    margin: 12px auto;
+    max-width: 300px;
+}
+
+.dk-chest-grid.single {
+    grid-template-columns: repeat(9, 48px);
+    grid-template-rows: repeat(3, 48px);
+}
+
+.dk-chest-grid.double {
+    grid-template-columns: repeat(18, 48px);
+    grid-template-rows: repeat(3, 48px);
+}

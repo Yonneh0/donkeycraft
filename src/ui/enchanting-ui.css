@@ -1,0 +1,46 @@
+/* ============================================================
+   ENCHANTING UI
+   ============================================================ */
+
+.dk-enchant-options {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.dk-enchant-option {
+    flex: 1;
+    padding: 12px;
+    background: rgba(50, 30, 80, 0.7);
+    border: 2px solid #6a3cab;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.1s, background 0.1s;
+}
+
+.dk-enchant-option:hover {
+    border-color: #9b59b6;
+    background: rgba(70, 40, 110, 0.8);
+}
+
+.dk-enchant-option.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dk-enchant-name {
+    font-size: 13px;
+    color: #9b59b6;
+    margin-bottom: 4px;
+}
+
+.dk-enchant-level {
+    font-size: 11px;
+    color: #888;
+}
+
+.dk-enchant-cost {
+    font-size: 12px;
+    color: #f1c40f;
+    margin-top: 6px;
+}

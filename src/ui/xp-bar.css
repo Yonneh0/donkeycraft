@@ -1,0 +1,179 @@
+/* ============================================================
+   XP BAR
+   ============================================================ */
+
+/* Outer wrapper — positioned above hotbar, centered horizontally.
+   Default state is hidden (display: none). Shown via .dk-visible class
+   only when the player has earned XP (level > 0 or points > 0). */
+.dk-xp-bar-wrapper {
+    position: absolute;
+    bottom: 95px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 400px;
+    z-index: 25;
+    pointer-events: none;
+    display: none;
+    /* Hidden by default — initial state until XP is added */
+}
+
+/* Show XP bar when it has content */
+.dk-xp-bar-wrapper.dk-visible {
+    display: block;
+}
+
+/* Inner container — flexbox centering for bar elements */
+.dk-xp-bar-container {
+    position: relative;
+    width: 100%;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Segmented dark background — 20 segments with 2px gaps */
+.dk-xp-segmented-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    gap: 2px;
+    pointer-events: none;
+}
+
+.dk-xp-segment {
+    flex: 1;
+    background: rgba(30, 30, 30, 0.12);
+    border-radius: 1px;
+    border: 1px solid rgba(60, 60, 60, 0.1);
+}
+
+/* Animated fill bar — tier color with transition */
+.dk-xp-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 3px;
+    transition: width 200ms ease-out, background 300ms ease;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 4px rgba(52, 152, 219, 0.3);
+    pointer-events: none;
+    background: transparent;
+}
+
+/* Watermark text — shows progress at fill edge */
+.dk-xp-watermark {
+    position: absolute;
+    font-size: 11px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000, 0 0 4px rgba(0, 0, 0, 0.8);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 2;
+}
+
+/* Badge container — centered on bar */
+.dk-xp-badge-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* Badge background circle */
+.dk-xp-badge-bg {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(200, 200, 200, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 500ms ease, width 300ms ease, height 300ms ease;
+    position: relative;
+    /* Prevent transform from affecting parent layout */
+    will-change: transform, opacity;
+}
+
+/* Badge text — level number or "MAX"/"DONE" */
+.dk-xp-badge-text {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px #000;
+    transition: color 500ms ease, font-size 300ms ease;
+    user-select: none;
+}
+
+/* Badge outer glow ring — positioned relative to badge-container */
+.dk-xp-badge-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid transparent;
+    pointer-events: none;
+    transition: border-color 500ms ease, width 300ms ease, height 300ms ease;
+    /* Fixed stacking context: z-index 1 ensures glow renders above bar but below badge text */
+    z-index: 1;
+}
+
+/* Particle element style */
+.dk-xp-particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 4;
+}
+
+/* Level burst ring element */
+.dk-xp-level-burst {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border-style: solid;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Ambient ring for tier 3 (rotating outer ring) */
+.dk-xp-badge-ambient-ring {
+    position: absolute;
+    top: 0%;
+    left: 0%;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 2px dashed rgba(150, 50, 255, 0.4);
+    transform: translate(0%, 0%);
+    pointer-events: none;
+}
+
+/* Spark element for tier 4 */
+.dk-xp-spark {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 4;
+}

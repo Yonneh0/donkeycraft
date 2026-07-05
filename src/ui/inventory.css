@@ -1,0 +1,59 @@
+
+/* ============================================================
+   INVENTORY GRID
+   ============================================================ */
+
+.dk-inventory-grid {
+    display: grid;
+    gap: 2px;
+    padding: 4px;
+}
+
+.dk-inventory-grid.grid-9x1 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x3 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x4 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x5 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-inventory-grid.grid-9x6 {
+    grid-template-columns: repeat(9, 48px);
+}
+
+.dk-slot {
+    width: 48px;
+    height: 48px;
+    background: rgba(100, 100, 100, 0.6);
+    border: 2px solid #555;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.1s ease;
+}
+
+.dk-slot:hover {
+    border-color: #888;
+    background: rgba(120, 120, 120, 0.7);
+}
+
+.dk-slot.drag-over {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.15);
+}
+
+.dk-slot.highlight {
+    border-color: #3498db;
+    background: rgba(52, 152, 219, 0.15);
+}

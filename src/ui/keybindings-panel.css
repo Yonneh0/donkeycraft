@@ -1,0 +1,63 @@
+/* ============================================================
+    KEYBINDINGS PANEL (top display-only bar)
+    ============================================================ */
+
+.dk-keybindings-panel {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    pointer-events: none;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 6px 14px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #e0e0e0;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9), 1px 1px 2px rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.dk-keybindings-panel .dk-kb-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin: 0 4px;
+}
+
+.dk-keybindings-panel .dk-kb-separator {
+    color: rgba(255, 255, 255, 0.25);
+    margin: 0 1px;
+}
+
+.dk-keybindings-panel .dk-kb-keys {
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.dk-keybindings-panel .dk-kb-label {
+    color: #bbbbbb;
+}
+
+.dk-keybindings-panel .dk-kb-input-status {
+    margin-left: 6px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dk-keybindings-panel .dk-kb-locked {
+    color: #2ecc71;
+}
+
+.dk-keybindings-panel .dk-kb-unlocked {
+    color: #e74c3c;
+}

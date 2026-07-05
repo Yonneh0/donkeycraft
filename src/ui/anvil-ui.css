@@ -1,0 +1,17 @@
+
+/* ============================================================
+   ANVIL UI
+   ============================================================ */
+
+.dk-anvil-rename {
+    margin: 12px 0;
+}
+
+.dk-anvil-result {
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(60, 60, 60, 0.4);
+    border: 1px dashed #666;
+    border-radius: 4px;
+    text-align: center;
+}

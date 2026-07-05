@@ -1,0 +1,232 @@
+/* ============================================================
+   HUNGER BAR
+   ============================================================ */
+
+/* Outer wrapper — positioned above hotbar, right-aligned with hotbar edge */
+.dk-hunger-bar-wrapper {
+    position: absolute;
+    bottom: 68px;
+    right: calc(50% - 228px);
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    z-index: 24;
+    pointer-events: none;
+}
+
+/* Unified hunger + hydration bar — single row for all 9 icons (6 drumsticks + 3 water drops) */
+.dk-hunger-hydration-bar {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 2px 4px;
+    border-radius: 6px;
+    /* Layered shadows: outer depth + inner top highlight + subtle border glow */
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+    /* Subtle gradient background blending hunger brown with hydration blue */
+    background: linear-gradient(180deg, rgba(32, 32, 30, 0.45) 0%, rgba(16, 18, 20, 0.55) 100%);
+    overflow: visible;
+    /* Allow floating +/- text to render outside row bounds */
+}
+
+/* Individual drumstick container — no border, subtle glow */
+.dk-drumstick-container {
+    width: 18px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 150ms ease, transform 150ms ease;
+    position: relative;
+    border: none;
+    box-shadow: none;
+}
+
+/* Drumstick SVG base styles */
+.dk-drumstick-container svg {
+    width: 18px;
+    height: 20px;
+    display: block;
+}
+
+/* Drumstick eat pulse animation */
+.dk-drumstick-eat-pulse {
+    animation: drumstick-eat-pulse 400ms ease-out;
+}
+
+/* Drumstick dim animation on depletion */
+.dk-drumstick-dim {
+    animation: drumstick-dim 300ms ease-out;
+}
+
+/* Floating +/- text */
+.dk-hunger-text {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    pointer-events: none;
+    animation: float-text-up 800ms ease-out forwards;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+    z-index: 10;
+}
+
+/* Full-screen brown overlay for low hunger — more opaque */
+.dk-hunger-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
+}
+
+
+/* Individual water drop container — no border, subtle glow */
+.dk-drop-container {
+    width: 18px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: filter 150ms ease, transform 150ms ease;
+    position: relative;
+    border: none;
+    box-shadow: none;
+}
+
+/* Water drop SVG base styles */
+.dk-drop-container svg {
+    width: 18px;
+    height: 20px;
+    display: block;
+}
+
+/* Full water drop — blue fill with glow */
+.dk-drop-full .dk-drop {
+    filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.5));
+}
+
+/* Water drop drink pulse animation (on hydration gain) */
+.dk-drop-drink-pulse {
+    animation: drop-drink-pulse 400ms ease-out;
+}
+
+/* Water drop dim animation on dehydration */
+.dk-drop-dim {
+    animation: drop-dim 300ms ease-out;
+}
+
+/* Floating +/- text for hydration */
+.dk-hydration-text {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    pointer-events: none;
+    animation: float-text-up 800ms ease-out forwards;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+    z-index: 10;
+}
+
+/* Full-screen blue overlay for low hydration — more opaque */
+.dk-hydration-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    background: radial-gradient(ellipse at center, rgba(0, 100, 200, 0.3) 0%, rgba(0, 60, 120, 0.6) 100%);
+}
+
+/* ============================================================
+   HUNGER/HYDRATION BAR ANIMATIONS — @keyframes definitions
+   ============================================================ */
+
+/* Water drop drink pulse — brief scale-up + blue glow on hydration gain (unique to hydration) */
+@keyframes drop-drink-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+/* Water drop dim — fade + desaturate on dehydration (unique to hydration) */
+@keyframes drop-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}
+
+/* ============================================================
+   HUNGER BAR ANIMATIONS — @keyframes definitions
+   ============================================================ */
+
+/* Drumstick eat pulse — brief scale-up + warm glow on hunger gain */
+@keyframes drumstick-eat-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+/* Drumstick dim — fade + desaturate on hunger loss */
+@keyframes drumstick-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}

@@ -660,7 +660,7 @@ body.dk-pointer-locked #dk-canvas-container {
 /* ============================================================
    HEALTH/HUNGER BAR ANIMATIONS — NOTE: All health and hunger bar
    @keyframes are defined in gui.css to avoid duplication.
-   style.css retains only XP, time-dial, and map-related animations.
+   core.css retains only XP, time-dial, and map-related animations.
    ============================================================ */
 
 /* ============================================================

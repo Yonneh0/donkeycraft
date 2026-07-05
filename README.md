@@ -119,9 +119,6 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-css/
-  style.css         # Base styles: full-screen canvas, overlay positioning
-  gui.css           # GUI styles: panels, tabs, slots, buttons
 src/
   core/             # Core infrastructure (12 files, ~3,670 lines)
     namespace.js        # Global Donkeycraft namespace object
@@ -223,6 +220,7 @@ src/
     weather.js            # Weather particle effects
     map-renderer.js       # 2D overhead map, rotating minimap, time-of-day dial, surface cache
   ui/                 # Inventory, HUD, GUI screens (19 files, ~7,800 lines)
+    gui-core.css            # GUI styles: panels, tabs, slots, buttons
     item-stack.js           # Item stacks with NBT-like tags
     inventory.js            # Multi-slot inventories
     gui-manager.js          # Screen open/close system
@@ -243,6 +241,8 @@ src/
     keybindings-panel.js    # Keybind configuration UI
     gamemode-badge.js       # Game mode badge (SURVIVAL/CREATIVE) with click-to-swap
     speed-indicator.js      # Speed indicator/control (sneak/walk/run/turbo buttons)
+    
+core.css           # Base styles: full-screen canvas, overlay positioning
 game.js             # Main game class: loop, init, pause/resume (1,639 lines)
 
 assets/

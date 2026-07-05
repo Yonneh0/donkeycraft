@@ -190,13 +190,13 @@
      * @private
      */
     Donkeycraft.HungerBar.prototype._createOverlays = function () {
-        // Brown overlay for low hunger (styling defined in css/gui.css .dk-hunger-overlay)
+        // Brown overlay for low hunger
         var hungerOverlay = document.createElement('div');
         hungerOverlay.className = 'dk-hunger-overlay';
         document.body.appendChild(hungerOverlay);
         this._hungerOverlay = hungerOverlay;
 
-        // Blue overlay for low hydration (styling defined in css/gui.css .dk-hydration-overlay)
+        // Blue overlay for low hydration
         var hydrationOverlay = document.createElement('div');
         hydrationOverlay.className = 'dk-hydration-overlay';
         document.body.appendChild(hydrationOverlay);
