@@ -1,5 +1,6 @@
 // Donkeycraft — Base Entity Class
-// All entities (mobs, bosses, projectiles) inherit from this base class.
+// All entities (mobs, bosses, projectiles, doors, sign posts, donkeys, etc.) inherit from this base class.
+// Enhanced with skeletal animation support via the entity engine system.
 (function () {
     'use strict';
 
@@ -7,21 +8,45 @@
     var Config = Donkeycraft.Config;
     var EventBus = Donkeycraft.EventBus;
 
+    // ============================================================
+    // Entity Type Constants — Common entity type identifiers
+    // ============================================================
+
+    /**
+     * EntityTypes — Standardized entity type identifiers.
+     * @namespace
+     */
+    Donkeycraft.EntityTypes = {
+        PLAYER: 'player',
+        NPC: 'npc',
+        ANIMAL: 'animal',
+        HOSTILE: 'hostile',
+        BOSS: 'boss',
+        PROJECTILE: 'projectile',
+        DOOR: 'door',
+        SIGN_POST: 'sign_post',
+        CHEST: 'chest',
+        FURNACE: 'furnace'
+    };
+
     /**
      * Entity — base class for all entities in the world.
+     * Supports skeletal animation via bone definitions and animation controllers.
      * @param {object} [config] - Entity configuration.
-     * @param {string} [config.type='generic'] - Entity type identifier.
+     * @param {string} [config.type='generic'] - Entity type identifier (e.g., 'zombie', 'cow', 'door').
      * @param {number} [config.x=0] - Initial X position.
      * @param {number} [config.y=64] - Initial Y position.
      * @param {number} [config.z=0] - Initial Z position.
      * @param {number} [config.height=1.8] - Entity height in blocks.
      * @param {number} [config.width=0.6] - Entity width in blocks.
+     * @param {number} [config.maxHealth=20] - Maximum health points.
+     * @param {string} [config.skeleton=null] - Skeleton template name (e.g., 'bipedal', 'quadruped').
      */
     Donkeycraft.Entity = function (config) {
         config = config || {};
 
         /**
-         * Entity type identifier.
+         * Entity type identifier (from EntityTypeDB or custom).
          * @type {string}
          */
         this.type = config.type || 'generic';
@@ -55,13 +80,13 @@
         };
 
         /**
-         * Entity height in blocks.
+         * Entity height in blocks (from EntityTypeDB if available).
          * @type {number}
          */
         this.height = config.height || 1.8;
 
         /**
-         * Entity width in blocks.
+         * Entity width in blocks (from EntityTypeDB if available).
          * @type {number}
          */
         this.width = config.width || 0.6;
@@ -105,7 +130,147 @@
          * @private
          */
         this._subscribers = [];
+
+        // ============================================================
+        // Animation & Skeleton System
+        // ============================================================
+
+        /**
+         * Skeleton template name for this entity (e.g., 'bipedal', 'quadruped').
+         * Looked up from EntityTypeDB if not explicitly provided.
+         * @type {string|null}
+         */
+        this.skeleton = config.skeleton || null;
+
+        /**
+         * Bone definitions for this entity's skeleton.
+         * Array of Donkeycraft.BoneDefinition objects.
+         * @type {Array<Donkeycraft.BoneDefinition>|null}
+         */
+        this.bones = null;
+
+        /**
+         * Animation controller for this entity (manages state machine and kinematics).
+         * @type {Object|null}
+         * @private
+         */
+        this._animationController = null;
+
+        /**
+         * Whether this entity uses skeletal animation.
+         * @type {boolean}
+         */
+        this.useAnimation = false;
+
+        /**
+         * Entity unique ID (assigned by EntityManager).
+         * @type {number}
+         */
+        this._id = 0;
+
+        // Initialize skeleton and animation if available
+        this._initAnimationSystem();
     };
+
+    /**
+     * _initAnimationSystem — Initialize the skeleton and animation system for this entity.
+     * @private
+     */
+    Donkeycraft.Entity.prototype._initAnimationSystem = function () {
+        // Check if EntityTypeDB has a definition for this type
+        var typeDef = null;
+        if (Donkeycraft.EntityTypeDB) {
+            typeDef = Donkeycraft.EntityTypeDB[this.type];
+        }
+
+        // Use type definition if available, otherwise use config
+        if (typeDef) {
+            // Set dimensions from type definition
+            this.height = typeDef.height || this.height;
+            this.width = typeDef.width || this.width;
+
+            // Set skeleton if not already set
+            if (!this.skeleton && typeDef.skeleton) {
+                this.skeleton = typeDef.skeleton;
+            }
+        }
+
+        // Initialize bones from skeleton template
+        if (this.skeleton && Donkeycraft.SkeletonTemplates) {
+            var skeletonTemplate = Donkeycraft.SkeletonTemplates[this.skeleton];
+            if (skeletonTemplate && Array.isArray(skeletonTemplate)) {
+                this.bones = skeletonTemplate;
+                this.useAnimation = true;
+
+                // Create animation controller
+                this._createAnimationController(typeDef);
+            }
+        }
+
+        // If no skeleton but still want basic idle animation, create minimal system
+        if (!this.skeleton && !this._animationController) {
+            // Static entity — no animation needed
+            this.useAnimation = false;
+            this.bones = [new (Donkeycraft.BoneDefinition || function () {})('root', {
+                offset: new (Donkeycraft.Vector3 || function () {})(),
+                pivot: new (Donkeycraft.Vector3 || function () {})()
+            })];
+        }
+    };
+
+    /**
+     * _createAnimationController — Create and configure the animation controller for this entity.
+     * @param {Object|null} typeDef - Entity type definition from EntityTypeDB.
+     * @private
+     */
+    Donkeycraft.Entity.prototype._createAnimationController = function (typeDef) {
+        if (!this.useAnimation || !Donkeycraft.EntityAnimationController) return;
+
+        this._animationController = new Donkeycraft.EntityAnimationController();
+
+        // Register animation clips based on type definition
+        if (typeDef && typeDef.animations && Array.isArray(typeDef.animations)) {
+            var clips = [];
+            for (var i = 0; i < typeDef.animations.length; i++) {
+                var animName = typeDef.animations[i];
+                var animDef = Donkeycraft.AnimationDefinitions ? Donkeycraft.AnimationDefinitions[animName] : null;
+                if (animDef) {
+                    var clip = new Donkeycraft.AnimationClip(
+                        animName,
+                        animDef.duration,
+                        animDef.loop !== undefined ? animDef.loop : true,
+                        animDef.keyframes
+                    );
+                    clips.push(clip);
+                }
+            }
+            this._animationController.registerAnimations(clips);
+
+            // Set initial animation state to idle
+            if (clips.length > 0) {
+                this._animationController.setState('idle');
+            }
+        }
+    };
+
+    /**
+     * _notifyTick — Internal tick notification for subscribers.
+     * @param {number} deltaTime - Time since last tick.
+     * @private
+     */
+    Donkeycraft.Entity.prototype._notifyTick = function (deltaTime) {
+        for (var i = 0; i < this._subscribers.length; i++) {
+            try {
+                this._subscribers[i](deltaTime);
+            } catch (e) {
+                // Error isolation
+            }
+        }
+    };
+
+    // ============================================================
+    // Position & Velocity API
+    // ============================================================
 
     /**
      * Get the entity's current position.
@@ -178,6 +343,10 @@
         this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
     };
 
+    // ============================================================
+    // Dimensions & Bounding Box API
+    // ============================================================
+
     /**
      * Get the entity's dimensions.
      * @returns {{height: number, width: number}|null}
@@ -210,7 +379,7 @@
     };
 
     /**
-     * Get the entity's eye position.
+     * Get the entity's eye position (for raycasting, line-of-sight).
      * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getEyePosition = function () {
@@ -240,6 +409,10 @@
         ).normalize();
     };
 
+    // ============================================================
+    // Health & Damage API
+    // ============================================================
+
     /**
      * Check if the entity is alive.
      * @returns {boolean}
@@ -266,6 +439,14 @@
      */
     Donkeycraft.Entity.prototype.getHealth = function () {
         return this.health;
+    };
+
+    /**
+     * Get the entity's maximum health.
+     * @returns {number}
+     */
+    Donkeycraft.Entity.prototype.getMaxHealth = function () {
+        return this.maxHealth;
     };
 
     /**
@@ -300,6 +481,11 @@
         this.health = Math.floor(Donkeycraft.clamp(this.health - amount, 0, this.maxHealth));
         if (this.health <= 0) {
             this.setAlive(false);
+        }
+
+        // Trigger hurt animation if available
+        if (this._animationController && Donkeycraft.AnimationDefinitions && Donkeycraft.AnimationDefinitions.hurt) {
+            this._animationController.setForcedState('hurt', 0.4);
         }
 
         // Emit damage event via global EventBus for consistent handling
@@ -341,12 +527,107 @@
         // Subclasses can override
     };
 
+    // ============================================================
+    // Animation API — Bone transforms and animation control
+    // ============================================================
+
+    /**
+     * Get the entity's bone definitions.
+     * @returns {Array<Donkeycraft.BoneDefinition>|null} Array of bone definitions, or null.
+     */
+    Donkeycraft.Entity.prototype.getBones = function () {
+        if (this._destroyed) return null;
+        return this.bones;
+    };
+
+    /**
+     * Get the entity's animation controller.
+     * @returns {Object|null} Animation controller instance, or null.
+     */
+    Donkeycraft.Entity.prototype.getAnimationController = function () {
+        return this._animationController;
+    };
+
+    /**
+     * Get the current bone rotation transforms for rendering.
+     * Returns { boneName: { rx, ry, rz } } where rotations are in radians.
+     * @returns {Object.<string, {rx: number, ry: number, rz: number}>}
+     */
+    Donkeycraft.Entity.prototype.getBoneTransforms = function () {
+        if (!this._animationController) return {};
+        return this._animationController.getBoneTransforms();
+    };
+
+    /**
+     * Force an animation state on this entity (e.g., 'attack', 'hurt').
+     * @param {string} state - Animation state name.
+     * @param {number} [duration=0] - Duration in seconds (0 = until cleared).
+     */
+    Donkeycraft.Entity.prototype.setAnimationState = function (state, duration) {
+        if (!this._animationController) return;
+        this._animationController.setForcedState(state, duration);
+    };
+
+    /**
+     * Clear any forced animation state, returning to auto-selection.
+     */
+    Donkeycraft.Entity.prototype.clearAnimationState = function () {
+        if (!this._animationController) return;
+        this._animationController.clearForcedState();
+    };
+
+    /**
+     * Get the current animation state name.
+     * @returns {string|null} Current animation state or null.
+     */
+    Donkeycraft.Entity.prototype.getAnimationState = function () {
+        if (!this._animationController) return null;
+        return this._animationController.getState();
+    };
+
+    /**
+     * Get the skeleton template name for this entity.
+     * @returns {string|null} Skeleton name or null.
+     */
+    Donkeycraft.Entity.prototype.getSkeleton = function () {
+        return this.skeleton;
+    };
+
+    // ============================================================
+    // Tick & Lifecycle API
+    // ============================================================
+
     /**
      * Tick method — called every game tick. Override for entity-specific logic.
+     * Updates animation controller and applies velocity to position.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function (deltaTime) {
         if (this._destroyed) return;
+
+        // Update animation controller if available
+        if (this._animationController) {
+            // Ground detection callback: check if there's a solid block below the entity
+            var self = this;
+            var groundCheck = function () {
+                if (!self._position) return null;
+                var footY = Math.floor(self._position.y);
+                // Check if block at feet position is solid (simplified — real check uses chunk manager)
+                // For now, assume entities on the world surface are grounded
+                // This will be overridden by EntityManager with proper ground checking
+                return null; // Placeholder — ground detection handled externally
+            };
+
+            var result = this._animationController.tick(deltaTime, groundCheck);
+
+            // Apply kinematic velocity to entity position
+            var kinematics = result.kinematics;
+            if (kinematics) {
+                this._velocity.x = kinematics.velocity.x;
+                this._velocity.y = kinematics.velocity.y;
+                this._velocity.z = kinematics.velocity.z;
+            }
+        }
 
         // Apply velocity to position
         this._position.x += this._velocity.x * deltaTime;
@@ -444,6 +725,7 @@
         this._velocity = null;
         this._rotation = null;
         this._subscribers = [];
+        this._animationController = null;
     };
 
 })();

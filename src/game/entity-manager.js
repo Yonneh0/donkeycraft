@@ -1,25 +1,41 @@
 // Donkeycraft — Entity Manager
 // Manages entity lifecycle: spawn, despawn, tick all entities, by-type queries.
+// Enhanced with spatial hash-based awareness tracking for efficient rendering culling.
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
     var EventBus = Donkeycraft.EventBus;
 
+    // ============================================================
+    // Awareness Tier Constants — Proximity-based update/render tiers
+    // ============================================================
+
+    /**
+     * AwarenessTiers — Entity proximity tiers for render/update optimization.
+     * @namespace
+     */
+    Donkeycraft.AwarenessTiers = {
+        NEAR: 'near',    // 0-8 blocks: Full update, render, animate
+        FAR: 'far',      // 8-32 blocks: Reduced update, render, simplified animation
+        DISTANT: 'distant' // 32+ blocks: Position-only updates, no animation
+    };
+
     /**
      * EntityManager — manages all active entities in the world.
+     * Maintains an efficient spatial hash for proximity queries and tiered awareness tracking.
      */
     Donkeycraft.EntityManager = function () {
         /**
-         * All active entities indexed by unique ID.
-         * @type {Object}
+         * All active entities indexed by ID.
+         * @type {Object.<number, Donkeycraft.Entity>}
          * @private
          */
         this._entities = {};
 
         /**
          * Entities indexed by type for fast queries.
-         * @type {Object}
+         * @type {Object.<string, Array<Donkeycraft.Entity>>}
          * @private
          */
         this._byType = {};
@@ -36,7 +52,302 @@
          * @type {number}
          */
         this.maxEntities = 1000;
+
+        // ============================================================
+        // Spatial Hash — O(1) proximity queries
+        // ============================================================
+
+        /**
+         * Size of each spatial hash cell in blocks.
+         * Smaller cells = more precise queries but more overhead.
+         * @type {number}
+         * @private
+         */
+        this._cellSize = 2;
+
+        /**
+         * Spatial hash grid: "cellX,cellY,cellZ" → Set of entity IDs.
+         * @type {Object.<string, Set<number>>}
+         * @private
+         */
+        this._spatialHash = {};
+
+        /**
+         * Entity-to-cell mapping: entityId → "cellX,cellY,cellZ".
+         * @type {Object.<number, string>}
+         * @private
+         */
+        this._entityToCell = {};
+
+        // ============================================================
+        // Awareness Table — Player-centric proximity tracking
+        // ============================================================
+
+        /**
+         * Current awareness center (player position).
+         * @type {{x: number, y: number, z: number}|null}
+         * @private
+         */
+        this._awarenessCenter = null;
+
+        /**
+         * Awareness radius in blocks (matches render distance).
+         * @type {number}
+         * @private
+         */
+        this._awarenessRadius = 16;
+
+        /**
+         * Entity awareness tiers: entityId → AwarenessTier.
+         * @type {Object.<number, string>}
+         * @private
+         */
+        this._entityAwareness = {};
+
+        /**
+         * Cached near-tier entity IDs for fast rendering.
+         * @type {Array<number>}
+         * @private
+         */
+        this._nearEntities = [];
+
+        /**
+         * Cached far-tier entity IDs for rendering.
+         * @type {Array<number>}
+         * @private
+         */
+        this._farEntities = [];
     };
+
+    // ============================================================
+    // Spatial Hash Operations
+    // ============================================================
+
+    /**
+     * _hashKey — Compute spatial hash key from world coordinates.
+     * @private
+     * @param {number} x - World X coordinate.
+     * @param {number} y - World Y coordinate.
+     * @param {number} z - World Z coordinate.
+     * @returns {string} Hash key string.
+     */
+    Donkeycraft.EntityManager.prototype._hashKey = function (x, y, z) {
+        var cellSize = this._cellSize;
+        var cellX = Math.floor(x / cellSize);
+        var cellY = Math.floor(y / cellSize);
+        var cellZ = Math.floor(z / cellSize);
+        return cellX + ',' + cellY + ',' + cellZ;
+    };
+
+    /**
+     * _updateSpatialHash — Add or update an entity's position in the spatial hash.
+     * @private
+     * @param {number} entityId - Entity ID.
+     * @param {Donkeycraft.Vector3} position - Entity world position.
+     */
+    Donkeycraft.EntityManager.prototype._updateSpatialHash = function (entityId, position) {
+        if (!position) return;
+
+        var key = this._hashKey(position.x, position.y, position.z);
+        var oldKey = this._entityToCell[entityId];
+
+        // Remove from old cell
+        if (oldKey && this._spatialHash[oldKey]) {
+            var oldSet = this._spatialHash[oldKey];
+            oldSet.delete(entityId);
+            if (oldSet.size === 0) {
+                delete this._spatialHash[oldKey];
+            }
+        }
+
+        // Add to new cell
+        if (!this._spatialHash[key]) {
+            this._spatialHash[key] = new Set();
+        }
+        this._spatialHash[key].add(entityId);
+        this._entityToCell[entityId] = key;
+    };
+
+    /**
+     * _removeFromSpatialHash — Remove an entity from the spatial hash.
+     * @private
+     * @param {number} entityId - Entity ID.
+     */
+    Donkeycraft.EntityManager.prototype._removeFromSpatialHash = function (entityId) {
+        var key = this._entityToCell[entityId];
+        if (key && this._spatialHash[key]) {
+            var set = this._spatialHash[key];
+            set.delete(entityId);
+            if (set.size === 0) {
+                delete this._spatialHash[key];
+            }
+        }
+        delete this._entityToCell[entityId];
+    };
+
+    /**
+     * _getNearbyEntityIds — Get entity IDs within a radius of a point using spatial hash.
+     * @private
+     * @param {number} cx - Center X coordinate.
+     * @param {number} cy - Center Y coordinate.
+     * @param {number} cz - Center Z coordinate.
+     * @param {number} radius - Search radius in blocks.
+     * @returns {Array<number>} Array of nearby entity IDs.
+     */
+    Donkeycraft.EntityManager.prototype._getNearbyEntityIds = function (cx, cy, cz, radius) {
+        var cellSize = this._cellSize;
+        var minCellX = Math.floor((cx - radius) / cellSize);
+        var maxCellX = Math.floor((cx + radius) / cellSize);
+        var minCellY = Math.floor((cy - radius) / cellSize);
+        var maxCellY = Math.floor((cy + radius) / cellSize);
+        var minCellZ = Math.floor((cz - radius) / cellSize);
+        var maxCellZ = Math.floor((cz + radius) / cellSize);
+
+        var result = [];
+        var radiusSq = radius * radius;
+
+        for (var cellX = minCellX; cellX <= maxCellX; cellX++) {
+            for (var cellY = minCellY; cellY <= maxCellY; cellY++) {
+                for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+                    var key = cellX + ',' + cellY + ',' + cellZ;
+                    var cellSet = this._spatialHash[key];
+                    if (cellSet) {
+                        cellSet.forEach(function (entityId) {
+                            var entity = this._entities[entityId];
+                            if (entity && entity.isAlive()) {
+                                var pos = entity.getPosition();
+                                if (pos) {
+                                    var dx = pos.x - cx;
+                                    var dy = pos.y - cy;
+                                    var dz = pos.z - cz;
+                                    if (dx * dx + dy * dy + dz * dz <= radiusSq) {
+                                        result.push(entityId);
+                                    }
+                                }
+                            }
+                        }, this);
+                    }
+                }
+            }
+        }
+
+        return result;
+    };
+
+    // ============================================================
+    // Awareness Table Operations
+    // ============================================================
+
+    /**
+     * _updateAwareness — Recompute awareness tiers for all entities based on player position.
+     * @private
+     * @param {number} playerX - Player X coordinate.
+     * @param {number} playerY - Player Y coordinate.
+     * @param {number} playerZ - Player Z coordinate.
+     */
+    Donkeycraft.EntityManager.prototype._updateAwareness = function (playerX, playerY, playerZ) {
+        this._awarenessCenter = { x: playerX, y: playerY, z: playerZ };
+
+        var nearEntities = [];
+        var farEntities = [];
+        var awarenessRadius = this._awarenessRadius;
+        var nearRadius = 8; // NEAR tier radius in blocks
+        var farRadius = 32; // FAR tier outer radius
+
+        // Iterate over all alive entities
+        for (var id in this._entities) {
+            if (this._entities.hasOwnProperty(id)) {
+                var entity = this._entities[id];
+                if (!entity.isAlive()) continue;
+
+                var pos = entity.getPosition();
+                if (!pos) continue;
+
+                var dx = pos.x - playerX;
+                var dy = pos.y - playerY;
+                var dz = pos.z - playerZ;
+                var distSq = dx * dx + dy * dy + dz * dz;
+                var dist = Math.sqrt(distSq);
+
+                // Determine awareness tier
+                var tier = Donkeycraft.AwarenessTiers.DISTANT;
+                if (dist <= nearRadius) {
+                    tier = Donkeycraft.AwarenessTiers.NEAR;
+                    nearEntities.push(parseInt(id, 10));
+                } else if (dist <= farRadius && dist <= awarenessRadius) {
+                    tier = Donkeycraft.AwarenessTiers.FAR;
+                    farEntities.push(parseInt(id, 10));
+                }
+
+                // Update awareness tracking
+                var entityId = parseInt(id, 10);
+                var oldTier = this._entityAwareness[entityId];
+                this._entityAwareness[entityId] = tier;
+
+                // Emit awareness change event if tier changed
+                if (oldTier && oldTier !== tier && EventBus) {
+                    try {
+                        EventBus.emitSafe('entity:awareness:changed', {
+                            entity: entity,
+                            id: entityId,
+                            oldTier: oldTier,
+                            newTier: tier
+                        });
+                    } catch (e) {
+                        // EventBus may not be available
+                    }
+                }
+            }
+        }
+
+        this._nearEntities = nearEntities;
+        this._farEntities = farEntities;
+    };
+
+    /**
+     * getAwarenessTier — Get the awareness tier for a specific entity.
+     * @param {number} entityId - Entity ID.
+     * @returns {string|null} Awareness tier ('near', 'far', 'distant') or null if not tracked.
+     */
+    Donkeycraft.EntityManager.prototype.getAwarenessTier = function (entityId) {
+        return this._entityAwareness[entityId] || null;
+    };
+
+    /**
+     * getNearEntities — Get entity IDs in the NEAR awareness tier.
+     * @returns {Array<number>} Array of entity IDs.
+     */
+    Donkeycraft.EntityManager.prototype.getNearEntities = function () {
+        return this._nearEntities.slice(); // Return copy
+    };
+
+    /**
+     * getFarEntities — Get entity IDs in the FAR awareness tier.
+     * @returns {Array<number>} Array of entity IDs.
+     */
+    Donkeycraft.EntityManager.prototype.getFarEntities = function () {
+        return this._farEntities.slice(); // Return copy
+    };
+
+    /**
+     * getAwarenessRadius — Get the current awareness radius.
+     * @returns {number} Radius in blocks.
+     */
+    Donkeycraft.EntityManager.prototype.getAwarenessRadius = function () {
+        return this._awarenessRadius;
+    };
+
+    /**
+     * setAwarenessRadius — Set the awareness radius for entity culling.
+     * @param {number} radius - Radius in blocks.
+     */
+    Donkeycraft.EntityManager.prototype.setAwarenessRadius = function (radius) {
+        this._awarenessRadius = Math.max(4, Math.min(64, radius));
+    };
+
+    // ============================================================
+    // Entity Lifecycle — Spawn, despawn, tick
+    // ============================================================
 
     /**
      * Spawn a new entity.
@@ -66,6 +377,12 @@
         }
         this._byType[type].push(entity);
 
+        // Update spatial hash with entity position
+        var pos = entity.getPosition();
+        if (pos) {
+            this._updateSpatialHash(id, pos);
+        }
+
         // Emit spawn event via global EventBus
         if (EventBus) {
             try {
@@ -91,6 +408,18 @@
         if (!entity) {
             return;
         }
+
+        // Remove from spatial hash
+        this._removeFromSpatialHash(id);
+
+        // Remove from awareness tracking
+        delete this._entityAwareness[id];
+
+        var nearIdx = this._nearEntities.indexOf(id);
+        if (nearIdx !== -1) this._nearEntities.splice(nearIdx, 1);
+
+        var farIdx = this._farEntities.indexOf(id);
+        if (farIdx !== -1) this._farEntities.splice(farIdx, 1);
 
         // Remove from type index
         var typeList = this._byType[entity.type];
@@ -257,10 +586,19 @@
 
     /**
      * Tick all alive entities.
+     * Updates spatial hash and awareness table based on player position.
      * @param {number} deltaTime - Time since last tick in seconds.
+     * @param {number} [playerX=0] - Player X coordinate for awareness.
+     * @param {number} [playerY=64] - Player Y coordinate for awareness.
+     * @param {number} [playerZ=0] - Player Z coordinate for awareness.
      */
-    Donkeycraft.EntityManager.prototype.tick = function (deltaTime) {
+    Donkeycraft.EntityManager.prototype.tick = function (deltaTime, playerX, playerY, playerZ) {
         var idsToRemove = [];
+
+        // Update awareness if player position provided
+        if (playerX !== undefined && playerY !== undefined && playerZ !== undefined) {
+            this._updateAwareness(playerX, playerY, playerZ);
+        }
 
         // Single pass: tick alive entities and collect dead ones
         for (var id in this._entities) {
@@ -269,6 +607,12 @@
                 if (entity.isAlive()) {
                     try {
                         entity.tick(deltaTime);
+
+                        // Update spatial hash with new position
+                        var newPos = entity.getPosition();
+                        if (newPos) {
+                            this._updateSpatialHash(parseInt(id, 10), newPos);
+                        }
                     } catch (e) {
                         // Entity tick error — mark for removal
                         idsToRemove.push(parseInt(id, 10));
@@ -283,10 +627,10 @@
         }
 
         // Also remove any entities that died or were despawned during tick
-        for (var id in this._entities) {
-            if (this._entities.hasOwnProperty(id)) {
-                if (!this._entities[id].isAlive()) {
-                    this.despawn(parseInt(id, 10));
+        for (var id2 in this._entities) {
+            if (this._entities.hasOwnProperty(id2)) {
+                if (!this._entities[id2].isAlive()) {
+                    this.despawn(parseInt(id2, 10));
                 }
             }
         }
@@ -312,7 +656,15 @@
         }
         this._entities = {};
         this._byType = {};
+        this._spatialHash = {};
+        this._entityToCell = {};
+        this._entityAwareness = {};
+        this._nearEntities = [];
+        this._farEntities = [];
         this._nextId = 1;
+        this._awarenessCenter = null;
+        this._nearEntities = [];
+        this._farEntities = [];
     };
 
     /**
@@ -320,6 +672,40 @@
      */
     Donkeycraft.EntityManager.prototype.destroy = function () {
         this.clear();
+    };
+
+    /**
+     * Get statistics about the entity manager state.
+     * @returns {{total: number, alive: number, byType: Object, nearCount: number, farCount: number, distantCount: number}}
+     */
+    Donkeycraft.EntityManager.prototype.getStats = function () {
+        var byType = {};
+        for (var type in this._byType) {
+            if (this._byType.hasOwnProperty(type)) {
+                var list = this._byType[type];
+                var aliveCount = 0;
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].isAlive()) aliveCount++;
+                }
+                if (aliveCount > 0) byType[type] = aliveCount;
+            }
+        }
+
+        var distantCount = 0;
+        for (var id in this._entityAwareness) {
+            if (this._entityAwareness[id] === Donkeycraft.AwarenessTiers.DISTANT) {
+                distantCount++;
+            }
+        }
+
+        return {
+            total: Object.keys(this._entities).length,
+            alive: this.getAliveCount(),
+            byType: byType,
+            nearCount: this._nearEntities.length,
+            farCount: this._farEntities.length,
+            distantCount: distantCount
+        };
     };
 
 })();

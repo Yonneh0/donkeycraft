@@ -199,8 +199,9 @@
     <script src="src/ui/enchanting-ui.js"></script>
     <script src="src/ui/debug-overlay.js"></script>
 
-    <!-- Entities & Mobs -->
+    <!-- Entities & Mobs (base entity first, then engine, then manager, then extensions) -->
     <script src="src/game/entity.js"></script>
+    <script src="src/game/entity-engine.js"></script>
     <script src="src/game/entity-manager.js"></script>
     <script src="src/game/passive-mobs.js"></script>
     <script src="src/game/hostile-mobs.js"></script>
@@ -503,6 +504,9 @@ void main() {
 
 </script>
 
+    <!-- Entity Renderer (standalone entity rendering system — must load after entity-engine) -->
+    <script src="src/render/entity-renderer.js"></script>
+
     <!-- WebGL Rendering -->
     <script src="src/render/gl-context.js"></script>
     <script src="src/render/shader-manager.js"></script>
@@ -559,6 +563,14 @@ void main() {
                     gameSystems.blockPlacementSystem,
                     gameSystems.interactableBlocksSystem
                 );
+
+                // Wire up entity system: engine (animation/kinematics), manager (lifecycle/awareness), renderer
+                if (Donkeycraft.EntityEngine && Donkeycraft.EntityManager && Donkeycraft.EntityRenderer) {
+                    var entityEngine = new Donkeycraft.EntityEngine();
+                    var entityManager = new Donkeycraft.EntityManager();
+                    var entityRenderer = new Donkeycraft.EntityRenderer();
+                    game.setEntitySystems(entityEngine, entityManager, entityRenderer);
+                }
 
                 // Wire up storage systems (WorldStore + LevelData auto-save)
                 if (initSystems && initSystems.worldStore && initSystems.worldStore.isReady()) {

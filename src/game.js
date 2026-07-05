@@ -120,6 +120,11 @@
         // Player hitbox dimensions (from Config)
         this._playerWidth = Config.PLAYER_WIDTH;
         this._playerHeight = Config.PLAYER_HEIGHT;
+
+        // Entity system references (set via setEntitySystems())
+        this._entityEngine = null;
+        this._entityManager = null;
+        this._entityRenderer = null;
     };
 
     /**
@@ -545,6 +550,67 @@
     };
 
     /**
+     * setEntitySystems — wire up the entity engine, manager, and renderer.
+     * Also spawns example entities near the player for proof-of-concept testing.
+     * @param {Donkeycraft.EntityEngine} entityEngine - Animation & kinematics engine.
+     * @param {Donkeycraft.EntityManager} entityManager - Entity lifecycle manager.
+     * @param {Donkeycraft.EntityRenderer} entityRenderer - Standalone entity renderer.
+     */
+    Donkeycraft.Game.prototype.setEntitySystems = function (entityEngine, entityManager, entityRenderer) {
+        this._entityEngine = entityEngine || null;
+        this._entityManager = entityManager || null;
+        this._entityRenderer = entityRenderer || null;
+
+        // Wire entity engine to use the game's timer for tick updates
+        if (this._entityEngine && this._timer) {
+            try {
+                this._entityEngine.setTimer(this._timer);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire timer to entity engine: ' + e.message);
+            }
+        }
+
+        // Wire entity manager to use the game's event bus
+        if (this._entityManager && this._eventBus) {
+            try {
+                this._entityManager.setEventBus(this._eventBus);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire event bus to entity manager: ' + e.message);
+            }
+        }
+
+        // Wire entity renderer to use the game's WebGL context and shader manager
+        if (this._entityRenderer && this._gl && this._shaderManager) {
+            try {
+                this._entityRenderer.setGL(this._gl);
+                this._entityRenderer.setShaderManager(this._shaderManager);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire WebGL to entity renderer: ' + e.message);
+            }
+        }
+
+        // Wire the terrain renderer's world data access for entity block queries
+        if (this._entityRenderer && this._terrainRenderer) {
+            try {
+                this._entityRenderer.setWorldData(function (wx, wy, wz) {
+                    return self._getBlockAt(wx, wy, wz);
+                });
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire world data to entity renderer: ' + e.message);
+            }
+        }
+
+        // Spawn example entities for proof-of-concept testing
+        if (this._entityManager && this._player) {
+            try {
+                this._spawnExampleEntities();
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Failed to spawn example entities: ' + e.message);
+            }
+        }
+    };
+
+    /**
      * toggleDebugOverlay — toggles the F3 debug overlay visibility using CSS class.
      * @returns {boolean} True if debug is now visible.
      */
@@ -596,6 +662,111 @@
             'particles': '_renderParticles', 'hand': '_renderHand',
             'weather': '_renderWeather', 'gui': '_renderGUI'
         };
+    };
+
+    /**
+     * _spawnExampleEntities — spawn a variety of example entities near the player
+     * for proof-of-concept testing of the entity rendering system.
+     * Each entity type demonstrates different animation states and bone configurations.
+     * @private
+     */
+    Donkeycraft.Game.prototype._spawnExampleEntities = function () {
+        if (!this._entityManager || !this._player) return;
+
+        var playerPos = this._player.getPosition();
+        if (!playerPos) return;
+
+        // Define example entity configurations with different types and bone structures
+        var examples = [
+            // Humanoid entities (cow, zombie, skeleton) — use humanoid bone layout
+            { type: 'cow', x: 5, y: 0, z: 5, anim: 'idle' },
+            { type: 'zombie', x: -6, y: 0, z: 3, anim: 'walk' },
+            { type: 'skeleton', x: 3, y: 0, z: -7, anim: 'stand' },
+            // Animal entities (pig, chicken) — use animal bone layout
+            { type: 'pig', x: -4, y: 0, z: -5, anim: 'idle' },
+            { type: 'chicken', x: 8, y: 0, z: -2, anim: 'peck' },
+            // Structure entities (door, signpost) — static with minimal bones
+            { type: 'door', x: 0, y: 0, z: 10, anim: 'open' },
+            { type: 'signpost', x: -10, y: 0, z: 0, anim: 'static' }
+        ];
+
+        // Calculate ground Y for each entity position
+        var self = this;
+        for (var i = 0; i < examples.length; i++) {
+            (function (example) {
+                // Find ground level at entity position
+                var spawnChunkX = Math.floor(example.x / Config.CHUNK_SIZE);
+                var spawnChunkZ = Math.floor(example.z / Config.CHUNK_SIZE);
+                var spawnChunk = self._chunkManager.getChunkIfExists(spawnChunkX, spawnChunkZ);
+
+                var groundY = 64; // Default fallback
+                if (spawnChunk) {
+                    var localX = ((example.x % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
+                    var localZ = ((example.z % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
+                    // Scan for highest solid block
+                    for (var y = Config.WORLD_HEIGHT - 1; y >= 0; y--) {
+                        var blockId = spawnChunk.getBlock(Math.floor(localX), y, Math.floor(localZ));
+                        if (blockId && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(blockId)) {
+                            groundY = y + 1;
+                            break;
+                        }
+                    }
+                }
+
+                // Create entity with appropriate dimensions based on type
+                var entityConfig = {
+                    type: example.type,
+                    x: example.x,
+                    y: groundY,
+                    z: example.z,
+                    health: 20,
+                    maxHealth: 20
+                };
+
+                // Set dimensions based on entity type
+                switch (example.type) {
+                    case 'chicken':
+                        entityConfig.height = 0.6;
+                        entityConfig.width = 0.4;
+                        break;
+                    case 'pig':
+                        entityConfig.height = 1.0;
+                        entityConfig.width = 1.2;
+                        break;
+                    case 'door':
+                        entityConfig.height = 2.0;
+                        entityConfig.width = 0.8;
+                        break;
+                    case 'signpost':
+                        entityConfig.height = 1.5;
+                        entityConfig.width = 0.2;
+                        break;
+                    default: // humanoid types
+                        entityConfig.height = 1.8;
+                        entityConfig.width = 0.6;
+                        break;
+                }
+
+                try {
+                    var entity = new Donkeycraft.Entity(entityConfig);
+                    var entityId = self._entityManager.spawn(entity);
+                    if (entityId) {
+                        Donkeycraft.Logger.info('Game', 'Spawned example entity: ' + example.type + ' at (' + example.x + ', ' + groundY + ', ' + example.z + ')');
+
+                        // Set initial animation via entity engine if available
+                        if (self._entityEngine && self._entityEngine.setAnimation) {
+                            try {
+                                self._entityEngine.setAnimation(entityId, example.anim);
+                            } catch (e) {
+                                Donkeycraft.Logger.warn('Game', 'Failed to set animation for entity: ' + e.message);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    Donkeycraft.Logger.error('Game', 'Failed to create entity ' + example.type + ': ' + e.message);
+                }
+            })(examples[i]);
+        }
     };
 
     /**
@@ -1653,6 +1824,24 @@
             }
         }
 
+        // Tick entity engine (animation & kinematics solver)
+        if (this._entityEngine) {
+            try {
+                this._entityEngine.tick(dt);
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Entity engine tick failed: ' + e.message);
+            }
+        }
+
+        // Tick entity manager (lifecycle, awareness table)
+        if (this._entityManager) {
+            try {
+                this._entityManager.tick(dt);
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Entity manager tick failed: ' + e.message);
+            }
+        }
+
         // Check for player in portal (automatic dimension travel)
         if (Donkeycraft.Portal && Donkeycraft.Portal._checkPlayerInPortal && this._player) {
             try {
@@ -2104,6 +2293,15 @@
                 crosshair: true,
                 hotbar: true
             }, this._canvas.width, this._canvas.height);
+        }
+
+        // Render entities (animated, position-aware, cull by camera frustum)
+        if (this._renderTerrain && this._entityRenderer && this._camera && this._entityManager) {
+            try {
+                this._entityRenderer.render(this._camera);
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Entity render failed: ' + e.message);
+            }
         }
 
         // Render map view (2D overhead map + minimap) — always update each frame
