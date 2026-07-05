@@ -267,6 +267,8 @@
 
 // Terrain Vertex Shader
 var TERRAIN_VERTEX_SHADER = `
+precision mediump int;
+
 attribute vec3 aPosition;
 attribute vec2 aUV;
 attribute vec3 aNormal;
@@ -294,8 +296,12 @@ void main() {
     vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
     vDepth = -viewPos.z;
 
-    // Pass color to fragment shader (with alpha=1.0 for solid rendering)
-    vColor = vec4(uColor, 1.0);
+    // Pass color to fragment shader — use uColor when in entity mode (uUseColor == 1)
+    if (uUseColor == 1) {
+        vColor = vec4(uColor, 1.0);
+    } else {
+        vColor = vec4(1.0);
+    }
 }
 `;
 
@@ -447,6 +453,7 @@ void main() {
 // Terrain Fragment Shader
 var TERRAIN_FRAGMENT_SHADER = `
 precision mediump float;
+precision mediump int;
 
 varying vec2 vUV;
 varying vec3 vNormal;

@@ -465,13 +465,13 @@
      */
     Donkeycraft.SkeletonTemplates = {
 
-        /** Bipedal skeleton — For humanoid entities. */
+        /** Bipedal skeleton — For humanoid entities (zombie, player, creeper, etc.). */
         bipedal: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
-            new Donkeycraft.BoneDefinition('spine', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
-            new Donkeycraft.BoneDefinition('head', { parent: 'spine', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(0, 0.15, 0) }),
-            new Donkeycraft.BoneDefinition('leftArm', { parent: 'spine', offset: new Donkeycraft.Vector3(-0.4, 0.7, 0), pivot: new Donkeycraft.Vector3(-0.2, 0, 0) }),
-            new Donkeycraft.BoneDefinition('rightArm', { parent: 'spine', offset: new Donkeycraft.Vector3(0.4, 0.7, 0), pivot: new Donkeycraft.Vector3(0.2, 0, 0) }),
+            new Donkeycraft.BoneDefinition('body', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('head', { parent: 'body', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(0, 0.15, 0) }),
+            new Donkeycraft.BoneDefinition('leftArm', { parent: 'body', offset: new Donkeycraft.Vector3(-0.4, 0.7, 0), pivot: new Donkeycraft.Vector3(-0.2, 0, 0) }),
+            new Donkeycraft.BoneDefinition('rightArm', { parent: 'body', offset: new Donkeycraft.Vector3(0.4, 0.7, 0), pivot: new Donkeycraft.Vector3(0.2, 0, 0) }),
             new Donkeycraft.BoneDefinition('leftLeg', { parent: 'root', offset: new Donkeycraft.Vector3(-0.2, 0, 0), pivot: new Donkeycraft.Vector3(-0.1, 0.45, 0) }),
             new Donkeycraft.BoneDefinition('rightLeg', { parent: 'root', offset: new Donkeycraft.Vector3(0.2, 0, 0), pivot: new Donkeycraft.Vector3(0.1, 0.45, 0) })
         ],
@@ -494,9 +494,13 @@
             new Donkeycraft.BoneDefinition('head', { parent: 'body', offset: new Donkeycraft.Vector3(0.2, 0.2, 0), pivot: new Donkeycraft.Vector3(0.1, 0, 0) })
         ],
 
-        /** Static object skeleton — For doors, sign posts, chests. */
+        /** Static object skeleton — For sign posts, chests, furnaces. */
         static: [
-            new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
+            new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('post', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.5, 0), pivot: new Donkeycraft.Vector3(0, 0.5, 0) }),
+            new Donkeycraft.BoneDefinition('sign', { parent: 'post', offset: new Donkeycraft.Vector3(0, 0.6, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('chest', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.4375, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('furnace', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.5, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
         ],
 
         /** Door skeleton — For interactive door blocks. */
@@ -507,7 +511,10 @@
 
         /** Projectile skeleton — For arrows, snowballs, ender pearls. */
         projectile: [
-            new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
+            new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('shaft', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('tip', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.4, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
+            new Donkeycraft.BoneDefinition('sphere', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
         ]
     };
 
@@ -526,7 +533,7 @@
             duration: 2.0,
             loop: true,
             keyframes: {
-                spine: [
+                body: [
                     { time: 0.0, rx: 0, ry: 0, rz: 0 },
                     { time: 1.0, rx: -0.05, ry: 0, rz: 0 },
                     { time: 2.0, rx: 0, ry: 0, rz: 0 }
@@ -544,7 +551,7 @@
             duration: 0.8,
             loop: true,
             keyframes: {
-                spine: [
+                body: [
                     { time: 0.0, rx: 0, ry: 0, rz: 0 },
                     { time: 0.2, rx: 0.05, ry: 0, rz: 0.03 },
                     { time: 0.5, rx: 0, ry: 0, rz: 0 },
@@ -594,7 +601,7 @@
             duration: 0.4,
             loop: true,
             keyframes: {
-                spine: [
+                body: [
                     { time: 0.0, rx: 0.1, ry: 0, rz: 0 },
                     { time: 0.25, rx: -0.05, ry: 0, rz: 0.05 },
                     { time: 0.5, rx: 0.1, ry: 0, rz: 0 }
@@ -632,7 +639,7 @@
             duration: 0.5,
             loop: false,
             keyframes: {
-                spine: [
+                body: [
                     { time: 0.0, rx: 0, ry: 0, rz: 0 },
                     { time: 0.15, rx: 0, ry: 0.3, rz: 0 },
                     { time: 0.3, rx: 0, ry: -0.2, rz: 0 },
@@ -674,7 +681,7 @@
             duration: 0.4,
             loop: false,
             keyframes: {
-                spine: [
+                body: [
                     { time: 0.0, rx: 0, ry: 0, rz: 0 },
                     { time: 0.1, rx: 0, ry: 0, rz: -0.2 },
                     { time: 0.2, rx: 0.1, ry: 0, rz: 0.1 },

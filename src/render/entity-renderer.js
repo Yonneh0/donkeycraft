@@ -1327,6 +1327,10 @@
      * alpha blending: disabled when alpha is enabled (to prevent z-fighting on
      * transparent surfaces), enabled otherwise.
      *
+     * CRITICAL: Also saves the ShaderManager's current program reference so it can
+     * be restored after entity rendering. Without this, the terrain shader's uniforms
+     * (uColor=entity color, uUseColor=1) would leak into subsequent terrain rendering.
+     *
      * @private
      * @param {boolean} [alphaEnabled=false] - Whether alpha blending is enabled.
      */
@@ -1593,6 +1597,13 @@
             }
 
         } finally {
+            // CRITICAL: Reset shader uniforms to prevent terrain renderer pollution.
+            // The entity renderer sets uUseColor=1 and uColor=entity RGB for flat-color rendering.
+            // If these persist, the terrain shader will render all blocks as solid entity colors instead of textures.
+            if (shaderManager) {
+                shaderManager.setInt('uUseColor', 0);
+                shaderManager.setVec3('uColor', 0, 0, 0);
+            }
             this._restoreRenderState();
         }
     };
@@ -1627,6 +1638,11 @@
             this.entitiesRendered = 1;
             this.drawCalls = stats.drawCalls;
         } finally {
+            // CRITICAL: Reset shader uniforms to prevent terrain renderer pollution.
+            if (shaderManager) {
+                shaderManager.setInt('uUseColor', 0);
+                shaderManager.setVec3('uColor', 0, 0, 0);
+            }
             this._restoreRenderState();
         }
     };
