@@ -1,5 +1,21 @@
 // Donkeycraft — Mob AI & Navigation System
 // Full A* pathfinding, navmesh support, AI state machine, ambush/attack/flee behaviors.
+/**
+ * @module entity-ai
+ * @description AI navigation and behavior system for game entities.
+ *
+ * This module provides a comprehensive AI framework including:
+ * - A* pathfinding algorithm on 3D grids
+ * - NavMesh (navigation mesh) for walkability queries
+ * - AI state machine with multiple behaviors
+ * - Entity-specific behavior profiles
+ *
+ * @example Basic usage
+ * var aiComponent = new Donkeycraft.AIComponent(entity);
+ * aiComponent.setProfile('zombie');
+ * aiComponent.setNavMesh(navMesh);
+ * aiComponent.tick(deltaTime);
+ */
 (function () {
     'use strict';
 
@@ -7,6 +23,48 @@
     if (!Donkeycraft) return;
 
     var Config = Donkeycraft.Config;
+
+    // ============================================================
+    // Constants — Movement Speeds & Distances
+    // ============================================================
+
+    /**
+     * Default movement speeds for different AI behaviors.
+     * @namespace
+     */
+    Donkeycraft.AISpeeds = {
+        IDLE: 0,          // Stationary
+        WANDER: 1.0,      // Casual wandering
+        CHASE: 2.5,       // Pursuing a target
+        FLEE: 3.0,        // Retreating from danger
+        AMBUSH: 1.5,      // Stealthy stalking
+        ATTACK: 2.0,      // Engaging in combat
+        FOLLOW: 2.0,      // Following a leader
+        PATROL: 1.5       // Moving between patrol points
+    };
+
+    /**
+     * Default detection distances for different AI behaviors.
+     * @namespace
+     */
+    Donkeycraft.AIDistances = {
+        ATTACK_RANGE: 1.5,      // Melee attack range in blocks
+        PATROL_RECALC: 1.0,     // Path recalculation interval (seconds)
+        FLEE_SAFETY_MARGIN: 2.5 // Multiplier for flee distance
+    };
+
+    /**
+     * Default pathfinding parameters.
+     * @namespace
+     */
+    Donkeycraft.AStarDefaults = {
+        MAX_STEPS: 500,         // Maximum search iterations
+        WANDER_MAX_STEPS: 200,  // Max steps for wander paths
+        CHASE_MAX_STEPS: 300,   // Max steps for chase paths
+        AMBUSH_MAX_STEPS: 200,  // Max steps for ambush paths
+        FLEE_MAX_STEPS: 200,    // Max steps for flee paths
+        ATTACK_MAX_STEPS: 150   // Max steps for attack paths
+    };
 
     // ============================================================
     // Direction Constants
@@ -147,6 +205,9 @@
     /**
      * NavMeshCell — A single cell in the navigation grid.
      * @constructor
+     * @param {number} x - Grid X coordinate.
+     * @param {number} y - Grid Y coordinate.
+     * @param {number} z - Grid Z coordinate.
      */
     Donkeycraft.NavMeshCell = function (x, y, z) {
         this.x = x;
@@ -160,6 +221,8 @@
     /**
      * NavMesh — 3D navigation grid for pathfinding queries.
      * @constructor
+     * @param {number} [cellSize=1] - Size of each cell in world units.
+     * @param {number} [maxRadius=200] - Maximum query radius in blocks.
      */
     Donkeycraft.NavMesh = function (cellSize, maxRadius) {
         this.cellSize = cellSize || 1;
@@ -319,6 +382,10 @@
     /**
      * AStarNode — A node in the A* search tree.
      * @constructor
+     * @param {number} x - Grid X coordinate.
+     * @param {number} y - Grid Y coordinate.
+     * @param {number} z - Grid Z coordinate.
+     * @param {Donkeycraft.AStarNode} [parent] - Parent node, or null for start node.
      */
     Donkeycraft.AStarNode = function (x, y, z, parent) {
         this.x = x;
@@ -334,6 +401,7 @@
     /**
      * AStarPathfinder — True A* pathfinding on a 3D grid.
      * @constructor
+     * @param {number} [cellSize=1] - Size of each cell in world units.
      */
     Donkeycraft.AStarPathfinder = function (cellSize) {
         this.cellSize = cellSize || 1;
@@ -413,9 +481,14 @@
 
             var walkable = true;
             if (this._navMesh) {
-                walkable = this._navMesh.isWalkable(
-                    nx * this.cellSize, ny * this.cellSize, nz * this.cellSize
-                );
+                try {
+                    walkable = this._navMesh.isWalkable(
+                        nx * this.cellSize, ny * this.cellSize, nz * this.cellSize
+                    );
+                } catch (e) {
+                    // If navmesh query fails, treat as non-walkable for safety
+                    walkable = false;
+                }
             }
 
             if (walkable) {
@@ -441,7 +514,7 @@
      * @returns {{path: Array, steps: number, found: boolean}|null} Path result.
      */
     Donkeycraft.AStarPathfinder.prototype.findPath = function (startX, startY, startZ, endX, endY, endZ, maxSteps, includeVertical) {
-        maxSteps = maxSteps || 500;
+        maxSteps = maxSteps || Donkeycraft.AStarDefaults.MAX_STEPS;
         includeVertical = includeVertical !== false;
 
         this._nodeMap = {};
@@ -455,6 +528,11 @@
 
         if (sx === ex && sy === ey && sz === ez) {
             return { path: [], steps: 0, found: true };
+        }
+
+        // Validate start position is walkable
+        if (this._navMesh && !this._navMesh.isWalkable(startX, startY, startZ)) {
+            return null;
         }
 
         var startNode = this._getOrCreateNode(sx, sy, sz);
@@ -487,7 +565,14 @@
             openSet.splice(lowestIdx, 1);
             closedSet[current.key] = true;
 
-            var neighborList = this._getNeighbors(current, includeVertical);
+            var neighborList;
+            try {
+                neighborList = this._getNeighbors(current, includeVertical);
+            } catch (e) {
+                // Skip this node if neighbor query fails
+                continue;
+            }
+
             for (var j = 0; j < neighborList.length; j++) {
                 var neighbor = neighborList[j];
                 var neighborNode = neighbor.node;
@@ -548,7 +633,7 @@
                 var p1 = path[currentIdx];
                 var p2 = path[i];
 
-                if (hasLineOfSight(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z)) {
+                if (hasLineOfSight && hasLineOfSight(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z)) {
                     bestIdx = i;
                     break;
                 }
@@ -575,7 +660,7 @@
      * @param {number} x2 - End X.
      * @param {number} y2 - End Y.
      * @param {number} z2 - End Z.
-     * @param {Function} isBlockSolid - Callback(x, y, z) returning truthy if block blocks vision.
+     * @param {Function} [isBlockSolid] - Callback(x, y, z) returning truthy if block blocks vision.
      * @returns {boolean} True if line-of-sight exists.
      */
     Donkeycraft.MobAI = {};
@@ -598,10 +683,12 @@
             var cy = Math.floor(y1 + stepY * i);
             var cz = Math.floor(z1 + stepZ * i);
 
+            // Use provided isBlockSolid callback first
             if (isBlockSolid && isBlockSolid(cx, cy, cz)) {
                 return false;
             }
 
+            // Fall back to world block query
             var blockId = 0;
             if (Donkeycraft._worldGetBlockId) {
                 blockId = Donkeycraft._worldGetBlockId(cx, cy, cz);
@@ -622,12 +709,75 @@
     };
 
     // ============================================================
+    // Shared Movement Helper — Common path-following logic
+    // ============================================================
+
+    /**
+     * _followPathToTarget — Shared helper for moving along a path toward a target.
+     * Extracted to eliminate duplicate code across ChaseState, FleeState, AmbushState, AttackState, and FollowState.
+     * @private
+     * @param {Object} context - Context object containing:
+     *   - ai: AIComponent reference
+     *   - speed: Movement speed
+     *   - currentPath: Current path object
+     *   - target: Target entity (for fallback)
+     *   - useFallback: Whether to use direct movement as fallback
+     * @returns {boolean} True if movement was applied, false otherwise.
+     */
+    Donkeycraft._followPathToTarget = function (context) {
+        var ai = context.ai;
+        var speed = context.speed || 1.0;
+        var currentPath = context.currentPath;
+        var target = context.target;
+
+        if (!ai || !ai.entity) return false;
+
+        var pos = ai.entity.getPosition();
+        if (!pos) return false;
+
+        var targetX, targetZ;
+
+        // Use path waypoints if available
+        if (currentPath && currentPath.path && currentPath.path.length > 0) {
+            var waypoint = currentPath.path[0];
+            targetX = waypoint.x;
+            targetZ = waypoint.z;
+
+            // Remove waypoint if reached
+            var dx = waypoint.x - pos.x;
+            var dz = waypoint.z - pos.z;
+            if (dx * dx + dz * dz < 1.0) {
+                currentPath.path.shift();
+            }
+        } else if (context.useFallback && target && target.getPosition) {
+            // Fallback: move directly toward target
+            var tPos = target.getPosition();
+            if (!tPos) return false;
+            targetX = tPos.x;
+            targetZ = tPos.z;
+        } else {
+            return false;
+        }
+
+        if (targetX === undefined || targetZ === undefined) return false;
+
+        try {
+            var vel = ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
+            ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    // ============================================================
     // AI State — Base class for AI behavior states
     // ============================================================
 
     /**
      * AIStateInstance — Base class for a single AI state.
      * @constructor
+     * @param {string} [stateName='idle'] - State name identifier.
      */
     Donkeycraft.AIStateInstance = function (stateName) {
         /** State name identifier. */
@@ -733,7 +883,14 @@
     Donkeycraft.AIStateMachine.prototype.tick = function (deltaTime) {
         if (!this._currentState || !this._currentState.active) return;
 
-        var nextState = this._currentState.update(deltaTime);
+        var nextState;
+        try {
+            nextState = this._currentState.update(deltaTime);
+        } catch (e) {
+            // If the state update throws, fall back to idle
+            return;
+        }
+
         if (nextState && nextState !== this._currentState.name) {
             this.setState(nextState);
         }
@@ -764,10 +921,10 @@
             // Random head turn
             var entity = this.ai ? this.ai.entity : null;
             if (entity && entity.setRotation) {
-                entity.setRotation(
-                    entity._rotation ? entity._rotation.yaw + (Math.random() - 0.5) * 0.5 : 0,
-                    entity._rotation ? entity._rotation.pitch : 0
-                );
+                var currentRot = entity.getRotation();
+                var newYaw = currentRot ? currentRot.yaw + (Math.random() - 0.5) * 0.5 : 0;
+                var newPitch = currentRot ? currentRot.pitch : 0;
+                entity.setRotation(newYaw, newPitch);
             }
         }
 
@@ -775,6 +932,7 @@
             var profile = this.ai.profile;
             var target = this.ai.target;
 
+            // Check if a target is nearby and should be chased
             if (target && target.isAlive && target.isAlive()) {
                 var dist = this.ai.distanceToTarget();
                 if (profile.chaseDistance > 0 && dist <= profile.chaseDistance) {
@@ -785,6 +943,7 @@
                 }
             }
 
+            // Check if we should flee due to low health
             if (this.ai.hasDamage && profile.fleeDistance > 0 && this.ai.getHealthRatio() < 0.3) {
                 var nearestDist = this.ai.getNearestEnemyDistance(profile.chaseDistance || 20);
                 if (nearestDist < profile.fleeDistance) {
@@ -792,6 +951,7 @@
                 }
             }
 
+            // Transition to wander after idle period
             if (this.ai.idleTimer >= (profile.wanderInterval || 3.0)) {
                 return Donkeycraft.AIState.WANDER;
             }
@@ -809,6 +969,7 @@
         this._targetY = 0;
         this._targetZ = 0;
         this._pathRecalcTimer = 0;
+        this._currentPath = null; // FIX: Explicitly initialize _currentPath
     };
     Donkeycraft.WanderState.prototype = Object.create(Donkeycraft.AIStateInstance.prototype);
     Donkeycraft.WanderState.prototype.constructor = Donkeycraft.WanderState;
@@ -855,16 +1016,22 @@
 
         // Recalculate path periodically
         this._pathRecalcTimer += deltaTime;
-        if (this._pathRecalcTimer >= 1.0 || !this._currentPath || this._currentPath.path.length === 0) {
+        if (this._pathRecalcTimer >= 1.0 || !this._currentPath || !this._currentPath.path || this._currentPath.path.length === 0) {
             this._recalcWanderPath();
         }
 
         // Move toward target
-        this._moveAlongPath();
+        var moved = Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.WANDER,
+            currentPath: this._currentPath,
+            target: null,
+            useFallback: true
+        });
 
         // Check if reached wander target
         var pos = this.ai.entity.getPosition();
-        if (pos) {
+        if (pos && this._targetX !== undefined) {
             var dx = pos.x - this._targetX;
             var dz = pos.z - this._targetZ;
             if (dx * dx + dz * dz < 1.0) {
@@ -888,10 +1055,14 @@
         var endZ = this._targetZ;
 
         if (profile.smartPathfinding && this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, 200);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, Donkeycraft.AStarDefaults.WANDER_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct path
             }
         }
 
@@ -901,45 +1072,6 @@
             steps: 1,
             found: true
         };
-    };
-
-    Donkeycraft.WanderState.prototype._moveAlongPath = function () {
-        if (!this.ai || !this.entity) return;
-
-        if (!this._currentPath || !this._currentPath.path || this._currentPath.path.length === 0) {
-            // No path, use direct movement
-            if (!this._targetX && !this._targetZ) return;
-            var pos = this.ai.entity.getPosition();
-            if (!pos) return;
-            var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, this._targetX, this._targetZ, 1.0);
-            this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
-            return;
-        }
-
-        var path = this._currentPath.path;
-        if (path.length === 0) return;
-
-        // Use first waypoint as target
-        var target = path[0];
-        var pos = this.ai.entity.getPosition();
-        if (!pos) return;
-
-        var dx = target.x - pos.x;
-        var dz = target.z - pos.z;
-        var distSq = dx * dx + dz * dz;
-
-        // If close to waypoint, remove it
-        if (distSq < 0.5) {
-            path.shift();
-            if (path.length === 0) return;
-            target = path[0];
-            dx = target.x - pos.x;
-            dz = target.z - pos.z;
-        }
-
-        var speed = 1.0;
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, target.x, target.z, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
     };
 
     /**
@@ -978,8 +1110,15 @@
         }
 
         // Check if should switch to attack
-        if (profile.attackDamage > 0 && dist <= 1.5) {
+        if (profile.attackDamage > 0 && dist <= Donkeycraft.AIDistances.ATTACK_RANGE) {
             return Donkeycraft.AIState.ATTACK;
+        }
+
+        // Check if skeleton should retreat (ranged enemy nearby)
+        if (profile.retreatDistance && profile.retreatDistance > 0 && this.ai.getHealthRatio() < 0.3) {
+            if (dist < profile.retreatDistance) {
+                return Donkeycraft.AIState.FLEE;
+            }
         }
 
         // Recalculate path periodically
@@ -989,7 +1128,13 @@
         }
 
         // Follow path or move directly
-        this._moveAlongPath();
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.CHASE,
+            currentPath: this._currentPath,
+            target: target,
+            useFallback: true
+        });
 
         return null;
     };
@@ -1019,10 +1164,14 @@
         }
 
         if (profile.smartPathfinding && this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, 300);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, Donkeycraft.AStarDefaults.CHASE_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct movement
             }
         }
 
@@ -1032,39 +1181,6 @@
             steps: 1,
             found: true
         };
-    };
-
-    Donkeycraft.ChaseState.prototype._moveAlongPath = function () {
-        if (!this.ai || !this.ai.entity) return;
-
-        var pos = this.ai.entity.getPosition();
-        if (!pos) return;
-
-        var speed = 2.5; // Chase speed
-        var targetX, targetZ;
-
-        if (this._currentPath && this._currentPath.path && this._currentPath.path.length > 0) {
-            var path = this._currentPath.path;
-            var waypoint = path[0];
-            targetX = waypoint.x;
-            targetZ = waypoint.z;
-
-            var dx = waypoint.x - pos.x;
-            var dz = waypoint.z - pos.z;
-            if (dx * dx + dz * dz < 1.0) {
-                path.shift();
-            }
-        } else {
-            var target = this.ai.target;
-            if (!target) return;
-            var tPos = target.getPosition();
-            if (!tPos) return;
-            targetX = tPos.x;
-            targetZ = tPos.z;
-        }
-
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
     };
 
     /**
@@ -1107,7 +1223,7 @@
         }
 
         var dist = this.ai.distanceToTarget();
-        if (dist > (profile.fleeDistance || 10) * 2.5 && this.ai.getHealthRatio() > 0.5) {
+        if (dist > (profile.fleeDistance || 10) * Donkeycraft.AIDistances.FLEE_SAFETY_MARGIN && this.ai.getHealthRatio() > 0.5) {
             return Donkeycraft.AIState.IDLE;
         }
 
@@ -1117,7 +1233,13 @@
             this._recalcFleePath(target.getPosition());
         }
 
-        this._moveAlongPath();
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.FLEE,
+            currentPath: this._currentPath,
+            target: target,
+            useFallback: true
+        });
 
         return null;
     };
@@ -1149,10 +1271,14 @@
 
         // Try to find path to flee position
         if (this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, fleeX, fleeY, fleeZ, 200);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, fleeX, fleeY, fleeZ, Donkeycraft.AStarDefaults.FLEE_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct flee
             }
         }
 
@@ -1164,54 +1290,14 @@
         };
     };
 
-    Donkeycraft.FleeState.prototype._moveAlongPath = function () {
-        if (!this.ai || !this.ai.entity) return;
-
-        var pos = this.ai.entity.getPosition();
-        if (!pos) return;
-
-        var speed = 3.0; // Faster when fleeing
-        var targetX, targetZ;
-
-        if (this._currentPath && this._currentPath.path && this._currentPath.path.length > 0) {
-            var waypoint = this._currentPath.path[0];
-            targetX = waypoint.x;
-            targetZ = waypoint.z;
-
-            var dx = waypoint.x - pos.x;
-            var dz = waypoint.z - pos.z;
-            if (dx * dx + dz * dz < 1.0) {
-                this._currentPath.path.shift();
-            }
-        } else {
-            // Direct flee
-            if (!this.ai.target || !this.ai.target.getPosition) return;
-            var dangerPos = this.ai.target.getPosition();
-            var dx = pos.x - dangerPos.x;
-            var dz = pos.z - dangerPos.z;
-            var dist = Math.sqrt(dx * dx + dz * dz);
-            if (dist > 0.1) {
-                targetX = pos.x + (dx / dist) * 5;
-                targetZ = pos.z + (dz / dist) * 5;
-            } else {
-                targetX = pos.x + (Math.random() - 0.5) * 10;
-                targetZ = pos.z + (Math.random() - 0.5) * 10;
-            }
-        }
-
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
-    };
-
     /**
      * AmbushState — Entity stalks its target, waiting for close approach.
      */
     Donkeycraft.AmbushState = function () {
         Donkeycraft.AIStateInstance.call(this, Donkeycraft.AIState.AMBUSH);
-        this._stalkTimer = 0;
-        this._stalkInterval = 2.0;
         this._currentPath = null;
         this._pathRecalcTimer = 0;
+        // FIX: Removed unused _stalkTimer and _stalkInterval properties
     };
     Donkeycraft.AmbushState.prototype = Object.create(Donkeycraft.AIStateInstance.prototype);
     Donkeycraft.AmbushState.prototype.constructor = Donkeycraft.AmbushState;
@@ -1233,32 +1319,23 @@
         if (!targetPos) return Donkeycraft.AIState.IDLE;
 
         // If target is too close, break ambush and attack
-        if (dist <= 1.5 && profile.attackDamage > 0) {
+        if (dist <= Donkeycraft.AIDistances.ATTACK_RANGE && profile.attackDamage > 0) {
             return Donkeycraft.AIState.ATTACK;
         }
 
-        // If target spotted at distance, switch to chase
-        if (profile.aggressionRange > 0 && dist <= profile.aggressionRange * 0.5) {
-            if (Donkeycraft.MobAI.canMobSeePlayer && this.ai._getBlockId) {
-                var entity = this.ai.entity;
-                if (entity && entity.getEyePosition) {
-                    // Use line of sight to check if target sees the entity
-                    var eyePos = entity.getEyePosition();
-                    if (eyePos) {
-                        // If target can see us, we might be spotted
-                        // Continue stalking
-                    }
-                }
-            }
-        }
-
-        // Stalk toward target silently
+        // Recalculate stalk path periodically
         this._pathRecalcTimer += deltaTime;
         if (this._pathRecalcTimer >= 1.5 || !this._currentPath) {
             this._recalcStalkPath(targetPos);
         }
 
-        this._moveAlongPath();
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.AMBUSH,
+            currentPath: this._currentPath,
+            target: target,
+            useFallback: true
+        });
 
         return null;
     };
@@ -1288,10 +1365,14 @@
         }
 
         if (this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, targetX, targetPos.y, targetZ, 200);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, targetX, targetPos.y, targetZ, Donkeycraft.AStarDefaults.AMBUSH_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct path
             }
         }
 
@@ -1300,37 +1381,6 @@
             steps: 1,
             found: true
         };
-    };
-
-    Donkeycraft.AmbushState.prototype._moveAlongPath = function () {
-        if (!this.ai || !this.ai.entity) return;
-
-        var pos = this.ai.entity.getPosition();
-        if (!pos) return;
-
-        var speed = 1.5; // Slower, stealthy movement
-        var targetX, targetZ;
-
-        if (this._currentPath && this._currentPath.path && this._currentPath.path.length > 0) {
-            var waypoint = this._currentPath.path[0];
-            targetX = waypoint.x;
-            targetZ = waypoint.z;
-
-            var dx = waypoint.x - pos.x;
-            var dz = waypoint.z - pos.z;
-            if (dx * dx + dz * dz < 1.0) {
-                this._currentPath.path.shift();
-            }
-        } else {
-            var target = this.ai.target;
-            if (!target || !target.getPosition) return;
-            var tPos = target.getPosition();
-            targetX = tPos.x;
-            targetZ = tPos.z;
-        }
-
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
     };
 
     /**
@@ -1362,7 +1412,7 @@
         if (!targetPos) return Donkeycraft.AIState.IDLE;
 
         // Perform melee attack if in range
-        if (profile.attackDamage > 0 && dist <= 1.5) {
+        if (profile.attackDamage > 0 && dist <= Donkeycraft.AIDistances.ATTACK_RANGE) {
             this._attackTimer += deltaTime;
             if (this._attackTimer >= (profile.attackCooldown || 1.5)) {
                 this._attackTimer = 0;
@@ -1373,17 +1423,37 @@
             return null;
         }
 
+        // Check for ranged attack (skeleton)
+        if (profile.rangedDistance && dist <= profile.rangedDistance && dist > Donkeycraft.AIDistances.ATTACK_RANGE) {
+            this._attackTimer += deltaTime;
+            if (this._attackTimer >= (profile.attackCooldown || 2.0)) {
+                this._attackTimer = 0;
+                this._performRangedAttack(target);
+            }
+            return null;
+        }
+
         // Move toward target
         this._pathRecalcTimer += deltaTime;
         if (this._pathRecalcTimer >= 1.0 || !this._currentPath) {
             this._recalcAttackPath(targetPos);
         }
 
-        this._moveAlongPath();
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.ATTACK,
+            currentPath: this._currentPath,
+            target: target,
+            useFallback: true
+        });
 
         return null;
     };
 
+    /**
+     * _performAttack — Execute a melee attack against the target.
+     * @private
+     */
     Donkeycraft.AttackState.prototype._performAttack = function (target) {
         if (!this.ai || !target) return;
 
@@ -1414,6 +1484,45 @@
         }
     };
 
+    /**
+     * _performRangedAttack — Execute a ranged attack against the target.
+     * @private
+     */
+    Donkeycraft.AttackState.prototype._performRangedAttack = function (target) {
+        if (!this.ai || !target) return;
+
+        var profile = this.ai.profile;
+        var damage = profile.attackDamage || 1;
+
+        // Apply damage to target (ranged attacks deal same damage but may have different mechanics)
+        if (target.takeDamage && typeof target.takeDamage === 'function') {
+            target.takeDamage(damage, this.ai.entity ? this.ai.entity.type : 'skeleton');
+        }
+
+        // Trigger ranged attack animation
+        if (this.ai.entity && this.ai.entity._animationController) {
+            this.ai.entity._animationController.setForcedState('attack', 0.7);
+        }
+
+        // Emit ranged attack event
+        if (Donkeycraft.EventBus) {
+            try {
+                Donkeycraft.EventBus.emitSafe('entity:ranged_attack', {
+                    attacker: this.ai.entity,
+                    target: target,
+                    damage: damage,
+                    type: 'ranged'
+                });
+            } catch (e) {
+                // EventBus may not be available
+            }
+        }
+    };
+
+    /**
+     * _recalcAttackPath — Calculate path to attack position.
+     * @private
+     */
     Donkeycraft.AttackState.prototype._recalcAttackPath = function (targetPos) {
         if (!this.ai || !this.ai.entity) return;
 
@@ -1421,7 +1530,7 @@
         if (!pos) return;
 
         // Stay close to target
-        var keepDist = (this.ai.profile.keepDistance || 1.5);
+        var keepDist = (this.ai.profile.keepDistance || Donkeycraft.AIDistances.ATTACK_RANGE);
         var dx = targetPos.x - pos.x;
         var dz = targetPos.z - pos.z;
         var dist = Math.sqrt(dx * dx + dz * dz);
@@ -1431,7 +1540,8 @@
         if (dist > keepDist) {
             var ratio = keepDist / (dist || 1);
             endX = pos.x + dx * ratio;
-            endY = targetPos.y;
+            // FIX: Properly interpolate Y coordinate instead of always using target Y
+            endY = pos.y + (targetPos.y - pos.y) * Math.min(ratio, 1);
             endZ = pos.z + dz * ratio;
         } else {
             // Already close enough, just move toward target
@@ -1441,10 +1551,14 @@
         }
 
         if (this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, 150);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, Donkeycraft.AStarDefaults.ATTACK_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct path
             }
         }
 
@@ -1453,37 +1567,6 @@
             steps: 1,
             found: true
         };
-    };
-
-    Donkeycraft.AttackState.prototype._moveAlongPath = function () {
-        if (!this.ai || !this.ai.entity) return;
-
-        var pos = this.ai.entity.getPosition();
-        if (!pos) return;
-
-        var speed = 2.0;
-        var targetX, targetZ;
-
-        if (this._currentPath && this._currentPath.path && this._currentPath.path.length > 0) {
-            var waypoint = this._currentPath.path[0];
-            targetX = waypoint.x;
-            targetZ = waypoint.z;
-
-            var dx = waypoint.x - pos.x;
-            var dz = waypoint.z - pos.z;
-            if (dx * dx + dz * dz < 1.0) {
-                this._currentPath.path.shift();
-            }
-        } else {
-            var target = this.ai.target;
-            if (!target || !target.getPosition) return;
-            var tPos = target.getPosition();
-            targetX = tPos.x;
-            targetZ = tPos.z;
-        }
-
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
     };
 
     /**
@@ -1518,7 +1601,13 @@
             this._recalcFollowPath(targetPos);
         }
 
-        this._moveAlongPath();
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.FOLLOW,
+            currentPath: this._currentPath,
+            target: target,
+            useFallback: true
+        });
 
         return null;
     };
@@ -1544,10 +1633,14 @@
         }
 
         if (this.ai.navMesh) {
-            var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, 200);
-            if (result && result.path && result.path.length > 0) {
-                this._currentPath = result;
-                return;
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, endX, endY, endZ, Donkeycraft.AStarDefaults.FLEE_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct path
             }
         }
 
@@ -1558,35 +1651,169 @@
         };
     };
 
-    Donkeycraft.FollowState.prototype._moveAlongPath = function () {
+    /**
+     * PatrolState — Entity follows a set of patrol points in a loop.
+     * Implemented as part of Phase 2: Complete Missing Functionality.
+     */
+    Donkeycraft.PatrolState = function (patrolPoints) {
+        Donkeycraft.AIStateInstance.call(this, Donkeycraft.AIState.PATROL);
+        this._patrolPoints = patrolPoints || [];
+        this._currentPointIndex = 0;
+        this._currentPath = null;
+        this._pathRecalcTimer = 0;
+        this._pointReachedTimer = 0;
+    };
+    Donkeycraft.PatrolState.prototype = Object.create(Donkeycraft.AIStateInstance.prototype);
+    Donkeycraft.PatrolState.prototype.constructor = Donkeycraft.PatrolState;
+
+    /**
+     * setPatrolPoints — Set the patrol points for this state.
+     * @param {Array<{x:number, y:number, z:number}>} points - Array of patrol waypoint coordinates.
+     */
+    Donkeycraft.PatrolState.prototype.setPatrolPoints = function (points) {
+        if (points && Array.isArray(points) && points.length > 0) {
+            this._patrolPoints = points;
+        }
+    };
+
+    Donkeycraft.PatrolState.prototype.enter = function () {
+        Donkeycraft.AIStateInstance.prototype.enter.call(this);
+        this._currentPointIndex = 0;
+        this._pointReachedTimer = 0;
+    };
+
+    Donkeycraft.PatrolState.prototype.update = function (deltaTime) {
+        Donkeycraft.AIStateInstance.prototype.update.call(this, deltaTime);
+
+        if (!this.ai || !this.ai.entity) return null;
+
+        var profile = this.ai.profile;
+        var target = this.ai.target;
+
+        // Check if we should switch to chase (hostile entity detects player)
+        if (target && target.isAlive && target.isAlive()) {
+            var dist = this.ai.distanceToTarget();
+            if (profile.aggressionRange > 0 && dist <= profile.aggressionRange) {
+                return Donkeycraft.AIState.CHASE;
+            }
+            if (profile.chaseDistance > 0 && dist <= profile.chaseDistance) {
+                return Donkeycraft.AIState.CHASE;
+            }
+        }
+
+        // Get the current patrol point
+        if (this._patrolPoints.length === 0) {
+            // No patrol points, fall back to wander
+            return Donkeycraft.AIState.WANDER;
+        }
+
+        var currentPoint = this._patrolPoints[this._currentPointIndex];
+        if (!currentPoint) return Donkeycraft.AIState.IDLE;
+
+        // Recalculate path periodically
+        this._pathRecalcTimer += deltaTime;
+        if (this._pathRecalcTimer >= 1.0 || !this._currentPath || !this._currentPath.path || this._currentPath.path.length === 0) {
+            this._recalcPatrolPath(currentPoint);
+        }
+
+        // Check if reached current patrol point
+        var pos = this.ai.entity.getPosition();
+        if (pos) {
+            var dx = pos.x - currentPoint.x;
+            var dy = pos.y - currentPoint.y;
+            var dz = pos.z - currentPoint.z;
+            if (dx * dx + dy * dy + dz * dz < 2.0) {
+                // Reached point, move to next
+                this._currentPointIndex = (this._currentPointIndex + 1) % this._patrolPoints.length;
+                this._pointReachedTimer = 0;
+            }
+        }
+
+        Donkeycraft._followPathToTarget({
+            ai: this.ai,
+            speed: Donkeycraft.AISpeeds.PATROL,
+            currentPath: this._currentPath,
+            target: null,
+            useFallback: false
+        });
+
+        return null;
+    };
+
+    Donkeycraft.PatrolState.prototype._recalcPatrolPath = function (targetPoint) {
         if (!this.ai || !this.ai.entity) return;
 
         var pos = this.ai.entity.getPosition();
         if (!pos) return;
 
-        var speed = 2.0;
-        var targetX, targetZ;
-
-        if (this._currentPath && this._currentPath.path && this._currentPath.path.length > 0) {
-            var waypoint = this._currentPath.path[0];
-            targetX = waypoint.x;
-            targetZ = waypoint.z;
-
-            var dx = waypoint.x - pos.x;
-            var dz = waypoint.z - pos.z;
-            if (dx * dx + dz * dz < 1.0) {
-                this._currentPath.path.shift();
+        if (this.ai.navMesh) {
+            try {
+                var result = this.ai.navMesh.findPath(pos.x, pos.y, pos.z, targetPoint.x, targetPoint.y, targetPoint.z, Donkeycraft.AStarDefaults.WANDER_MAX_STEPS);
+                if (result && result.path && result.path.length > 0) {
+                    this._currentPath = result;
+                    return;
+                }
+            } catch (e) {
+                // Fall through to direct path
             }
-        } else {
-            var target = this.ai.target;
-            if (!target || !target.getPosition) return;
-            var tPos = target.getPosition();
-            targetX = tPos.x;
-            targetZ = tPos.z;
         }
 
-        var vel = this.ai.calculateMovementVelocity(pos.x, pos.z, targetX, targetZ, speed);
-        this.ai.entity.setVelocity(vel.vx || 0, 0, vel.vz || 0);
+        this._currentPath = {
+            path: [{ x: targetPoint.x, y: targetPoint.y, z: targetPoint.z }],
+            steps: 1,
+            found: true
+        };
+    };
+
+    /**
+     * HurtState — Entity reacts to being damaged with brief stun behavior.
+     * Implemented as part of Phase 2: Complete Missing Functionality.
+     */
+    Donkeycraft.HurtState = function (stunDuration) {
+        Donkeycraft.AIStateInstance.call(this, Donkeycraft.AIState.HURT);
+        this._stunDuration = stunDuration || 0.5; // Seconds to remain stunned
+        this._damageSource = null;
+    };
+    Donkeycraft.HurtState.prototype = Object.create(Donkeycraft.AIStateInstance.prototype);
+    Donkeycraft.HurtState.prototype.constructor = Donkeycraft.HurtState;
+
+    /**
+     * setDamageSource — Set the source of damage for potential flee behavior.
+     * @param {Donkeycraft.Entity} source - Entity that dealt damage.
+     */
+    Donkeycraft.HurtState.prototype.setDamageSource = function (source) {
+        this._damageSource = source;
+    };
+
+    Donkeycraft.HurtState.prototype.enter = function () {
+        Donkeycraft.AIStateInstance.prototype.enter.call(this);
+        // Clear any current path to stop movement during stun
+        if (this.ai && this.ai.entity) {
+            this.ai.entity.setVelocity(0, 0, 0);
+        }
+    };
+
+    Donkeycraft.HurtState.prototype.update = function (deltaTime) {
+        Donkeycraft.AIStateInstance.prototype.update.call(this, deltaTime);
+
+        if (this.elapsedTime >= this._stunDuration) {
+            // Stun duration expired, return to previous state or idle
+            if (this.ai && this.ai._previousState) {
+                return this.ai._previousState;
+            }
+            return Donkeycraft.AIState.IDLE;
+        }
+
+        // Check if we should flee based on damage taken
+        if (this.ai && this.ai.profile && this.ai.profile.fleeDistance > 0) {
+            var healthRatio = this.ai.getHealthRatio();
+            if (healthRatio < 0.3 && this._damageSource) {
+                return Donkeycraft.AIState.FLEE;
+            }
+        }
+
+        // Remain stunned — no movement
+        return null;
     };
 
     // ============================================================
@@ -1596,6 +1823,7 @@
     /**
      * AIComponent — Attaches to entities and manages their AI behavior.
      * @constructor
+     * @param {Donkeycraft.Entity} entity - The entity this AI controls.
      */
     Donkeycraft.AIComponent = function (entity) {
         /** Reference to the parent entity. */
@@ -1631,6 +1859,9 @@
         /** Whether AI is enabled. */
         this.enabled = true;
 
+        // Store previous state name for HurtState recovery
+        this._previousState = null;
+
         // Register all states
         var idleState = new Donkeycraft.IdleState();
         var wanderState = new Donkeycraft.WanderState();
@@ -1639,6 +1870,8 @@
         var ambushState = new Donkeycraft.AmbushState();
         var attackState = new Donkeycraft.AttackState();
         var followState = new Donkeycraft.FollowState();
+        var patrolState = new Donkeycraft.PatrolState([]);
+        var hurtState = new Donkeycraft.HurtState(0.5);
 
         this.stateMachine.registerState(idleState);
         this.stateMachine.registerState(wanderState);
@@ -1647,6 +1880,8 @@
         this.stateMachine.registerState(ambushState);
         this.stateMachine.registerState(attackState);
         this.stateMachine.registerState(followState);
+        this.stateMachine.registerState(patrolState);
+        this.stateMachine.registerState(hurtState);
 
         this.stateMachine.setAIComponent(this);
 
@@ -1728,35 +1963,65 @@
     };
 
     /**
-     * getNearestEnemyDistance — Get distance to the nearest hostile entity.
+     * getNearestEnemyDistance — Get distance to the nearest hostile entity within range.
      * @param {number} [range=20] - Search range.
-     * @returns {number} Distance to nearest enemy.
+     * @returns {number} Distance to nearest enemy (or range if none found).
      */
     Donkeycraft.AIComponent.prototype.getNearestEnemyDistance = function (range) {
         range = range || 20;
 
-        if (!this.entity || !this._getBlockId) return Infinity;
+        if (!this.entity) return range;
 
         var pos = this.entity.getPosition();
-        if (!pos) return Infinity;
+        if (!pos) return range;
 
         var minDist = range;
 
-        // Check nearby blocks for entities
-        var rangeCeil = Math.ceil(range);
-        for (var dx = -rangeCeil; dx <= rangeCeil; dx++) {
-            for (var dy = -rangeCeil; dy <= rangeCeil; dy++) {
-                for (var dz = -rangeCeil; dz <= rangeCeil; dz++) {
-                    var distSq = dx * dx + dy * dy + dz * dz;
-                    if (distSq > minDist * minDist) continue;
+        // Use EntityManager for proper entity queries if available
+        if (Donkeycraft._entityManager) {
+            try {
+                var nearbyEntities = Donkeycraft._entityManager.getEntitiesInRange(pos.x, pos.y, pos.z, range);
+                for (var i = 0; i < nearbyEntities.length; i++) {
+                    var entity = nearbyEntities[i];
+                    if (entity === this.entity) continue; // Skip self
 
-                    // This would query EntityManager in a full implementation
-                    // For now, return the search range
+                    // Check if hostile (has attackDamage > 0 or chaseDistance > 0)
+                    var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
+                    var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
+
+                    if (entityProfile.attackDamage > 0 || entityProfile.chaseDistance > 0) {
+                        var dist = this.distanceToEntity(entity);
+                        if (dist < minDist) {
+                            minDist = dist;
+                        }
+                    }
                 }
+            } catch (e) {
+                // EntityManager may not be available
             }
         }
 
         return minDist;
+    };
+
+    /**
+     * distanceToEntity — Calculate distance to a specific entity.
+     * @param {Donkeycraft.Entity} other - Target entity.
+     * @returns {number} Distance in blocks.
+     * @private
+     */
+    Donkeycraft.AIComponent.prototype.distanceToEntity = function (other) {
+        if (!this.entity || !other) return Infinity;
+
+        var pos = this.entity.getPosition();
+        var otherPos = other.getPosition();
+
+        if (!pos || !otherPos) return Infinity;
+
+        var dx = pos.x - otherPos.x;
+        var dy = pos.y - otherPos.y;
+        var dz = pos.z - otherPos.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     };
 
     /**
@@ -1814,19 +2079,25 @@
         // Ensure state machine has reference
         this.stateMachine.setAIComponent(this);
 
+        // Track previous state for HurtState recovery
+        var currentState = this.stateMachine.getState();
+        if (currentState && currentState !== Donkeycraft.AIState.HURT) {
+            this._previousState = currentState;
+        }
+
         // Tick the current state
         this.stateMachine.tick(deltaTime);
 
         // Sync animation controller with AI state
         if (this.entity && this.entity._animationController) {
-            var currentState = this.stateMachine.getState();
+            var stateName = this.stateMachine.getState();
             var pos = this.entity.getPosition();
             var vel = this.entity.getVelocity();
 
             if (vel && pos) {
-                var speed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+                var speed = Math.sqrt((vel.x || 0) * (vel.x || 0) + (vel.z || 0) * (vel.z || 0));
 
-                switch (currentState) {
+                switch (stateName) {
                     case Donkeycraft.AIState.ATTACK:
                         // Attack animation handled in AttackState
                         break;
@@ -1872,6 +2143,7 @@
         this.navMesh = null;
         this._getBlockId = null;
         this.stateMachine = null;
+        this._previousState = null;
     };
 
     // ============================================================
