@@ -206,19 +206,18 @@
     };
 
     /**
-     * _updateSelectionHighlight — updates the WebGL highlight and DOM border for selected slot.
+     * _updateSelectionHighlight — updates the WebGL highlight and DOM class for selected slot.
+     * Toggles the 'selected' CSS class on hotbar slots for visual highlighting.
      * @private
      */
     Donkeycraft.Hotbar.prototype._updateSelectionHighlight = function () {
-        // Update DOM borders
+        // Update DOM classes — toggle 'selected' class for visual highlighting
         for (var i = 0; i < this._slotElements.length; i++) {
             var el = this._slotElements[i];
             if (i === this._selectedSlot) {
-                el.style.borderColor = '#fff';
-                el.style.borderWidth = '3px';
+                el.classList.add('selected');
             } else {
-                el.style.borderColor = '#555';
-                el.style.borderWidth = '2px';
+                el.classList.remove('selected');
             }
         }
 

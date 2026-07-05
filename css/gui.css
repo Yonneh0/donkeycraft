@@ -1214,7 +1214,8 @@
 }
 
 .dk-item-slot.selected {
-    border-color: #f1c40f;
+    border-color: #fff;
+    border-width: 3px;
     background: rgba(241, 196, 15, 0.15);
 }
 
