@@ -298,6 +298,7 @@ varying vec3 vNormal;
 varying float vLight;
 varying float vDepth;
 varying vec4 vColor;
+varying vec3 vWorldPos;
 
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
@@ -308,6 +309,9 @@ void main() {
     // View-space Z for exponential distance fog
     vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);
     vDepth = -viewPos.z;
+
+    // World position for underwater effects
+    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;
 
     // Pass color to fragment shader — use uColor when in entity mode (uUseColor == 1)
     if (uUseColor == 1) {
@@ -436,6 +440,33 @@ void main() {
 }
 `;
 
+// Water Vertex Shader
+var WATER_VERTEX_SHADER = `
+precision mediump int;
+
+attribute vec3 aPosition;
+attribute vec2 aUV;
+attribute vec3 aNormal;
+attribute float aLight;
+
+uniform mat4 uProjection;
+uniform mat4 uView;
+uniform mat4 uModel;
+
+varying vec2 vUV;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying float vDepth;
+
+void main() {
+    gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+    vUV = aUV;
+    vNormal = aNormal;
+    vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;
+    vDepth = -((uView * uModel * vec4(aPosition, 1.0)).z);
+}
+`;
+
 // Hand/Item Vertex Shader
 var HAND_VERTEX_SHADER = `
 attribute vec3 aPosition;
@@ -473,12 +504,18 @@ varying vec3 vNormal;
 varying float vLight;
 varying float vDepth;
 varying vec4 vColor;
+varying vec3 vWorldPos;
 
 uniform sampler2D uTexture;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uLightFactor;
 uniform int uUseColor;
+
+// Underwater uniforms — active when camera is submerged
+uniform float uCameraWaterDepth;  // > 0 when camera is underwater
+uniform float uUnderwaterDensity; // fog density when underwater (~0.05)
+uniform vec3 uUnderwaterColor;    // blue-green tint
 
 void main() {
     // Entity rendering mode: use flat color directly, no texture lookup
@@ -498,11 +535,40 @@ void main() {
     vec4 texColor = texture2D(uTexture, vUV);
     if (texColor.a < 0.5) discard;
 
-    // Apply dynamic lighting factor (sun intensity * ambient) on top of baked face light
-    vec3 finalColor = texColor.rgb * vLight * uLightFactor;
+    // === Underwater texture distortion ===
+    vec3 finalColor;
+    if (uCameraWaterDepth > 0.5) {
+        float depthFactor = uCameraWaterDepth * 0.01; // 1% UV shift per meter
+        // Animated distortion using world position and time
+        vec2 noiseUV = vUV + vec2(
+            sin(vWorldPos.x * 0.3) * depthFactor,
+            cos(vWorldPos.z * 0.3) * depthFactor
+        );
 
-    // Exponential distance fog
-    float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
+        // Additional distortion for deeper water (> 3m)
+        if (uCameraWaterDepth > 3.0) {
+            float extraDistort = (uCameraWaterDepth - 3.0) * 0.005;
+            noiseUV += vec2(
+                sin(vWorldPos.y * 0.5) * extraDistort,
+                cos(vWorldPos.x * 0.5) * extraDistort
+            );
+        }
+
+        finalColor = texture2D(uTexture, noiseUV).rgb * vLight * uLightFactor;
+
+        // Underwater color tint (blue-green)
+        finalColor = mix(finalColor, finalColor * uUnderwaterColor, 0.4);
+    } else {
+        // Normal (non-underwater) rendering
+        finalColor = texColor.rgb * vLight * uLightFactor;
+    }
+
+    // Exponential distance fog — stronger underwater
+    float fogDensity = uFogDensity;
+    if (uCameraWaterDepth > 0.5) {
+        fogDensity = uUnderwaterDensity; // ~3-5× stronger
+    }
+    float fogFactor = 1.0 - exp(-vDepth * fogDensity);
     fogFactor = clamp(fogFactor, 0.0, 1.0);
     finalColor = mix(finalColor, uFogColor, fogFactor);
 
@@ -601,6 +667,147 @@ void main() {
 }
 `;
 
+// Water Fragment Shader — unified semi-transparent water surface with FBM waves,
+// semi-scattered reflection, sun glare (Fresnel + specular), and depth-based fog.
+var WATER_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec2 vUV;
+varying vec3 vNormal;
+varying vec3 vWorldPos;
+varying float vDepth;
+
+uniform sampler2D uTexture;
+uniform vec3 uFogColor;
+uniform float uFogDensity;
+uniform float uLightFactor;
+
+uniform float uWaterAlpha;        // base transparency (~0.65)
+uniform float uReflectionStrength;// 0-1 based on viewing angle (Fresnel)
+uniform sampler2D uReflectionTex; // reflected terrain texture
+uniform float uTime;              // animated wave time
+uniform vec3 uCameraPos;          // camera world position
+uniform float uWaterLevel;        // water surface Y coordinate
+uniform vec3 uSunDir;             // sun direction vector for specular glare
+
+// === Simplex-like 2D noise (fast approximation) ===
+vec3 permute(vec3 x) {
+    return mod(((x * 34.0) + 1.0) * x, 289.0);
+}
+
+float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187,  // (3.0-sqrt(3.0))/6.0
+                        0.366025403784439,  // 0.5*(sqrt(3.0)-1.0)
+                       -0.577350269189626,  // -1.0 + 2.0 * C.x
+                        0.024390243902439); // 1.0 / 41.0
+    vec2 i = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+    vec2 i1;
+    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod(i, 289.0);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
+        + i.x + vec3(0.0, i1.x, 1.0));
+    vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+    m = m * m;
+    m = m * m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+    vec3 g;
+    g.x = a0.x * x0.x + h.x * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+}
+
+// === FBM (Fractional Brownian Motion) — 4 octaves for organic rolling waves ===
+float fbm(vec2 p, float time) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    // 4 octaves: base + 3 harmonics
+    vec2 offset = vec2(time * 0.08, time * 0.06); // slow drift
+    for (int i = 0; i < 4; i++) {
+        float noiseVal = snoise(p * frequency + offset) * amplitude;
+        value += noiseVal;
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    return value;
+}
+
+void main() {
+    // === Animated FBM wave displacement ===
+    // Scale UV for seamless large surface — water is much larger than 1x1
+    vec2 waterUV = vUV * 8.0; // 8 tile-sized repeats across the water surface
+    float waveHeight = fbm(waterUV, uTime);
+
+    // Distort UV based on wave gradient for semi-scattered reflection
+    float eps = 0.01;
+    vec2 dx = vec2(eps, 0.0);
+    vec2 dy = vec2(0.0, eps);
+    float waveXp = fbm(waterUV + dx, uTime);
+    float waveXn = fbm(waterUV - dx, uTime);
+    float waveYp = fbm(waterUV + dy, uTime);
+    float waveYn = fbm(waterUV - dy, uTime);
+    vec2 waveGradient = vec2(waveXp - waveXn, waveYp - waveYn) * 0.5;
+
+    // Reflection UV: distort by wave gradient for scattered reflection effect
+    vec2 reflUV = vUV;
+    reflUV += waveGradient * 0.3; // subtle scattering
+
+    // Sample base terrain texture (for water color mixing)
+    vec2 baseUV = vUV + waveGradient * 0.05; // slight direct distortion
+    vec4 texColor = texture2D(uTexture, baseUV);
+
+    // Sample reflected terrain
+    vec4 reflColor = texture2D(uReflectionTex, reflUV);
+
+    // === Fresnel effect: steeper angles = more reflection ===
+    vec3 viewDir = normalize(uCameraPos - vWorldPos);
+    float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 4.0);
+
+    // Reflection blend: mix between direct water (bottom angle) and reflection (grazing)
+    float reflectionBlend = mix(0.2, 1.0, fresnel) * uReflectionStrength;
+    vec3 directWater = texColor.rgb * vec3(0.15, 0.35, 0.6); // blue-green water color
+    vec3 waterColor = mix(directWater, reflColor.rgb, reflectionBlend);
+
+    // === Sun glare (specular highlight) ===
+    // Blinn-Phong specular: highlight when half-angle aligns with normal
+    vec3 halfDir = normalize(uSunDir + viewDir);
+    float spec = pow(max(dot(vNormal, halfDir), 0.0), 64.0);
+    // Add wave perturbation to specular for realistic shimmer
+    spec *= (0.5 + 0.5 * (0.5 + waveHeight)); // shimmer: brightens/darkens with waves
+    vec3 sunGlare = vec3(1.0, 0.95, 0.8) * spec * 0.6; // warm white glare
+
+    waterColor += sunGlare;
+
+    // === Depth-based fog ===
+    // Distance from camera to water surface point
+    float distFromCamera = length(vWorldPos - uCameraPos);
+
+    // Exponential distance fog
+    float fogFactor = 1.0 - exp(-distFromCamera * uFogDensity);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    waterColor = mix(waterColor, uFogColor, fogFactor);
+
+    // === Alpha: Fresnel-based transparency ===
+    // Steeper angles (grazing) = more opaque (more reflection)
+    // Direct overhead view = more transparent
+    float alpha = mix(0.55, 0.85, fresnel);
+    alpha *= (1.0 - reflectionBlend * 0.2); // slightly reduce alpha where reflection is strong
+
+    // Dithering: subtle per-pixel variation to prevent banding
+    float dither = (fract(sin(dot(vWorldPos.xz, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.02;
+    alpha += dither;
+
+    gl_FragColor = vec4(waterColor, clamp(alpha, 0.3, 0.9));
+}
+`;
+
 </script>
 
     <!-- Entity Renderer (standalone entity rendering system — must load after entity-engine) -->
@@ -613,6 +820,7 @@ void main() {
     <script src="src/render/mesh-optimizer.js"></script>
     <script src="src/render/chunk-mesh.js"></script>
     <script src="src/render/terrain-renderer.js"></script>
+    <script src="src/render/water-renderer.js"></script>
     <script src="src/render/camera.js"></script>
     <script src="src/render/fog.js"></script>
     <script src="src/render/sky.js"></script>

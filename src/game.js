@@ -31,6 +31,7 @@
         // Rendering subsystems (initialized in init())
         this._camera = null;
         this._terrainRenderer = null;
+        this._waterRenderer = null;
         this._fog = null;
         this._sky = null;
         this._lighting = null;
@@ -78,6 +79,10 @@
         // Chunk update tracking
         this._lastPlayerChunkX = null;
         this._lastPlayerChunkZ = null;
+
+        // Water chunk update tracking (separate from terrain to avoid stale data)
+        this._lastWaterChunkX = null;
+        this._lastWaterChunkZ = null;
 
         // Unsubscribe functions for cleanup
         this._unsubscribeTick = null;
@@ -239,6 +244,26 @@
 
             // Wire camera reference into terrain renderer for back-face culling optimization.
             this._terrainRenderer.setCamera(this._camera);
+
+            // Enable water block skipping in terrain mesh — water rendered separately
+            if (this._terrainRenderer.setSkipWaterBlocks) {
+                this._terrainRenderer.setSkipWaterBlocks(true);
+            }
+
+            // Create WaterRenderer for unified semi-transparent water surface rendering
+            if (Donkeycraft.WaterRenderer) {
+                try {
+                    this._waterRenderer = new Donkeycraft.WaterRenderer(this._gl, this._shaderManager);
+                    // Get water level from terrain generator or default to 63
+                    var waterLevel = 63;
+                    if (Donkeycraft.TerrainGenerator && Donkeycraft.TerrainGenerator.getWaterLevel !== undefined) {
+                        waterLevel = Donkeycraft.TerrainGenerator.getWaterLevel();
+                    }
+                    this._waterRenderer.setWaterLevel(waterLevel);
+                } catch (e) {
+                    Donkeycraft.Logger.error('Game', 'WaterRenderer initialization failed: ' + e.message);
+                }
+            }
 
             // Create hand renderer
             this._handRenderer = new Donkeycraft.HandRenderer(this._gl, this._shaderManager);
@@ -2099,6 +2124,31 @@
             }
         } catch (e) {
             Donkeycraft.Logger.error('Game', 'Terrain render failed: ' + e.message);
+        }
+
+        // Update and render water surface (unified semi-transparent mesh with reflection)
+        if (this._waterRenderer && this._camera && this._terrainRenderer) {
+            try {
+                // Get player position for water mesh update
+                var waterPos = this._player.getPosition();
+                var waterChunkX = Math.floor(waterPos.x / Config.CHUNK_SIZE);
+                var waterChunkZ = Math.floor(waterPos.z / Config.CHUNK_SIZE);
+
+                // Update water mesh if player moved chunks or there are dirty chunks
+                var waterPlayerChanged = (waterChunkX !== this._lastWaterChunkX || waterChunkZ !== this._lastWaterChunkZ);
+                var waterHasDirtyChunks = this._chunkManager && this._chunkManager.getDirtyChunks().length > 0;
+
+                if (waterPlayerChanged || waterHasDirtyChunks) {
+                    this._lastWaterChunkX = waterChunkX;
+                    this._lastWaterChunkZ = waterChunkZ;
+                    this._waterRenderer.updateMesh(waterChunkX, waterChunkZ, this._getBlockAt.bind(this));
+                }
+
+                // Render water surface with reflection pass
+                this._waterRenderer.render(this._camera, this._lighting, this._getBlockAt.bind(this));
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Water render failed: ' + e.message);
+            }
         }
 
         // Update and render break particles (physics simulation + rendering)

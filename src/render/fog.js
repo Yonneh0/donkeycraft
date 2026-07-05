@@ -6,12 +6,17 @@
     var Donkeycraft = window.Donkeycraft;
 
     /**
-     * Fog — Distance fog rendering with time-based color.
+     * Fog — Distance fog rendering with time-based color and underwater mode.
      */
     Donkeycraft.Fog = function () {
         this._density = 0.015;
         this._enabled = true;
         this._color = { r: 0.6, g: 0.7, b: 0.9 };
+
+        // Underwater mode — activated when camera is submerged
+        this._underwater = false;
+        this._underwaterDensity = 0.05; // ~3× normal fog density
+        this._underwaterColor = { r: 0.1, g: 0.3, b: 0.5 }; // blue-green tint
     };
 
     /**
@@ -89,6 +94,50 @@
         var colorSet = shaderManager.setVec3('uFogColor', this._color.r, this._color.g, this._color.b);
         var densitySet = shaderManager.setFloat('uFogDensity', this._density);
         return colorSet && densitySet;
+    };
+
+    /**
+     * Set underwater mode parameters.
+     * @param {boolean} enabled - Whether to enable underwater mode.
+     * @param {number} [density=0.05] - Fog density when underwater.
+     * @param {{r: number, g: number, b: number}} [color={r:0.1, g:0.3, b:0.5}] - Blue-green tint color.
+     */
+    Donkeycraft.Fog.prototype.setUnderwaterMode = function (enabled, density, color) {
+        this._underwater = !!enabled;
+        if (density !== undefined) this._underwaterDensity = density;
+        if (color !== undefined) {
+            this._underwaterColor.r = color.r;
+            this._underwaterColor.g = color.g;
+            this._underwaterColor.b = color.b;
+        }
+    };
+
+    /**
+     * Check if underwater mode is enabled.
+     * @returns {boolean}
+     */
+    Donkeycraft.Fog.prototype.isUnderwaterMode = function () {
+        return this._underwater;
+    };
+
+    /**
+     * Get underwater mode uniforms for the terrain shader.
+     * Returns density and color values to pass as uCameraWaterDepth, uUnderwaterDensity, uUnderwaterColor.
+     * @returns {{cameraWaterDepth: number, underwaterDensity: number, underwaterColor: {r: number, g: number, b: number}}}
+     */
+    Donkeycraft.Fog.prototype.getUnderwaterUniforms = function () {
+        if (this._underwater) {
+            return {
+                cameraWaterDepth: 1.0, // Signal that we're underwater
+                underwaterDensity: this._underwaterDensity,
+                underwaterColor: this._underwaterColor
+            };
+        }
+        return {
+            cameraWaterDepth: 0.0,
+            underwaterDensity: this._underwaterDensity,
+            underwaterColor: this._underwaterColor
+        };
     };
 
 })();

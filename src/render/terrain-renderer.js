@@ -85,6 +85,14 @@
         this._meshOptimizer = new Donkeycraft.MeshOptimizer();
 
         /**
+         * Whether to skip water blocks during terrain mesh building.
+         * When true, water blocks are excluded from the terrain mesh so they can
+         * be rendered separately by WaterRenderer as a unified semi-transparent surface.
+         * @type {boolean}
+         */
+        this._skipWaterBlocks = false;
+
+        /**
          * Reusable temp buffer for matrix multiplication (avoids per-frame allocation).
          * @type {Float32Array}
          * @private
@@ -170,6 +178,20 @@
      */
     Donkeycraft.TerrainRenderer.prototype.setTextureAtlas = function (atlas) {
         this._textureAtlas = atlas;
+    };
+
+    /**
+     * Enable or disable skipping water blocks during terrain mesh building.
+     * When enabled, water blocks are excluded from the terrain mesh so they can
+     * be rendered separately by WaterRenderer as a unified semi-transparent surface.
+     *
+     * @param {boolean} enabled - Whether to skip water blocks.
+     */
+    Donkeycraft.TerrainRenderer.prototype.setSkipWaterBlocks = function (enabled) {
+        this._skipWaterBlocks = !!enabled;
+        if (this._geometryBuilder) {
+            this._geometryBuilder._skipWaterBlocks = !!enabled;
+        }
     };
 
     /**

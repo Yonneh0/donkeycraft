@@ -145,6 +145,14 @@
          * @private
          */
         this._vertexSize = 9; // position(3) + light(1) + UV(2) + normal(3)
+
+        /**
+         * Whether to skip water blocks during terrain mesh building.
+         * When true, water blocks are excluded from the terrain mesh so they can
+         * be rendered separately by WaterRenderer as a unified semi-transparent surface.
+         * @type {boolean}
+         */
+        this._skipWaterBlocks = false;
     };
 
     /**
@@ -173,6 +181,47 @@
             case 9:  // water
             case 10: // lava
             case 11: // still lava
+                return true;
+            default:
+                return false;
+        }
+    };
+
+    /**
+     * Check if a block ID is a water block.
+     * Used to skip water blocks during terrain mesh building so they can be
+     * rendered separately by WaterRenderer as a unified semi-transparent surface.
+     *
+     * @param {number} blockId - The block ID to check.
+     * @returns {boolean} True if the block is water.
+     */
+    Donkeycraft.GeometryBuilder.prototype.isWaterBlock = function (blockId) {
+        // Validate input
+        if (!Number.isInteger(blockId) || blockId < 0) {
+            return false;
+        }
+
+        // Prefer BlockTypes for accurate liquid checks.
+        if (Donkeycraft.BlockTypes && typeof Donkeycraft.BlockTypes.isLiquid === 'function') {
+            var liquidInfo = Donkeycraft.BlockTypes.isLiquid(blockId);
+            if (liquidInfo !== undefined) return liquidInfo;
+        }
+
+        // Fallback: check WaterGenerator's liquid cache if available.
+        if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.isLiquidBlock === 'function') {
+            if (Donkeycraft.WaterGenerator.isLiquidBlock(blockId)) {
+                // Double-check it's water, not lava
+                var blocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
+                for (var i = 0; i < blocks.length; i++) {
+                    if (blocks[i].id === blockId && blocks[i].name === 'water') return true;
+                }
+            }
+        }
+
+        // Final fallback: hardcoded water block IDs.
+        switch (blockId) {
+            case 9:   // water
+            case 10:  // flowing_water
                 return true;
             default:
                 return false;
@@ -307,6 +356,9 @@
 
                     // Skip air blocks — they have no visible faces
                     if (!Number.isInteger(blockId) || blockId <= 0) continue;
+
+                    // Skip water blocks when rendering terrain separately from WaterRenderer
+                    if (this._skipWaterBlocks && this.isWaterBlock(blockId)) continue;
 
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldY = y;
