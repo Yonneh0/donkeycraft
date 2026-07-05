@@ -1,0 +1,224 @@
+/* ============================================================
+   GUI ELEMENTS — Draggable slots, buttons, tabs, text input
+   ============================================================ */
+
+/* ============================================================
+   DRAG-AND-DROP (GuiDragDrop)
+   ============================================================ */
+
+/* Draggable slot base styles — used by hotbar, inventory, creative inventory */
+.dk-slot,
+.dk-hotbar-slot,
+.dk-item-slot {
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.1s ease;
+}
+
+/* Slot hover state */
+.dk-slot:hover,
+.dk-hotbar-slot:hover,
+.dk-item-slot:hover {
+    border-color: #888;
+}
+
+/* Slot drag-over highlight — applied when dragging over a valid drop target */
+.dk-slot.drag-over,
+.dk-hotbar-slot.drag-over,
+.dk-item-slot.drag-over {
+    border-color: #f1c40f;
+    background: rgba(241, 196, 15, 0.15);
+}
+
+/* Slot highlight — programmatic highlight (e.g., for crafting results) */
+.dk-slot.highlight {
+    border-color: #3498db;
+    background: rgba(52, 152, 219, 0.15);
+}
+
+/* Drag ghost — floating element that follows cursor during drag */
+.dk-drag-ghost {
+    pointer-events: none;
+    z-index: 9999;
+    font-size: 24px;
+    opacity: 0.8;
+    position: fixed;
+    transform: translate(-50%, -50%);
+}
+
+/* ============================================================
+   BUTTONS (GuiButton)
+   ============================================================ */
+
+/* Base button style */
+.dk-button {
+    padding: 8px 16px;
+    background: rgba(80, 80, 80, 0.8);
+    color: #e0e0e0;
+    border: 2px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: background 0.1s, border-color 0.1s;
+    pointer-events: auto;
+}
+
+.dk-button:hover {
+    background: rgba(100, 100, 100, 0.9);
+    border-color: #888;
+    color: #fff;
+}
+
+.dk-button:active {
+    background: rgba(60, 60, 60, 0.9);
+    border-color: #444;
+}
+
+.dk-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dk-button:disabled:hover {
+    background: rgba(80, 80, 80, 0.8);
+    border-color: #555;
+    color: #e0e0e0;
+}
+
+/* Primary button variant */
+.dk-button-primary {
+    background: rgba(46, 204, 113, 0.6);
+    border-color: #27ae60;
+}
+
+.dk-button-primary:hover {
+    background: rgba(46, 204, 113, 0.8);
+    border-color: #2ecc71;
+}
+
+/* Danger button variant */
+.dk-button-danger {
+    background: rgba(231, 76, 60, 0.6);
+    border-color: #c0392b;
+}
+
+.dk-button-danger:hover {
+    background: rgba(231, 76, 60, 0.8);
+    border-color: #e74c3c;
+}
+
+/* ============================================================
+   TAB NAVIGATOR (GuiTabNavigator)
+   ============================================================ */
+
+/* Panel container */
+.dk-gui-panel {
+    position: relative;
+    background: rgba(30, 30, 30, 0.95);
+    border: 2px solid #666;
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 300px;
+    pointer-events: auto;
+}
+
+/* Panel title */
+.dk-panel-title {
+    font-size: 14px;
+    color: #ccc;
+    text-align: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #444;
+}
+
+/* Panel close button */
+.dk-panel-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: #c0392b;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dk-panel-close:hover {
+    background: #e74c3c;
+}
+
+/* Tab bar container */
+.dk-tab-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #444;
+}
+
+/* Individual tab button */
+.dk-tab {
+    padding: 6px 12px;
+    background: rgba(60, 60, 60, 0.6);
+    color: #aaa;
+    border: 1px solid #555;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: background 0.1s, color 0.1s;
+}
+
+.dk-tab:hover {
+    background: rgba(80, 80, 80, 0.7);
+    color: #ddd;
+}
+
+.dk-tab.active {
+    background: rgba(30, 30, 30, 0.95);
+    color: #fff;
+    border-color: #666;
+}
+
+/* Tab content area */
+.dk-tab-content {
+    min-height: 200px;
+}
+
+/* ============================================================
+   TEXT INPUT (GuiTextInput)
+   ============================================================ */
+
+/* Base text input style */
+.dk-text-input {
+    padding: 6px 10px;
+    background: rgba(20, 20, 20, 0.9);
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+}
+
+.dk-text-input:focus {
+    border-color: #3498db;
+}
+
+.dk-text-input::placeholder {
+    color: #666;
+}
+
+.dk-text-input.error {
+    border-color: #e74c3c;
+}

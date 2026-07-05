@@ -1,6 +1,6 @@
 /* ============================================================
-    DEBUG OVERLAY (F3)
-    ============================================================ */
+   DEBUG OVERLAY (F3)
+   ============================================================ */
 
 .dk-debug-info {
     position: absolute;
@@ -12,8 +12,6 @@
     line-height: 1.5;
     white-space: pre;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-    /* pointer-events: none is intentional for the container — mouse clicks pass through when hidden.
-       When visible, interactive elements (checkboxes) explicitly enable pointer-events via . */
     pointer-events: auto;
     z-index: 100;
     display: none;
@@ -22,11 +20,9 @@
 
 .dk-debug-info.visible {
     display: block;
-    /* Enable pointer events on the container so child interactive elements can receive them */
     pointer-events: auto;
 }
 
-/* Ensure interactive elements inside the debug overlay are clickable */
 .dk-debug-info input[type="checkbox"],
 .dk-toggle-line input[type="checkbox"] {
     pointer-events: auto;
@@ -74,4 +70,67 @@
     border-bottom: none;
     margin-bottom: 0;
     padding-bottom: 0;
+}
+
+/* Debug control buttons */
+.dk-debug-line.dk-ctrl-label {
+    display: block;
+    color: #f39c12;
+    font-weight: bold;
+    margin-top: 4px;
+    margin-bottom: 1px;
+    padding-left: 2px;
+    font-size: 11px;
+}
+
+.dk-debug-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding-left: 2px;
+    margin-top: 1px;
+}
+
+.dk-debug-ctrl-btn {
+    display: inline-block;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 5px;
+    min-width: 32px;
+    text-align: center;
+    background: rgba(40, 40, 40, 0.8);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.dk-debug-ctrl-btn:hover {
+    background: rgba(60, 60, 60, 0.9);
+    color: #fff;
+    border-color: #888;
+}
+
+.dk-debug-ctrl-btn:active {
+    background: rgba(80, 80, 80, 0.95);
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+.dk-debug-ctrl-btn-special {
+    color: #f39c12;
+    border-color: rgba(243, 156, 18, 0.4);
+}
+
+.dk-debug-ctrl-btn-special:hover {
+    color: #f1c40f;
+    border-color: rgba(243, 156, 18, 0.7);
+}
+
+.dk-debug-ctrl-btn-special:active {
+    color: #e67e22;
+    border-color: #f39c12;
 }

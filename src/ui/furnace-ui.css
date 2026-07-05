@@ -2,12 +2,13 @@
    FURNACE UI
    ============================================================ */
 
-.dk-furnace-area {
+.dk-furnace-ui {
     display: flex;
-    gap: 12px;
     align-items: center;
-    justify-content: center;
-    margin: 12px 0;
+    gap: 24px;
+    padding: 20px;
+    background: rgba(40,35,30,0.95);
+    border-radius: 6px;
 }
 
 .dk-furnace-slot-column {
@@ -26,6 +27,33 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.dk-furnace-area {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin: 12px 0;
+}
+
+.dk-furnace-input,
+.dk-furnace-output,
+.dk-fuel-slot {
+    width: 56px;
+    height: 56px;
+    background: rgba(80,70,60,0.8);
+    border: 2px solid #998866;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.dk-fuel-slot {
+    border-color: #886644;
 }
 
 .dk-progress-bar {
