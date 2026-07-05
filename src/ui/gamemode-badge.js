@@ -32,8 +32,6 @@
         // Badge container — clickable to swap between survival and creative
         var badge = document.createElement('div');
         badge.className = 'dk-gamemode-badge';
-        badge.style.display = 'none'; // Hidden by default until mode is set
-        badge.style.cursor = 'pointer'; // Indicate interactivity for survival/creative
         this._container.appendChild(badge);
         this._badgeEl = badge;
 

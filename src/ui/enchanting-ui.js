@@ -65,35 +65,30 @@
      */
     Donkeycraft.EnchantingUI.prototype._buildDOM = function () {
         var self = this;
-        this._container.className = 'dk-enchanting-ui';
-        this._container.style.cssText = 'display: flex; align-items: center; gap: 16px; padding: 20px; background: rgba(30,25,40,0.95); border-radius: 6px;';
+        this._container.className = 'dk-enchanting-ui dk-interactive';
 
         // Left: input slot
         this._inputSlotEl = document.createElement('div');
-        this._inputSlotEl.className = 'dk-enchant-input';
-        this._inputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,60,100,0.8); border: 2px solid #7755aa; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
-        this._inputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Item</span>';
+        this._inputSlotEl.className = 'dk-enchant-input dk-interactive';
+        this._inputSlotEl.innerHTML = '<span class="dk-enchant-placeholder">Item</span>';
         this._container.appendChild(this._inputSlotEl);
 
         // Center: enchantment options (3 cards)
         var centerPanel = document.createElement('div');
-        centerPanel.style.cssText = 'display: flex; flex-direction: column; gap: 8px; flex: 1;';
+        centerPanel.className = 'dk-enchant-center-panel dk-interactive';
 
         for (var c = 0; c < 3; c++) {
             var optionEl = document.createElement('div');
-            optionEl.className = 'dk-enchant-option';
-            optionEl.style.cssText = 'width: 100%; height: 56px; background: rgba(60,50,70,0.8); border: 2px solid #554466; border-radius: 3px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; cursor: pointer;';
+            optionEl.className = 'dk-enchant-option dk-interactive';
             optionEl.dataset.optionIndex = c;
 
             var textSpan = document.createElement('span');
             textSpan.className = 'dk-enchant-option-text';
-            textSpan.style.cssText = 'color: #aaa; font-size: 12px; flex: 1;';
             textSpan.textContent = 'Option ' + (c + 1);
             optionEl.appendChild(textSpan);
 
             var costSpan = document.createElement('span');
             costSpan.className = 'dk-enchant-cost';
-            costSpan.style.cssText = 'color: #4a9; font-size: 12px; font-weight: bold;';
             costSpan.textContent = 'Level 0';
             optionEl.appendChild(costSpan);
 
@@ -109,41 +104,39 @@
 
         // Right: lapis + output
         var rightPanel = document.createElement('div');
-        rightPanel.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 16px;';
+        rightPanel.className = 'dk-enchant-right-panel dk-interactive';
 
         // Lapis slot
         this._lapisSlotEl = document.createElement('div');
-        this._lapisSlotEl.className = 'dk-enchant-lapis';
-        this._lapisSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(60,80,100,0.8); border: 2px solid #5577aa; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px;';
-        this._lapisSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Lapis</span>';
+        this._lapisSlotEl.className = 'dk-enchant-lapis dk-interactive';
+        this._lapisSlotEl.innerHTML = '<span class="dk-enchant-placeholder">Lapis</span>';
         rightPanel.appendChild(this._lapisSlotEl);
 
         // Arrow
         var arrow = document.createElement('div');
-        arrow.style.cssText = 'font-size: 24px; color: #aaa;';
+        arrow.className = 'dk-enchant-arrow';
         arrow.textContent = '→';
         rightPanel.appendChild(arrow);
 
         // Output slot
         this._outputSlotEl = document.createElement('div');
-        this._outputSlotEl.className = 'dk-enchant-output';
-        this._outputSlotEl.style.cssText = 'width: 64px; height: 64px; background: rgba(80,60,100,0.8); border: 2px solid #8866bb; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 28px;';
-        this._outputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Result</span>';
+        this._outputSlotEl.className = 'dk-enchant-output dk-interactive';
+        this._outputSlotEl.innerHTML = '<span class="dk-enchant-placeholder">Result</span>';
         rightPanel.appendChild(this._outputSlotEl);
 
         this._container.appendChild(rightPanel);
 
         // Bottom panel: player levels + cost display
         var bottomPanel = document.createElement('div');
-        bottomPanel.style.cssText = 'width: 100%; display: flex; justify-content: center; gap: 24px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #333;';
+        bottomPanel.className = 'dk-enchant-bottom-panel';
 
         this._levelsEl = document.createElement('div');
-        this._levelsEl.style.cssText = 'font-size: 14px; color: #4a9; font-weight: bold;';
+        this._levelsEl.className = 'dk-enchant-levels-display';
         this._levelsEl.textContent = 'Levels: 0';
         bottomPanel.appendChild(this._levelsEl);
 
         this._levelCostEl = document.createElement('div');
-        this._levelCostEl.style.cssText = 'font-size: 14px; color: #f84; font-weight: bold;';
+        this._levelCostEl.className = 'dk-enchant-cost-display';
         this._levelCostEl.textContent = 'Cost: 0';
         bottomPanel.appendChild(this._levelCostEl);
 

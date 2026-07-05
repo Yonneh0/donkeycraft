@@ -110,23 +110,19 @@
         var self = this;
         if (!this._container) return;
 
-        this._container.className = 'dk-creative-inventory';
-        this._container.style.cssText = 'display: flex; width: 100%; height: 100%; background: rgba(20,20,30,0.95); border-radius: 6px; overflow: hidden;';
+        this._container.className = 'dk-creative-inventory dk-interactive';
 
         // Left panel: tabs + search
         var leftPanel = document.createElement('div');
-        leftPanel.className = 'dk-creative-left-panel';
-        leftPanel.style.cssText = 'width: 180px; background: rgba(40,40,50,0.9); border-right: 2px solid #333; display: flex; flex-direction: column;';
+        leftPanel.className = 'dk-creative-left-panel dk-interactive';
 
         // Tab bar
         this._tabBarEl = document.createElement('div');
-        this._tabBarEl.className = 'dk-creative-tab-bar';
-        this._tabBarEl.style.cssText = 'flex: 1; overflow-y: auto; padding: 8px;';
+        this._tabBarEl.className = 'dk-creative-tab-bar dk-interactive';
 
         for (var t = 0; t < this._tabs.length; t++) {
             var tabBtn = document.createElement('div');
             tabBtn.className = 'dk-inv-tab' + (this._tabs[t] === this._currentTab ? ' active' : '');
-            tabBtn.style.cssText = 'padding: 8px 12px; margin: 2px 0; cursor: pointer; border-radius: 3px; color: #ccc; font-size: 13px; text-align: center; user-select: none;';
             tabBtn.textContent = this._tabs[t].charAt(0).toUpperCase() + this._tabs[t].slice(1);
 
             if (this._tabs[t] === this._currentTab) {
@@ -146,14 +142,12 @@
 
         // Search bar container
         var searchContainer = document.createElement('div');
-        searchContainer.className = 'dk-creative-search-container';
-        searchContainer.style.cssText = 'padding: 8px; border-top: 1px solid #333;';
+        searchContainer.className = 'dk-creative-search-container dk-interactive';
 
         this._searchEl = document.createElement('input');
         this._searchEl.type = 'text';
-        this._searchEl.className = 'dk-creative-search-input';
+        this._searchEl.className = 'dk-creative-search-input dk-interactive';
         this._searchEl.placeholder = 'Search items...';
-        this._searchEl.style.cssText = 'width: 100%; padding: 6px 8px; background: #222; border: 1px solid #555; color: #ccc; border-radius: 3px; font-size: 12px; box-sizing: border-box; outline: none;';
 
         this._searchEl.addEventListener('input', (function () {
             return function () { self._onSearchChange(); };
@@ -165,8 +159,7 @@
 
         // Right panel: item grid
         this._gridEl = document.createElement('div');
-        this._gridEl.className = 'dk-creative-item-grid';
-        this._gridEl.style.cssText = 'flex: 1; padding: 16px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; align-content: start;';
+        this._gridEl.className = 'dk-creative-item-grid dk-interactive';
 
         this._container.appendChild(leftPanel);
         this._container.appendChild(this._gridEl);
@@ -213,19 +206,17 @@
         for (var i = 0; i < items.length; i++) {
             var itemId = items[i];
             var itemEl = document.createElement('div');
-            itemEl.className = 'dk-creative-item';
+            itemEl.className = 'dk-creative-item dk-interactive';
             itemEl.setAttribute('role', 'button');
             itemEl.setAttribute('tabindex', '0');
             itemEl.setAttribute('aria-label', this._getItemName(itemId) + ' (ID: ' + itemId + ')');
-            itemEl.style.cssText = 'width: 40px; height: 40px; background: rgba(80,80,80,0.6); border: 1px solid #555; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; transition: background 0.1s;';
 
             // Use Unicode block characters for visual variety based on ID
             itemEl.textContent = this._getItemDisplayChar(itemId);
             itemEl.dataset.itemId = itemId;
 
             if (this._selectedItemId === itemId) {
-                itemEl.style.borderColor = '#6af';
-                itemEl.style.background = 'rgba(80,120,200,0.3)';
+                itemEl.classList.add('selected');
             }
 
             var self = this;
@@ -242,16 +233,6 @@
                     }
                 };
             })(itemId, itemEl));
-
-            // Hover effects
-            itemEl.addEventListener('mouseenter', function () {
-                this.style.background = 'rgba(100,100,120,0.8)';
-            });
-            itemEl.addEventListener('mouseleave', function () {
-                if (this.dataset.itemId !== String(self._selectedItemId)) {
-                    this.style.background = 'rgba(80,80,80,0.6)';
-                }
-            });
 
             this._gridEl.appendChild(itemEl);
         }
@@ -399,12 +380,8 @@
             for (var i = 0; i < btns.length; i++) {
                 var btn = btns[i];
                 if (btn.dataset.tabName === tabName) {
-                    btn.style.background = 'rgba(80,120,200,0.5)';
-                    btn.style.color = '#fff';
                     btn.className = 'dk-inv-tab active';
                 } else {
-                    btn.style.background = '';
-                    btn.style.color = '#ccc';
                     btn.className = 'dk-inv-tab';
                 }
             }
@@ -559,17 +536,15 @@
         if (this._selectedItemId === itemId) return;
         this._selectedItemId = itemId;
 
-        // Update visual highlight if grid is rendered
+        // Update visual highlight if grid is rendered — use CSS class instead of inline styles
         if (this._gridEl) {
             var itemEls = this._gridEl.querySelectorAll('.dk-creative-item');
             for (var i = 0; i < itemEls.length; i++) {
                 var el = itemEls[i];
                 if (el.dataset.itemId === String(itemId)) {
-                    el.style.borderColor = '#6af';
-                    el.style.background = 'rgba(80,120,200,0.3)';
+                    el.classList.add('selected');
                 } else {
-                    el.style.borderColor = '#555';
-                    el.style.background = 'rgba(80,80,80,0.6)';
+                    el.classList.remove('selected');
                 }
             }
         }

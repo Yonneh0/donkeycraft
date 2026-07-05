@@ -61,26 +61,24 @@
      */
     Donkeycraft.FurnaceUI.prototype._buildDOM = function () {
         var self = this;
-        this._container.className = 'dk-furnace-ui';
-        this._container.style.cssText = 'display: flex; align-items: center; gap: 24px; padding: 20px; background: rgba(40,35,30,0.95); border-radius: 6px;';
+        this._container.className = 'dk-furnace-ui dk-interactive';
 
         // Left panel: fuel slot + progress bar
         var leftPanel = document.createElement('div');
-        leftPanel.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 8px;';
+        leftPanel.className = 'dk-furnace-slot-column dk-interactive';
 
         this._fuelSlotEl = document.createElement('div');
-        this._fuelSlotEl.className = 'dk-fuel-slot';
-        this._fuelSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(60,50,40,0.8); border: 2px solid #886644; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._fuelSlotEl.className = 'dk-fuel-slot dk-interactive';
         this._fuelSlotEl.dataset.slotIndex = 0;
         this._fuelSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Fuel</span>';
         leftPanel.appendChild(this._fuelSlotEl);
 
-        // Progress bar (vertical)
+        // Progress bar (vertical) — inline styles for dynamic height are kept as they change per tick
         var progressContainer = document.createElement('div');
-        progressContainer.style.cssText = 'width: 16px; height: 100px; background: rgba(30,30,30,0.8); border: 1px solid #555; border-radius: 2px; position: relative; overflow: hidden;';
+        progressContainer.className = 'dk-furnace-progress-container';
 
         this._progressBarEl = document.createElement('div');
-        this._progressBarEl.style.cssText = 'position: absolute; bottom: 0; left: 0; right: 0; height: 0%; background: linear-gradient(to top, #f80, #fa0); transition: height 0.1s;';
+        this._progressBarEl.className = 'dk-furnace-progress-fill';
         progressContainer.appendChild(this._progressBarEl);
 
         leftPanel.appendChild(progressContainer);
@@ -88,7 +86,7 @@
 
         // Center: furnace icon/area
         var centerDiv = document.createElement('div');
-        centerDiv.style.cssText = 'width: 80px; height: 80px; background: rgba(50,45,40,0.8); border: 2px solid #665544; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 40px;';
+        centerDiv.className = 'dk-furnace-center-icon';
         centerDiv.textContent = '🔥';
         this._container.appendChild(centerDiv);
 
@@ -97,21 +95,19 @@
         rightPanel.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 16px;';
 
         this._inputSlotEl = document.createElement('div');
-        this._inputSlotEl.className = 'dk-furnace-input';
-        this._inputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._inputSlotEl.className = 'dk-furnace-input dk-interactive';
         this._inputSlotEl.dataset.slotIndex = 1;
         this._inputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Input</span>';
         rightPanel.appendChild(this._inputSlotEl);
 
         // Arrow
         var arrow = document.createElement('div');
-        arrow.style.cssText = 'font-size: 24px; color: #aaa;';
+        arrow.className = 'dk-furnace-arrow';
         arrow.textContent = '→';
         rightPanel.appendChild(arrow);
 
         this._outputSlotEl = document.createElement('div');
-        this._outputSlotEl.className = 'dk-furnace-output';
-        this._outputSlotEl.style.cssText = 'width: 56px; height: 56px; background: rgba(80,70,60,0.8); border: 2px solid #998866; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;';
+        this._outputSlotEl.className = 'dk-furnace-output dk-interactive';
         this._outputSlotEl.dataset.slotIndex = 2;
         this._outputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Output</span>';
         rightPanel.appendChild(this._outputSlotEl);
@@ -136,7 +132,7 @@
         var stack = this._slots[index];
         if (!stack || stack.isEmpty()) {
             var labels = ['Fuel', 'Input', 'Output'];
-            el.innerHTML = '<span style="color:#aaa;font-size:11px;">' + (labels[index] || '') + '</span>';
+            el.innerHTML = '<span class="dk-furnace-placeholder">' + (labels[index] || '') + '</span>';
         } else {
             el.textContent = this._getItemDisplayChar(stack.getItemId());
         }
