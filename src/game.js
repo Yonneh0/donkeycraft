@@ -1317,6 +1317,7 @@
         _compileShaderPair('gui', 'GUI_VERTEX_SHADER', 'GUI_FRAGMENT_SHADER');
         _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
         _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
+        _compileShaderPair('water', 'WATER_VERTEX_SHADER', 'WATER_FRAGMENT_SHADER');
 
     };
 
