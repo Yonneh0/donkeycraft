@@ -225,21 +225,23 @@
 
     /**
      * findLandSpawnPosition — Exhaustively search for a valid land spawn position.
-     * Uses an unlimited spiral search outward from the starting position until valid land is found.
+     * Uses a chunk-based spiral search with O(1) heightmap lookups.
+     * Terrain is generated on-demand for each chunk evaluated.
      * Valid spawn criteria:
      *   - On solid ground (never over water)
      *   - Near water level (Y ≤ 80 for Overworld, configurable)
-     *   - Flat terrain (surface variation ≤ 1 Y within a 5x5 area)
+     *   - Flat terrain (surface variation ≤ 1 Y within a 7x7 area)
      *   - Not on a cliff or mountain (gentle slope in all directions)
      *   - Player space clear (2 blocks above is air)
      *
-     * @param {Donkeycraft.ChunkManager} chunkManager — Chunk manager for block queries.
+     * @param {Donkeycraft.ChunkManager} chunkManager — Chunk manager for block queries and terrain generation.
      * @param {number} [startX=0] — Starting world X coordinate.
      * @param {number} [startZ=0] — Starting world Z coordinate.
      * @param {Object} [options] — Search options.
      * @param {number} [options.maxY=80] — Maximum Y for "near water level" check.
      * @param {number} [options.flatRadius=3] — Radius (in blocks) for flatness check.
      * @param {number} [options.slopeLimit=3] — Max Y drop within flatRadius blocks.
+     * @param {number} [options.maxChunkRings=128] — Maximum chunk rings to search (128 chunks = 2048 blocks radius).
      * @returns {{x: number, y: number, z: number}|null} Valid spawn position or null if none found.
      */
     Donkeycraft.Player.findLandSpawnPosition = function (chunkManager, startX, startZ, options) {
@@ -247,17 +249,44 @@
             return null;
         }
 
+        var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+        var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+
         options = options || {};
         var maxYLevel = options.maxY !== undefined ? options.maxY : 80;
         var flatRadius = options.flatRadius !== undefined ? options.flatRadius : 3;
         var slopeLimit = options.slopeLimit !== undefined ? options.slopeLimit : 3;
+        var maxChunkRings = options.maxChunkRings !== undefined ? options.maxChunkRings : 128;
 
-        // Helper: get block at world coordinates, querying across chunk boundaries
-        function getBlock(wx, wy, wz) {
-            if (wy < 0 || wy >= Donkeycraft.Config.WORLD_HEIGHT) {
-                return -1; // Out of world bounds = air
-            }
-            return chunkManager.getBlock(Math.floor(wx), Math.floor(wy), Math.floor(wz));
+        /**
+         * getBlockAt — Get block ID at world coordinates by querying the correct chunk.
+         * IMPORTANT: This function ONLY reads from already-generated chunks.
+         * It does NOT trigger terrain generation.
+         * @param {number} wx - World X coordinate.
+         * @param {number} wy - World Y coordinate.
+         * @param {number} wz - World Z coordinate.
+         * @returns {number} Block ID (0 = air if no chunk or out of bounds).
+         */
+        function getBlockAt(wx, wy, wz) {
+            if (wy < 0 || wy >= WORLD_HEIGHT) return 0;
+            var chunkX = Math.floor(wx / CHUNK_SIZE);
+            var chunkZ = Math.floor(wz / CHUNK_SIZE);
+            var localX = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            var localZ = ((wz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            var chunk = chunkManager.getChunkIfExists(chunkX, chunkZ);
+            if (!chunk) return 0;
+            return chunk.getBlock(localX, wy, localZ);
+        }
+
+        /**
+         * ensureChunkGenerated — Force-generate terrain for a chunk if not already generated.
+         * This triggers the onChunkLoad callback which wires up terrain generation.
+         * @param {number} chunkX - Chunk X coordinate.
+         * @param {number} chunkZ - Chunk Z coordinate.
+         */
+        function ensureChunkGenerated(chunkX, chunkZ) {
+            // getChunk() triggers onChunkLoad callback which runs terrain generation
+            chunkManager.getChunk(chunkX, chunkZ);
         }
 
         // Helper: check if block is solid
@@ -271,22 +300,25 @@
         }
 
         /**
-         * findSurfaceY — Scan downward from top to find the highest solid block at (x, z).
-         * Returns the Y of the solid block, or -1 if none found.
+         * getHeightmapSurfaceY — O(1) surface height lookup from chunk's heightmap.
+         * Returns the terrain surface Y at the given world coordinates, or -1 if no heightmap.
+         * @param {number} wx - World X coordinate.
+         * @param {number} wz - World Z coordinate.
+         * @returns {number} Surface Y or -1.
          */
-        function findSurfaceY(x, z) {
-            var worldHeight = Donkeycraft.Config.WORLD_HEIGHT;
-            for (var y = worldHeight - 1; y >= 0; y--) {
-                var block = getBlock(x, y, z);
-                if (isSolid(block)) {
-                    return y;
-                }
-            }
-            return -1;
+        function getHeightmapSurfaceY(wx, wz) {
+            var chunkX = Math.floor(wx / CHUNK_SIZE);
+            var chunkZ = Math.floor(wz / CHUNK_SIZE);
+            var chunk = chunkManager.getChunkIfExists(chunkX, chunkZ);
+            if (!chunk || !chunk.heightmap) return -1;
+            var localX = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            var localZ = ((wz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+            return chunk.heightmap[localX + localZ * CHUNK_SIZE];
         }
 
         /**
          * checkFlatness — Check if terrain is flat within a radius around (x, z).
+         * Uses heightmap for O(1) surface height lookups.
          * Returns the surface Y if flat, or -1 if not flat.
          */
         function checkFlatness(x, z, surfaceY) {
@@ -295,13 +327,9 @@
                 for (var dz = -r; dz <= r; dz++) {
                     var cx = Math.floor(x) + dx;
                     var cz = Math.floor(z) + dz;
-                    var cy = findSurfaceY(cx, cz);
-                    if (cy < 0) {
-                        return -1; // No solid ground in this column
-                    }
-                    if (Math.abs(cy - surfaceY) > 1) {
-                        return -1; // Too much height variation — not flat
-                    }
+                    var cy = getHeightmapSurfaceY(cx, cz);
+                    if (cy < 0) return -1; // No heightmap data
+                    if (Math.abs(cy - surfaceY) > 1) return -1; // Too much variation
                 }
             }
             return surfaceY;
@@ -309,6 +337,7 @@
 
         /**
          * checkSlope — Check that terrain slopes gently in all directions.
+         * Uses heightmap for O(1) surface height lookups.
          * Returns true if the Y drop within radius blocks doesn't exceed slopeLimit.
          */
         function checkSlope(x, z, surfaceY) {
@@ -319,10 +348,8 @@
                 for (var dist = 1; dist <= r; dist++) {
                     var cx = Math.floor(x) + Math.round(Math.cos(rad) * dist);
                     var cz = Math.floor(z) + Math.round(Math.sin(rad) * dist);
-                    var cy = findSurfaceY(cx, cz);
-                    if (cy >= 0 && cy < minY) {
-                        minY = cy;
-                    }
+                    var cy = getHeightmapSurfaceY(cx, cz);
+                    if (cy >= 0 && cy < minY) minY = cy;
                 }
             }
             return (surfaceY - minY) <= slopeLimit;
@@ -330,25 +357,13 @@
 
         /**
          * checkNotOverWater — Verify the spawn position is not over water.
-         * The block at surface level must NOT be liquid, and there should be no water
-         * column extending up from below through the spawn area.
          */
         function checkNotOverWater(x, z, surfaceY) {
-            var feetBlock = getBlock(x, surfaceY, z);
-            if (isLiquid(feetBlock)) {
-                return false; // Player would spawn inside water
-            }
-            // Check that the surface block itself is not water/lava
-            if (isLiquid(getBlock(x, surfaceY, z))) {
-                return false;
-            }
-            // Verify there's no tall water column we'd spawn in
+            var feetBlock = getBlockAt(x, surfaceY, z);
+            if (isLiquid(feetBlock)) return false;
             for (var wy = surfaceY + 1; wy <= surfaceY + 2; wy++) {
-                var wBlock = getBlock(x, wy, z);
-                if (isLiquid(wBlock) && isLiquid(getBlock(x, wy - 1, z))) {
-                    // Flowing water (block above is also water) — skip this position
-                    return false;
-                }
+                var wBlock = getBlockAt(x, wy, z);
+                if (isLiquid(wBlock) && isLiquid(getBlockAt(x, wy - 1, z))) return false;
             }
             return true;
         }
@@ -358,22 +373,21 @@
          */
         function checkClearPlayerSpace(x, z, feetY) {
             var playerHeight = Donkeycraft.Config.PLAYER_HEIGHT;
-            // Check blocks from feet to feet + player height
             for (var cy = Math.floor(feetY); cy <= Math.floor(feetY + playerHeight); cy++) {
-                if (isSolid(getBlock(x, cy, z))) {
-                    return false; // Player would spawn inside a solid block
-                }
+                if (isSolid(getBlockAt(x, cy, z))) return false;
             }
             return true;
         }
 
         /**
-         * validateSpawn — Run all checks on a candidate position.
+         * validateSpawn — Run all checks on a candidate block position.
+         * Uses heightmap for O(1) surface lookup instead of Y-scanning.
          * Returns the valid spawn Y, or -1 if invalid.
          */
         function validateSpawn(x, z) {
-            var surfaceY = findSurfaceY(x, z);
-            if (surfaceY < 0) return -1; // No solid ground
+            // O(1) heightmap lookup — no Y-scan needed!
+            var surfaceY = getHeightmapSurfaceY(x, z);
+            if (surfaceY < 0) return -1;
 
             // Must be near water level (not on a mountain)
             if (surfaceY > maxYLevel) return -1;
@@ -391,57 +405,187 @@
             // Player space must be clear
             if (!checkClearPlayerSpace(x, z, flatY + 1)) return -1;
 
-            // All checks passed — return the Y position for player feet (on top of surface block)
             return flatY + 1;
         }
 
-        // ============================================================
-        // Exhaustive Spiral Search — unlimited range
-        // ============================================================
-        var searchX = Math.floor(startX || 0);
-        var searchZ = Math.floor(startZ || 0);
-        var ring = 0;
-        var maxRings = 4096; // Reasonable upper limit (~8K chunks in every direction)
+        /**
+         * findSpawnInChunk — Search for a valid spawn position within a single chunk.
+         * For already-generated chunks, just checks data. For new chunks, generates terrain first.
+         * @param {number} chunkX - Chunk X coordinate.
+         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {boolean} [generateIfNeeded=false] — Whether to generate terrain if chunk doesn't exist.
+         * @returns {{x: number, y: number, z: number}|null} Valid spawn or null.
+         */
+        function findSpawnInChunk(chunkX, chunkZ, generateIfNeeded) {
+            // Optionally generate terrain for this chunk
+            if (generateIfNeeded && !chunkManager.hasChunk(chunkX, chunkZ)) {
+                ensureChunkGenerated(chunkX, chunkZ);
+            }
 
-        while (ring <= maxRings) {
-            // Determine the extent of this ring in world block coordinates
-            var extent = ring * Donkeycraft.Config.CHUNK_SIZE;
+            // Check if chunk exists and has valid data
+            var chunk = chunkManager.getChunkIfExists(chunkX, chunkZ);
+            if (!chunk) return null;
 
-            // Check all positions on this ring boundary using spiral pattern
-            // Top edge: left to right
-            for (var sx = -extent; sx <= extent; sx++) {
-                var cx = searchX + sx;
-                var cz = searchZ - extent;
-                var resultY = validateSpawn(cx, cz);
+            // Must have a heightmap for fast surface queries
+            if (!chunk.heightmap) return null;
+
+            // Sample positions across the chunk — prioritize center and a few offsets
+            var samplePositions = [
+                { x: 8, z: 8 },   // center
+                { x: 4, z: 4 },   // offset inner
+                { x: 12, z: 12 }, // offset outer
+                { x: 1, z: 1 },   // top-left corner
+                { x: CHUNK_SIZE - 2, z: 1 },                 // top-right corner
+                { x: 1, z: CHUNK_SIZE - 2 },                 // bottom-left corner
+                { x: CHUNK_SIZE - 2, z: CHUNK_SIZE - 2 }     // bottom-right corner
+            ];
+
+            for (var i = 0; i < samplePositions.length; i++) {
+                var sp = samplePositions[i];
+                var wx = chunkX * CHUNK_SIZE + sp.x;
+                var wz = chunkZ * CHUNK_SIZE + sp.z;
+                var resultY = validateSpawn(wx, wz);
                 if (resultY > 0) {
-                    return { x: cx + 0.5, y: resultY, z: cz + 0.5 };
+                    return { x: wx + 0.5, y: resultY, z: wz + 0.5 };
                 }
             }
-            // Right edge: top to bottom
-            for (var sy = -extent + 1; sy <= extent; sy++) {
-                var rx = searchX + extent;
-                var rz = searchZ + sy;
-                var resultY2 = validateSpawn(rx, rz);
-                if (resultY2 > 0) {
-                    return { x: rx + 0.5, y: resultY2, z: rz + 0.5 };
+
+            return null;
+        }
+
+        // ============================================================
+        // Chunk-Based Spiral Search — searches chunks, not individual blocks
+        // Phase 1: check already-generated chunks (fast, no terrain generation)
+        // Phase 2: expand outward generating new chunks only as needed
+        // ============================================================
+        var startChunkX = Math.floor((startX || 0) / CHUNK_SIZE);
+        var startChunkZ = Math.floor((startZ || 0) / CHUNK_SIZE);
+
+        // Track visited chunks to avoid re-checking
+        var visitedChunks = {};
+
+        // Hard limits
+        var maxTotalChunksChecked = 500;
+        var chunksChecked = 0;
+        var ring = 0;
+
+        // PHASE 1: Check all already-generated chunks within search radius first.
+        // These are fast — no terrain generation, just reading existing data.
+        for (var phaseRing = 0; phaseRing <= maxChunkRings && chunksChecked < maxTotalChunksChecked; phaseRing++) {
+            var pStartX = startChunkX - phaseRing;
+            var pEndX = startChunkX + phaseRing;
+            var pStartZ = startChunkZ - phaseRing;
+            var pEndZ = startChunkZ + phaseRing;
+
+            // Top edge
+            for (var pcx = pStartX; pcx <= pEndX && chunksChecked < maxTotalChunksChecked; pcx++) {
+                var pcz = pStartZ;
+                var pkey = pcx + ',' + pcz;
+                if (!visitedChunks[pkey]) {
+                    visitedChunks[pkey] = true;
+                    chunksChecked++;
+                    // Only check chunks that already exist (already generated)
+                    if (chunkManager.hasChunk(pcx, pcz)) {
+                        var phase1Result = findSpawnInChunk(pcx, pcz);
+                        if (phase1Result) return phase1Result;
+                    }
                 }
             }
-            // Bottom edge: right to left
-            for (var ss = -extent + 1; ss < extent; ss++) {
-                var bx = searchX + extent - ss - 1;
-                var bz = searchZ + extent;
-                var resultY3 = validateSpawn(bx, bz);
-                if (resultY3 > 0) {
-                    return { x: bx + 0.5, y: resultY3, z: bz + 0.5 };
+            // Right edge
+            for (pcz = pStartZ + 1; pcz <= pEndZ && chunksChecked < maxTotalChunksChecked; pcz++) {
+                var prx = pEndX;
+                var prkey = prx + ',' + pcz;
+                if (!visitedChunks[prkey]) {
+                    visitedChunks[prkey] = true;
+                    chunksChecked++;
+                    if (chunkManager.hasChunk(prx, pcz)) {
+                        var phase1Result2 = findSpawnInChunk(prx, pcz);
+                        if (phase1Result2) return phase1Result2;
+                    }
                 }
             }
-            // Left edge: bottom to top
-            for (var ss2 = -extent + 1; ss2 < extent; ss2++) {
-                var lx = searchX - extent;
-                var lz = searchZ + extent - ss2 - 1;
-                var resultY4 = validateSpawn(lx, lz);
-                if (resultY4 > 0) {
-                    return { x: lx + 0.5, y: resultY4, z: lz + 0.5 };
+            // Bottom edge
+            for (var pbx = pEndX - 1; pbx >= pStartX && chunksChecked < maxTotalChunksChecked; pbx--) {
+                var pbz = pEndZ;
+                var pbkey = pbx + ',' + pbz;
+                if (!visitedChunks[pbkey]) {
+                    visitedChunks[pbkey] = true;
+                    chunksChecked++;
+                    if (chunkManager.hasChunk(pbx, pbz)) {
+                        var phase1Result3 = findSpawnInChunk(pbx, pbz);
+                        if (phase1Result3) return phase1Result3;
+                    }
+                }
+            }
+            // Left edge
+            for (var plz = pEndZ - 1; plz >= pStartZ + 1 && chunksChecked < maxTotalChunksChecked; plz--) {
+                var plx = pStartX;
+                var plkey = plx + ',' + plz;
+                if (!visitedChunks[plkey]) {
+                    visitedChunks[plkey] = true;
+                    chunksChecked++;
+                    if (chunkManager.hasChunk(plx, plz)) {
+                        var phase1Result4 = findSpawnInChunk(plx, plz);
+                        if (phase1Result4) return phase1Result4;
+                    }
+                }
+            }
+        }
+
+        // PHASE 2: No valid spawn found in already-generated chunks.
+        // Now expand outward, generating new chunks as needed.
+        ring = 0;
+
+        while (ring <= maxChunkRings && chunksChecked < maxTotalChunksChecked) {
+            // For each ring, check all chunk positions on the perimeter
+            var ringStartX = startChunkX - ring;
+            var ringEndX = startChunkX + ring;
+            var ringStartZ = startChunkZ - ring;
+            var ringEndZ = startChunkZ + ring;
+
+            // Top edge: left to right
+            for (var cx = ringStartX; cx <= ringEndX && chunksChecked < maxTotalChunksChecked; cx++) {
+                var cz = ringStartZ;
+                var key = cx + ',' + cz;
+                if (!visitedChunks[key]) {
+                    visitedChunks[key] = true;
+                    chunksChecked++;
+                    // Generate new chunks on-demand
+                    var result = findSpawnInChunk(cx, cz, true);
+                    if (result) return result;
+                }
+            }
+            // Right edge: top+1 to bottom
+            for (cz = ringStartZ + 1; cz <= ringEndZ && chunksChecked < maxTotalChunksChecked; cz++) {
+                var crx = ringEndX;
+                var rkey = crx + ',' + cz;
+                if (!visitedChunks[rkey]) {
+                    visitedChunks[rkey] = true;
+                    chunksChecked++;
+                    var result2 = findSpawnInChunk(crx, cz, true);
+                    if (result2) return result2;
+                }
+            }
+            // Bottom edge: right-1 to left
+            for (var bcx = ringEndX - 1; bcx >= ringStartX && chunksChecked < maxTotalChunksChecked; bcx--) {
+                var bcz = ringEndZ;
+                var bkey = bcx + ',' + bcz;
+                if (!visitedChunks[bkey]) {
+                    visitedChunks[bkey] = true;
+                    chunksChecked++;
+                    var result3 = findSpawnInChunk(bcx, bcz, true);
+                    if (result3) return result3;
+                }
+            }
+            // Left edge: bottom-1 to top+1
+            for (var lcz = ringEndZ - 1; lcz >= ringStartZ + 1 && chunksChecked < maxTotalChunksChecked; lcz--) {
+                var lcx = ringStartX;
+                var lkey = lcx + ',' + lcz;
+                if (!visitedChunks[lkey]) {
+                    visitedChunks[lkey] = true;
+                    chunksChecked++;
+                    var result4 = findSpawnInChunk(lcx, lcz, true);
+                    if (result4) return result4;
                 }
             }
 

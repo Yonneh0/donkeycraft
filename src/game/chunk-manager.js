@@ -438,6 +438,9 @@
         var hasSnow = !!biome.hasSnow;
         var isOcean = !!biome.isOcean;
 
+        // Store the heightmap on the chunk for fast surface queries
+        chunk.heightmap = heightmap;
+
         // Fill chunk blocks based on heightmap
         for (var localX = 0; localX < CHUNK_SIZE; localX++) {
             for (var localZ = 0; localZ < CHUNK_SIZE; localZ++) {

@@ -68,6 +68,14 @@
         this.biomeId = 0;
 
         /**
+         * Heightmap array: surface height at each (x, z) position within the chunk.
+         * Size CHUNK_SIZE × CHUNK_SIZE. Heightmap[x + z * CHUNK_SIZE] = surface Y.
+         * Used for fast surface height queries during spawn finding and rendering.
+         * @type {Uint16Array|null}
+         */
+        this.heightmap = null;
+
+        /**
          * Whether this chunk has been destroyed and its resources freed.
          * @type {boolean}
          * @private
