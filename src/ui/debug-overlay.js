@@ -77,6 +77,9 @@
 
         // Unsubscribe for render events (startListening)
         this._unsubscribeRender = null;
+
+        // Debug terrain toggle button reference
+        this._terrainToggleBtn = null;
     };
 
     // ============================================================
@@ -309,6 +312,45 @@
             }
             controlsContainer.appendChild(row);
         }
+
+        // Add debug terrain toggle button after stat groups
+        this._buildDebugTerrainToggle();
+    };
+
+    /**
+     * _buildDebugTerrainToggle — creates the debug terrain generator toggle button.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._buildDebugTerrainToggle = function () {
+        var el = this._element;
+        if (!el) return;
+
+        var controlsContainer = el.querySelector('.dk-debug-controls');
+        if (!controlsContainer) return;
+
+        // Section label for debug terrain
+        var terrainLabelLine = document.createElement('span');
+        terrainLabelLine.className = 'dk-debug-line dk-ctrl-label';
+        terrainLabelLine.textContent = 'Debug Terrain:';
+        controlsContainer.appendChild(terrainLabelLine);
+
+        // Toggle button row
+        var terrainRow = document.createElement('div');
+        terrainRow.className = 'dk-debug-btn-row';
+
+        this._terrainToggleBtn = document.createElement('button');
+        this._terrainToggleBtn.className = 'dk-debug-terrain-toggle';
+        this._terrainToggleBtn.textContent = 'OFF';
+        this._terrainToggleBtn.addEventListener('click', (function (self) {
+            return function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                self._onDebugTerrainToggle();
+            };
+        })(this));
+
+        terrainRow.appendChild(this._terrainToggleBtn);
+        controlsContainer.appendChild(terrainRow);
     };
 
     /**
@@ -954,6 +996,31 @@
     };
 
     /**
+     * _onDebugTerrainToggle — handles clicks on the debug terrain toggle button.
+     * @private
+     */
+    Donkeycraft.DebugOverlay.prototype._onDebugTerrainToggle = function () {
+        var self = this;
+        try {
+            if (!Donkeycraft.DebugTerrainGenerator) {
+                Donkeycraft.Logger.warn('DebugOverlay', 'DebugTerrainGenerator not available');
+                return;
+            }
+
+            var isActive = Donkeycraft.DebugTerrainGenerator.isDebugTerrainActive();
+            var success = Donkeycraft.DebugTerrainGenerator.toggle(!isActive);
+
+            if (success && this._terrainToggleBtn) {
+                var newState = Donkeycraft.DebugTerrainGenerator.isDebugTerrainActive();
+                this._terrainToggleBtn.textContent = newState ? 'ON' : 'OFF';
+                this._terrainToggleBtn.classList.toggle('active', newState);
+            }
+        } catch (e) {
+            Donkeycraft.Logger.error('DebugOverlay', 'Failed to toggle debug terrain: ' + e.message);
+        }
+    };
+
+    /**
      * stopListening — stops auto-updating.
      */
     Donkeycraft.DebugOverlay.prototype.stopListening = function () {
@@ -972,7 +1039,7 @@
         this.stopListening();
         this._eventBus = this._player = this._chunkManager = this._biome =
             this._terrainRenderer = this._timer =
-            this._game = this._element = null;
+            this._game = this._element = this._terrainToggleBtn = null;
     };
 
 })();

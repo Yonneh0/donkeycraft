@@ -130,25 +130,69 @@
 }
 
 @keyframes drumstick-eat-pulse {
-    0% { transform: scale(1); filter: brightness(1); }
-    50% { transform: scale(1.35); filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7)); }
-    100% { transform: scale(1); filter: brightness(1); }
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
 }
 
 @keyframes drumstick-dim {
-    0% { opacity: 1; filter: brightness(1) saturate(1); }
-    50% { opacity: 0.4; filter: brightness(0.6) saturate(0.3); }
-    100% { opacity: 1; filter: brightness(1) saturate(1); }
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
 }
 
 @keyframes drop-drink-pulse {
-    0% { transform: scale(1); filter: brightness(1); }
-    50% { transform: scale(1.35); filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7)); }
-    100% { transform: scale(1); filter: brightness(1); }
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
 }
 
 @keyframes drop-dim {
-    0% { opacity: 1; filter: brightness(1) saturate(1); }
-    50% { opacity: 0.4; filter: brightness(0.6) saturate(0.3); }
-    100% { opacity: 1; filter: brightness(1) saturate(1); }
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
 }

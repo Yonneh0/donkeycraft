@@ -134,3 +134,155 @@
     color: #e67e22;
     border-color: #f39c12;
 }
+
+/* Debug terrain toggle button */
+.dk-debug-terrain-toggle {
+    display: inline-block;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    text-align: center;
+    background: rgba(40, 40, 40, 0.8);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+    margin-top: 4px;
+}
+
+.dk-debug-terrain-toggle:hover {
+    background: rgba(60, 60, 60, 0.9);
+    color: #fff;
+    border-color: #888;
+}
+
+.dk-debug-terrain-toggle:active {
+    background: rgba(80, 80, 60, 0.95);
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+.dk-debug-terrain-toggle.active {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+/* Debug overlay (F3) */
+#dk-debug-overlay {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px 12px;
+    border-radius: 4px;
+    white-space: pre;
+    display: none;
+    max-width: 400px;
+}
+
+#dk-debug-overlay.visible {
+    display: block;
+}
+
+/* Debug overlay renderer toggles — interactive section */
+.dk-debug-info .dk-renderer-toggles {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(100, 100, 100, 0.5);
+}
+
+.dk-debug-info .dk-toggle-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.dk-debug-info .dk-renderer-toggle {
+    pointer-events: auto;
+    /* Override parent's pointer-events: none */
+    cursor: pointer;
+    margin: 0;
+    accent-color: #aaa;
+}
+
+.dk-debug-info .dk-renderer-toggle:checked {
+    accent-color: #5f5;
+}
+
+/* Debug controls section — interactive stat manipulation buttons */
+.dk-debug-info .dk-debug-controls {
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid rgba(100, 100, 100, 0.5);
+}
+
+/* Stat group labels */
+.dk-debug-line.dk-ctrl-label {
+    display: block;
+    color: #f39c12;
+    font-weight: bold;
+    margin-top: 4px;
+    margin-bottom: 1px;
+    padding-left: 2px;
+    font-size: 11px;
+}
+
+/* Button rows — aligned under each label */
+.dk-debug-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding-left: 2px;
+    margin-top: 1px;
+}
+
+.dk-debug-ctrl-btn {
+    display: inline-block;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 5px;
+    min-width: 32px;
+    text-align: center;
+    background: rgba(40, 40, 40, 0.8);
+    color: #ccc;
+    border: 1px solid #555;
+    border-radius: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+}
+
+.dk-debug-ctrl-btn:hover {
+    background: rgba(60, 60, 60, 0.9);
+    color: #fff;
+    border-color: #888;
+}
+
+.dk-debug-ctrl-btn:active {
+    background: rgba(80, 80, 80, 0.95);
+    color: #2ecc71;
+    border-color: #2ecc71;
+}
+
+/* Special styling for FULL/EMPTY/RESET buttons */
+.dk-debug-ctrl-btn-special {
+    color: #f39c12;
+    border-color: rgba(243, 156, 18, 0.4);
+}
+
+.dk-debug-ctrl-btn-special:hover {
+    color: #f1c40f;
+    border-color: rgba(243, 156, 18, 0.7);
+}
+
+.dk-debug-ctrl-btn-special:active {
+    color: #e67e22;
+    border-color: #f39c12;
+}

@@ -460,8 +460,7 @@
     };
 
     /**
-     * setEntitySystems — wire up the entity engine, manager, and renderer.
-     * Also spawns example entities near the player for proof-of-concept testing.
+     * setEntitySystems — wire up the entity engine, manager, renderer, and debug generator.
      * @param {Donkeycraft.EntityEngine} entityEngine - Animation & kinematics engine.
      * @param {Donkeycraft.EntityManager} entityManager - Entity lifecycle manager.
      * @param {Donkeycraft.EntityRenderer} entityRenderer - Standalone entity renderer.
@@ -470,6 +469,21 @@
         this._entityEngine = entityEngine || null;
         this._entityManager = entityManager || null;
         this._entityRenderer = entityRenderer || null;
+
+        // Wire up Debug Terrain Generator references
+        if (Donkeycraft.DebugTerrainGenerator) {
+            try {
+                Donkeycraft.DebugTerrainGenerator.setReferences(
+                    this,
+                    this._chunkManager,
+                    entityManager,
+                    entityEngine,
+                    this._eventBus
+                );
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Failed to wire DebugTerrainGenerator references: ' + e.message);
+            }
+        }
 
         // Wire entity engine to use the game's timer for tick updates
         if (this._entityEngine && this._timer) {
@@ -524,28 +538,26 @@
             }
         }
 
-        // Wire block query callback for AI navigation
-        if (this._entityEngine) {
+        // Wire block query callback for AI navigation via EntityManager
+        if (this._entityManager) {
             try {
-                this._entityEngine.setBlockQuery(function (wx, wy, wz) {
+                this._entityManager.setBlockQuery(function (wx, wy, wz) {
                     return self._getBlockAt(Math.floor(wx), Math.floor(wy), Math.floor(wz));
                 });
             } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'Failed to wire block query to entity engine: ' + e.message);
+                Donkeycraft.Logger.warn('Game', 'Failed to wire block query to entity manager: ' + e.message);
             }
         }
 
         // Wire player entity for AI targeting
-        if (this._entityEngine && this._player) {
+        if (this._entityManager && this._player) {
             try {
-                this._entityEngine.setPlayerEntity(this._player);
+                this._entityManager.setPlayerEntity(this._player);
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Failed to wire player entity: ' + e.message);
             }
         }
 
-        // Note: Example entities are now spawned automatically by EntityEngine
-        // after a 2-second delay, triggered during the tick loop.
     };
 
     /**
@@ -602,9 +614,6 @@
             'entity': '_renderEntity'
         };
     };
-
-    // _spawnExampleEntities removed — now handled by EntityEngine._spawnExamples()
-    // which auto-spawns after 2 seconds during the tick loop.
 
     /**
      * setSystems — set external system references (called after Game.init()).
@@ -1517,9 +1526,11 @@
         var localX = ((wx % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
         var localZ = ((wz % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
 
-        // Get chunk from manager
-        var chunk = this._chunkManager.getChunkIfExists(chunkX, chunkZ);
-        if (!chunk) return 0;
+        // Get chunk from manager — use getChunk to auto-create/unload chunks that haven't been
+        // generated yet. This ensures the terrain renderer can query block data for all chunks
+        // within render distance, triggering onChunkLoad → terrain generation when needed.
+        var chunk = this._chunkManager.getChunk(chunkX, chunkZ);
+        if (!chunk || !chunk.generated) return 0;
 
         return chunk.getBlock(localX, wy, localZ);
     };

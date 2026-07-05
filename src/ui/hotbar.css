@@ -111,13 +111,29 @@
 }
 
 @keyframes stamina-fill-appear {
-    0% { filter: brightness(1.6) drop-shadow(0 0 6px rgba(255, 210, 50, 0.8)); }
-    60% { filter: brightness(1.3) drop-shadow(0 0 3px rgba(255, 210, 50, 0.4)); }
-    100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+    0% {
+        filter: brightness(1.6) drop-shadow(0 0 6px rgba(255, 210, 50, 0.8));
+    }
+
+    60% {
+        filter: brightness(1.3) drop-shadow(0 0 3px rgba(255, 210, 50, 0.4));
+    }
+
+    100% {
+        filter: brightness(1) drop-shadow(0 0 0px transparent);
+    }
 }
 
 @keyframes stamina-drain-pulse {
-    0% { filter: brightness(1) saturate(1); }
-    40% { filter: brightness(0.5) saturate(0.6); }
-    100% { filter: brightness(1) saturate(1); }
+    0% {
+        filter: brightness(1) saturate(1);
+    }
+
+    40% {
+        filter: brightness(0.5) saturate(0.6);
+    }
+
+    100% {
+        filter: brightness(1) saturate(1);
+    }
 }

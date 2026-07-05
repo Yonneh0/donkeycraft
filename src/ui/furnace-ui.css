@@ -7,7 +7,7 @@
     align-items: center;
     gap: 24px;
     padding: 20px;
-    background: rgba(40,35,30,0.95);
+    background: rgba(40, 35, 30, 0.95);
     border-radius: 6px;
 }
 
@@ -42,7 +42,7 @@
 .dk-fuel-slot {
     width: 56px;
     height: 56px;
-    background: rgba(80,70,60,0.8);
+    background: rgba(80, 70, 60, 0.8);
     border: 2px solid #998866;
     border-radius: 3px;
     display: flex;
@@ -74,7 +74,7 @@
 .dk-furnace-progress-container {
     width: 16px;
     height: 100px;
-    background: rgba(30,30,30,0.8);
+    background: rgba(30, 30, 30, 0.8);
     border: 1px solid #555;
     border-radius: 2px;
     position: relative;
@@ -96,7 +96,7 @@
 .dk-furnace-center-icon {
     width: 80px;
     height: 80px;
-    background: rgba(50,45,40,0.8);
+    background: rgba(50, 45, 40, 0.8);
     border: 2px solid #665544;
     border-radius: 4px;
     display: flex;
@@ -125,4 +125,3 @@
     background: linear-gradient(90deg, #e67e22, #f39c12);
     transition: width 0.2s ease;
 }
-

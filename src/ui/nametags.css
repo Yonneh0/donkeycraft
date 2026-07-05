@@ -5,7 +5,8 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    pointer-events: none; /* Allow clicks to pass through */
+    pointer-events: none;
+    /* Allow clicks to pass through */
     z-index: 100;
     overflow: hidden;
 }
@@ -29,22 +30,26 @@
 
 /* Color coding by aggressiveness */
 .dk-nametag.neutral {
-    background-color: rgba(144, 238, 144, 0.7); /* Light green */
+    background-color: rgba(144, 238, 144, 0.7);
+    /* Light green */
     color: #003300;
 }
 
 .dk-nametag.hostile {
-    background-color: rgba(220, 50, 50, 0.7); /* Red */
+    background-color: rgba(220, 50, 50, 0.7);
+    /* Red */
     color: #ffffff;
 }
 
 .dk-nametag.passive {
-    background-color: rgba(200, 200, 200, 0.6); /* Gray */
+    background-color: rgba(200, 200, 200, 0.6);
+    /* Gray */
     color: #333333;
 }
 
 .dk-nametag.boss {
-    background-color: rgba(148, 0, 211, 0.7); /* Purple */
+    background-color: rgba(148, 0, 211, 0.7);
+    /* Purple */
     color: #ffffff;
 }
 
@@ -63,6 +68,14 @@
     transition: width 0.3s ease;
 }
 
-.dk-nametag-hp-fill.high { background-color: #4CAF50; }
-.dk-nametag-hp-fill.medium { background-color: #FFC107; }
-.dk-nametag-hp-fill.low { background-color: #F44336; }
+.dk-nametag-hp-fill.high {
+    background-color: #4CAF50;
+}
+
+.dk-nametag-hp-fill.medium {
+    background-color: #FFC107;
+}
+
+.dk-nametag-hp-fill.low {
+    background-color: #F44336;
+}
