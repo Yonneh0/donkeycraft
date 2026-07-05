@@ -9,6 +9,7 @@
 // - Bone transform computation for skeletal animation
 // - Mesh caching for efficient repeated rendering
 // - Proper model matrix computation and shader uniform integration
+// - WebGL context loss handling and restoration
 //
 // @module EntityRenderer
 (function () {
@@ -59,6 +60,35 @@
      */
     var FRUSTUM_FORWARD_THRESHOLD = 0.1;
 
+    /**
+     * Minimum distance for normalization in frustum culling — entities closer than this
+     * are not subject to forward-facing check to avoid division by near-zero.
+     * @constant {number}
+     * @default 0.001
+     */
+    var FRUSTUM_MIN_DISTANCE = 0.001;
+
+    /**
+     * Vertex component stride for entity meshes — number of floats per vertex (position: 3, normal: 3, UV: 2).
+     * @constant {number}
+     * @default 8
+     */
+    var VERTEX_COMPONENT_STRIDE = 8;
+
+    /**
+     * Bytes per float in WebGL.
+     * @constant {number}
+     * @default 4
+     */
+    var BYTES_PER_FLOAT = 4;
+
+    /**
+     * Number of indices per triangle (vertices).
+     * @constant {number}
+     * @default 3
+     */
+    var INDICES_PER_TRIANGLE = 3;
+
     // ============================================================
     // Entity Mesh Builder — Generates simple blocky entity meshes
     // ============================================================
@@ -96,40 +126,40 @@
         // Each vertex: x, y, z, nx, ny, nz, u, v = 8 floats
         var vertices = new Float32Array([
             // Front face (z = +hd), normal = (0, 0, 1)
-            -hw, -hh,  hd,  0, 0, 1,  0, 0,
-             hw, -hh,  hd,  0, 0, 1,  1, 0,
-             hw,  hh,  hd,  0, 0, 1,  1, 1,
-            -hw,  hh,  hd,  0, 0, 1,  0, 1,
+            -hw, -hh, hd, 0, 0, 1, 0, 0,
+            hw, -hh, hd, 0, 0, 1, 1, 0,
+            hw, hh, hd, 0, 0, 1, 1, 1,
+            -hw, hh, hd, 0, 0, 1, 0, 1,
 
             // Back face (z = -hd), normal = (0, 0, -1)
-             hw, -hh, -hd,  0, 0,-1,  0, 0,
-            -hw, -hh, -hd,  0, 0,-1,  1, 0,
-            -hw,  hh, -hd,  0, 0,-1,  1, 1,
-             hw,  hh, -hd,  0, 0,-1,  0, 1,
+            hw, -hh, -hd, 0, 0, -1, 0, 0,
+            -hw, -hh, -hd, 0, 0, -1, 1, 0,
+            -hw, hh, -hd, 0, 0, -1, 1, 1,
+            hw, hh, -hd, 0, 0, -1, 0, 1,
 
             // Top face (y = +hh), normal = (0, 1, 0)
-            -hw,  hh,  hd,  0, 1, 0,  0, 0,
-             hw,  hh,  hd,  0, 1, 0,  1, 0,
-             hw,  hh, -hd,  0, 1, 0,  1, 1,
-            -hw,  hh, -hd,  0, 1, 0,  0, 1,
+            -hw, hh, hd, 0, 1, 0, 0, 0,
+            hw, hh, hd, 0, 1, 0, 1, 0,
+            hw, hh, -hd, 0, 1, 0, 1, 1,
+            -hw, hh, -hd, 0, 1, 0, 0, 1,
 
             // Bottom face (y = -hh), normal = (0, -1, 0)
-            -hw, -hh, -hd,  0,-1, 0,  0, 0,
-             hw, -hh, -hd,  0,-1, 0,  1, 0,
-             hw, -hh,  hd,  0,-1, 0,  1, 1,
-            -hw, -hh,  hd,  0,-1, 0,  0, 1,
+            -hw, -hh, -hd, 0, -1, 0, 0, 0,
+            hw, -hh, -hd, 0, -1, 0, 1, 0,
+            hw, -hh, hd, 0, -1, 0, 1, 1,
+            -hw, -hh, hd, 0, -1, 0, 0, 1,
 
             // Right face (x = +hw), normal = (1, 0, 0)
-             hw, -hh,  hd,  1, 0, 0,  0, 0,
-             hw, -hh, -hd,  1, 0, 0,  1, 0,
-             hw,  hh, -hd,  1, 0, 0,  1, 1,
-             hw,  hh,  hd,  1, 0, 0,  0, 1,
+            hw, -hh, hd, 1, 0, 0, 0, 0,
+            hw, -hh, -hd, 1, 0, 0, 1, 0,
+            hw, hh, -hd, 1, 0, 0, 1, 1,
+            hw, hh, hd, 1, 0, 0, 0, 1,
 
             // Left face (x = -hw), normal = (-1, 0, 0)
-            -hw, -hh, -hd, -1, 0, 0,  0, 0,
-            -hw, -hh,  hd, -1, 0, 0,  1, 0,
-            -hw,  hh,  hd, -1, 0, 0,  1, 1,
-            -hw,  hh, -hd, -1, 0, 0,  0, 1
+            -hw, -hh, -hd, -1, 0, 0, 0, 0,
+            -hw, -hh, hd, -1, 0, 0, 1, 0,
+            -hw, hh, hd, -1, 0, 0, 1, 1,
+            -hw, hh, -hd, -1, 0, 0, 0, 1
         ]);
 
         // 6 faces × 2 triangles × 3 vertices = 36 indices
@@ -350,9 +380,9 @@
      */
     function _createMat4() {
         var m = new Float32Array(16);
-        m[0] = 1;  m[1] = 0;  m[2] = 0;  m[3] = 0;
-        m[4] = 0;  m[5] = 1;  m[6] = 0;  m[7] = 0;
-        m[8] = 0;  m[9] = 0;  m[10] = 1; m[11] = 0;
+        m[0] = 1; m[1] = 0; m[2] = 0; m[3] = 0;
+        m[4] = 0; m[5] = 1; m[6] = 0; m[7] = 0;
+        m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
         m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
         return m;
     }
@@ -447,23 +477,33 @@
      */
     function _multiplyMat4(a, b) {
         var r = new Float32Array(16);
-        r[0] = a[0]*b[0] + a[1]*b[4] + a[2]*b[8] + a[3]*b[12];
-        r[1] = a[0]*b[1] + a[1]*b[5] + a[2]*b[9] + a[3]*b[13];
-        r[2] = a[0]*b[2] + a[1]*b[6] + a[2]*b[10] + a[3]*b[14];
-        r[3] = a[0]*b[3] + a[1]*b[7] + a[2]*b[11] + a[3]*b[15];
-        r[4] = a[4]*b[0] + a[5]*b[4] + a[6]*b[8] + a[7]*b[12];
-        r[5] = a[4]*b[1] + a[5]*b[5] + a[6]*b[9] + a[7]*b[13];
-        r[6] = a[4]*b[2] + a[5]*b[6] + a[6]*b[10] + a[7]*b[14];
-        r[7] = a[4]*b[3] + a[5]*b[7] + a[6]*b[11] + a[7]*b[15];
-        r[8] = a[8]*b[0] + a[9]*b[4] + a[10]*b[8] + a[11]*b[12];
-        r[9] = a[8]*b[1] + a[9]*b[5] + a[10]*b[9] + a[11]*b[13];
-        r[10] = a[8]*b[2] + a[9]*b[6] + a[10]*b[10] + a[11]*b[14];
-        r[11] = a[8]*b[3] + a[9]*b[7] + a[10]*b[11] + a[11]*b[15];
-        r[12] = a[12]*b[0] + a[13]*b[4] + a[14]*b[8] + a[15]*b[12];
-        r[13] = a[12]*b[1] + a[13]*b[5] + a[14]*b[9] + a[15]*b[13];
-        r[14] = a[12]*b[2] + a[13]*b[6] + a[14]*b[10] + a[15]*b[14];
-        r[15] = a[12]*b[3] + a[13]*b[7] + a[14]*b[11] + a[15]*b[15];
+        r[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
+        r[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
+        r[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
+        r[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
+        r[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
+        r[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
+        r[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
+        r[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
+        r[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
+        r[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
+        r[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
+        r[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
+        r[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
+        r[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
+        r[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
+        r[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
         return r;
+    }
+
+    /**
+     * _cloneMat4 — Create a copy of a 4x4 matrix.
+     * @param {Float32Array} src - Source matrix to clone.
+     * @returns {Float32Array} New matrix with the same values.
+     * @private
+     */
+    function _cloneMat4(src) {
+        return new Float32Array(src);
     }
 
     // ============================================================
@@ -516,9 +556,9 @@
         this._camera = null;
 
         /**
-         * Mesh cache: normalized key → {vbo, ibo, vertexCount, stride}.
-         * Keys are formatted as "meshType:w:h:d" (boxes) or "meshType:r:h" (cylinders).
-         * @type {Object.<string, {vbo: WebGLBuffer, ibo: WebGLBuffer, vertexCount: number, stride: number}>}
+         * Mesh cache: normalized key → {vbo, ibo, vertexCount, vertexByteStride}.
+         * Keys are formatted as "meshType:w.h.d" (boxes) or "meshType:r.h" (cylinders).
+         * @type {Object.<string, {vbo: WebGLBuffer, ibo: WebGLBuffer, vertexCount: number, vertexByteStride: number}>}
          * @private
          */
         this._meshCache = {};
@@ -542,13 +582,22 @@
         this.renderDistance = DEFAULT_RENDER_DISTANCE;
 
         /**
-         * Statistics: total entities rendered per frame (updated each render call).
+         * Whether to enable alpha blending for transparent rendering.
+         * Set to true if rendering entities with translucent materials.
+         * @type {boolean}
+         */
+        this.enableAlphaBlending = false;
+
+        /**
+         * Statistics: total body parts rendered last frame (updated each render call).
+         * Note: This counts individual mesh parts drawn, not total entities.
+         * For entity count, divide by the average number of body parts per entity.
          * @type {number}
          */
         this.entitiesRendered = 0;
 
         /**
-         * Statistics: total draw calls per frame (updated each render call).
+         * Statistics: total draw calls last frame (updated each render call).
          * @type {number}
          */
         this.drawCalls = 0;
@@ -559,6 +608,20 @@
          * @private
          */
         this._modelMatrix = _createMat4();
+
+        /**
+         * Whether the WebGL context has been lost.
+         * @type {boolean}
+         * @private
+         */
+        this._contextLost = false;
+
+        /**
+         * Callback registered with WebGL context loss event.
+         * @type {Function|null}
+         * @private
+         */
+        this._contextLossHandler = null;
     };
 
     /**
@@ -590,18 +653,24 @@
 
     /**
      * _normalizeMeshKey — Generate a robust cache key from mesh type and dimensions.
-     * Rounds floating-point values to 3 decimal places to avoid precision-based cache misses.
+     * Rounds floating-point values to 2 decimal places to avoid precision-based cache misses
+     * while preserving enough granularity for visually correct mesh selection.
      * @private
      * @param {string} meshType - Mesh type ('box' or 'cylinder').
      * @param {Object} dimensions - Dimension properties (w/h/d for boxes, r/h for cylinders).
      * @returns {string} Normalized cache key string.
      */
     Donkeycraft.EntityRenderer.prototype._normalizeMeshKey = function (meshType, dimensions) {
-        var r = Math.round; // Alias for rounding
+        // Round to 2 decimal places (multiply, truncate, divide) to avoid floating-point
+        // precision issues while preserving visually significant differences.
+        var round2 = function (v) { return (Math.round(v * 100) / 100) || 0; };
+
         if (meshType === 'box') {
-            return 'box:' + r(dimensions.w || 1) + ':' + r(dimensions.h || 1) + ':' + r(dimensions.d || 1);
+            var d = dimensions || {};
+            return 'box:' + round2(d.w || 1) + ':' + round2(d.h || 1) + ':' + round2(d.d || 1);
         } else if (meshType === 'cylinder') {
-            return 'cyl:' + r(dimensions.r || 0.1) + ':' + r(dimensions.h || 1);
+            var dim = dimensions || {};
+            return 'cyl:' + round2(dim.r || 0.1) + ':' + round2(dim.h || 1);
         }
         return meshType + ':unknown';
     };
@@ -611,10 +680,10 @@
      * Creates WebGL buffers from the mesh geometry and caches them for reuse.
      * @private
      * @param {Object} shapeDef - Shape definition with meshType and dimensions.
-     * @returns {{vbo: WebGLBuffer, ibo: WebGLBuffer, vertexCount: number, stride: number}|null} Mesh cache entry, or null on failure.
+     * @returns {{vbo: WebGLBuffer, ibo: WebGLBuffer, vertexCount: number, vertexByteStride: number}|null} Mesh cache entry, or null on failure.
      */
     Donkeycraft.EntityRenderer.prototype._getOrBuildMesh = function (shapeDef) {
-        if (!this._gl) return null;
+        if (!this._gl || this._contextLost) return null;
 
         var key = this._normalizeMeshKey(shapeDef.meshType, shapeDef.dimensions);
         if (this._meshCache[key]) {
@@ -625,10 +694,10 @@
         var meshData = null;
 
         if (shapeDef.meshType === 'box') {
-            var d = shapeDef.dimensions;
+            var d = shapeDef.dimensions || {};
             meshData = Donkeycraft.EntityMeshBuilder.createBoxMesh(d.w || 1, d.h || 1, d.d || 1);
         } else if (shapeDef.meshType === 'cylinder') {
-            var dim = shapeDef.dimensions;
+            var dim = shapeDef.dimensions || {};
             meshData = Donkeycraft.EntityMeshBuilder.createCylinderMesh(dim.r || 0.1, dim.h || 1, 8);
         }
 
@@ -644,11 +713,14 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshData.indices, gl.STATIC_DRAW);
 
+        // Store the actual byte stride per vertex (8 floats × 4 bytes = 32 bytes)
+        var vertexByteStride = VERTEX_COMPONENT_STRIDE * BYTES_PER_FLOAT;
+
         var cached = {
             vbo: vbo,
             ibo: ibo,
             vertexCount: meshData.indices.length,
-            stride: meshData.vertices.BYTES_PER_ELEMENT || 4 // bytes per vertex component
+            vertexByteStride: vertexByteStride
         };
         this._meshCache[key] = cached;
 
@@ -667,16 +739,11 @@
      * @param {number} rx - Rotation around X axis in radians.
      * @param {number} ry - Rotation around Y axis in radians.
      * @param {number} rz - Rotation around Z axis in radians.
-     * @returns {Float32Array} Column-major 4x4 model matrix (16 elements).
+     * @returns {Float32Array} New column-major 4x4 model matrix (16 elements).
      */
     Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz) {
-        // Reuse pre-allocated matrix to reduce GC pressure
-        var m = this._modelMatrix;
-        // Reset to identity
-        m[0] = 1; m[1] = 0; m[2] = 0; m[3] = 0;
-        m[4] = 0; m[5] = 1; m[6] = 0; m[7] = 0;
-        m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-        m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
+        // Create a fresh identity matrix to avoid overwriting previously returned matrices
+        var m = _createMat4();
 
         // Apply rotations (YXZ order — yaw first, then pitch, then roll)
         if (ry !== 0) _rotateMat4Y(m, ry);
@@ -712,7 +779,7 @@
 
         // Find bone definition to get offset and pivot
         var boneDef = null;
-        if (bones) {
+        if (bones && Array.isArray(bones)) {
             for (var i = 0; i < bones.length; i++) {
                 if (bones[i].name === boneName) {
                     boneDef = bones[i];
@@ -749,34 +816,34 @@
      * @returns {{r: number, g: number, b: number}} RGB values in [0, 1] range.
      */
     Donkeycraft.EntityRenderer.prototype._parseHexColor = function (color) {
-        var r = 0.5, g = 0.5, b = 0.5; // Default gray for invalid colors
+        var red = 0.5, green = 0.5, blue = 0.5; // Default gray for invalid colors
 
-        if (!color || color.charAt(0) !== '#') {
-            return { r: r, g: g, b: b };
+        if (!color || typeof color !== 'string' || color.charAt(0) !== '#') {
+            return { r: red, g: green, b: blue };
         }
 
         var hex = color.substring(1);
 
         if (hex.length === 6) {
             // Full hex color #RRGGBB
-            r = parseInt(hex.substring(0, 2), 16) / 255;
-            g = parseInt(hex.substring(2, 4), 16) / 255;
-            b = parseInt(hex.substring(4, 6), 16) / 255;
+            red = parseInt(hex.substring(0, 2), 16) / 255;
+            green = parseInt(hex.substring(2, 4), 16) / 255;
+            blue = parseInt(hex.substring(4, 6), 16) / 255;
         } else if (hex.length === 3) {
             // Shorthand hex color #RGB
-            r = parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255;
-            g = parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255;
-            b = parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255;
+            red = parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255;
+            green = parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255;
+            blue = parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255;
         }
 
-        return { r: r, g: g, b: b };
+        return { r: red, g: green, b: blue };
     };
 
     /**
      * _bindMeshAttributes — Bind vertex attributes for a mesh using the shader manager.
      * Sets up position (aPosition), normal (aNormal), and UV (aUV) attribute pointers.
      * @private
-     * @param {Object} meshCache - Cached mesh data with VBO and stride.
+     * @param {Object} meshCache - Cached mesh data with VBO and vertexByteStride.
      * @param {Object} shaderManager - ShaderManager instance for getting attribute locations.
      * @returns {boolean} True if all attributes were bound successfully.
      */
@@ -786,25 +853,28 @@
 
         gl.bindBuffer(gl.ARRAY_BUFFER, meshCache.vbo);
 
+        // Compute actual byte stride from stored value
+        var stride = meshCache.vertexByteStride || (VERTEX_COMPONENT_STRIDE * BYTES_PER_FLOAT);
+
         // Position attribute: 3 floats (x, y, z) at offset 0
         var posLoc = shaderManager.getAttribute('aPosition');
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, meshCache.stride * 8, 0);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, stride, 0);
         }
 
         // Normal attribute: 3 floats (nx, ny, nz) at offset 3
         var normLoc = shaderManager.getAttribute('aNormal');
         if (normLoc >= 0) {
             gl.enableVertexAttribArray(normLoc);
-            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, meshCache.stride * 8, 3 * meshCache.stride);
+            gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, stride, 3 * BYTES_PER_FLOAT);
         }
 
         // UV attribute: 2 floats (u, v) at offset 6
         var uvLoc = shaderManager.getAttribute('aUV');
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, meshCache.stride * 8, 6 * meshCache.stride);
+            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, stride, 6 * BYTES_PER_FLOAT);
         }
 
         return true;
@@ -854,7 +924,9 @@
         // Check for WebGL draw errors
         var err = gl.getError();
         if (err !== gl.NO_ERROR) {
-            Donkeycraft.Logger.warn('EntityRenderer', 'WebGL draw error: ' + err.toString(16));
+            if (Donkeycraft.Logger) {
+                Donkeycraft.Logger.warn('EntityRenderer', 'WebGL draw error: ' + err.toString(16));
+            }
             return false;
         }
 
@@ -895,10 +967,10 @@
         // Forward-facing check: cull entities behind the camera
         var forward = this._camera.getForwardDirection && this._camera.getForwardDirection();
         if (forward) {
-            // Normalize direction vector
-            var len = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (len > 0.001) {
-                var dot = (dx * forward.x + dy * forward.y + dz * forward.z) / len;
+            var dist = Math.sqrt(distSq);
+            // Only apply forward-facing check for entities beyond minimum distance
+            if (dist > FRUSTUM_MIN_DISTANCE) {
+                var dot = (dx * forward.x + dy * forward.y + dz * forward.z) / dist;
                 if (dot < FRUSTUM_FORWARD_THRESHOLD) return false;
             }
         }
@@ -947,9 +1019,128 @@
     };
 
     /**
+     * _applyRenderState — Apply common WebGL render state for entity rendering.
+     * @private
+     * @param {boolean} [alphaEnabled=false] - Whether alpha blending is enabled.
+     */
+    Donkeycraft.EntityRenderer.prototype._applyRenderState = function (alphaEnabled) {
+        var gl = this._gl;
+        if (!gl) return;
+
+        // Enable depth testing and face culling for correct rendering
+        gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.CULL_FACE);
+        gl.cullFace(gl.BACK);
+
+        // Optionally enable alpha blending for transparent entities
+        if (alphaEnabled) {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        } else {
+            gl.disable(gl.BLEND);
+        }
+    };
+
+    /**
+     * _renderEntityParts — Render all body parts for a single entity.
+     * Shared code path for both batch and single-entity rendering.
+     * @private
+     * @param {Donkeycraft.Entity} entity - Entity to render.
+     * @param {boolean} [isBatch=false] - Whether called from batch render (for stats tracking).
+     * @returns {{partsRendered: number, drawCalls: number}} Render statistics for this entity.
+     */
+    Donkeycraft.EntityRenderer.prototype._renderEntityParts = function (entity, isBatch) {
+        var gl = this._gl;
+        var shaderManager = this._shaderManager;
+
+        // Activate terrain shader
+        if (shaderManager) {
+            shaderManager.use('terrain');
+        }
+
+        // Get shape definitions for this entity type
+        var shapeDefs = Donkeycraft.EntityShapeDefs[entity.type];
+        if (!shapeDefs) {
+            // Fallback: use a generic box for unknown entity types
+            var halfW = (entity.width || 0.6) / 2;
+            shapeDefs = [{
+                name: 'body',
+                meshType: 'box',
+                dimensions: { w: entity.width || 0.6, h: entity.height || 1.8, d: entity.width || 0.6 },
+                color: '#FF00FF' // Magenta = unknown type
+            }];
+        }
+
+        // Get bone transforms from animation controller (if available)
+        var boneTransforms = entity.getBoneTransforms ? entity.getBoneTransforms() : {};
+
+        // Render each body part
+        var partsRendered = 0;
+        var drawCalls = 0;
+
+        for (var i = 0; i < shapeDefs.length; i++) {
+            var shapeDef = shapeDefs[i];
+
+            // Get or build mesh cache for this body part
+            var meshCache = this._getOrBuildMesh(shapeDef);
+            if (!meshCache) continue;
+
+            // Compute bone world-space transform (position + rotation)
+            var worldTransform = this._computeBoneWorldTransform(entity, shapeDef.name, boneTransforms);
+
+            // Draw the mesh part with bone transform and color
+            var success = this._drawMesh(
+                meshCache,
+                worldTransform.x,
+                worldTransform.y,
+                worldTransform.z,
+                worldTransform.rx,
+                worldTransform.ry,
+                worldTransform.rz,
+                shapeDef.color
+            );
+
+            if (success) {
+                partsRendered++;
+                drawCalls++;
+            }
+        }
+
+        // Track stats — only in batch mode to avoid overwriting frame totals
+        if (isBatch) {
+            this.entitiesRendered += partsRendered;
+            this.drawCalls += drawCalls;
+        }
+
+        return { partsRendered: partsRendered, drawCalls: drawCalls };
+    };
+
+    /**
+     * _onContextLost — Handler for WebGL context loss events.
+     * @private
+     * @param {Event} event - The context loss event.
+     */
+    Donkeycraft.EntityRenderer.prototype._onContextLost = function (event) {
+        this._contextLost = true;
+        // Prevent default browser behavior
+        event.preventDefault();
+    };
+
+    /**
+     * _restoreFromContextLoss — Rebuild mesh cache after WebGL context restoration.
+     * Called when the `webglcontextrestored` event fires.
+     * @private
+     */
+    Donkeycraft.EntityRenderer.prototype._restoreFromContextLoss = function () {
+        this._contextLost = false;
+        // Clear and rebuild mesh cache — all buffers are invalid after context loss
+        this.clearMeshCache();
+    };
+
+    /**
      * render — Render all visible entities using awareness-based culling.
      *
-     * Renders NEAR-tier entities with full animation, FAR-tier with simplified rendering.
+     * Renders NEAR-tier and FAR-tier entities with distance-sorted batch rendering.
      * Entities are sorted by distance and frustum-culled before drawing.
      *
      * Prerequisites:
@@ -960,9 +1151,10 @@
      * @param {Object} [options] - Render options.
      * @param {boolean} [options.renderNear=true] - Render NEAR tier entities.
      * @param {boolean} [options.renderFar=true] - Render FAR tier entities.
+     * @param {boolean} [options.alphaBlending=false] - Enable alpha blending for transparent rendering.
      */
     Donkeycraft.EntityRenderer.prototype.render = function (options) {
-        if (!this.enabled || !this._gl || !this._entityManager) return;
+        if (!this.enabled || !this._gl || !this._entityManager || this._contextLost) return;
 
         var gl = this._gl;
         var shaderManager = this._shaderManager;
@@ -972,10 +1164,8 @@
         this.entitiesRendered = 0;
         this.drawCalls = 0;
 
-        // Enable depth testing and face culling for correct rendering
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
+        // Apply render state (depth, culling, optional blending)
+        this._applyRenderState(opts.alphaBlending);
 
         // Activate terrain shader for entity rendering
         if (shaderManager) {
@@ -1013,48 +1203,8 @@
             // Frustum culling
             if (!this._isEntityInFrustum(entity)) continue;
 
-            // Get entity shape definitions for this entity type
-            var shapeDefs = Donkeycraft.EntityShapeDefs[entity.type];
-            if (!shapeDefs) {
-                // Fallback: use a generic box for unknown entity types
-                shapeDefs = [{
-                    name: 'body',
-                    meshType: 'box',
-                    dimensions: { w: entity.width || 0.6, h: entity.height || 1.8, d: entity.width || 0.6 },
-                    color: '#FF00FF' // Magenta = unknown type
-                }];
-            }
-
-            // Get bone transforms from animation controller (if available)
-            var boneTransforms = entity.getBoneTransforms ? entity.getBoneTransforms() : {};
-
-            // Render each body part mesh
-            for (var m = 0; m < shapeDefs.length; m++) {
-                var shapeDef = shapeDefs[m];
-
-                // Get or build mesh cache for this body part
-                var meshCache = this._getOrBuildMesh(shapeDef);
-                if (!meshCache) continue;
-
-                // Compute bone world-space transform (position + rotation)
-                var worldTransform = this._computeBoneWorldTransform(entity, shapeDef.name, boneTransforms);
-
-                // Draw the mesh part with bone transform and color
-                var success = this._drawMesh(
-                    meshCache,
-                    worldTransform.x,
-                    worldTransform.y,
-                    worldTransform.z,
-                    worldTransform.rx,
-                    worldTransform.ry,
-                    worldTransform.rz,
-                    shapeDef.color
-                );
-
-                if (success) {
-                    this.entitiesRendered++;
-                }
-            }
+            // Render all body parts for this entity
+            this._renderEntityParts(entity, true);
         }
     };
 
@@ -1064,59 +1214,18 @@
      * @param {Donkeycraft.Entity} entity - Entity to render.
      */
     Donkeycraft.EntityRenderer.prototype.renderEntity = function (entity) {
-        if (!this._gl || !entity || !entity.isAlive()) return;
+        if (!this._gl || !entity || !entity.isAlive() || this._contextLost) return;
 
         var gl = this._gl;
-        var shaderManager = this._shaderManager;
 
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
+        // Apply render state
+        this._applyRenderState(this.enableAlphaBlending);
 
-        // Activate terrain shader
-        if (shaderManager) {
-            shaderManager.use('terrain');
-        }
+        // Render all body parts for this entity (non-batch mode)
+        var stats = this._renderEntityParts(entity, false);
 
-        // Get shape definitions for this entity type
-        var shapeDefs = Donkeycraft.EntityShapeDefs[entity.type];
-        if (!shapeDefs) {
-            shapeDefs = [{
-                name: 'body',
-                meshType: 'box',
-                dimensions: { w: entity.width || 0.6, h: entity.height || 1.8, d: entity.width || 0.6 },
-                color: '#FF00FF'
-            }];
-        }
-
-        // Get bone transforms from animation controller
-        var boneTransforms = entity.getBoneTransforms ? entity.getBoneTransforms() : {};
-
-        // Render each body part
-        var renderedParts = 0;
-        for (var i = 0; i < shapeDefs.length; i++) {
-            var shapeDef = shapeDefs[i];
-            var meshCache = this._getOrBuildMesh(shapeDef);
-            if (!meshCache) continue;
-
-            var worldTransform = this._computeBoneWorldTransform(entity, shapeDef.name, boneTransforms);
-
-            var success = this._drawMesh(
-                meshCache,
-                worldTransform.x,
-                worldTransform.y,
-                worldTransform.z,
-                worldTransform.rx,
-                worldTransform.ry,
-                worldTransform.rz,
-                shapeDef.color
-            );
-
-            if (success) renderedParts++;
-        }
-
-        this.entitiesRendered = renderedParts;
-        this.drawCalls = renderedParts;
+        this.entitiesRendered = stats.partsRendered;
+        this.drawCalls = stats.drawCalls;
     };
 
     /**
@@ -1142,17 +1251,59 @@
      * Call this when the renderer is no longer needed to prevent memory leaks.
      */
     Donkeycraft.EntityRenderer.prototype.destroy = function () {
+        // Remove context loss listener
+        this._removeContextLossListener();
+
         this.clearMeshCache();
         this._entityManager = null;
         this._camera = null;
         this._shaderManager = null;
         this._modelMatrix = null;
+        this._contextLossHandler = null;
+    };
+
+    /**
+     * _removeContextLossListener — Remove the WebGL context loss event listener.
+     * @private
+     */
+    Donkeycraft.EntityRenderer.prototype._removeContextLossListener = function () {
+        if (this._contextLossHandler && this._gl) {
+            var gl = this._gl;
+            gl.canvas.removeEventListener('webglcontextlost', this._contextLossHandler);
+            gl.canvas.removeEventListener('webglcontextrestored', this._contextLossHandler);
+            this._contextLossHandler = null;
+        }
+    };
+
+    /**
+     * _setupContextLossListener — Register a listener for WebGL context loss/restoration events.
+     * Ensures only one handler is registered and existing ones are removed first.
+     * @private
+     */
+    Donkeycraft.EntityRenderer.prototype._setupContextLossListener = function () {
+        var gl = this._gl;
+        if (!gl || !gl.canvas) return;
+
+        // Remove any existing listener first
+        this._removeContextLossListener();
+
+        var self = this;
+        this._contextLossHandler = function (event) {
+            if (event.type === 'webglcontextlost') {
+                self._onContextLost(event);
+            } else if (event.type === 'webglcontextrestored') {
+                self._restoreFromContextLoss();
+            }
+        };
+
+        gl.canvas.addEventListener('webglcontextlost', this._contextLossHandler, false);
+        gl.canvas.addEventListener('webglcontextrestored', this._contextLossHandler, false);
     };
 
     /**
      * getStats — Get renderer statistics since the last render call.
      * @returns {{entitiesRendered: number, drawCalls: number, cachedMeshes: number}}
-     *   - entitiesRendered: Number of body parts successfully rendered last frame
+     *   - entitiesRendered: Number of body parts successfully rendered last frame (not total entities)
      *   - drawCalls: Number of gl.drawElements calls made last frame
      *   - cachedMeshes: Total number of unique mesh definitions currently cached
      */
@@ -1163,5 +1314,36 @@
             cachedMeshes: Object.keys(this._meshCache).length
         };
     };
+
+    // ============================================================
+    // Initialization — Set up WebGL context loss handling after construction
+    // ============================================================
+
+    // Defer context loss listener setup to allow constructor to complete.
+    // This is safe because the renderer is not used until all initialization is done.
+    (function () {
+        var origConstructor = Donkeycraft.EntityRenderer;
+
+        /**
+         * EntityRenderer — Constructor with automatic WebGL context loss handling setup.
+         * @constructor
+         * @param {WebGLRenderingContext} gl - WebGL 1.0 context.
+         * @param {Object} shaderManager - ShaderManager instance.
+         */
+        Donkeycraft.EntityRenderer = function (gl, shaderManager) {
+            origConstructor.call(this, gl, shaderManager);
+            // Set up context loss handling after construction
+            var self = this;
+            setTimeout(function () { self._setupContextLossListener(); }, 0);
+        };
+
+        // Copy all prototype methods from the original constructor
+        var proto = origConstructor.prototype;
+        for (var key in proto) {
+            if (proto.hasOwnProperty(key)) {
+                Donkeycraft.EntityRenderer.prototype[key] = proto[key];
+            }
+        }
+    })();
 
 })();
