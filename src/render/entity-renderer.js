@@ -1062,8 +1062,11 @@
         // Set model matrix uniform (uModel)
         shaderManager.setMat4('uModel', { getData: function () { return modelMatrix; } });
 
-        // Set flat color uniform (uColor) — overrides texture shading for entities
+        // Set flat color uniform (uColor) — entity RGB color
         shaderManager.setVec3('uColor', rgb.r, rgb.g, rgb.b);
+
+        // Enable entity rendering mode (uUseColor = 1) so the shader uses flat color instead of texture
+        shaderManager.setInt('uUseColor', 1);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshCache.ibo);
         gl.drawElements(gl.TRIANGLES, meshCache.vertexCount, gl.UNSIGNED_SHORT, 0);
@@ -1562,16 +1565,33 @@
 
             var renderList = sorted.slice(0, this.maxRenderEntities);
 
+            var frustumSkipped = 0;
+            var aliveSkipped = 0;
+            var totalPartsRendered = 0;
+
             for (var k = 0; k < renderList.length; k++) {
                 var entData = renderList[k];
                 var entity = this._entityManager.getEntity(entData.id);
 
-                if (!entity || !entity.isAlive()) continue;
+                if (!entity || !entity.isAlive()) {
+                    aliveSkipped++;
+                    continue;
+                }
 
-                if (!this._isEntityInFrustum(entity)) continue;
+                if (!this._isEntityInFrustum(entity)) {
+                    frustumSkipped++;
+                    continue;
+                }
 
-                this._renderEntityParts(entity, true);
+                var stats = this._renderEntityParts(entity, true);
+                totalPartsRendered += stats.partsRendered;
             }
+
+            // Diagnostic logging (only when debug logging is enabled)
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.debug === 'function') {
+                Donkeycraft.Logger.debug('EntityRenderer', 'Entities: near=' + nearIds.length + ' far=' + farIds.length + ' sorted=' + sorted.length + ' rendered=' + this.entitiesRendered + ' parts=' + totalPartsRendered + ' drawCalls=' + this.drawCalls + ' frustumSkipped=' + frustumSkipped + ' aliveSkipped=' + aliveSkipped);
+            }
+
         } finally {
             this._restoreRenderState();
         }

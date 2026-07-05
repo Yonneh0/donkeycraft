@@ -490,10 +490,17 @@
             }
         }
 
-        // Wire entity renderer to use the EntityManager for awareness queries
-        if (this._entityRenderer && this._entityManager) {
+        // Wire entity renderer to use the EntityEngine's internal EntityManager for awareness queries.
+        // The EntityEngine owns its own EntityManager instance (separate from game._entityManager),
+        // and entities are spawned into that manager via EntityEngine.spawn().
+        if (this._entityRenderer && this._entityEngine) {
             try {
-                this._entityRenderer.setEntityManager(this._entityManager);
+                var engineEntityManager = this._entityEngine.getEntityManager();
+                if (engineEntityManager) {
+                    this._entityRenderer.setEntityManager(engineEntityManager);
+                } else {
+                    Donkeycraft.Logger.warn('Game', 'EntityEngine.getEntityManager() returned null — renderer will not see any entities.');
+                }
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Failed to wire EntityManager to entity renderer: ' + e.message);
             }

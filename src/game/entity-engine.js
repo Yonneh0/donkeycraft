@@ -1444,6 +1444,15 @@
         this._timer = null;
 
         /**
+         * Player entity reference for position-relative spawning.
+         * Set via setPlayerEntity() by game.js. Used by _spawnExamples to spawn
+         * entities near the actual player rather than falling back to world center.
+         * @type {Donkeycraft.Entity|null}
+         * @private
+         */
+        this._playerEntity = null;
+
+        /**
          * Whether the engine is enabled.
          * @type {boolean}
          */
@@ -1511,11 +1520,13 @@
     };
 
     /**
-     * setPlayerEntity — Set the player entity reference for AI targeting.
+     * setPlayerEntity — Set the player entity reference for AI targeting and position-relative spawning.
+     * Stores the player on both the EntityEngine (for _spawnExamples) and the internal EntityManager (for AI).
      * @param {Donkeycraft.Entity} player - The player entity.
      */
     Donkeycraft.EntityEngine.prototype.setPlayerEntity = function (player) {
         if (!this.initialize()) return;
+        this._playerEntity = player || null;
         this._entityManager.setPlayerEntity(player);
     };
 
@@ -1559,9 +1570,21 @@
     Donkeycraft.EntityEngine.prototype.tick = function (dt, groundCheck) {
         if (!this.enabled || !this._entityManager) return;
 
+        // Get player position for awareness updates — this is critical for entity rendering.
+        // Without it, _updateAwareness() never runs and near/far entity lists stay empty.
+        var playerPos = null;
+        if (this._playerEntity && this._playerEntity.isAlive && this._playerEntity.isAlive()) {
+            playerPos = this._playerEntity.getPosition();
+        }
+
         // Tick the entity manager — this handles awareness updates, spatial hash, and entity ticks
         try {
-            this._entityManager.tick(dt);
+            if (playerPos) {
+                this._entityManager.tick(dt, playerPos.x, playerPos.y, playerPos.z);
+            } else {
+                // If no player entity is available, still tick entities but skip awareness.
+                this._entityManager.tick(dt);
+            }
         } catch (e) {
             if (typeof console !== 'undefined' && typeof console.error === 'function') {
                 console.error('[EntityEngine] EntityManager tick error:', e);
@@ -1574,6 +1597,8 @@
 
     /**
      * _spawnExamples — Spawn proof-of-concept example entities near the player.
+     * Uses _playerEntity (set via setPlayerEntity) for position-relative spawning.
+     * Falls back to world center if no player is available.
      * @private
      * @param {number} dt - Delta time.
      * @param {Function} [groundCheck] - Ground detection callback.
@@ -1587,17 +1612,15 @@
 
         this._examplesSpawned = true;
 
-        // Get player position for offset-based spawning
+        // Get player position for offset-based spawning from _playerEntity field.
+        // This is set via setPlayerEntity() by game.js, which is the authoritative source.
         var entityManager = this._entityManager;
-        var entities = entityManager.getAllEntities();
         var playerPos = null;
-        for (var p = 0; p < entities.length; p++) {
-            if (entities[p].type === 'player') {
-                playerPos = entities[p].getPosition();
-                break;
-            }
+        if (this._playerEntity && this._playerEntity.isAlive && this._playerEntity.isAlive()) {
+            playerPos = this._playerEntity.getPosition();
         }
-        // Fallback to origin if no player found
+
+        // Fallback to world center if no player is available.
         var worldHeight = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 64;
         if (!playerPos) {
             playerPos = { x: 0, y: worldHeight / 2, z: 0 };
@@ -1623,10 +1646,15 @@
                 var spawnY = Math.floor(playerPos.y + ex.offsetY);
                 var spawnZ = Math.floor(playerPos.z + ex.offsetZ);
 
-                // Find ground level at spawn position using downward scan
+                // Find ground level at spawn position using downward scan.
+                // Start from a generous height above the player to ensure we reach terrain,
+                // even if the player is on a cliff or underground. The scan range of 128 blocks
+                // covers the full world height for safety.
                 var groundY = null;
+                var scanStartY = Math.min(spawnY + 128, worldHeight - 1);
+
                 if (self._getBlockIdFn) {
-                    for (var gy = spawnY + 20; gy >= 0; gy--) {
+                    for (var gy = scanStartY; gy >= 0; gy--) {
                         var bid = self._getBlockIdFn(spawnX, gy, spawnZ);
                         if (bid && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(bid)) {
                             groundY = gy + 1;
@@ -1634,9 +1662,16 @@
                         }
                     }
                 }
-                // Fallback: place above world height / 2
+
+                // Multi-tier fallback:
+                // 1. If ground scan failed, use player Y + a small offset (safe surface position).
+                // 2. Last resort: use the world's default spawn Y from config.
                 if (groundY === null) {
-                    groundY = worldHeight - 10;
+                    // Use player's Y as reference — entities spawn on the same surface level.
+                    groundY = Math.floor(playerPos.y) + 1;
+
+                    // Ensure we don't spawn below the world or above the world height.
+                    groundY = Math.max(1, Math.min(groundY, worldHeight - 1));
                 }
 
                 // Create entity with proper position
