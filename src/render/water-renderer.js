@@ -6,7 +6,7 @@
 // - Animated FBM wave displacement in fragment shader
 // - Fresnel-based reflection blending
 // - Sun glare specular highlight (Blinn-Phong)
-// - Depth-based distance fog
+// - Depth-based distance fog with lighting factor
 // - Dithering to prevent alpha banding
 //
 // Rendering pipeline:
@@ -40,12 +40,12 @@
     var WATER_UV_SCALE = 0.0625;
 
     /**
-     * Visible area coverage factor for mesh scanning.
-     * Scans renderDistance × 2 + 1 chunks in each direction to ensure
-     * all water surfaces near the player are captured, including edge cases.
+     * FBM wave UV scale multiplier for animated water surface.
+     * 8.0 creates 8 tile-sized repeats across the water surface.
+     * Must match the value in WATER_FRAGMENT_SHADER's fbm() function.
      * @constant {number}
      */
-    var VISIBLE_AREA_MARGIN = 1;
+    var FBM_WAVE_SCALE = 8.0;
 
     /**
      * Base water alpha (transparency) for direct overhead view.
@@ -98,23 +98,10 @@
     var WATER_FOG_DENSITY = 0.015;
 
     /**
-     * Light factor multiplier for water surface brightness.
-     * @constant {number}
-     */
-    var WATER_LIGHT_FACTOR = 1.0;
-
-    /**
      * Reflection strength factor for Fresnel blending.
      * @constant {number}
      */
     var WATER_REFLECTION_STRENGTH = 0.5;
-
-    /**
-     * FBM wave UV scale multiplier for animated water surface.
-     * 8.0 creates 8 tile-sized repeats across the water surface.
-     * @constant {number}
-     */
-    var FBM_WAVE_SCALE = 8.0;
 
     /**
      * Time accumulator reset threshold to prevent floating-point drift.
@@ -148,18 +135,18 @@
     // ============================================================
 
     /**
-     * Resolve the water block ID from available subsystems.
-     * Tries BlockRegistry first, then falls back to hardcoded IDs.
-     * Caches the result after first resolution for performance.
-     *
-     * @returns {number|null} Water block ID, or null if undetectable.
+     * Cached water block ID resolved on first call.
+     * @type {number|null}
      * @private
      */
     var _cachedWaterBlockId = null;
 
     /**
-     * Get the water block ID, caching the result for subsequent calls.
-     * @returns {number} Water block ID, or -1 if undetectable.
+     * Resolve the water block ID from available subsystems.
+     * Tries BlockRegistry first, then falls back to hardcoded IDs.
+     * Caches the result after first resolution for performance.
+     *
+     * @returns {number|null} Water block ID, or null if undetectable.
      * @private
      */
     function _getWaterBlockId() {
@@ -170,7 +157,7 @@
         _cachedWaterBlockId = -1;
 
         try {
-            // Try BlockRegistry first
+            // Try BlockRegistry.getId first
             if (Donkeycraft.BlockRegistry) {
                 var getId = Donkeycraft.BlockRegistry.getId;
                 if (typeof getId === 'function') {
@@ -183,23 +170,21 @@
                 }
             }
 
-            // Fallback: check BlockTypes.isLiquid for water-named blocks
+            // Fallback: iterate BlockRegistry for blocks named "water"
             var allBlocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : null;
             if (allBlocks && Array.isArray(allBlocks)) {
-                for (var i = 0; i < allBlocks.length; i++) {
-                    var block = allBlocks[i];
-                    if (block && block.name === 'water') {
-                        _cachedWaterBlockId = block.id;
-                        Donkeycraft.Logger.debug(LOGGER_NAMESPACE, 'Water block ID resolved from BlockRegistry name: ' + block.id);
-                        return block.id;
+                for (var _i = 0; _i < allBlocks.length; _i++) {
+                    var _b = allBlocks[_i];
+                    if (_b && _b.name === 'water') {
+                        _cachedWaterBlockId = _b.id;
+                        Donkeycraft.Logger.debug(LOGGER_NAMESPACE, 'Water block ID resolved from BlockRegistry name: ' + _b.id);
+                        return _b.id;
                     }
                 }
             }
 
-            // Ultimate fallback: hardcoded water block IDs
-            // Water is typically ID 8 or 9 in Minecraft-style games
+            // Ultimate fallback: check common water IDs with isLiquid verification
             if (Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isLiquid) {
-                // Check common water IDs
                 var commonWaterIds = [8, 9, 10];
                 for (var j = 0; j < commonWaterIds.length; j++) {
                     if (Donkeycraft.BlockTypes.isLiquid(commonWaterIds[j])) {
@@ -233,6 +218,29 @@
     }
 
     // ============================================================
+    // Robust position hash for vertex deduplication
+    // ============================================================
+
+    /**
+     * Generate a robust numeric hash for world coordinates.
+     * Uses multiplicative hashing with the golden ratio constant for
+     * excellent distribution and minimal collisions.
+     *
+     * @param {number} x - World X coordinate.
+     * @param {number} y - World Y coordinate.
+     * @param {number} z - World Z coordinate.
+     * @returns {number} Unsigned 32-bit numeric hash key.
+     * @private
+     */
+    function _hashPosition(x, y, z) {
+        // Multiplicative hash — avoids XOR collisions that simple addition suffers from
+        var h = (x * 73856093) | 0;
+        h = Math.imul(h ^ (y * 19349663), 83492791);
+        h = Math.imul(h ^ (z * 1500489829), 185741191);
+        return h >>> 0; // Convert to unsigned
+    }
+
+    // ============================================================
     // Donkeycraft.WaterRenderer — Constructor
     // ============================================================
 
@@ -250,14 +258,14 @@
     Donkeycraft.WaterRenderer = function (gl, shaderManager) {
         /**
          * WebGL rendering context.
-         * @type {WebGLRenderingContext}
+         * @type {WebGLRenderingContext|null}
          * @private
          */
         this._gl = gl;
 
         /**
          * Shader manager for program access and uniform setting.
-         * @type {Donkeycraft.ShaderManager}
+         * @type {Donkeycraft.ShaderManager|null}
          * @private
          */
         this._shaderManager = shaderManager;
@@ -389,14 +397,6 @@
          */
         this._lastWaterLevel = 63;
 
-        /**
-         * Set of chunk keys that have exposed water surfaces.
-         * Used to detect when adjacent chunks change and water needs rebuild.
-         * @type{Object<boolean>}
-         * @private
-         */
-        this._waterChunkKeys = null;
-
         // ============================================================
         // Animation state
         // ============================================================
@@ -462,44 +462,50 @@
 
         // Create vertex buffer with initial capacity (4096 vertices = 512 quads)
         if (!this._vertexBuffer) {
-            this._vertexBuffer = gl.createBuffer();
-            // Check that createBuffer returned a valid non-null handle
-            if (!this._vertexBuffer || typeof this._vertexBuffer !== 'object') {
-                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: vertex buffer creation failed — createBuffer returned invalid handle');
+            try {
+                this._vertexBuffer = gl.createBuffer();
+                if (!this._vertexBuffer || typeof this._vertexBuffer !== 'object') {
+                    Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: vertex buffer creation failed — createBuffer returned invalid handle');
+                    this._vertexBuffer = null;
+                    return;
+                }
+                var glErr = gl.getError();
+                if (glErr !== gl.NO_ERROR) {
+                    Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: vertex buffer creation failed — WebGL error 0x' + glErr.toString(16));
+                    this._vertexBuffer = null;
+                    return;
+                }
+                this._vertexBufferCapacity = 4096;
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, this._vertexBufferCapacity * 9 * 4, gl.DYNAMIC_DRAW);
+            } catch (e) {
+                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers vertex buffer error: ' + e.message);
                 this._vertexBuffer = null;
-                return;
             }
-            // Verify no WebGL error occurred during buffer creation
-            var glErr = gl.getError();
-            if (glErr !== gl.NO_ERROR) {
-                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: vertex buffer creation failed — WebGL error 0x' + glErr.toString(16));
-                this._vertexBuffer = null;
-                return;
-            }
-            this._vertexBufferCapacity = 4096;
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, this._vertexBufferCapacity * 9 * 4, gl.DYNAMIC_DRAW);
         }
 
         // Create index buffer with initial capacity (6144 indices = 1024 triangles)
         if (!this._indexBuffer) {
-            this._indexBuffer = gl.createBuffer();
-            // Check that createBuffer returned a valid non-null handle
-            if (!this._indexBuffer || typeof this._indexBuffer !== 'object') {
-                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: index buffer creation failed — createBuffer returned invalid handle');
+            try {
+                this._indexBuffer = gl.createBuffer();
+                if (!this._indexBuffer || typeof this._indexBuffer !== 'object') {
+                    Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: index buffer creation failed — createBuffer returned invalid handle');
+                    this._indexBuffer = null;
+                    return;
+                }
+                glErr = gl.getError();
+                if (glErr !== gl.NO_ERROR) {
+                    Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: index buffer creation failed — WebGL error 0x' + glErr.toString(16));
+                    this._indexBuffer = null;
+                    return;
+                }
+                this._indexBufferCapacity = 6144;
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
+                gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._indexBufferCapacity * 2, gl.DYNAMIC_DRAW);
+            } catch (e) {
+                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers index buffer error: ' + e.message);
                 this._indexBuffer = null;
-                return;
             }
-            // Verify no WebGL error occurred during buffer creation
-            glErr = gl.getError();
-            if (glErr !== gl.NO_ERROR) {
-                Donkeycraft.Logger.error(this._loggerNamespace, '_initBuffers: index buffer creation failed — WebGL error 0x' + glErr.toString(16));
-                this._indexBuffer = null;
-                return;
-            }
-            this._indexBufferCapacity = 6144;
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this._indexBufferCapacity * 2, gl.DYNAMIC_DRAW);
         }
 
         // Register WebGL context loss handlers
@@ -676,10 +682,6 @@
         }
 
         // Check if rebuild is needed.
-        // Rebuild on ANY of these conditions:
-        // 1. _dirty flag set (markDirty() called or water level changed)
-        // 2. Player moved to a different chunk
-        // 3. First call (no mesh yet)
         var needsRebuild = false;
 
         if (this._dirty) {
@@ -772,24 +774,13 @@
          */
         var vertexMap = {};
 
-        /**
-         * Generate a numeric hash for world coordinates.
-         * Uses prime multiplication to minimize collisions.
-         * @param {number} x - World X coordinate.
-         * @param {number} y - World Y coordinate.
-         * @param {number} z - World Z coordinate.
-         * @returns {number} Numeric hash key.
-         * @private
-         */
-        var _hashPosition = function (x, y, z) {
-            // Use prime multipliers for good distribution
-            return ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0; // >>> 0 converts to unsigned int
-        };
         var vertexCount = 0;
 
         /**
          * Add or reuse a vertex at the given world position.
-         * Uses numeric hashing for O(1) deduplication lookup.
+         * Uses robust multiplicative hashing for O(1) deduplication lookup.
+         * Checks capacity BEFORE incrementing to prevent overflow.
+         *
          * @param {number} wx - World X.
          * @param {number} wy - World Y.
          * @param {number} wz - World Z.
@@ -799,7 +790,8 @@
          * @private
          */
         var addVertex = function (wx, wy, wz, u, v) {
-            if (vertexCount >= maxVerts) {
+            // FIX: Check capacity BEFORE incrementing (was checking after — caused overflow)
+            if (vertexCount + 1 >= maxVerts) {
                 Donkeycraft.Logger.warn(LOGGER_NAMESPACE, 'addVertex: vertex capacity exceeded');
                 return -1;
             }
@@ -826,6 +818,7 @@
 
         /**
          * Add a quad (two triangles) using the vertex map for deduplication.
+         *
          * @param {number} v0 - Vertex index at bottom-left.
          * @param {number} v1 - Vertex index at bottom-right.
          * @param {number} v2 - Vertex index at top-right.
@@ -854,6 +847,16 @@
 
         // Resolve water block ID once (cached internally)
         var waterBlockId = _getWaterBlockId();
+
+        // Precompute UV values per column to avoid redundant computation in inner loop
+        // FIX: UVs were computed per-block inside the innermost loop — moved outside
+        var colUVs = new Array(CHUNK_SIZE);
+        for (var localX = 0; localX < CHUNK_SIZE; localX++) {
+            colUVs[localX] = {
+                u0: localX * WATER_UV_SCALE,
+                u1: (localX + 1) * WATER_UV_SCALE
+            };
+        }
 
         // Scan each visible chunk
         for (var dx = -renderDist; dx <= renderDist; dx++) {
@@ -885,11 +888,10 @@
 
                         // This water block has an exposed top face — add to mesh
                         // Use chunk-relative UVs for seamless tiling across all chunks.
-                        // World-relative UVs cause massive coordinate values at distance
-                        // which breaks the FBM wave function's expected small-coordinate range.
-                        var absU = localX * WATER_UV_SCALE;
+                        var uvCol = colUVs[localX];
+                        var absU = uvCol.u0;
+                        var absUw = uvCol.u1;
                         var absV = localZ * WATER_UV_SCALE;
-                        var absUw = (localX + 1) * WATER_UV_SCALE;
                         var absVw = (localZ + 1) * WATER_UV_SCALE;
 
                         // Add four corners with deduplication
@@ -909,13 +911,18 @@
             // Resize GPU buffers if needed
             this._resizeBuffers(vertexCount, idxOffset);
 
-            // Upload vertex data to GPU
-            gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
-            gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertexData.subarray(0, vertexCount * 9));
+            try {
+                // Upload vertex data to GPU
+                gl.bindBuffer(gl.ARRAY_BUFFER, this._vertexBuffer);
+                gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertexData.subarray(0, vertexCount * 9));
 
-            // Upload index data to GPU
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
-            gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, indexData.subarray(0, idxOffset));
+                // Upload index data to GPU
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
+                gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, indexData.subarray(0, idxOffset));
+            } catch (e) {
+                Donkeycraft.Logger.error(this._loggerNamespace, '_buildWaterMesh: buffer upload failed: ' + e.message);
+                return;
+            }
 
             this._vertexCount = vertexCount;
             this._indexCount = idxOffset;
@@ -1000,17 +1007,27 @@
 
         // Cache attribute locations on first use
         if (!this._cachedAttributes) {
-            this._cachedAttributes = {
-                aPosition: gl.getAttribLocation(this._shaderManager._getActiveProgram(), 'aPosition'),
-                aUV: gl.getAttribLocation(this._shaderManager._getActiveProgram(), 'aUV'),
-                aNormal: gl.getAttribLocation(this._shaderManager._getActiveProgram(), 'aNormal')
-            };
+            try {
+                var activeProgram = this._shaderManager._getActiveProgram();
+                if (!activeProgram) {
+                    Donkeycraft.Logger.error(this._loggerNamespace, 'render: no active shader program — cannot get attributes');
+                    return;
+                }
+                this._cachedAttributes = {
+                    aPosition: gl.getAttribLocation(activeProgram, 'aPosition'),
+                    aUV: gl.getAttribLocation(activeProgram, 'aUV'),
+                    aNormal: gl.getAttribLocation(activeProgram, 'aNormal')
+                };
 
-            if (this._cachedAttributes.aPosition < 0 || this._cachedAttributes.aUV < 0) {
-                Donkeycraft.Logger.error(this._loggerNamespace,
-                    'render: water shader missing required attributes (aPosition=' +
-                    this._cachedAttributes.aPosition + ', aUV=' + this._cachedAttributes.aUV + ')');
-                this._cachedAttributes = null;
+                if (this._cachedAttributes.aPosition < 0 || this._cachedAttributes.aUV < 0) {
+                    Donkeycraft.Logger.error(this._loggerNamespace,
+                        'render: water shader missing required attributes (aPosition=' +
+                        this._cachedAttributes.aPosition + ', aUV=' + this._cachedAttributes.aUV + ')');
+                    this._cachedAttributes = null;
+                    return;
+                }
+            } catch (e) {
+                Donkeycraft.Logger.error(this._loggerNamespace, 'render: attribute lookup failed: ' + e.message);
                 return;
             }
         }
@@ -1063,8 +1080,13 @@
         // Fog density
         uniformsOk = uniformsOk && this._shaderManager.setFloat('uFogDensity', WATER_FOG_DENSITY);
 
-        // Light factor (full brightness for water)
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uLightFactor', WATER_LIGHT_FACTOR);
+        // Light factor — pass through from lighting system for proper brightness
+        if (lighting && lighting.getLightFactor) {
+            var lightFactor = lighting.getLightFactor();
+            uniformsOk = uniformsOk && this._shaderManager.setFloat('uLightFactor', lightFactor);
+        } else {
+            uniformsOk = uniformsOk && this._shaderManager.setFloat('uLightFactor', 1.0);
+        }
 
         // Water alpha (base transparency)
         uniformsOk = uniformsOk && this._shaderManager.setFloat('uWaterAlpha', WATER_ALPHA_BASE);
@@ -1083,6 +1105,9 @@
 
         // Sun direction
         uniformsOk = uniformsOk && this._shaderManager.setVec3('uSunDir', sunDir.x, sunDir.y, sunDir.z);
+
+        // Wave scale — FBM UV multiplier (must match shader's expected value)
+        uniformsOk = uniformsOk && this._shaderManager.setFloat('uWaveScale', FBM_WAVE_SCALE);
 
         if (!uniformsOk) {
             Donkeycraft.Logger.warn(this._loggerNamespace, 'render: some water shader uniforms failed to set');
@@ -1113,11 +1138,15 @@
 
         // --- WebGL state for transparent rendering ---
 
-        // Save current GL state
+        // Save current GL state (FIX: save ALL blend factors independently, not just SRC_RGB)
         var prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
         var prevBlend = gl.isEnabled(gl.BLEND);
         var prevCullFace = gl.isEnabled(gl.CULL_FACE);
-        var prevBlendFunc = gl.getParameter(gl.BLEND_SRC_RGB);
+        var prevBlendSrcRGB = gl.getParameter(gl.BLEND_SRC_RGB);
+        var prevBlendDstRGB = gl.getParameter(gl.BLEND_DST_RGB);
+        var prevBlendSrcAlpha = gl.getParameter(gl.BLEND_SRC_ALPHA);
+        var prevBlendDstAlpha = gl.getParameter(gl.BLEND_DST_ALPHA);
+        var prevDepthFunc = gl.getParameter(gl.DEPTH_FUNC);
 
         // Enable blending for transparency
         gl.enable(gl.BLEND);
@@ -1139,19 +1168,15 @@
             Donkeycraft.Logger.error(this._loggerNamespace, 'render: drawElements failed: ' + e.message);
         }
 
-        // Restore previous GL state
+        // Restore previous GL state (FIX: restore ALL blend factors independently)
         gl.depthMask(prevDepthMask);
+        gl.depthFunc(prevDepthFunc);
         if (prevBlend) {
             gl.enable(gl.BLEND);
+            gl.blendFuncSeparate(prevBlendSrcRGB, prevBlendDstRGB, prevBlendSrcAlpha, prevBlendDstAlpha);
         } else {
             gl.disable(gl.BLEND);
         }
-        gl.blendFuncSeparate(
-            prevBlendFunc,
-            gl.getParameter(gl.BLEND_DST_RGB),
-            gl.getParameter(gl.BLEND_SRC_ALPHA),
-            gl.getParameter(gl.BLEND_DST_ALPHA)
-        );
         if (prevCullFace) {
             gl.enable(gl.CULL_FACE);
         } else {
@@ -1164,7 +1189,7 @@
         if (attrNormal >= 0) gl.disableVertexAttribArray(attrNormal);
 
         Donkeycraft.Logger.debug(this._loggerNamespace,
-            'Water rendered: ' + this._indexCount / 3 + ' triangles');
+            'Water rendered: ' + (this._indexCount / 3) + ' triangles');
     };
 
     // ============================================================

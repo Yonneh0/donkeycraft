@@ -681,13 +681,14 @@ uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uLightFactor;
 
-uniform float uWaterAlpha;        // base transparency (~0.65)
+uniform float uWaterAlpha;        // base transparency (~0.55)
 uniform float uReflectionStrength;// 0-1 based on viewing angle (Fresnel)
 uniform sampler2D uReflectionTex; // reflected terrain texture
 uniform float uTime;              // animated wave time
 uniform vec3 uCameraPos;          // camera world position
 uniform float uWaterLevel;        // water surface Y coordinate
 uniform vec3 uSunDir;             // sun direction vector for specular glare
+uniform float uWaveScale;         // FBM wave UV scale multiplier (matches JS FBM_WAVE_SCALE)
 
 // === Simplex-like 2D noise (fast approximation) ===
 vec3 permute(vec3 x) {
@@ -741,7 +742,8 @@ float fbm(vec2 p, float time) {
 void main() {
     // === Animated FBM wave displacement ===
     // Scale UV for seamless large surface — water is much larger than 1x1
-    vec2 waterUV = vUV * 8.0; // 8 tile-sized repeats across the water surface
+    // FIX: Use uniform uWaveScale instead of hardcoded 8.0 for consistency with JS
+    vec2 waterUV = vUV * uWaveScale;
     float waveHeight = fbm(waterUV, uTime);
 
     // Distort UV based on wave gradient for semi-scattered reflection
@@ -783,6 +785,10 @@ void main() {
     vec3 sunGlare = vec3(1.0, 0.95, 0.8) * spec * 0.6; // warm white glare
 
     waterColor += sunGlare;
+
+    // === Apply lighting factor for time-of-day brightness ===
+    // Multiplies the entire water surface to match terrain lighting consistency
+    waterColor *= uLightFactor;
 
     // === Depth-based fog ===
     // Distance from camera to water surface point
