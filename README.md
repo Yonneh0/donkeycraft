@@ -156,7 +156,6 @@ src/                # Sauce
     chunk.js              # 16×256×16 chunk volume
     chunk-manager.js      # Chunk loading/unloading
     collision.js          # AABB collision detection
-    damage.js             # Hitbox, damage, knockback, fall damage, stamina management
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
     entity.js             # Base entity class with animation and bone support
@@ -176,7 +175,7 @@ src/                # Sauce
     passive-mobs.js       # Cow, pig, sheep, chicken
     physics.js            # Gravity-affected blocks, liquid flow
     pistons.js            # Pistons and sticky pistons
-    player.js             # Player entity (position, velocity, rotation)
+    player.js             # Player entity (position, velocity, rotation), Hitbox, damage, knockback, fall damage, stamina management
     portal.js             # Inter-dimensional portals
     potion.js             # 18 effects, 40 potions
     projectiles.js        # Arrows, snowballs, ender pearls
