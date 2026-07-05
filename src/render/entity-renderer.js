@@ -419,12 +419,13 @@
     function _rotateMat4X(mat, rad) {
         var c = Math.cos(rad);
         var s = Math.sin(rad);
-        var m5 = mat[5] * c - mat[9] * s;
-        var m6 = mat[6] * c - mat[10] * s;
-        var m7 = mat[7] * c - mat[11] * s;
-        var m9 = mat[5] * s + mat[9] * c;
-        var m10 = mat[6] * s + mat[10] * c;
-        var m11 = mat[7] * s + mat[11] * c;
+        // Post-multiply by R_x(θ): column 1 = col1*c + col2*s, column 2 = -col1*s + col2*c
+        var m5 = mat[5] * c + mat[9] * s;
+        var m6 = mat[6] * c + mat[10] * s;
+        var m7 = mat[7] * c + mat[11] * s;
+        var m9 = -mat[5] * s + mat[9] * c;
+        var m10 = -mat[6] * s + mat[10] * c;
+        var m11 = -mat[7] * s + mat[11] * c;
         mat[5] = m5; mat[6] = m6; mat[7] = m7;
         mat[9] = m9; mat[10] = m10; mat[11] = m11;
         return mat;
@@ -440,12 +441,13 @@
     function _rotateMat4Y(mat, rad) {
         var c = Math.cos(rad);
         var s = Math.sin(rad);
-        var m0 = mat[0] * c + mat[8] * s;
-        var m2 = mat[2] * c + mat[10] * s;
-        var m3 = mat[3] * c + mat[11] * s;
-        var m8 = mat[8] * c - mat[0] * s;
-        var m10 = mat[10] * c - mat[2] * s;
-        var m11 = mat[11] * c - mat[3] * s;
+        // Post-multiply by R_y(θ): column 0 = col0*c - col2*s, column 2 = col0*s + col2*c
+        var m0 = mat[0] * c - mat[8] * s;
+        var m2 = mat[2] * c - mat[10] * s;
+        var m3 = mat[3] * c - mat[11] * s;
+        var m8 = mat[0] * s + mat[8] * c;
+        var m10 = mat[2] * s + mat[10] * c;
+        var m11 = mat[3] * s + mat[11] * c;
         mat[0] = m0; mat[2] = m2; mat[3] = m3;
         mat[8] = m8; mat[10] = m10; mat[11] = m11;
         return mat;
@@ -461,14 +463,15 @@
     function _rotateMat4Z(mat, rad) {
         var c = Math.cos(rad);
         var s = Math.sin(rad);
-        var m0 = mat[0] * c - mat[4] * s;
-        var m1 = mat[1] * c - mat[5] * s;
-        var m2 = mat[2] * c - mat[6] * s;
-        var m3 = mat[3] * c - mat[7] * s;
-        var m4 = mat[0] * s + mat[4] * c;
-        var m5 = mat[1] * s + mat[5] * c;
-        var m6 = mat[2] * s + mat[6] * c;
-        var m7 = mat[3] * s + mat[7] * c;
+        // Post-multiply by R_z(θ): column 0 = col0*c + col1*s, column 1 = -col0*s + col1*c
+        var m0 = mat[0] * c + mat[4] * s;
+        var m1 = mat[1] * c + mat[5] * s;
+        var m2 = mat[2] * c + mat[6] * s;
+        var m3 = mat[3] * c + mat[7] * s;
+        var m4 = -mat[0] * s + mat[4] * c;
+        var m5 = -mat[1] * s + mat[5] * c;
+        var m6 = -mat[2] * s + mat[6] * c;
+        var m7 = -mat[3] * s + mat[7] * c;
         mat[0] = m0; mat[1] = m1; mat[2] = m2; mat[3] = m3;
         mat[4] = m4; mat[5] = m5; mat[6] = m6; mat[7] = m7;
         return mat;
@@ -1357,6 +1360,8 @@
 
         var partsRendered = 0;
         var drawCalls = 0;
+
+        var bones = entity.getBones();
 
         // Cache bone lookup: build a Map from bone name to definition for O(1) lookup.
         var boneMap = null;
