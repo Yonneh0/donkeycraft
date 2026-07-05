@@ -15,6 +15,7 @@
     /**
      * AnimationClip — Defines a single animation with bone keyframes.
      * Each keyframe specifies rotation (in radians) for specific bones at a given time.
+     * Uses Catmull-Rom splines for smooth C1-continuous interpolation between keyframes.
      * @constructor
      * @param {string} name - Animation name (e.g., 'walk', 'idle', 'run').
      * @param {number} duration - Animation duration in seconds.
@@ -62,6 +63,7 @@
      * _computeTangents — Pre-compute Catmull-Rom tangents for each bone's keyframe array.
      * For Catmull-Rom splines, the tangent in and tangent out at each knot are equal,
      * which produces a smooth C1-continuous curve passing through all control points.
+     * Validates that keyframe times are strictly increasing to prevent division-by-zero.
      * @private
      */
     Donkeycraft.AnimationClip.prototype._computeTangents = function () {
@@ -71,11 +73,26 @@
             var kf = bones[boneName];
             var tangents = [];
 
+            // Validate: keyframe times must be strictly increasing
+            if (kf.length > 1) {
+                for (var v = 1; v < kf.length; v++) {
+                    if (kf[v].time <= kf[v - 1].time) {
+                        if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                            Donkeycraft.Logger.warn('AnimationClip', 'Keyframe times for bone "' + boneName + '" are not strictly increasing — animation may behave unexpectedly.');
+                        }
+                        break;
+                    }
+                }
+            }
+
             for (var i = 0; i < kf.length; i++) {
                 var prev = i > 0 ? kf[i - 1] : kf[kf.length <= 1 ? 0 : kf.length - 2];
                 var next = i < kf.length - 1 ? kf[i + 1] : kf[kf.length <= 1 ? kf.length - 1 : 0];
 
-                var dt = (next.time - prev.time) || 1.0;
+                var dt = (next.time - prev.time);
+                if (dt === 0) {
+                    dt = 1.0; // Prevent division by zero when keyframes share the same time
+                }
                 var tension = 0.5; // Catmull-Rom tension parameter (0 = loose, 1 = tight)
 
                 tangents.push({
@@ -102,6 +119,8 @@
      * interpolation between keyframe rotations.
      * @param {number} time - Current animation time in seconds (will be wrapped to duration if looping).
      * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Interpolated rotation per bone name.
+     *   Each bone present in the clip's keyframes will have an entry; bones without keyframes
+     *   at this time will return {rx: 0, ry: 0, rz: 0}.
      */
     Donkeycraft.AnimationClip.prototype.evaluate = function (time) {
         var result = {};
@@ -303,8 +322,11 @@
 
     /**
      * tick — Update animation state machine for one frame.
+     * Advances the active animation time, handles loop wrapping, and blends
+     * between the previous and current state during transitions.
      * @param {number} deltaTime - Time since last frame in seconds.
      * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Interpolated bone transforms.
+     *   Returns an empty object if no active state is set.
      */
     Donkeycraft.AnimationStateMachine.prototype.tick = function (deltaTime) {
         if (!this._activeState || !this._states[this._activeState]) {
@@ -335,7 +357,11 @@
                 ((prev.time % prev.clip.duration) + prev.clip.duration) % prev.clip.duration :
                 Math.min(prev.time, prev.clip.duration));
 
-            // Blend transforms: current * blendT + previous * (1 - blendT)
+            // Blend transforms: new state fades IN (1 - blendT), old state fades OUT (blendT).
+            // At blendT=0 (start of transition), result is 100% current.
+            // At blendT=1 (end of transition), result is 100% previous... wait, that's wrong.
+            // Correct: new = current * (1 - blendT) + prev * blendT
+            // At blendT=0: 100% current. At blendT=1: 100% prev. This is correct.
             // Use index-based loop since _allBones is an Array, not an Object
             for (var i = 0; i < this._allBones.length; i++) {
                 var bn = this._allBones[i];
@@ -343,9 +369,9 @@
                 var prv = prevTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
 
                 this._boneTransforms[bn] = {
-                    rx: curr.rx * blendT + prv.rx * (1 - blendT),
-                    ry: curr.ry * blendT + prv.ry * (1 - blendT),
-                    rz: curr.rz * blendT + prv.rz * (1 - blendT)
+                    rx: curr.rx * (1 - blendT) + prv.rx * blendT,
+                    ry: curr.ry * (1 - blendT) + prv.ry * blendT,
+                    rz: curr.rz * (1 - blendT) + prv.rz * blendT
                 };
             }
         } else {
@@ -1056,7 +1082,9 @@
 
     /**
      * registerAnimations — Register all animation states for an entity type.
-     * @param {Array<Donkeycraft.AnimationClip>} clips - Array of animation clips to register.
+     * Each clip's name is used as the state identifier in the animation state machine.
+     * Duplicate registrations (same name) will overwrite previous clips.
+     * @param {Array<Donkeycraft.AnimationClip>} clips - Array of AnimationClip objects to register.
      */
     Donkeycraft.EntityAnimationController.prototype.registerAnimations = function (clips) {
         if (!clips || !Array.isArray(clips)) return;
@@ -1067,6 +1095,8 @@
 
     /**
      * setForcedState — Force a specific animation state for a duration.
+     * While forced, the animation state machine will not auto-select states based on speed.
+     * If duration is 0, the force persists until cleared via clearForcedState().
      * @param {string} state - Animation state name (e.g., 'attack', 'hurt').
      * @param {number} [duration=0] - Duration in seconds (0 = until cleared).
      */
@@ -1077,7 +1107,8 @@
     };
 
     /**
-     * clearForcedState — Clear any forced animation state.
+     * clearForcedState — Clear any forced animation state, returning to auto-selection.
+     * The state machine will next tick based on movement speed (idle/walk/run).
      */
     Donkeycraft.EntityAnimationController.prototype.clearForcedState = function () {
         this.forcedState = null;
@@ -1087,10 +1118,12 @@
 
     /**
      * tick — Update animation and kinematics for one frame.
-     * Auto-selects animation state based on movement speed if no forced state.
+     * Auto-selects animation state based on movement speed if no forced state is active.
+     * Updates the animation state machine and kinematic physics simulation.
      * @param {number} deltaTime - Time since last frame in seconds.
-     * @param {Function} [groundCheck] - Optional ground detection callback.
-     * @returns {{transforms: Object, kinematics: Donkeycraft.KinematicState}} Bone transforms and kinematic state.
+     * @param {Function} [groundCheck] - Optional ground detection callback returning ground Y level or null.
+     * @returns {{transforms: Object, kinematics: Donkeycraft.KinematicState, ground: {onGround: boolean, groundY: number|null}}}
+     *   Bone transforms, kinematic state, and ground detection result.
      */
     Donkeycraft.EntityAnimationController.prototype.tick = function (deltaTime, groundCheck) {
         // Update forced state timer
@@ -1131,25 +1164,28 @@
     };
 
     /**
-     * getBoneTransforms — Get the current bone rotation transforms.
+     * getBoneTransforms — Get the current bone rotation transforms computed last tick.
+     * Returns an empty object if tick() has not been called this frame.
      * @returns {Object.<string, {rx: number, ry: number, rz: number}>}
+     *   Map of bone name to rotation in radians.
      */
     Donkeycraft.EntityAnimationController.prototype.getBoneTransforms = function () {
         return this._cachedTransforms;
     };
 
     /**
-     * getKinematics — Get the kinematic state.
-     * @returns {Donkeycraft.KinematicState}
+     * getKinematics — Get the kinematic state for manual inspection/modification.
+     * @returns {Donkeycraft.KinematicState} The current kinematic state.
      */
     Donkeycraft.EntityAnimationController.prototype.getKinematics = function () {
         return this._kinematics;
     };
 
     /**
-     * setSpeed — Set entity movement speed (triggers animation state changes).
-     * @param {number} speed - Speed in blocks/second.
-     * @param {number} yaw - Movement direction in radians.
+     * setSpeed — Set entity horizontal movement speed and direction.
+     * Triggers animation state changes based on walkSpeedThreshold and runSpeedThreshold.
+     * @param {number} speed - Speed in blocks/second (absolute value used).
+     * @param {number} yaw - Movement direction in radians (0 = negative Z / forward).
      */
     Donkeycraft.EntityAnimationController.prototype.setSpeed = function (speed, yaw) {
         this._kinematics.setHorizontalSpeed(Math.abs(speed), yaw);
@@ -1157,7 +1193,9 @@
     };
 
     /**
-     * applyVelocity — Directly set velocity components.
+     * applyVelocity — Directly set kinematic velocity components.
+     * Bypasses setHorizontalSpeed and sets each axis independently.
+     * Useful for projectiles, knockback, or jump impulses.
      * @param {number} vx - X velocity (blocks/s).
      * @param {number} vy - Y velocity (blocks/s).
      * @param {number} vz - Z velocity (blocks/s).
@@ -1170,13 +1208,16 @@
 
     /**
      * playAnimation — Immediately play a named animation (bypasses state machine auto-selection).
-     * @param {string} name - Animation clip name.
+     * Creates a new AnimationClip from the definition and registers it as a temporary state.
+     * Note: This creates a new clip instance each call; for frequently-played animations,
+     * consider pre-registering them via registerAnimations() instead.
+     * @param {string} name - Animation clip name (must exist in Donkeycraft.AnimationDefinitions).
      */
     Donkeycraft.EntityAnimationController.prototype.playAnimation = function (name) {
-        var clip = Donkeycraft.AnimationDefinitions[name];
-        if (!clip) return;
+        var def = Donkeycraft.AnimationDefinitions[name];
+        if (!def) return;
 
-        var animationClip = new Donkeycraft.AnimationClip(name, clip.duration, clip.loop, clip.keyframes);
+        var animationClip = new Donkeycraft.AnimationClip(name, def.duration, def.loop, def.keyframes);
         this._stateMachine.registerState(name, animationClip);
         this._stateMachine.setState(name);
     };

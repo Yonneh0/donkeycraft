@@ -13,10 +13,13 @@
     // ============================================================
 
     /**
-     * EntityTypes — Standardized entity type identifiers.
+     * EntityTypes — Standardized entity type identifiers for categorization.
+     * For specific entity definitions (skeleton, animations, dimensions),
+     * see Donkeycraft.EntityTypeDB.
      * @namespace
      */
     Donkeycraft.EntityTypes = {
+        GENERIC: 'generic',
         PLAYER: 'player',
         NPC: 'npc',
         ANIMAL: 'animal',
@@ -183,6 +186,8 @@
 
     /**
      * _initAnimationSystem — Initialize the skeleton and animation system for this entity.
+     * Loads skeleton template from Donkeycraft.SkeletonTemplates and creates an
+     * EntityAnimationController with registered animation clips from EntityTypeDB.
      * @private
      */
     Donkeycraft.Entity.prototype._initAnimationSystem = function () {
@@ -218,11 +223,20 @@
 
         // If no skeleton but still want basic idle animation, create minimal system
         if (!this.skeleton && !this._animationController) {
-            // Static entity — no animation needed
+            // Static entity — no animation needed.
+            // Create a single root bone with explicit zero vectors.
             this.useAnimation = false;
-            this.bones = [new (Donkeycraft.BoneDefinition || function () {})('root', {
-                offset: new (Donkeycraft.Vector3 || function () {})(),
-                pivot: new (Donkeycraft.Vector3 || function () {})()
+            var BoneDef = Donkeycraft.BoneDefinition || function (name, config) {
+                this.name = name;
+                this.parent = config && config.parent ? config.parent : null;
+                this.offset = config && config.offset ? config.offset : new (Donkeycraft.Vector3 || function () {})();
+                this.pivot = config && config.pivot ? config.pivot : new (Donkeycraft.Vector3 || function () {})();
+            };
+            var Vec3 = Donkeycraft.Vector3 || function (x, y, z) { this.x = x || 0; this.y = y || 0; this.z = z || 0; };
+            Vec3.prototype.set = function (x, y, z) { this.x = x; this.y = y; this.z = z; };
+            this.bones = [new BoneDef('root', {
+                offset: new Vec3(0, 0, 0),
+                pivot: new Vec3(0, 0, 0)
             })];
         }
     };
@@ -284,12 +298,10 @@
     /**
      * Get the entity's current position.
      * Returns a copy to prevent external mutation of internal state.
-     * @returns {Donkeycraft.Vector3|null}
+     * @returns {Donkeycraft.Vector3|null} Position vector, or null if destroyed.
      */
     Donkeycraft.Entity.prototype.getPosition = function () {
-        if (this._destroyed || !this._position) {
-            return null;
-        }
+        if (this._destroyed || !this._position) return null;
         return new Donkeycraft.Vector3(this._position.x, this._position.y, this._position.z);
     };
 
@@ -309,12 +321,10 @@
     /**
      * Get the entity's current velocity.
      * Returns a copy to prevent external mutation of internal state.
-     * @returns {Donkeycraft.Vector3|null}
+     * @returns {Donkeycraft.Vector3|null} Velocity vector, or null if destroyed.
      */
     Donkeycraft.Entity.prototype.getVelocity = function () {
-        if (this._destroyed || !this._velocity) {
-            return null;
-        }
+        if (this._destroyed || !this._velocity) return null;
         return new Donkeycraft.Vector3(this._velocity.x, this._velocity.y, this._velocity.z);
     };
 
@@ -326,27 +336,26 @@
      */
     Donkeycraft.Entity.prototype.setVelocity = function (vx, vy, vz) {
         if (this._destroyed) return;
-        this._velocity.x = vx;
-        this._velocity.y = vy;
-        this._velocity.z = vz;
+        this._velocity.x = vx || 0;
+        this._velocity.y = vy || 0;
+        this._velocity.z = vz || 0;
     };
 
     /**
      * Get the entity's current rotation.
      * Returns a copy to prevent external mutation of internal state.
-     * @returns {{yaw: number, pitch: number}|null} Rotation in radians.
+     * @returns {{yaw: number, pitch: number}|null} Rotation object with yaw and pitch in radians, or null if destroyed.
      */
     Donkeycraft.Entity.prototype.getRotation = function () {
-        if (this._destroyed || !this._rotation) {
-            return null;
-        }
+        if (this._destroyed || !this._rotation) return null;
         return { yaw: this._rotation.yaw, pitch: this._rotation.pitch };
     };
 
     /**
      * Set the entity's rotation.
-     * @param {number} yaw - Yaw angle in radians [0, 2π).
-     * @param {number} pitch - Pitch angle in radians [-π/2, π/2].
+     * Yaw is normalized to [0, 2π). Pitch is clamped to [-π/2, π/2].
+     * @param {number} yaw - Yaw angle in radians.
+     * @param {number} pitch - Pitch angle in radians.
      */
     Donkeycraft.Entity.prototype.setRotation = function (yaw, pitch) {
         if (this._destroyed) return;
@@ -360,6 +369,7 @@
      * The callback should return the Y coordinate of the ground surface at the entity's
      * current position, or null if no solid ground exists below the entity.
      * This is typically called by EntityManager during tick to provide chunk-based ground detection.
+     * Passing null explicitly clears any previously set ground check.
      * @param {Function|null} groundCheck - Function returning ground Y level or null.
      */
     Donkeycraft.Entity.prototype.setGroundCheck = function (groundCheck) {
@@ -623,31 +633,42 @@
 
     /**
      * Tick method — called every game tick. Override for entity-specific logic.
-     * Updates animation controller and applies velocity to position.
+     * Updates animation controller (if available), applies velocity to position,
+     * and notifies tick subscribers.
+     *
+     * Velocity handling:
+     * - If an EntityAnimationController exists, its kinematics module computes
+     *   velocity based on movement speed thresholds and physics simulation.
+     *   The entity's velocity is synchronized from the kinematics state.
+     * - If no animation controller exists (e.g., projectiles, static entities),
+     *   the entity's existing velocity is preserved and applied directly.
+     *
      * The ground detection callback is injected via setGroundCheck() by EntityManager
-     * or the game's logic layer. If no callback is set, entities will fall through the world.
+     * or the game's logic layer. If no callback is set, entities will fall through
+     * the world (gravity has no effect without ground detection).
+     *
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function (deltaTime) {
         if (this._destroyed || !this._position) return;
 
-        // Use injected ground check if available, otherwise fall back to internal placeholder
-        var groundCheck = this._groundCheck || null;
+        // Use injected ground check if available.
+        var groundCheck = this._groundCheck;
 
-        // Update animation controller if available
+        // Update animation controller if available — synchronizes velocity from kinematics.
         if (this._animationController) {
             var result = this._animationController.tick(deltaTime, groundCheck);
-
-            // Apply kinematic velocity to entity position.
-            // The animation controller's kinematics module computes velocity based on
-            // movement speed thresholds and physics simulation.
             var kinematics = result.kinematics;
             if (kinematics) {
+                // Synchronize entity velocity from the animation controller's kinematics.
+                // The kinematics module manages velocity based on animation state (idle/walk/run),
+                // ground detection, gravity, and physics simulation.
                 this._velocity.x = kinematics.velocity.x;
                 this._velocity.y = kinematics.velocity.y;
                 this._velocity.z = kinematics.velocity.z;
             }
         }
+        // If no animation controller, preserve existing velocity (for projectiles, static entities).
 
         // Apply velocity to position using semi-implicit Euler integration.
         // Position delta = velocity * deltaTime ensures frame-rate-independent movement.
@@ -655,12 +676,12 @@
         this._position.y += this._velocity.y * deltaTime;
         this._position.z += this._velocity.z * deltaTime;
 
-        // Notify tick subscribers
+        // Notify tick subscribers with error isolation.
         for (var i = 0; i < this._subscribers.length; i++) {
             try {
                 this._subscribers[i](deltaTime);
             } catch (e) {
-                // Error isolation — a failing subscriber should not break the entity
+                // A failing subscriber should not break the entity
             }
         }
     };
@@ -737,6 +758,7 @@
      * Destroy the entity and free resources.
      * After calling destroy(), all getter methods return null.
      * This method is idempotent — calling it multiple times is safe.
+     * The entity will no longer be ticked or rendered.
      */
     Donkeycraft.Entity.prototype.destroy = function () {
         if (this._destroyed) return; // Guard against double-destroy

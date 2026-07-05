@@ -354,7 +354,7 @@
     /**
      * Spawn a new entity.
      * @param {Donkeycraft.Entity} entity - Entity to spawn.
-     * @returns {number|null} Entity ID, or null if spawn failed.
+     * @returns {number|null} Entity ID, or null if spawn failed (entity invalid or limit reached).
      */
     Donkeycraft.EntityManager.prototype.spawn = function (entity) {
         if (!entity || !entity.isAlive()) {
@@ -363,6 +363,9 @@
 
         // Check entity limit
         if (this.getAliveCount() >= this.maxEntities) {
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityManager', 'Entity spawn rejected — alive count (' + this.getAliveCount() + ') at maxEntities limit (' + this.maxEntities + ')');
+            }
             return null;
         }
 
@@ -402,38 +405,97 @@
     };
 
     /**
-     * _injectGroundCheck — Inject ground detection callbacks into all entities.
+     * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
      * This is called during tick to provide chunk-based ground detection.
+     * Only entities with a setGroundCheck method are updated (all Entity instances).
      * @private
-     * @param {Function} groundCheckFn - Ground detection function to inject.
+     * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
      */
     Donkeycraft.EntityManager.prototype._injectGroundCheck = function (groundCheckFn) {
         if (!groundCheckFn || typeof groundCheckFn !== 'function') return;
 
-        for (var id in this._entities) {
-            if (!this._entities.hasOwnProperty(id)) continue;
-
-            var entity = this._entities[id];
-            if (!entity.isAlive() || !entity.setGroundCheck) continue;
-
-            entity.setGroundCheck(groundCheckFn);
+        var entities = this.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            if (entity.setGroundCheck) {
+                entity.setGroundCheck(groundCheckFn);
+            }
         }
     };
 
     /**
      * Get an entity by ID.
      * @param {number} id - Entity ID.
-     * @returns {Donkeycraft.Entity|null}
+     * @returns {Donkeycraft.Entity|null} The entity, or null if not found.
      */
     Donkeycraft.EntityManager.prototype.getEntity = function (id) {
         return this._entities[id] || null;
     };
 
     /**
-     * Get all entities of a given type.
-     * @param {string} type - Entity type.
+     * Despawns an entity by ID.
+     * Calls the entity's despawn() method, removes it from all internal indexes
+     * (by ID, by type, spatial hash, awareness table), and emits a despawn event.
+     * Safe to call on non-existent or already-despawned entities.
+     * @param {number} id - Entity ID to despawn.
+     */
+    Donkeycraft.EntityManager.prototype.despawn = function (id) {
+        if (!this._entities[id]) return;
+
+        var entity = this._entities[id];
+        var entityId = parseInt(id, 10);
+
+        // Mark entity as despawned
+        entity.despawn();
+
+        // Remove from by-type index
+        var type = entity.type;
+        if (this._byType[type]) {
+            var idx = this._byType[type].indexOf(entity);
+            if (idx !== -1) {
+                this._byType[type].splice(idx, 1);
+            }
+            // Clean up empty type arrays
+            if (this._byType[type].length === 0) {
+                delete this._byType[type];
+            }
+        }
+
+        // Remove from spatial hash
+        this._removeFromSpatialHash(entityId);
+
+        // Remove from awareness table
+        delete this._entityAwareness[entityId];
+
+        // Remove from near/far cached lists
+        var nearIdx = this._nearEntities.indexOf(entityId);
+        if (nearIdx !== -1) this._nearEntities.splice(nearIdx, 1);
+        var farIdx = this._farEntities.indexOf(entityId);
+        if (farIdx !== -1) this._farEntities.splice(farIdx, 1);
+
+        // Remove from entity map
+        delete this._entities[id];
+
+        // Emit despawn event via global EventBus
+        if (EventBus) {
+            try {
+                EventBus.emitSafe('entity:despawn', {
+                    entity: entity,
+                    id: entityId,
+                    type: type
+                });
+            } catch (e) {
+                // EventBus may not be available in tests
+            }
+        }
+    };
+
+    /**
+     * Get all alive entities of a given type.
+     * Filters out dead/despawned entities before returning.
+     * @param {string} type - Entity type (e.g., 'zombie', 'cow').
      * @param {number} [maxResults=100] - Maximum number of results to return.
-     * @returns {Donkeycraft.Entity[]} Array of entities.
+     * @returns {Donkeycraft.Entity[]} Array of alive entities, up to maxResults.
      */
     Donkeycraft.EntityManager.prototype.getByType = function (type, maxResults) {
         maxResults = maxResults || 100;
@@ -454,11 +516,12 @@
     /**
      * Get all alive entities within a spherical range from a point.
      * Supports both 2D (cx, cz, radius) and 3D (cx, cy, cz, range) signatures.
+     * Uses spatial hash for O(n) performance when searching near existing cells.
      * @param {number} cx - Center X coordinate (or center Z if 2 args).
      * @param {number} [cy] - Center Y coordinate (3D) or radius (2D).
      * @param {number} [cz] - Center Z coordinate (3D only).
      * @param {number} [range] - Maximum distance (blocks) (3D only).
-     * @returns {Donkeycraft.Entity[]} Array of entities within range.
+     * @returns {Donkeycraft.Entity[]} Array of alive entities within range, up to 1000 results.
      */
     Donkeycraft.EntityManager.prototype.getEntitiesInRange = function (cx, cy, cz, range) {
         // Support 2D signature: getEntitiesInRange(cx, cz, radius)
@@ -517,7 +580,7 @@
 
     /**
      * Get all alive entities.
-     * @returns {Donkeycraft.Entity[]} Array of entities.
+     * @returns {Donkeycraft.Entity[]} Array of all alive entities.
      */
     Donkeycraft.EntityManager.prototype.getAllEntities = function () {
         var result = [];
@@ -560,18 +623,23 @@
      * Tick all alive entities.
      * Updates spatial hash and awareness table based on player position.
      * Dead/despawned entities are collected during ticking and removed in a cleanup pass.
+     *
+     * Tick flow:
+     * 1. Update awareness table (if player position provided)
+     * 2. Inject ground check callback (if provided) into all alive entities
+     * 3. Tick each alive entity, updating spatial hash with new positions
+     * 4. Collect dead/despawned/errored entities and remove them
+     *
      * @param {number} deltaTime - Time since last tick in seconds.
-     * @param {number} [playerX=0] - Player X coordinate for awareness.
-     * @param {number} [playerY=64] - Player Y coordinate for awareness.
-     * @param {number} [playerZ=0] - Player Z coordinate for awareness.
+     * @param {number} [playerX=0] - Player X coordinate for awareness tier calculation.
+     * @param {number} [playerY=64] - Player Y coordinate for awareness tier calculation.
+     * @param {number} [playerZ=0] - Player Z coordinate for awareness tier calculation.
      * @param {Function} [groundCheckFn=null] - Optional ground detection callback.
      *   If provided, it is injected into all entities via setGroundCheck() before ticking.
      *   The function should return the Y coordinate of the ground surface at a given position,
      *   or null if no solid ground exists.
      */
     Donkeycraft.EntityManager.prototype.tick = function (deltaTime, playerX, playerY, playerZ, groundCheckFn) {
-        var errorQueue = [];
-
         // Update awareness if player position provided
         if (playerX !== undefined && playerY !== undefined && playerZ !== undefined) {
             this._updateAwareness(playerX, playerY, playerZ);
@@ -581,6 +649,9 @@
         if (groundCheckFn) {
             this._injectGroundCheck(groundCheckFn);
         }
+
+        // Collect entity IDs to despawn (errored or died during tick)
+        var toDespawn = [];
 
         // Single pass: tick alive entities and collect errors
         for (var id in this._entities) {
@@ -598,15 +669,13 @@
                     this._updateSpatialHash(parseInt(id, 10), newPos);
                 }
             } catch (e) {
-                // Entity tick error — mark for removal
-                errorQueue.push(parseInt(id, 10));
+                // Entity tick error — mark for despawn
+                toDespawn.push(parseInt(id, 10));
             }
         }
 
         // Cleanup pass: remove all dead/despawned entities exactly once.
-        // Entities that errored are despawned here; entities that died naturally
-        // (e.g., health reached zero, explicit despawn) are also removed.
-        var despawnedSet = new Set(errorQueue);
+        var despawnedSet = new Set(toDespawn);
 
         for (var id2 in this._entities) {
             if (!this._entities.hasOwnProperty(id2)) continue;
@@ -614,7 +683,7 @@
             var entity2 = this._entities[id2];
             var entityId2 = parseInt(id2, 10);
 
-            // Skip entities already in the error queue
+            // Skip entities already in the despawn list
             if (despawnedSet.has(entityId2)) continue;
 
             // Remove any entity that died or was despawned during tick
@@ -625,8 +694,8 @@
         }
 
         // Despawn entities that errored during tick.
-        for (var i = 0; i < errorQueue.length; i++) {
-            var errorId = errorQueue[i];
+        for (var i = 0; i < toDespawn.length; i++) {
+            var errorId = toDespawn[i];
             if (!despawnedSet.has(errorId)) {
                 this.despawn(errorId);
             }
@@ -634,9 +703,9 @@
     };
 
     /**
-     * Check if an entity exists by ID.
+     * Check if an entity exists by ID (regardless of alive status).
      * @param {number} id - Entity ID.
-     * @returns {boolean}
+     * @returns {boolean} True if an entity with this ID exists.
      */
     Donkeycraft.EntityManager.prototype.hasEntity = function (id) {
         return this._entities[id] !== undefined;
@@ -644,7 +713,9 @@
 
     /**
      * Clear all entities.
-     * Destroys each entity and resets all internal state to initial values.
+     * Destroys each entity via its destroy() method, then resets all internal
+     * state (entity maps, spatial hash, awareness table, ID counter) to initial values.
+     * This method is idempotent — calling it multiple times is safe.
      */
     Donkeycraft.EntityManager.prototype.clear = function () {
         for (var id in this._entities) {
@@ -665,6 +736,7 @@
 
     /**
      * Destroy the entity manager and free resources.
+     * Equivalent to clear() but explicitly documents resource cleanup.
      */
     Donkeycraft.EntityManager.prototype.destroy = function () {
         this.clear();
@@ -673,6 +745,12 @@
     /**
      * Get statistics about the entity manager state.
      * @returns {{total: number, alive: number, byType: Object, nearCount: number, farCount: number, distantCount: number}}
+     *   - total: Total entities (alive + dead)
+     *   - alive: Count of alive entities
+     *   - byType: Map of type name to alive count
+     *   - nearCount: Entities in NEAR awareness tier
+     *   - farCount: Entities in FAR awareness tier
+     *   - distantCount: Entities in DISTANT awareness tier
      */
     Donkeycraft.EntityManager.prototype.getStats = function () {
         var byType = {};
