@@ -41,9 +41,21 @@
     pointer-events: none;
     z-index: 9999;
     font-size: 24px;
-    opacity: 0.8;
+    opacity: 0.85;
     position: fixed;
     transform: translate(-50%, -50%);
+    display: none;
+}
+
+/* Drag ghost count overlay — shows count on dragged items */
+.dk-drag-ghost-count {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 10px;
+    color: #fff;
+    font-weight: bold;
+    pointer-events: none;
 }
 
 /* ============================================================

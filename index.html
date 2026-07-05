@@ -5,28 +5,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Donkeycraft</title>
-    <link rel="stylesheet" href="src/core.css">
-    <link rel="stylesheet" href="src/ui/gui-core.css">
-    <link rel="stylesheet" href="src/ui/anvil-ui.css">
-    <link rel="stylesheet" href="src/ui/chest-ui.css">
-    <link rel="stylesheet" href="src/ui/crafting-grid.css">
-    <link rel="stylesheet" href="src/ui/creative-inventory.css">
-    <link rel="stylesheet" href="src/ui/debug-overlay.css">
-    <link rel="stylesheet" href="src/ui/enchanting-ui.css">
-    <link rel="stylesheet" href="src/ui/furnace-ui.css">
-    <link rel="stylesheet" href="src/ui/gamemode-badge.css">
-    <link rel="stylesheet" href="src/ui/gui-core.css">
-    <link rel="stylesheet" href="src/ui/gui-elements.css">
-    <link rel="stylesheet" href="src/ui/gui-manager.css">
-    <link rel="stylesheet" href="src/ui/health-bar.css">
-    <link rel="stylesheet" href="src/ui/hotbar.css">
-    <link rel="stylesheet" href="src/ui/hunger-bar.css">
-    <link rel="stylesheet" href="src/ui/inventory.css">
-    <link rel="stylesheet" href="src/ui/item-stack.css">
-    <link rel="stylesheet" href="src/ui/keybindings-panel.css">
-    <link rel="stylesheet" href="src/ui/loading-screen.css">
-    <link rel="stylesheet" href="src/ui/speed-indicator.css">
-    <link rel="stylesheet" href="src/ui/xp-bar.css">
+
+    <link rel="stylesheet" href="src/core.css"><!-- Core CSS includes (always first) -->
+
+    <link rel="stylesheet" href="src/ui/gui-core.css"> <!-- GUI Core CSS includes (always first in GUI) -->
+    <link rel="stylesheet" href="src/ui/gui-elements.css"> <!-- GUI Elements -->
+    <link rel="stylesheet" href="src/ui/gui-manager.css"> <!-- GUI Manager -->
+
+    <link rel="stylesheet" href="src/ui/loading-screen.css"> <!-- loading-screen -->
+
+    <link rel="stylesheet" href="src/ui/item-stack.css"> <!-- item-stack -->
+    <link rel="stylesheet" href="src/ui/hotbar.css"> <!-- hotbar (Belt Items) -->
+    <link rel="stylesheet" href="src/ui/inventory.css"> <!-- inventory -->
+    <link rel="stylesheet" href="src/ui/anvil-ui.css"> <!-- anvil-ui (Crafting Interface) -->
+    <link rel="stylesheet" href="src/ui/crafting-grid.css"> <!-- crafting-grid -->
+    <link rel="stylesheet" href="src/ui/creative-inventory.css"> <!-- creative-inventory -->
+    <link rel="stylesheet" href="src/ui/chest-ui.css"> <!-- chest-ui (External Container UI) -->
+    <link rel="stylesheet" href="src/ui/furnace-ui.css"> <!-- furnace-ui (External Container UI) -->
+    <link rel="stylesheet" href="src/ui/enchanting-ui.css"> <!-- enchanting-ui (Spellcrafting Interface) -->
+    <link rel="stylesheet" href="src/ui/gamemode-badge.css"> <!-- gamemode-badge (UI Indicator/Control) -->
+    <link rel="stylesheet" href="src/ui/health-bar.css"> <!-- health-bar (Vital Display: health) -->
+    <link rel="stylesheet" href="src/ui/hunger-bar.css"> <!-- hunger-bar (Vital Display: hunger/hydration) -->
+    <link rel="stylesheet" href="src/ui/xp-bar.css"> <!-- xp-bar (Vital Display: Experience, Current Level) -->
+    <link rel="stylesheet" href="src/ui/keybindings-panel.css"> <!-- keybindings-panel (Info Display) -->
+    <link rel="stylesheet" href="src/ui/speed-indicator.css"> <!-- speed-indicator (UI Indicator/Control) -->
+    <link rel="stylesheet" href="src/ui/debug-overlay.css"> <!-- debug-overlay (Engine/UI Testing Interface) -->
+
     <style>
         /* Inline styles for dynamically-created elements */
         #dk-canvas-container {

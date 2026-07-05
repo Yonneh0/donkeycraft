@@ -105,12 +105,12 @@
             this._dragState.dragElement = document.createElement('div');
             this._dragState.dragElement.className = 'dk-drag-ghost dk-interactive';
             // Hidden initially — shown on mousemove to avoid interfering with hit tests
-            this._dragState.dragElement.style.cssText = 'position:fixed; pointer-events:none; z-index:9999; font-size:24px; opacity:0.85; transform:translate(-50%,-50%); display:none;';
+            // All static styles (position, z-index, font-size, opacity, transform, display) are defined in .dk-drag-ghost CSS
             this._dragState.dragElement.textContent = itemEl ? itemEl.textContent : '';
 
             if (countEl && countEl.style.display !== 'none') {
                 var countSpan = document.createElement('span');
-                countSpan.style.cssText = 'position:absolute; bottom:-2px; right:-2px; font-size:10px; color:#fff; font-weight:bold;';
+                countSpan.className = 'dk-drag-ghost-count';
                 countSpan.textContent = countEl.textContent;
                 this._dragState.dragElement.appendChild(countSpan);
             }

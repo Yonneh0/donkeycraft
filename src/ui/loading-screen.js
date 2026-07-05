@@ -50,47 +50,41 @@
     Donkeycraft.LoadingScreen.prototype._create = function () {
         var self = this;
 
-        // Main overlay
+        // Main overlay — styles defined in loading-screen.css (.dk-loading-screen)
         this._element = document.createElement('div');
         this._element.className = 'dk-loading-screen';
-        this._element.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:sans-serif;color:#e0e0e0;';
 
-        // Title
+        // Title — styles defined in loading-screen.css (.dk-loading-title)
         var title = document.createElement('div');
         title.className = 'dk-loading-title';
-        title.style.cssText = 'font-size:2em;margin-bottom:20px;color:#4CAF50;font-weight:bold;letter-spacing:2px;';
         title.textContent = 'Donkeycraft';
         this._element.appendChild(title);
 
-        // Status message
+        // Status message — styles defined in loading-screen.css (.dk-loading-message)
         this._messageEl = document.createElement('div');
         this._messageEl.className = 'dk-loading-message';
-        this._messageEl.style.cssText = 'font-size:1.1em;margin-bottom:16px;color:#aaa;min-height:1.4em;';
         this._messageEl.textContent = 'Initializing...';
         this._element.appendChild(this._messageEl);
 
-        // Progress bar container
+        // Progress bar container — styles defined in loading-screen.css (.dk-loading-progress-container)
         var barContainer = document.createElement('div');
-        barContainer.style.cssText = 'width:400px;max-width:90vw;height:20px;background:#333;border-radius:10px;overflow:hidden;margin-bottom:16px;border:1px solid #555;';
+        barContainer.className = 'dk-loading-progress-container';
 
-        // Progress bar fill
+        // Progress bar fill — base styles defined in loading-screen.css (.dk-loading-progress)
         this._progressBar = document.createElement('div');
         this._progressBar.className = 'dk-loading-progress';
-        this._progressBar.style.cssText = 'width:0%;height:100%;background:linear-gradient(90deg,#4CAF50,#66BB6A);transition:width 0.3s ease;border-radius:10px;';
         barContainer.appendChild(this._progressBar);
         this._element.appendChild(barContainer);
 
-        // Loading tips
+        // Loading tips — styles defined in loading-screen.css (.dk-loading-tip)
         this._tipEl = document.createElement('div');
         this._tipEl.className = 'dk-loading-tip';
-        this._tipEl.style.cssText = 'font-size:0.9em;color:#777;font-style:italic;max-width:400px;text-align:center;padding:0 20px;';
         this._tipEl.textContent = '[Tip] ' + Donkeycraft.LoadingScreenTips[0];
         this._element.appendChild(this._tipEl);
 
-        // Error display (hidden by default)
+        // Error display (hidden by default) — styles defined in loading-screen.css (.dk-loading-error)
         this._errorEl = document.createElement('div');
         this._errorEl.className = 'dk-loading-error';
-        this._errorEl.style.cssText = 'display:none;width:400px;max-width:90vw;padding:16px;background:#3d0a0a;border:1px solid #e74c3c;border-radius:8px;color:#ff6b6b;font-size:0.95em;text-align:center;margin-top:10px;';
         this._errorEl.textContent = '';
         this._element.appendChild(this._errorEl);
 
@@ -140,18 +134,21 @@
     Donkeycraft.LoadingScreen.prototype.showError = function (errorMessage) {
         if (this._disposed) return;
 
-        // Hide progress bar and tip
-        if (this._progressBar) this._progressBar.style.display = 'none';
-        if (this._tipEl) this._tipEl.style.display = 'none';
+        // Hide progress bar and tip using CSS classes
+        if (this._progressBar) {
+            var parent = this._progressBar.parentElement;
+            if (parent) parent.classList.add('dk-hidden');
+        }
+        if (this._tipEl) this._tipEl.classList.add('dk-hidden');
 
         // Show error (use textContent to prevent XSS)
         this._errorEl.style.display = 'block';
         this._errorEl.textContent = 'ERROR: ' + errorMessage;
 
-        // Update message
+        // Update message color using CSS class
         if (this._messageEl) {
             this._messageEl.textContent = 'Failed to initialize';
-            this._messageEl.style.color = '#e74c3c';
+            this._messageEl.classList.add('dk-loading-message-error');
         }
     };
 

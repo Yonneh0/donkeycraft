@@ -70,7 +70,7 @@
         this._fuelSlotEl = document.createElement('div');
         this._fuelSlotEl.className = 'dk-fuel-slot dk-interactive';
         this._fuelSlotEl.dataset.slotIndex = 0;
-        this._fuelSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Fuel</span>';
+        this._fuelSlotEl.innerHTML = '<span class="dk-furnace-placeholder">Fuel</span>';
         leftPanel.appendChild(this._fuelSlotEl);
 
         // Progress bar (vertical) — inline styles for dynamic height are kept as they change per tick
@@ -92,12 +92,12 @@
 
         // Right panel: input + output slots
         var rightPanel = document.createElement('div');
-        rightPanel.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 16px;';
+        rightPanel.className = 'dk-furnace-right-panel';
 
         this._inputSlotEl = document.createElement('div');
         this._inputSlotEl.className = 'dk-furnace-input dk-interactive';
         this._inputSlotEl.dataset.slotIndex = 1;
-        this._inputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Input</span>';
+        this._inputSlotEl.innerHTML = '<span class="dk-furnace-placeholder">Input</span>';
         rightPanel.appendChild(this._inputSlotEl);
 
         // Arrow
@@ -109,7 +109,7 @@
         this._outputSlotEl = document.createElement('div');
         this._outputSlotEl.className = 'dk-furnace-output dk-interactive';
         this._outputSlotEl.dataset.slotIndex = 2;
-        this._outputSlotEl.innerHTML = '<span style="color:#aaa;font-size:11px;">Output</span>';
+        this._outputSlotEl.innerHTML = '<span class="dk-furnace-placeholder">Output</span>';
         rightPanel.appendChild(this._outputSlotEl);
 
         this._container.appendChild(rightPanel);
