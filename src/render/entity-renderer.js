@@ -2,17 +2,6 @@
 // Standalone robust renderer for all entities using WebGL 1.0.
 // Tightly integrated with EntityManager's awareness tracking and culling system.
 // Renders animated entities with bone transforms using per-mesh draw calls.
-//
-// Features:
-// - Awareness-based culling (NEAR/FAR tiers from EntityManager)
-// - Distance-sorted batch rendering (far-to-near for correct depth sorting)
-// - Bone transform computation for skeletal animation
-// - Mesh caching for efficient repeated rendering
-// - Proper model matrix computation and shader uniform integration
-// - WebGL context loss handling and restoration
-// - Bounding-box frustum culling for accurate visibility detection
-//
-// @module EntityRenderer
 (function () {
     'use strict';
 
@@ -132,12 +121,10 @@
      * // Returns 96 floats (24 vertices × 8 components) and 36 indices
      */
     Donkeycraft.EntityMeshBuilder.createBoxMesh = function (width, height, depth) {
-        var hw = width / 2; // half-width
-        var hh = height / 2; // half-height
-        var hd = depth / 2; // half-depth
+        var hw = width / 2;
+        var hh = height / 2;
+        var hd = depth / 2;
 
-        // 8 unique corners × 6 faces (with shared edges having duplicate vertices for per-face normals)
-        // Each vertex: x, y, z, nx, ny, nz, u, v = 8 floats
         var vertices = new Float32Array([
             // Front face (z = +hd), normal = (0, 0, 1)
             -hw, -hh, hd, 0, 0, 1, 0, 0,
@@ -176,7 +163,6 @@
             -hw, hh, -hd, -1, 0, 0, 0, 1
         ]);
 
-        // 6 faces × 2 triangles × 3 vertices = 36 indices
         var indices = new Uint16Array([
             0, 1, 2, 0, 2, 3,       // Front (z+)
             4, 5, 6, 4, 6, 7,       // Back (z-)
@@ -202,8 +188,6 @@
      * var mesh = Donkeycraft.EntityMeshBuilder.createCylinderMesh(0.1, 0.7, 8);
      */
     Donkeycraft.EntityMeshBuilder.createCylinderMesh = function (radius, height, segments) {
-        // Use explicit null check so that passing 0 segments is handled gracefully
-        // rather than silently defaulting to 8.
         segments = segments != null ? segments : 8;
         var vertices = [];
         var indices = [];
@@ -356,7 +340,7 @@
             { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
             { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#3366CC', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
             { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#336969', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
         ],
         npc: [
             { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#8B0000', offset: { x: 0, y: 0.85, z: 0 } },
@@ -552,8 +536,6 @@
      * @returns {string} Normalized cache key string.
      */
     function _normalizeMeshKey(meshType, dimensions) {
-        // Round to 4 decimal places to avoid floating-point precision issues
-        // while preserving visually significant differences in mesh dimensions.
         var round4 = function (v) { return Math.round(v * 10000) / 10000; };
 
         if (meshType === 'box') {
@@ -575,12 +557,6 @@
      *
      * Uses awareness-based culling from EntityManager, depth-sorted batch rendering,
      * and bone transform computation for skeletal animation.
-     *
-     * Rendering pipeline:
-     * 1. Query NEAR-tier and FAR-tier entities from EntityManager based on awareness tiers
-     * 2. Sort entities by distance from camera (far-to-near)
-     * 3. For each entity, compute bone world transforms from animation data
-     * 4. Build model matrices and draw each body part mesh
      *
      * @constructor
      * @param {WebGLRenderingContext} gl - WebGL 1.0 context.
@@ -751,7 +727,6 @@
             return null;
         }
 
-        // Create vertex buffer object (VBO) with error checking.
         var vbo = gl.createBuffer();
         if (!vbo) {
             if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
@@ -762,7 +737,6 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
         gl.bufferData(gl.ARRAY_BUFFER, meshData.vertices, gl.STATIC_DRAW);
 
-        // Create index buffer object (IBO) with error checking.
         var ibo = gl.createBuffer();
         if (!ibo) {
             if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
@@ -803,7 +777,6 @@
      * @returns {Float32Array} New column-major 4x4 model matrix (16 elements).
      */
     Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz) {
-        // Create a fresh identity matrix to avoid overwriting previously returned matrices
         var m = _createMat4();
 
         // Apply rotations (YXZ order — yaw first, then pitch, then roll)
@@ -872,8 +845,7 @@
         var localPivotY = pivot.y;
 
         // When a pivot is defined, the bone position is placed at the pivot point so that
-        // rotations occur around the joint center rather than the mesh center. This ensures
-        // limbs rotate naturally from their attachment points.
+        // rotations occur around the joint center rather than the mesh center.
         var finalX = pos.x + localPivotX;
         var finalY = pos.y + localPivotY;
         var finalZ = pos.z + localPivotZ;
@@ -902,9 +874,6 @@
      * @returns {{r: number, g: number, b: number}} RGB values in [0, 1] range.
      */
     Donkeycraft.EntityRenderer.prototype._parseHexColor = function (color) {
-        // Default to magenta (#FF00FF) for invalid colors — the standard debug/missing-texture
-        // color in game engines. This makes configuration errors visually obvious rather than
-        // producing invisible entities that are hard to debug.
         var DEFAULT_RED = 1, DEFAULT_GREEN = 0, DEFAULT_BLUE = 1;
 
         if (!color || typeof color !== 'string' || color.charAt(0) !== '#') {
@@ -917,11 +886,9 @@
         var hex = color.substring(1);
 
         if (hex.length === 6) {
-            // Full hex color #RRGGBB
             var red = parseInt(hex.substring(0, 2), 16);
             var green = parseInt(hex.substring(2, 4), 16);
             var blue = parseInt(hex.substring(4, 6), 16);
-            // Validate that all hex pairs are valid
             if (isNaN(red) || isNaN(green) || isNaN(blue)) {
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
                     Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color "' + color + '" — rendering as magenta (#FF00FF).');
@@ -930,11 +897,9 @@
             }
             return { r: red / 255, g: green / 255, b: blue / 255 };
         } else if (hex.length === 3) {
-            // Shorthand hex color #RGB
             var r2 = parseInt(hex.charAt(0) + hex.charAt(0), 16);
             var g2 = parseInt(hex.charAt(1) + hex.charAt(1), 16);
             var b2 = parseInt(hex.charAt(2) + hex.charAt(2), 16);
-            // Validate that all hex pairs are valid
             if (isNaN(r2) || isNaN(g2) || isNaN(b2)) {
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
                     Donkeycraft.Logger.warn('EntityRenderer', 'Invalid shorthand hex color "' + color + '" — rendering as magenta (#FF00FF).');
@@ -944,7 +909,6 @@
             return { r: r2 / 255, g: g2 / 255, b: b2 / 255 };
         }
 
-        // Invalid length
         if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
             Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as magenta (#FF00FF).');
         }
@@ -965,21 +929,18 @@
 
         gl.bindBuffer(gl.ARRAY_BUFFER, meshCache.vbo);
 
-        // Position attribute: 3 floats (x, y, z) at offset 0
         var posLoc = shaderManager.getAttribute('aPosition');
         if (posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, meshCache.vertexByteStride, 0);
         }
 
-        // Normal attribute: 3 floats (nx, ny, nz) at offset 3
         var normLoc = shaderManager.getAttribute('aNormal');
         if (normLoc >= 0) {
             gl.enableVertexAttribArray(normLoc);
             gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, meshCache.vertexByteStride, 3 * BYTES_PER_FLOAT);
         }
 
-        // UV attribute: 2 floats (u, v) at offset 6
         var uvLoc = shaderManager.getAttribute('aUV');
         if (uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
@@ -1009,13 +970,9 @@
         var shaderManager = this._shaderManager;
         if (!gl || !meshCache || !shaderManager) return false;
 
-        // Parse hex color to normalized RGB
         var rgb = this._parseHexColor(color);
-
-        // Build model matrix from position and rotation
         var modelMatrix = this._buildModelMatrix(px, py, pz, rx, ry, rz);
 
-        // Bind vertex attributes for the mesh
         if (!this._bindMeshAttributes(meshCache, shaderManager)) {
             return false;
         }
@@ -1026,11 +983,9 @@
         // Set flat color uniform (uColor) — overrides texture shading for entities
         shaderManager.setVec3('uColor', rgb.r, rgb.g, rgb.b);
 
-        // Bind index buffer and draw
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, meshCache.ibo);
         gl.drawElements(gl.TRIANGLES, meshCache.vertexCount, gl.UNSIGNED_SHORT, 0);
 
-        // Check for WebGL draw errors
         var err = gl.getError();
         if (err !== gl.NO_ERROR) {
             if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
@@ -1067,8 +1022,6 @@
         if (!viewData || !projData) return null;
 
         // Multiply projection × view to get the combined clip-space matrix (column-major).
-        // For column-major matrices: C[r + c*4] = sum over k of A[r + k*4] * B[k + c*4]
-        // result = proj × view
         var m = new Float32Array(16);
         for (var j = 0; j < 4; j++) {
             m[j] = projData[0] * viewData[j] + projData[4] * viewData[j + 4] + projData[8] * viewData[j + 8] + projData[12] * viewData[j + 12];
@@ -1078,8 +1031,6 @@
         }
 
         // Extract 6 frustum planes from the combined matrix.
-        // Plane coefficients are read from column-major rows (swizzled for left-handed extraction).
-        // Each plane is normalized to prevent bias from unnormalized normals.
         var planes = [];
 
         // Left plane
@@ -1148,17 +1099,11 @@
     Donkeycraft.EntityRenderer.prototype._isAABBInFrustum = function (cx, cy, cz, halfW, fullH, halfD, planes) {
         var halfH2 = fullH / 2;
 
-        // For each plane, check if all 8 AABB corners are on the negative side.
         for (var i = 0; i < planes.length; i++) {
             var p = planes[i];
-
-            // Compute the signed distance from the box center to this plane.
             var dist = cx * p.nx + cy * p.ny + cz * p.nz + p.d;
-
-            // Compute the effective radius of the box along this plane's normal.
             var radius = halfW * Math.abs(p.nx) + halfH2 * Math.abs(p.ny) + halfD * Math.abs(p.nz);
 
-            // If dist < -radius, the entire box is on the negative side of this plane → outside frustum.
             if (dist < -radius) {
                 return false;
             }
@@ -1200,12 +1145,9 @@
         if (distSq > renderDistSq) return false;
 
         // Stage 2: Forward-facing check — cull entities behind the camera.
-        // Store in `camForward` for reuse in Stage 3 fallback to avoid redundant call.
         var camForward = this._camera.getForwardDirection && this._camera.getForwardDirection();
         if (camForward) {
             var dist = Math.sqrt(distSq);
-            // Only apply forward-facing check for entities beyond minimum distance
-            // to avoid division by near-zero and prevent culling adjacent entities.
             if (dist > FRUSTUM_MIN_DISTANCE) {
                 var dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / dist;
                 if (dot < FRUSTUM_FORWARD_THRESHOLD) return false;
@@ -1213,7 +1155,6 @@
         }
 
         // Stage 3: AABB vs frustum plane test for accurate visibility detection.
-        // Only perform this expensive check if the entity passed stages 1 and 2.
         var dims = entity.getDimensions && entity.getDimensions();
         if (dims) {
             var halfW = (dims.width || 0.6) / 2;
@@ -1228,19 +1169,11 @@
 
             // Fallback: if the camera doesn't provide view/projection matrices, use a
             // simplified angle check relative to the camera's forward direction.
-            // This is less accurate than full frustum testing but prevents rendering
-            // entities that are clearly outside the viewing cone.
-            // Reuse camForward from Stage 2 to avoid redundant call.
             if (camForward) {
                 var horizDist = Math.sqrt(dx * dx + dz * dz);
-                // Compute dot product of entity direction and camera forward direction.
-                // When dot > 0, entity is in front of camera; when dot < 0, behind.
                 var entDist = Math.sqrt(horizDist * horizDist + dy * dy);
                 if (entDist > FRUSTUM_MIN_DISTANCE) {
                     var dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / entDist;
-                    // If the entity is beyond a wide angle threshold from camera forward,
-                    // cull it. Using a generous threshold to compensate for lack of
-                    // proper frustum plane testing.
                     if (dot < 0.0) { // ~90° from camera forward direction
                         return false;
                     }
@@ -1266,9 +1199,6 @@
     Donkeycraft.EntityRenderer.prototype._sortEntitiesByDistance = function (entityIds) {
         var camPos = null;
 
-        // Try to get camera position for distance-based sorting.
-        // If no camera is available, return all alive entities unsorted so rendering
-        // still proceeds (prevents the "no camera = nothing renders" bug).
         if (this._camera && this._camera.getPosition) {
             camPos = this._camera.getPosition();
         }
@@ -1286,13 +1216,11 @@
             var distSq = 0;
 
             if (camPos) {
-                // Compute distance from camera for sorting.
                 var dx = pos.x - camPos.x;
                 var dy = pos.y - camPos.y;
                 var dz = pos.z - camPos.z;
                 distSq = dx * dx + dy * dy + dz * dz;
 
-                // Filter by render distance — only include entities within range
                 if (distSq > renderDistSq) continue;
             }
 
@@ -1300,7 +1228,6 @@
         }
 
         // Sort far to near (descending distance) when camera is available.
-        // When no camera is available, return unsorted since all distSq values are 0.
         if (camPos) {
             result.sort(function (a, b) { return b.distSq - a.distSq; });
         }
@@ -1316,10 +1243,6 @@
      * alpha blending: disabled when alpha is enabled (to prevent z-fighting on
      * transparent surfaces), enabled otherwise.
      *
-     * If a WebGL state query fails (indicating a lost or invalid context), defaults
-     * are assumed rather than silently swallowing the error — this makes context
-     * loss easier to diagnose.
-     *
      * @private
      * @param {boolean} [alphaEnabled=false] - Whether alpha blending is enabled.
      */
@@ -1327,9 +1250,6 @@
         var gl = this._gl;
         if (!gl) return;
 
-        // Save current WebGL state for restoration after rendering.
-        // If context queries fail, assume default state (enabled) rather than
-        // silently guessing — a failed isEnabled check usually means context loss.
         var depthTestEnabled = true;
         var cullFaceEnabled = true;
         var blendEnabled = false;
@@ -1339,28 +1259,21 @@
             depthTestEnabled = gl.isEnabled(gl.DEPTH_TEST);
             cullFaceEnabled = gl.isEnabled(gl.CULL_FACE);
             blendEnabled = gl.isEnabled(gl.BLEND);
-            // Read the actual depth write mask state from WebGL.
             depthWriteEnabled = gl.getParameter(gl.DEPTH_WRITEMASK);
         } catch (e) {
-            // Context is likely lost — keep defaults and let downstream code handle it.
             return;
         }
 
-        // Enable depth testing and face culling for correct rendering
         gl.enable(gl.DEPTH_TEST);
         gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
 
-        // Disable depth write when alpha blending is enabled to prevent z-fighting
-        // on transparent surfaces. Transparent fragments should sort by depth but
-        // not overwrite depth values of fragments behind them.
         if (alphaEnabled) {
             gl.depthMask(false);
         } else {
             gl.depthMask(true);
         }
 
-        // Optionally enable alpha blending for transparent entities
         if (alphaEnabled) {
             gl.enable(gl.BLEND);
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -1368,7 +1281,6 @@
             gl.disable(gl.BLEND);
         }
 
-        // Store state for restoration in _restoreRenderState
         this._savedRenderState = {
             depthTest: depthTestEnabled,
             cullFace: cullFaceEnabled,
@@ -1387,33 +1299,28 @@
         var gl = this._gl;
         if (!gl || !this._savedRenderState) return;
 
-        // Restore depth test state
         if (this._savedRenderState.depthTest) {
             gl.enable(gl.DEPTH_TEST);
         } else {
             gl.disable(gl.DEPTH_TEST);
         }
 
-        // Restore cull face state
         if (this._savedRenderState.cullFace) {
             gl.enable(gl.CULL_FACE);
         } else {
             gl.disable(gl.CULL_FACE);
         }
 
-        // Restore blend state
         if (this._savedRenderState.blend) {
             gl.enable(gl.BLEND);
         } else {
             gl.disable(gl.BLEND);
         }
 
-        // Restore depth write mask
         if (this._savedRenderState.depthWrite !== undefined) {
             gl.depthMask(this._savedRenderState.depthWrite);
         }
 
-        // Clear saved state
         this._savedRenderState = null;
     };
 
@@ -1434,9 +1341,6 @@
         // Get shape definitions for this entity type
         var shapeDefs = Donkeycraft.EntityShapeDefs[entity.type];
         if (!shapeDefs) {
-            // Fallback: use a generic box for unknown entity types.
-            // Use getDimensions() as primary source, falling back to direct properties,
-            // then to hardcoded defaults for maximum robustness.
             var dims = entity.getDimensions ? entity.getDimensions() : null;
             var entWidth = (dims && dims.width) != null ? dims.width : (entity.width || 0.6);
             var entHeight = (dims && dims.height) != null ? dims.height : (entity.height || 1.8);
@@ -1449,15 +1353,12 @@
             }];
         }
 
-        // Get bone transforms from animation controller (if available)
         var boneTransforms = entity.getBoneTransforms ? entity.getBoneTransforms() : {};
 
-        // Render each body part
         var partsRendered = 0;
         var drawCalls = 0;
 
         // Cache bone lookup: build a Map from bone name to definition for O(1) lookup.
-        // This avoids O(n^2) linear searches when iterating shapeDefs × bones array.
         var boneMap = null;
         if (bones && Array.isArray(bones)) {
             boneMap = new Map();
@@ -1469,21 +1370,16 @@
         for (var i = 0; i < shapeDefs.length; i++) {
             var shapeDef = shapeDefs[i];
 
-            // Warn if bone definition is not found in entity's bones array.
-            // This helps debug missing or mismatched bone configurations.
             if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function'
                 && boneMap !== null && !boneMap.has(shapeDef.name)) {
                 Donkeycraft.Logger.warn('EntityRenderer', 'Bone "' + shapeDef.name + '" not found in entity "' + entity.type + '" — using default offset/pivot.');
             }
 
-            // Get or build mesh cache for this body part
             var meshCache = this._getOrBuildMesh(shapeDef);
             if (!meshCache) continue;
 
-            // Compute bone world-space transform (position + rotation)
             var worldTransform = this._computeBoneWorldTransform(entity, shapeDef.name, boneTransforms);
 
-            // Draw the mesh part with bone transform and color
             var success = this._drawMesh(
                 meshCache,
                 worldTransform.x,
@@ -1518,7 +1414,6 @@
      */
     Donkeycraft.EntityRenderer.prototype._onContextLost = function (event) {
         this._contextLost = true;
-        // Prevent default browser behavior
         event.preventDefault();
     };
 
@@ -1530,7 +1425,6 @@
      */
     Donkeycraft.EntityRenderer.prototype._restoreFromContextLoss = function () {
         this._contextLost = false;
-        // Clear and rebuild mesh cache — all buffers are invalid after context loss
         this.clearMeshCache();
     };
 
@@ -1559,60 +1453,40 @@
         var shaderManager = this._shaderManager;
         var opts = options || {};
 
-        // Reset per-frame statistics
         this.entitiesRendered = 0;
         this.drawCalls = 0;
 
-        // Resolve alpha blending: use option if explicitly provided, otherwise fall back
-        // to the instance default (this.enableAlphaBlending). This allows users to set
-        // renderer.enableAlphaBlending = true and have it applied even when no option
-        // is passed to render().
         var alphaEnabled = (opts.alphaBlending !== undefined) ? opts.alphaBlending : this.enableAlphaBlending;
 
-        // Apply render state (saves previous state for restoration)
         this._applyRenderState(alphaEnabled);
 
-        // Activate terrain shader for entity rendering
         if (shaderManager) {
             shaderManager.use('terrain');
         }
 
         try {
-            // Get entities to render based on awareness tier.
-            // Convert Set/Map returns from EntityManager to arrays for compatibility.
             var nearRaw = this._entityManager.getNearEntities();
             var farRaw = this._entityManager.getFarEntities();
             var nearIds = _toArray(nearRaw);
             var farIds = _toArray(farRaw);
 
-            // Combine entity IDs from both tiers — collect ALL candidates first,
-            // THEN sort by distance, THEN cap to maxRenderEntities. This prevents
-            // flickering caused by pre-sort truncation which biased toward NEAR tier.
             var allIds = nearIds.concat(farIds);
 
-            // Sort by distance from camera (far to near), filtered by render distance.
-            // _sortEntitiesByDistance handles the render distance filter internally.
             var sorted = this._sortEntitiesByDistance(allIds);
 
-            // Cap to max entities AFTER sorting so the farthest entities are preferred.
             var renderList = sorted.slice(0, this.maxRenderEntities);
 
-            // Render each entity
             for (var k = 0; k < renderList.length; k++) {
                 var entData = renderList[k];
                 var entity = this._entityManager.getEntity(entData.id);
 
                 if (!entity || !entity.isAlive()) continue;
 
-                // Frustum culling
                 if (!this._isEntityInFrustum(entity)) continue;
 
-                // Render all body parts for this entity
                 this._renderEntityParts(entity, true);
             }
         } finally {
-            // Always restore WebGL state, even if an error occurred during rendering.
-            // This prevents the renderer from leaving WebGL in a corrupted state.
             this._restoreRenderState();
         }
     };
@@ -1633,22 +1507,18 @@
         var gl = this._gl;
         var shaderManager = this._shaderManager;
 
-        // Activate terrain shader for entity rendering
         if (shaderManager) {
             shaderManager.use('terrain');
         }
 
-        // Apply render state (saves previous state for restoration)
         this._applyRenderState(this.enableAlphaBlending);
 
         try {
-            // Render all body parts for this entity (non-batch mode)
             var stats = this._renderEntityParts(entity, false);
 
             this.entitiesRendered = 1;
             this.drawCalls = stats.drawCalls;
         } finally {
-            // Always restore WebGL state, even if an error occurred during rendering.
             this._restoreRenderState();
         }
     };
@@ -1676,9 +1546,7 @@
      * Call this when the renderer is no longer needed to prevent memory leaks.
      */
     Donkeycraft.EntityRenderer.prototype.destroy = function () {
-        // Remove context loss listener
         this._removeContextLossListener();
-
         this.clearMeshCache();
         this._entityManager = null;
         this._camera = null;
@@ -1712,7 +1580,6 @@
         var gl = this._gl;
         if (!gl || !gl.canvas) return;
 
-        // Remove any existing listener first
         this._removeContextLossListener();
 
         var self = this;
@@ -1766,7 +1633,6 @@
             return result;
         }
 
-        // Check required vertex attributes.
         var requiredAttrs = ['aPosition', 'aNormal', 'aUV'];
         for (var i = 0; i < requiredAttrs.length; i++) {
             var attrName = requiredAttrs[i];
@@ -1778,7 +1644,6 @@
             }
         }
 
-        // Check that required setter methods exist on the ShaderManager.
         if (typeof this._shaderManager.setMat4 !== 'function') {
             result.valid = false;
             result.missingUniforms.push('uModel');
@@ -1812,10 +1677,6 @@
     // Initialization — Set up WebGL context loss handling after construction
     // ============================================================
 
-    // Wrap the original constructor to automatically register WebGL context loss/restoration
-    // listeners. The setup runs synchronously at the end of construction to ensure the
-    // listener is registered before any render calls can occur, eliminating the race
-    // condition where a render call could happen before the listener is attached.
     (function () {
         var origConstructor = Donkeycraft.EntityRenderer;
 
@@ -1827,13 +1688,9 @@
          */
         Donkeycraft.EntityRenderer = function (gl, shaderManager) {
             origConstructor.call(this, gl, shaderManager);
-            // Register context loss listener synchronously — the canvas is already
-            // attached to the context by this point, and this ensures no render call
-            // can occur before we are listening for context loss events.
             this._setupContextLossListener();
         };
 
-        // Copy all prototype methods from the original constructor
         var proto = origConstructor.prototype;
         for (var key in proto) {
             if (proto.hasOwnProperty(key)) {
@@ -1841,7 +1698,6 @@
             }
         }
 
-        // Restore correct prototype.constructor reference for instanceof checks
         Donkeycraft.EntityRenderer.prototype.constructor = Donkeycraft.EntityRenderer;
     })();
 
