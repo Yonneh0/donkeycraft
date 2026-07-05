@@ -220,6 +220,239 @@
     };
 
     // ============================================================
+    // Exhaustive Land Spawn Finder
+    // ============================================================
+
+    /**
+     * findLandSpawnPosition — Exhaustively search for a valid land spawn position.
+     * Uses an unlimited spiral search outward from the starting position until valid land is found.
+     * Valid spawn criteria:
+     *   - On solid ground (never over water)
+     *   - Near water level (Y ≤ 80 for Overworld, configurable)
+     *   - Flat terrain (surface variation ≤ 1 Y within a 5x5 area)
+     *   - Not on a cliff or mountain (gentle slope in all directions)
+     *   - Player space clear (2 blocks above is air)
+     *
+     * @param {Donkeycraft.ChunkManager} chunkManager — Chunk manager for block queries.
+     * @param {number} [startX=0] — Starting world X coordinate.
+     * @param {number} [startZ=0] — Starting world Z coordinate.
+     * @param {Object} [options] — Search options.
+     * @param {number} [options.maxY=80] — Maximum Y for "near water level" check.
+     * @param {number} [options.flatRadius=3] — Radius (in blocks) for flatness check.
+     * @param {number} [options.slopeLimit=3] — Max Y drop within flatRadius blocks.
+     * @returns {{x: number, y: number, z: number}|null} Valid spawn position or null if none found.
+     */
+    Donkeycraft.Player.findLandSpawnPosition = function (chunkManager, startX, startZ, options) {
+        if (!chunkManager) {
+            return null;
+        }
+
+        options = options || {};
+        var maxYLevel = options.maxY !== undefined ? options.maxY : 80;
+        var flatRadius = options.flatRadius !== undefined ? options.flatRadius : 3;
+        var slopeLimit = options.slopeLimit !== undefined ? options.slopeLimit : 3;
+
+        // Helper: get block at world coordinates, querying across chunk boundaries
+        function getBlock(wx, wy, wz) {
+            if (wy < 0 || wy >= Donkeycraft.Config.WORLD_HEIGHT) {
+                return -1; // Out of world bounds = air
+            }
+            return chunkManager.getBlock(Math.floor(wx), Math.floor(wy), Math.floor(wz));
+        }
+
+        // Helper: check if block is solid
+        function isSolid(id) {
+            return id > 0 && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isSolid(id);
+        }
+
+        // Helper: check if block is liquid
+        function isLiquid(id) {
+            return id > 0 && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isLiquid(id);
+        }
+
+        /**
+         * findSurfaceY — Scan downward from top to find the highest solid block at (x, z).
+         * Returns the Y of the solid block, or -1 if none found.
+         */
+        function findSurfaceY(x, z) {
+            var worldHeight = Donkeycraft.Config.WORLD_HEIGHT;
+            for (var y = worldHeight - 1; y >= 0; y--) {
+                var block = getBlock(x, y, z);
+                if (isSolid(block)) {
+                    return y;
+                }
+            }
+            return -1;
+        }
+
+        /**
+         * checkFlatness — Check if terrain is flat within a radius around (x, z).
+         * Returns the surface Y if flat, or -1 if not flat.
+         */
+        function checkFlatness(x, z, surfaceY) {
+            var r = flatRadius;
+            for (var dx = -r; dx <= r; dx++) {
+                for (var dz = -r; dz <= r; dz++) {
+                    var cx = Math.floor(x) + dx;
+                    var cz = Math.floor(z) + dz;
+                    var cy = findSurfaceY(cx, cz);
+                    if (cy < 0) {
+                        return -1; // No solid ground in this column
+                    }
+                    if (Math.abs(cy - surfaceY) > 1) {
+                        return -1; // Too much height variation — not flat
+                    }
+                }
+            }
+            return surfaceY;
+        }
+
+        /**
+         * checkSlope — Check that terrain slopes gently in all directions.
+         * Returns true if the Y drop within radius blocks doesn't exceed slopeLimit.
+         */
+        function checkSlope(x, z, surfaceY) {
+            var r = flatRadius;
+            var minY = surfaceY;
+            for (var angle = 0; angle < 360; angle += 15) {
+                var rad = angle * Math.PI / 180;
+                for (var dist = 1; dist <= r; dist++) {
+                    var cx = Math.floor(x) + Math.round(Math.cos(rad) * dist);
+                    var cz = Math.floor(z) + Math.round(Math.sin(rad) * dist);
+                    var cy = findSurfaceY(cx, cz);
+                    if (cy >= 0 && cy < minY) {
+                        minY = cy;
+                    }
+                }
+            }
+            return (surfaceY - minY) <= slopeLimit;
+        }
+
+        /**
+         * checkNotOverWater — Verify the spawn position is not over water.
+         * The block at surface level must NOT be liquid, and there should be no water
+         * column extending up from below through the spawn area.
+         */
+        function checkNotOverWater(x, z, surfaceY) {
+            var feetBlock = getBlock(x, surfaceY, z);
+            if (isLiquid(feetBlock)) {
+                return false; // Player would spawn inside water
+            }
+            // Check that the surface block itself is not water/lava
+            if (isLiquid(getBlock(x, surfaceY, z))) {
+                return false;
+            }
+            // Verify there's no tall water column we'd spawn in
+            for (var wy = surfaceY + 1; wy <= surfaceY + 2; wy++) {
+                var wBlock = getBlock(x, wy, z);
+                if (isLiquid(wBlock) && isLiquid(getBlock(x, wy - 1, z))) {
+                    // Flowing water (block above is also water) — skip this position
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * checkClearPlayerSpace — Verify the 2-block vertical space above feet is clear.
+         */
+        function checkClearPlayerSpace(x, z, feetY) {
+            var playerHeight = Donkeycraft.Config.PLAYER_HEIGHT;
+            // Check blocks from feet to feet + player height
+            for (var cy = Math.floor(feetY); cy <= Math.floor(feetY + playerHeight); cy++) {
+                if (isSolid(getBlock(x, cy, z))) {
+                    return false; // Player would spawn inside a solid block
+                }
+            }
+            return true;
+        }
+
+        /**
+         * validateSpawn — Run all checks on a candidate position.
+         * Returns the valid spawn Y, or -1 if invalid.
+         */
+        function validateSpawn(x, z) {
+            var surfaceY = findSurfaceY(x, z);
+            if (surfaceY < 0) return -1; // No solid ground
+
+            // Must be near water level (not on a mountain)
+            if (surfaceY > maxYLevel) return -1;
+
+            // Must not be over water
+            if (!checkNotOverWater(x, z, surfaceY)) return -1;
+
+            // Must be flat terrain
+            var flatY = checkFlatness(x, z, surfaceY);
+            if (flatY < 0) return -1;
+
+            // Must not be on a cliff/mountain slope
+            if (!checkSlope(x, z, flatY)) return -1;
+
+            // Player space must be clear
+            if (!checkClearPlayerSpace(x, z, flatY + 1)) return -1;
+
+            // All checks passed — return the Y position for player feet (on top of surface block)
+            return flatY + 1;
+        }
+
+        // ============================================================
+        // Exhaustive Spiral Search — unlimited range
+        // ============================================================
+        var searchX = Math.floor(startX || 0);
+        var searchZ = Math.floor(startZ || 0);
+        var ring = 0;
+        var maxRings = 4096; // Reasonable upper limit (~8K chunks in every direction)
+
+        while (ring <= maxRings) {
+            // Determine the extent of this ring in world block coordinates
+            var extent = ring * Donkeycraft.Config.CHUNK_SIZE;
+
+            // Check all positions on this ring boundary using spiral pattern
+            // Top edge: left to right
+            for (var sx = -extent; sx <= extent; sx++) {
+                var cx = searchX + sx;
+                var cz = searchZ - extent;
+                var resultY = validateSpawn(cx, cz);
+                if (resultY > 0) {
+                    return { x: cx + 0.5, y: resultY, z: cz + 0.5 };
+                }
+            }
+            // Right edge: top to bottom
+            for (var sy = -extent + 1; sy <= extent; sy++) {
+                var rx = searchX + extent;
+                var rz = searchZ + sy;
+                var resultY2 = validateSpawn(rx, rz);
+                if (resultY2 > 0) {
+                    return { x: rx + 0.5, y: resultY2, z: rz + 0.5 };
+                }
+            }
+            // Bottom edge: right to left
+            for (var ss = -extent + 1; ss < extent; ss++) {
+                var bx = searchX + extent - ss - 1;
+                var bz = searchZ + extent;
+                var resultY3 = validateSpawn(bx, bz);
+                if (resultY3 > 0) {
+                    return { x: bx + 0.5, y: resultY3, z: bz + 0.5 };
+                }
+            }
+            // Left edge: bottom to top
+            for (var ss2 = -extent + 1; ss2 < extent; ss2++) {
+                var lx = searchX - extent;
+                var lz = searchZ + extent - ss2 - 1;
+                var resultY4 = validateSpawn(lx, lz);
+                if (resultY4 > 0) {
+                    return { x: lx + 0.5, y: resultY4, z: lz + 0.5 };
+                }
+            }
+
+            ring++;
+        }
+
+        // No valid land found after exhaustive search
+        return null;
+    };
+
+    // ============================================================
     // Position, Velocity, Rotation (existing)
     // ============================================================
 

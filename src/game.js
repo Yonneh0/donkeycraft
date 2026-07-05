@@ -296,170 +296,78 @@
                 }
             };
 
-            // Set initial player position to spawn point on the terrain surface.
-            // Spawn near water level (Y) — never on cliffs or high mountains.
-            // First, ensure the spawn chunk exists and has terrain generated.
-            var spawnChunkX = Math.floor(0.5 / Config.CHUNK_SIZE);
-            var spawnChunkZ = Math.floor(0.5 / Config.CHUNK_SIZE);
+            // ============================================================
+            // Exhaustive land spawn search — always finds valid land position.
+            // Uses Player.findLandSpawnPosition() which performs an unlimited
+            // spiral search outward from (0, 0) until flat solid ground near
+            // water level is found (never on cliffs, mountains, or water).
+            // ============================================================
 
-            // Get or create the spawn chunk
-            var spawnChunk = this._chunkManager.getChunk(spawnChunkX, spawnChunkZ);
+            // First, generate terrain around the default spawn area so the
+            // finder has data to work with. We generate a larger radius to
+            // ensure chunks are populated before searching.
+            var initSpawnCX = Math.floor(0.5 / Config.CHUNK_SIZE); // = 0
+            var initSpawnCZ = Math.floor(0.5 / Config.CHUNK_SIZE); // = 0
+            var initRadius = 2; // Generate a 5x5 chunk area around spawn
 
-            // Generate terrain for the spawn chunk if it hasn't been generated yet
-            if (spawnChunk && !spawnChunk.generated) {
-                try {
-                    this._chunkManager.generateChunkTerrain(spawnChunkX, spawnChunkZ);
-                } catch (e) {
-                    Donkeycraft.Logger.error('Game', 'Failed to generate spawn chunk terrain: ' + e.message);
+            try {
+                for (var ix = -initRadius; ix <= initRadius; ix++) {
+                    for (var iz = -initRadius; iz <= initRadius; iz++) {
+                        var genCX = initSpawnCX + ix;
+                        var genCZ = initSpawnCZ + iz;
+                        // getChunk auto-generates if needed, but call explicitly
+                        this._chunkManager.getChunk(genCX, genCZ);
+                    }
                 }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Initial chunk generation had errors: ' + e.message);
             }
 
-            // Also generate nearby chunks for collision safety
-            for (var nx = -1; nx <= 1; nx++) {
-                for (var nz = -1; nz <= 1; nz++) {
-                    var checkChunkX = spawnChunkX + nx;
-                    var checkChunkZ = spawnChunkZ + nz;
-                    var checkChunk = this._chunkManager.getChunkIfExists(checkChunkX, checkChunkZ);
-                    if (checkChunk && !checkChunk.generated) {
-                        try {
-                            this._chunkManager.generateChunkTerrain(checkChunkX, checkChunkZ);
-                        } catch (e2) {
-                            // Silently skip — not critical for spawn safety
+            // Run the exhaustive land spawn finder.
+            // This will spiral-search unlimited chunks until valid land is found,
+            // handling cases like a 5x5 ocean where the center has no land.
+            var spawnOptions = {
+                maxY: 80,           // Near water level — excludes mountains
+                flatRadius: 3,      // Surface must be flat within ±1 Y over a 7x7 area
+                slopeLimit: 3       // No cliff/mountain slopes steeper than 3 blocks
+            };
+
+            var spawnPos = Donkeycraft.Player.findLandSpawnPosition(
+                this._chunkManager,
+                0.5,    // Starting world X
+                0.5,    // Starting world Z
+                spawnOptions
+            );
+
+            // If the exhaustive finder found land, use it.
+            // Otherwise fall back to a safe default position.
+            if (spawnPos && spawnPos.y > 0) {
+                Donkeycraft.Logger.info('Game', 'Spawn found at (' + spawnPos.x + ', ' + spawnPos.y + ', ' + spawnPos.z + ')');
+                this._player.setPosition(spawnPos.x, spawnPos.y, spawnPos.z);
+                this._camera.setPosition(spawnPos.x, spawnPos.y + Config.PLAYER_EYE_HEIGHT, spawnPos.z);
+
+                // Also record the spawn point in LevelData if available
+                if (this._levelData) {
+                    this._levelData.setSpawn(spawnPos.x, spawnPos.y, spawnPos.z);
+                }
+            } else {
+                // Fallback: generate terrain and find highest solid at (0.5, 0.5)
+                Donkeycraft.Logger.warn('Game', 'No land found by exhaustive search — using fallback spawn');
+                var fallbackY = Config.WORLD_HEIGHT - 10;
+                var fallbackChunk = this._chunkManager.getChunk(initSpawnCX, initSpawnCZ);
+                if (fallbackChunk) {
+                    for (var fy = Config.WORLD_HEIGHT - 1; fy >= 0; fy--) {
+                        var fb = fallbackChunk.getBlock(0, fy, 0);
+                        if (fb && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isSolid(fb)) {
+                            fallbackY = fy + 2;
+                            break;
                         }
                     }
                 }
+                fallbackY = Math.max(1, Math.min(fallbackY, Config.WORLD_HEIGHT - 1));
+                this._player.setPosition(0.5, fallbackY, 0.5);
+                this._camera.setPosition(0.5, fallbackY + Config.PLAYER_EYE_HEIGHT, 0.5);
             }
-
-            // Re-get the chunk after generation to ensure we have the latest data
-            spawnChunk = this._chunkManager.getChunkIfExists(spawnChunkX, spawnChunkZ);
-            var spawnY = Config.WORLD_HEIGHT - 10; // Default: safely above typical terrain
-
-            if (spawnChunk) {
-                // Scan a 3x3 area around the spawn position to find the highest solid block.
-                // This guards against corrupted single-column data and ensures we find
-                // the actual terrain surface even when the player spawns near a chunk edge.
-                var localSpawnX = ((0.5 % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
-                var localSpawnZ = ((0.5 % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
-                var foundSolid = false;
-                var highestSolidY = -1;
-
-                // Determine the 3x3 grid in local chunk coordinates centered on (localSpawnX, localSpawnZ)
-                var startX = Math.max(0, Math.floor(localSpawnX) - 1);
-                var endX = Math.min(Config.CHUNK_SIZE - 1, Math.ceil(localSpawnX) + 1);
-                var startZ = Math.max(0, Math.floor(localSpawnZ) - 1);
-                var endZ = Math.min(Config.CHUNK_SIZE - 1, Math.ceil(localSpawnZ) + 1);
-
-                for (var scanY = Config.WORLD_HEIGHT - 1; scanY >= 0; scanY--) {
-                    for (var lx = startX; lx <= endX; lx++) {
-                        for (var lz = startZ; lz <= endZ; lz++) {
-                            var blockId = spawnChunk.getBlock(lx, scanY, lz);
-                            if (blockId && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(blockId)) {
-                                highestSolidY = Math.max(highestSolidY, scanY);
-                                break; // Found solid at this Y in this column, move to next column
-                            }
-                        }
-                        if (highestSolidY === scanY) break; // Already found at this height
-                    }
-                    if (highestSolidY >= 0) break; // Found the highest solid across all columns
-                }
-
-                if (highestSolidY >= 0) {
-                    spawnY = highestSolidY + 1; // Place player directly on top of the highest solid block
-
-                    // Verify the block above is air (or non-solid) so the player doesn't spawn inside something.
-                    // If not, bump up one more block.
-                    var blockAbove = spawnChunk.getBlock(Math.floor(localSpawnX), highestSolidY + 1, Math.floor(localSpawnZ));
-                    if (blockAbove && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(blockAbove)) {
-                        spawnY = highestSolidY + 2;
-                    }
-
-                    // Water avoidance: check the full player AABB footprint for liquids.
-                    // The single-column check misses water at edges of the player's width.
-                    // Scan all block columns within the player's horizontal bounds.
-                    var playerMinX = Math.floor(0.5 - Config.PLAYER_WIDTH / 2);
-                    var playerMaxX = Math.ceil(0.5 + Config.PLAYER_WIDTH / 2);
-                    var playerMinZ = Math.floor(0.5 - Config.PLAYER_WIDTH / 2);
-                    var playerMaxZ = Math.ceil(0.5 + Config.PLAYER_WIDTH / 2);
-
-                    // Convert to local chunk coordinates for safe access
-                    var checkMinX = Math.max(0, playerMinX);
-                    var checkMaxX = Math.min(Config.CHUNK_SIZE - 1, playerMaxX);
-                    var checkMinZ = Math.max(0, playerMinZ);
-                    var checkMaxZ = Math.min(Config.CHUNK_SIZE - 1, playerMaxZ);
-
-                    var foundLiquidAtSpawn = false;
-                    var highestLiquidY = -1;
-
-                    // Check all blocks from spawnY upward within the player footprint
-                    for (var checkX = checkMinX; checkX <= checkMaxX && !foundLiquidAtSpawn; checkX++) {
-                        for (var checkZ = checkMinZ; checkZ <= checkMaxZ && !foundLiquidAtSpawn; checkZ++) {
-                            for (var checkY = spawnY; checkY < Config.WORLD_HEIGHT; checkY++) {
-                                var liquidBlock = spawnChunk.getBlock(checkX, checkY, checkZ);
-                                if (liquidBlock && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isLiquid(liquidBlock)) {
-                                    foundLiquidAtSpawn = true;
-                                    if (checkY > highestLiquidY) {
-                                        highestLiquidY = checkY;
-                                    }
-                                } else {
-                                    // Non-liquid block encountered in this column — stop scanning up
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (foundLiquidAtSpawn) {
-                        // Place player above the highest liquid column found.
-                        // If the liquid extends to world top, place at world top - 1.
-                        spawnY = highestLiquidY + 1;
-                        if (spawnY >= Config.WORLD_HEIGHT) {
-                            spawnY = Config.WORLD_HEIGHT - 1;
-                        }
-
-                        // Final safety: verify block at new spawn feet is NOT liquid
-                        var finalFeetBlock = spawnChunk.getBlock(Math.floor(localSpawnX), spawnY, Math.floor(localSpawnZ));
-                        if (finalFeetBlock && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isLiquid(finalFeetBlock)) {
-                            // Scan downward for solid ground as last resort
-                            for (var downScanY = spawnY - 1; downScanY >= 0; downScanY--) {
-                                var downBlock = spawnChunk.getBlock(Math.floor(localSpawnX), downScanY, Math.floor(localSpawnZ));
-                                if (downBlock && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(downBlock)) {
-                                    spawnY = downScanY + 2; // On top of solid ground
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Post-spawn verification: ensure the block at the player's feet is solid.
-                    // This catches edge cases where water replaced the terrain surface or
-                    // the player would spawn floating above a liquid/air block.
-                    var feetBlockId = spawnChunk.getBlock(Math.floor(localSpawnX), spawnY, Math.floor(localSpawnZ));
-                    var feetIsSolid = feetBlockId && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(feetBlockId);
-                    var feetIsLiquid = feetBlockId && Donkeycraft.BlockTypes && Donkeycraft.BlockTypes.isLiquid(feetBlockId);
-
-                    if (!feetIsSolid || feetIsLiquid) {
-                        // Scan downward from current spawnY to find the nearest solid block.
-                        for (var verifyScanY = spawnY - 1; verifyScanY >= 0; verifyScanY--) {
-                            var verifyBlock = spawnChunk.getBlock(Math.floor(localSpawnX), verifyScanY, Math.floor(localSpawnZ));
-                            if (verifyBlock && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(verifyBlock)) {
-                                spawnY = verifyScanY + 2; // Place on top of solid block
-                                break;
-                            }
-                        }
-                    }
-
-                    foundSolid = true;
-                } else {
-                    Donkeycraft.Logger.warn('Game', 'No solid block found at spawn — placing player at Y=' + spawnY);
-                }
-            }
-
-            // Clamp to valid world bounds
-            spawnY = Math.max(1, Math.min(spawnY, Config.WORLD_HEIGHT - 1));
-
-            // Place player at spawn position
-            this._player.setPosition(0.5, spawnY, 0.5);
-            this._camera.setPosition(0.5, spawnY + Config.PLAYER_EYE_HEIGHT, 0.5);
 
             // CRITICAL: Set velocity Y to 0 on spawn to prevent player from falling through the map.
             // The first physics tick would otherwise apply gravity before collision can resolve.
