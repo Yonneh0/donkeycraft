@@ -56,8 +56,9 @@
      * entities that are within range but behind or to the side of the camera view.
      * The dot product of (entityDirection, cameraForward) ranges from -1 (directly behind)
      * to 1 (directly in front). A value of 0.0 means perpendicular to camera (90° to side),
-     * while 0.1 corresponds to approximately 84° from directly behind (i.e., ~96° total
-     * viewing cone). Entities with a dot product below this threshold are culled.
+     * while 0.1 corresponds to approximately 84° from the camera's forward direction.
+     * Entities with a dot product below this threshold are culled (i.e., outside a ~168°
+     * total viewing cone centered on the camera's forward direction).
      * @constant {number}
      * @default 0.1
      */
@@ -70,15 +71,6 @@
      * @default 0.001
      */
     var FRUSTUM_MIN_DISTANCE = 0.001;
-
-    /**
-     * Angle threshold for fallback frustum culling — approximately π/4 radians (45°).
-     * Used in the simplified cone-based frustum check when view/projection matrices
-     * are unavailable.
-     * @constant {number}
-     * @private
-     */
-    var _FALLBACK_FRUSTUM_ANGLE = Math.PI / 4; // ~0.785 radians (45 degrees)
 
     /**
      * Vertex component stride for entity meshes — number of floats per vertex
@@ -532,8 +524,7 @@
      * @returns {string} Normalized cache key string.
      */
     function _normalizeMeshKey(meshType, dimensions) {
-        // Round to 3 decimal places using Math.round for correct handling of both
-        // positive and negative values. This avoids floating-point precision issues
+        // Round to 3 decimal places to avoid floating-point precision issues
         // while preserving visually significant differences in mesh dimensions.
         var round3 = function (v) { return Math.round(v * 1000) / 1000; };
 
@@ -688,6 +679,7 @@
 
     /**
      * setRenderDistance — Set the entity render distance in blocks.
+     * The value is clamped to the valid range [4, 64] blocks.
      * @param {number} distance - Render distance in blocks (clamped to [4, 64]).
      */
     Donkeycraft.EntityRenderer.prototype.setRenderDistance = function (distance) {
@@ -1022,13 +1014,14 @@
         if (!viewData || !projData) return null;
 
         // Multiply projection × view to get the combined clip-space matrix (column-major).
+        // For column-major matrices: C[r + c*4] = sum over k of A[r + k*4] * B[k + c*4]
         // result = proj × view
         var m = new Float32Array(16);
-        for (var i = 0; i < 4; i++) {
-            m[i]     = projData[i] * viewData[0] + projData[i+4] * viewData[1] + projData[i+8] * viewData[2] + projData[i+12] * viewData[3];
-            m[i+4]   = projData[i] * viewData[4] + projData[i+4] * viewData[5] + projData[i+8] * viewData[6] + projData[i+12] * viewData[7];
-            m[i+8]   = projData[i] * viewData[8] + projData[i+4] * viewData[9] + projData[i+8] * viewData[10] + projData[i+12] * viewData[11];
-            m[i+12]  = projData[i] * viewData[12] + projData[i+4] * viewData[13] + projData[i+8] * viewData[14] + projData[i+12] * viewData[15];
+        for (var j = 0; j < 4; j++) {
+            m[j]     = projData[0] * viewData[j]   + projData[4] * viewData[j+4]   + projData[8] * viewData[j+8]   + projData[12] * viewData[j+12];
+            m[j+4]   = projData[1] * viewData[j]   + projData[5] * viewData[j+4]   + projData[9] * viewData[j+8]   + projData[13] * viewData[j+12];
+            m[j+8]   = projData[2] * viewData[j]   + projData[6] * viewData[j+4]   + projData[10] * viewData[j+8]  + projData[14] * viewData[j+12];
+            m[j+12]  = projData[3] * viewData[j]   + projData[7] * viewData[j+4]   + projData[11] * viewData[j+8]  + projData[15] * viewData[j+12];
         }
 
         // Extract 6 frustum planes from the combined matrix.
@@ -1180,14 +1173,23 @@
             }
 
             // Fallback: if the camera doesn't provide view/projection matrices, use a
-            // simplified cone check to catch entities at extreme angles. This is less
-            // accurate but better than rendering clearly off-screen entities.
-            var horizDist = Math.sqrt(dx * dx + dz * dz);
-            if (horizDist > FRUSTUM_MIN_DISTANCE) {
-                var entityAngle = Math.atan2(Math.abs(dx), Math.abs(dz));
-                // Use a reasonable FOV threshold (~90 degrees total) to catch edge entities.
-                if (entityAngle > _FALLBACK_FRUSTUM_ANGLE && dy * dy > horizDist * horizDist * 0.5) {
-                    return false;
+            // simplified angle check relative to the camera's forward direction.
+            // This is less accurate than full frustum testing but prevents rendering
+            // entities that are clearly outside the viewing cone.
+            var forward = this._camera.getForwardDirection && this._camera.getForwardDirection();
+            if (forward) {
+                var horizDist = Math.sqrt(dx * dx + dz * dz);
+                // Compute dot product of entity direction and camera forward direction.
+                // When dot > 0, entity is in front of camera; when dot < 0, behind.
+                var entDist = Math.sqrt(horizDist * horizDist + dy * dy);
+                if (entDist > FRUSTUM_MIN_DISTANCE) {
+                    var dot = (dx * forward.x + dy * forward.y + dz * forward.z) / entDist;
+                    // If the entity is beyond a wide angle threshold from camera forward,
+                    // cull it. Using a generous threshold to compensate for lack of
+                    // proper frustum plane testing.
+                    if (dot < 0.0) { // ~90° from camera forward direction
+                        return false;
+                    }
                 }
             }
         }
@@ -1199,18 +1201,24 @@
      * _sortEntitiesByDistance — Sort entity IDs by distance from camera (far to near).
      * Far-to-near sorting ensures transparent entities render correctly and distant
      * entities are drawn first for better depth buffer coverage.
+     *
+     * When the camera is unavailable, returns an empty array since distance-based
+     * sorting cannot be performed without a reference point.
+     *
      * @private
      * @param {Array<number>} entityIds - Array of entity IDs to sort.
-     * @returns {Array<{id: number, distSq: number}>} Sorted array (far to near), filtered by render distance.
+     * @returns {Array<{id: number, distSq: number}>} Sorted array (far to near), filtered by render distance. Empty if camera unavailable.
      */
     Donkeycraft.EntityRenderer.prototype._sortEntitiesByDistance = function (entityIds) {
+        // Return empty array when camera is unavailable — distance sorting requires
+        // a reference point. The caller should handle this gracefully.
         if (!this._camera || !this._camera.getPosition) {
-            return entityIds.map(function (id) { return { id: id, distSq: 0 }; });
+            return [];
         }
 
         var camPos = this._camera.getPosition();
         if (!camPos) {
-            return entityIds.map(function (id) { return { id: id, distSq: 0 }; });
+            return [];
         }
 
         var renderDistSq = this.renderDistance * this.renderDistance;
@@ -1244,7 +1252,8 @@
      * _applyRenderState — Apply common WebGL render state for entity rendering.
      * Saves the current WebGL state so it can be restored via _restoreRenderState().
      * Enables depth testing and face culling unconditionally; alpha blending is
-     * controlled by the alphaEnabled parameter. Depth write mask defaults to true.
+     * controlled by the alphaEnabled parameter. Depth write mask is explicitly read
+     * and restored.
      *
      * If a WebGL state query fails (indicating a lost or invalid context), defaults
      * are assumed rather than silently swallowing the error — this makes context
@@ -1269,13 +1278,8 @@
             depthTestEnabled = gl.isEnabled(gl.DEPTH_TEST);
             cullFaceEnabled = gl.isEnabled(gl.CULL_FACE);
             blendEnabled = gl.isEnabled(gl.BLEND);
-            // Get current depth write mask (defaults to true if query fails)
-            try {
-                gl.depthMask(true);
-                depthWriteEnabled = true;
-            } catch (e2) {
-                depthWriteEnabled = true;
-            }
+            // Read the actual depth write mask state from WebGL.
+            depthWriteEnabled = gl.getParameter(gl.DEPTH_WRITEMASK);
         } catch (e) {
             // Context is likely lost — keep defaults and let downstream code handle it.
             return;
@@ -1363,12 +1367,17 @@
         // Get shape definitions for this entity type
         var shapeDefs = Donkeycraft.EntityShapeDefs[entity.type];
         if (!shapeDefs) {
-            // Fallback: use a generic box for unknown entity types
-            var halfW = (entity.width || 0.6) / 2;
+            // Fallback: use a generic box for unknown entity types.
+            // Use getDimensions() as primary source, falling back to direct properties,
+            // then to hardcoded defaults for maximum robustness.
+            var dims = entity.getDimensions ? entity.getDimensions() : null;
+            var entWidth = (dims && dims.width) != null ? dims.width : (entity.width || 0.6);
+            var entHeight = (dims && dims.height) != null ? dims.height : (entity.height || 1.8);
+
             shapeDefs = [{
                 name: 'body',
                 meshType: 'box',
-                dimensions: { w: entity.width || 0.6, h: entity.height || 1.8, d: entity.width || 0.6 },
+                dimensions: { w: entWidth, h: entHeight, d: entWidth },
                 color: '#FF00FF' // Magenta = unknown type
             }];
         }
@@ -1445,7 +1454,7 @@
      * render — Render all visible entities using awareness-based culling.
      *
      * Renders NEAR-tier and FAR-tier entities with distance-sorted batch rendering.
-     * Entities are sorted by distance and frustum-culled before drawing.
+     * Entities are sorted by distance (far-to-near) and frustum-culled before drawing.
      * WebGL state is saved before rendering and restored afterward to maintain
      * compatibility with the larger render pipeline. State restoration is guaranteed
      * via try-finally even if rendering errors occur.
@@ -1456,8 +1465,6 @@
      * - Shader programs ('terrain') must be compiled in the ShaderManager
      *
      * @param {Object} [options] - Render options.
-     * @param {boolean} [options.renderNear=true] - Render NEAR tier entities.
-     * @param {boolean} [options.renderFar=true] - Render FAR tier entities.
      * @param {boolean} [options.alphaBlending] - Enable alpha blending for transparent rendering.
      *   If omitted, falls back to this.enableAlphaBlending instance default.
      */
@@ -1487,9 +1494,11 @@
         }
 
         try {
-            // Get entities to render based on awareness tier (with null-safe fallback)
-            var nearIds = Array.isArray(this._entityManager.getNearEntities()) ? this._entityManager.getNearEntities() : [];
-            var farIds = Array.isArray(this._entityManager.getFarEntities()) ? this._entityManager.getFarEntities() : [];
+            // Get entities to render based on awareness tier (cached to avoid double calls)
+            var nearRaw = this._entityManager.getNearEntities();
+            var nearIds = Array.isArray(nearRaw) ? nearRaw : [];
+            var farRaw = this._entityManager.getFarEntities();
+            var farIds = Array.isArray(farRaw) ? farRaw : [];
 
             // Combine entity IDs from both tiers, respecting the render limit
             var maxEntities = this.maxRenderEntities;
@@ -1536,9 +1545,12 @@
 
     /**
      * renderEntity — Render a single entity (for debugging/specific targeting).
-     * Useful for rendering a specific entity without going through the full batch pipeline.
+     *
+     * Useful for rendering a specific entity without going through the full batch pipeline,
+     * such as highlighting a selected entity or rendering a debug representation.
      * WebGL state is saved before rendering and restored afterward via try-finally.
-     * @param {Donkeycraft.Entity} entity - Entity to render.
+     *
+     * @param {Donkeycraft.Entity} entity - Entity to render. Must be alive (isAlive() returns true).
      */
     Donkeycraft.EntityRenderer.prototype.renderEntity = function (entity) {
         if (!this._gl || !entity || !entity.isAlive() || this._contextLost) return;
