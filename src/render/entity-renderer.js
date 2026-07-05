@@ -53,9 +53,11 @@
 
     /**
      * Frustum forward-facing check factor — dot product threshold for culling
-     * entities that are within range but behind or perpendicular to camera view.
-     * A value of 0.0 means perpendicular to camera, 1.0 means directly in front.
-     * Entities with a dot product below this threshold are culled.
+     * entities that are within range but behind or to the side of the camera view.
+     * The dot product of (entityDirection, cameraForward) ranges from -1 (directly behind)
+     * to 1 (directly in front). A value of 0.0 means perpendicular to camera (90° to side),
+     * while 0.1 corresponds to approximately 84° from directly behind (i.e., ~96° total
+     * viewing cone). Entities with a dot product below this threshold are culled.
      * @constant {number}
      * @default 0.1
      */
@@ -68,6 +70,15 @@
      * @default 0.001
      */
     var FRUSTUM_MIN_DISTANCE = 0.001;
+
+    /**
+     * Angle threshold for fallback frustum culling — approximately π/4 radians (45°).
+     * Used in the simplified cone-based frustum check when view/projection matrices
+     * are unavailable.
+     * @constant {number}
+     * @private
+     */
+    var _FALLBACK_FRUSTUM_ANGLE = Math.PI / 4; // ~0.785 radians (45 degrees)
 
     /**
      * Vertex component stride for entity meshes — number of floats per vertex
@@ -95,7 +106,6 @@
      * Vertex byte stride — total bytes per vertex including all components.
      * @constant {number}
      * @default 32 (8 floats × 4 bytes)
-     * @private
      */
     var VERTEX_BYTE_STRIDE = VERTEX_COMPONENT_STRIDE * BYTES_PER_FLOAT;
 
@@ -273,89 +283,92 @@
      * - meshType: 'box' or 'cylinder'
      * - dimensions: Mesh dimensions (w/h/d for boxes, r/h for cylinders)
      * - color: Flat render color as hex string
+     * - offset: (optional) Bone offset relative to entity origin {x, y, z}
+     * - pivot: (optional) Rotation pivot point for the bone {x, y, z}. When provided,
+     *   rotations occur around this point rather than the mesh center.
      *
-     * @type {Object.<string, Array<{name: string, meshType: string, dimensions: Object, color: string}>}
+     * @type {Object.<string, Array<{name: string, meshType: string, dimensions: Object, color: string, offset?: {x:number,y:number,z:number}, pivot?: {x:number,y:number,z:number}}>}
      */
     Donkeycraft.EntityShapeDefs = {
         cow: [
-            { name: 'body', meshType: 'box', dimensions: { w: 1.4, h: 1.0, d: 0.7 }, color: '#8B4513' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#A0522D' },
-            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513' },
-            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513' },
-            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513' },
-            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513' }
+            { name: 'body', meshType: 'box', dimensions: { w: 1.4, h: 1.0, d: 0.7 }, color: '#8B4513', offset: { x: 0, y: 0.5, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#A0522D', offset: { x: 0, y: 1.0, z: 0.7 } },
+            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513', offset: { x: -0.4, y: 0.35, z: 0.3 }, pivot: { x: 0, y: 0.35, z: 0 } },
+            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513', offset: { x: 0.4, y: 0.35, z: 0.3 }, pivot: { x: 0, y: 0.35, z: 0 } },
+            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513', offset: { x: -0.4, y: 0.35, z: -0.3 }, pivot: { x: 0, y: 0.35, z: 0 } },
+            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.7 }, color: '#8B4513', offset: { x: 0.4, y: 0.35, z: -0.3 }, pivot: { x: 0, y: 0.35, z: 0 } }
         ],
         pig: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.9, h: 0.6, d: 0.5 }, color: '#FFC0CB' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.35, h: 0.35, d: 0.4 }, color: '#FFB6C1' },
-            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB' },
-            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB' },
-            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB' },
-            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.9, h: 0.6, d: 0.5 }, color: '#FFC0CB', offset: { x: 0, y: 0.3, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.35, h: 0.35, d: 0.4 }, color: '#FFB6C1', offset: { x: 0, y: 0.55, z: 0.5 } },
+            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB', offset: { x: -0.25, y: 0.25, z: 0.2 }, pivot: { x: 0, y: 0.25, z: 0 } },
+            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB', offset: { x: 0.25, y: 0.25, z: 0.2 }, pivot: { x: 0, y: 0.25, z: 0 } },
+            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB', offset: { x: -0.25, y: 0.25, z: -0.2 }, pivot: { x: 0, y: 0.25, z: 0 } },
+            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.5 }, color: '#FFC0CB', offset: { x: 0.25, y: 0.25, z: -0.2 }, pivot: { x: 0, y: 0.25, z: 0 } }
         ],
         donkey: [
-            { name: 'body', meshType: 'box', dimensions: { w: 1.0, h: 1.2, d: 0.5 }, color: '#808080' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.4, h: 0.6, d: 0.35 }, color: '#A9A9A9' },
-            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969' },
-            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969' },
-            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969' },
-            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969' }
+            { name: 'body', meshType: 'box', dimensions: { w: 1.0, h: 1.2, d: 0.5 }, color: '#808080', offset: { x: 0, y: 0.6, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.4, h: 0.6, d: 0.35 }, color: '#A9A9A9', offset: { x: 0, y: 1.3, z: 0.5 } },
+            { name: 'frontLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969', offset: { x: -0.3, y: 0.4, z: 0.25 }, pivot: { x: 0, y: 0.8, z: 0 } },
+            { name: 'frontRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969', offset: { x: 0.3, y: 0.4, z: 0.25 }, pivot: { x: 0, y: 0.8, z: 0 } },
+            { name: 'rearLeftLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969', offset: { x: -0.3, y: 0.4, z: -0.25 }, pivot: { x: 0, y: 0.8, z: 0 } },
+            { name: 'rearRightLeg', meshType: 'cylinder', dimensions: { r: 0.1, h: 0.8 }, color: '#696969', offset: { x: 0.3, y: 0.4, z: -0.25 }, pivot: { x: 0, y: 0.8, z: 0 } }
         ],
         chicken: [
             { name: 'body', meshType: 'box', dimensions: { w: 0.4, h: 0.35, d: 0.3 }, color: '#FFFFFF' },
             { name: 'head', meshType: 'box', dimensions: { w: 0.2, h: 0.2, d: 0.2 }, color: '#FF0000' }
         ],
         zombie: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#4B0082' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#228B22' },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#228B22' },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#228B22' },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#000080' },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#000080' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#4B0082', offset: { x: 0, y: 0.85, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#228B22', offset: { x: 0, y: 1.55, z: 0 } },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#228B22', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#228B22', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#000080', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#000080', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
         ],
         skeleton: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.5, h: 0.8, d: 0.25 }, color: '#F5F5DC' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.45, h: 0.45, d: 0.45 }, color: '#FAFAD2' },
-            { name: 'leftArm', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.7 }, color: '#F5F5DC' },
-            { name: 'rightArm', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.7 }, color: '#F5F5DC' },
-            { name: 'leftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.8 }, color: '#F5F5DC' },
-            { name: 'rightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.8 }, color: '#F5F5DC' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.5, h: 0.8, d: 0.25 }, color: '#F5F5DC', offset: { x: 0, y: 0.8, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.45, h: 0.45, d: 0.45 }, color: '#FAFAD2', offset: { x: 0, y: 1.45, z: 0 } },
+            { name: 'leftArm', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.7 }, color: '#F5F5DC', offset: { x: -0.35, y: 0.85, z: 0 }, pivot: { x: 0, y: 0.35, z: 0 } },
+            { name: 'rightArm', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.7 }, color: '#F5F5DC', offset: { x: 0.35, y: 0.85, z: 0 }, pivot: { x: 0, y: 0.35, z: 0 } },
+            { name: 'leftLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.8 }, color: '#F5F5DC', offset: { x: -0.12, y: 0.4, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'rightLeg', meshType: 'cylinder', dimensions: { r: 0.08, h: 0.8 }, color: '#F5F5DC', offset: { x: 0.12, y: 0.4, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } }
         ],
         creeper: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 1.0, d: 0.3 }, color: '#00FF00' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#00CC00' },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#00FF00' },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#00FF00' },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#00FF00' },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#00FF00' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 1.0, d: 0.3 }, color: '#00FF00', offset: { x: 0, y: 0.85, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#00CC00', offset: { x: 0, y: 1.6, z: 0 } },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#00FF00', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#00FF00', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#00FF00', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#00FF00', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
         ],
         spider: [
             { name: 'body', meshType: 'box', dimensions: { w: 1.4, h: 0.8, d: 1.0 }, color: '#2F4F4F' },
             { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.4, d: 0.5 }, color: '#000000' }
         ],
         enderman: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 1.2, d: 0.3 }, color: '#000000' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#000000' },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 1.0, d: 0.25 }, color: '#000000' },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 1.0, d: 0.25 }, color: '#000000' },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 1.2, d: 0.25 }, color: '#000000' },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 1.2, d: 0.25 }, color: '#000000' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 1.4, d: 0.3 }, color: '#000000', offset: { x: 0, y: 1.0, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#000000', offset: { x: 0, y: 1.95, z: 0 } },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 1.0, d: 0.25 }, color: '#000000', offset: { x: -0.42, y: 1.05, z: 0 }, pivot: { x: 0, y: 0.5, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 1.0, d: 0.25 }, color: '#000000', offset: { x: 0.42, y: 1.05, z: 0 }, pivot: { x: 0, y: 0.5, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 1.2, d: 0.25 }, color: '#000000', offset: { x: -0.15, y: 0.6, z: 0 }, pivot: { x: 0, y: 0.6, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 1.2, d: 0.25 }, color: '#000000', offset: { x: 0.15, y: 0.6, z: 0 }, pivot: { x: 0, y: 0.6, z: 0 } }
         ],
         player: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#3366CC' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99' },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99' },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#3366CC' },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC' },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#3366CC', offset: { x: 0, y: 0.85, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#3366CC', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
         ],
         npc: [
-            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#8B0000' },
-            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99' },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99' },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#8B0000' },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000' },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000' }
+            { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#8B0000', offset: { x: 0, y: 0.85, z: 0 } },
+            { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#8B0000', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
         ],
         door: [
             { name: 'doorPanel', meshType: 'box', dimensions: { w: 0.75, h: 1.8, d: 0.1 }, color: '#8B4513' }
@@ -519,9 +532,10 @@
      * @returns {string} Normalized cache key string.
      */
     function _normalizeMeshKey(meshType, dimensions) {
-        // Round to 3 decimal places (multiply, round, divide) to avoid floating-point
-        // precision issues while preserving visually significant differences.
-        var round3 = function (v) { return Math.round(v * 1000 + 0.5) / 1000; };
+        // Round to 3 decimal places using Math.round for correct handling of both
+        // positive and negative values. This avoids floating-point precision issues
+        // while preserving visually significant differences in mesh dimensions.
+        var round3 = function (v) { return Math.round(v * 1000) / 1000; };
 
         if (meshType === 'box') {
             var d = dimensions || {};
@@ -839,32 +853,57 @@
 
     /**
      * _parseHexColor — Parse a hex color string (#RGB or #RRGGBB) to normalized RGB values.
+     * Logs a warning via Donkeycraft.Logger (if available) for invalid color strings.
      * @private
      * @param {string} color - Hex color string (e.g., '#8B4513' or '#F00').
      * @returns {{r: number, g: number, b: number}} RGB values in [0, 1] range.
      */
     Donkeycraft.EntityRenderer.prototype._parseHexColor = function (color) {
-        var red = 0.5, green = 0.5, blue = 0.5; // Default gray for invalid colors
+        // Default to black for invalid colors — invisible rather than masking bugs with mid-gray.
+        var DEFAULT_RED = 0, DEFAULT_GREEN = 0, DEFAULT_BLUE = 0;
 
         if (!color || typeof color !== 'string' || color.charAt(0) !== '#') {
-            return { r: red, g: green, b: blue };
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityRenderer', 'Invalid color string "' + color + '" — rendering as black.');
+            }
+            return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
         }
 
         var hex = color.substring(1);
 
         if (hex.length === 6) {
             // Full hex color #RRGGBB
-            red = parseInt(hex.substring(0, 2), 16) / 255;
-            green = parseInt(hex.substring(2, 4), 16) / 255;
-            blue = parseInt(hex.substring(4, 6), 16) / 255;
+            var red = parseInt(hex.substring(0, 2), 16);
+            var green = parseInt(hex.substring(2, 4), 16);
+            var blue = parseInt(hex.substring(4, 6), 16);
+            // Validate that all hex pairs are valid
+            if (isNaN(red) || isNaN(green) || isNaN(blue)) {
+                if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color "' + color + '" — rendering as black.');
+                }
+                return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+            }
+            return { r: red / 255, g: green / 255, b: blue / 255 };
         } else if (hex.length === 3) {
             // Shorthand hex color #RGB
-            red = parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255;
-            green = parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255;
-            blue = parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255;
+            var r2 = parseInt(hex.charAt(0) + hex.charAt(0), 16);
+            var g2 = parseInt(hex.charAt(1) + hex.charAt(1), 16);
+            var b2 = parseInt(hex.charAt(2) + hex.charAt(2), 16);
+            // Validate that all hex pairs are valid
+            if (isNaN(r2) || isNaN(g2) || isNaN(b2)) {
+                if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid shorthand hex color "' + color + '" — rendering as black.');
+                }
+                return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+            }
+            return { r: r2 / 255, g: g2 / 255, b: b2 / 255 };
         }
 
-        return { r: red, g: green, b: blue };
+        // Invalid length
+        if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+            Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as black.');
+        }
+        return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
     };
 
     /**
@@ -967,7 +1006,7 @@
      * is inside the plane when dot(p, normal) + d >= 0 (i.e., it's on the positive side).
      *
      * The camera object must provide:
-     * - getViewMatrix() → { getData(): Float32Array(16) } (column-major inverse view matrix)
+     * - getViewMatrix() → { getData(): Float32Array(16) } (column-major view matrix)
      * - getProjectionMatrix() → { getData(): Float32Array(16) } (column-major projection matrix)
      *
      * @private
@@ -1147,7 +1186,7 @@
             if (horizDist > FRUSTUM_MIN_DISTANCE) {
                 var entityAngle = Math.atan2(Math.abs(dx), Math.abs(dz));
                 // Use a reasonable FOV threshold (~90 degrees total) to catch edge entities.
-                if (entityAngle > 0.785 && dy * dy > horizDist * horizDist * 0.5) {
+                if (entityAngle > _FALLBACK_FRUSTUM_ANGLE && dy * dy > horizDist * horizDist * 0.5) {
                     return false;
                 }
             }
@@ -1205,7 +1244,7 @@
      * _applyRenderState — Apply common WebGL render state for entity rendering.
      * Saves the current WebGL state so it can be restored via _restoreRenderState().
      * Enables depth testing and face culling unconditionally; alpha blending is
-     * controlled by the alphaEnabled parameter.
+     * controlled by the alphaEnabled parameter. Depth write mask defaults to true.
      *
      * If a WebGL state query fails (indicating a lost or invalid context), defaults
      * are assumed rather than silently swallowing the error — this makes context
@@ -1224,11 +1263,19 @@
         var depthTestEnabled = true;
         var cullFaceEnabled = true;
         var blendEnabled = false;
+        var depthWriteEnabled = true;
 
         try {
             depthTestEnabled = gl.isEnabled(gl.DEPTH_TEST);
             cullFaceEnabled = gl.isEnabled(gl.CULL_FACE);
             blendEnabled = gl.isEnabled(gl.BLEND);
+            // Get current depth write mask (defaults to true if query fails)
+            try {
+                gl.depthMask(true);
+                depthWriteEnabled = true;
+            } catch (e2) {
+                depthWriteEnabled = true;
+            }
         } catch (e) {
             // Context is likely lost — keep defaults and let downstream code handle it.
             return;
@@ -1238,6 +1285,9 @@
         gl.enable(gl.DEPTH_TEST);
         gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
+
+        // Ensure depth writing is enabled
+        gl.depthMask(true);
 
         // Optionally enable alpha blending for transparent entities
         if (alphaEnabled) {
@@ -1251,12 +1301,15 @@
         this._savedRenderState = {
             depthTest: depthTestEnabled,
             cullFace: cullFaceEnabled,
-            blend: blendEnabled
+            blend: blendEnabled,
+            depthWrite: depthWriteEnabled
         };
     };
 
     /**
      * _restoreRenderState — Restore WebGL render state to pre-render values.
+     * Restores depth test, face culling, alpha blending, and depth write mask
+     * to their pre-render state.
      * @private
      */
     Donkeycraft.EntityRenderer.prototype._restoreRenderState = function () {
@@ -1282,6 +1335,11 @@
             gl.enable(gl.BLEND);
         } else {
             gl.disable(gl.BLEND);
+        }
+
+        // Restore depth write mask
+        if (this._savedRenderState.depthWrite !== undefined) {
+            gl.depthMask(this._savedRenderState.depthWrite);
         }
 
         // Clear saved state
@@ -1361,6 +1419,7 @@
 
     /**
      * _onContextLost — Handler for WebGL context loss events.
+     * Sets the internal `_contextLost` flag to prevent further render calls.
      * @private
      * @param {Event} event - The context loss event.
      */
@@ -1372,7 +1431,8 @@
 
     /**
      * _restoreFromContextLoss — Rebuild mesh cache after WebGL context restoration.
-     * Called when the `webglcontextrestored` event fires.
+     * Called when the `webglcontextrestored` event fires. Clears all cached GPU buffers
+     * so they will be recreated on the next render call.
      * @private
      */
     Donkeycraft.EntityRenderer.prototype._restoreFromContextLoss = function () {
@@ -1427,19 +1487,25 @@
         }
 
         try {
-            // Get entities to render based on awareness tier
-            var nearIds = opts.renderNear !== false ? this._entityManager.getNearEntities() : [];
-            var farIds = opts.renderFar !== false ? this._entityManager.getFarEntities() : [];
+            // Get entities to render based on awareness tier (with null-safe fallback)
+            var nearIds = Array.isArray(this._entityManager.getNearEntities()) ? this._entityManager.getNearEntities() : [];
+            var farIds = Array.isArray(this._entityManager.getFarEntities()) ? this._entityManager.getFarEntities() : [];
 
-            // Combine entity IDs from both tiers
-            var allIds = [];
+            // Combine entity IDs from both tiers, respecting the render limit
             var maxEntities = this.maxRenderEntities;
+            var totalCandidates = Math.min(nearIds.length + farIds.length, maxEntities);
+            var allIds = new Array(totalCandidates);
 
-            for (var i = 0; i < nearIds.length && allIds.length < maxEntities; i++) {
-                allIds.push(nearIds[i]);
+            var idx = 0;
+            for (var i = 0; i < nearIds.length && idx < maxEntities; i++) {
+                allIds[idx++] = nearIds[i];
             }
-            for (var j = 0; j < farIds.length && allIds.length < maxEntities; j++) {
-                allIds.push(farIds[j]);
+            for (var j = 0; j < farIds.length && idx < maxEntities; j++) {
+                allIds[idx++] = farIds[j];
+            }
+            // Trim array to actual count (handles case where totalCandidates was capped)
+            if (idx < allIds.length) {
+                allIds.length = idx;
             }
 
             // Sort by distance from camera (far to near), filtered by render distance
@@ -1530,10 +1596,12 @@
 
     /**
      * _removeContextLossListener — Remove the WebGL context loss event listener.
+     * Safely removes both 'webglcontextlost' and 'webglcontextrestored' listeners
+     * without throwing if the canvas or handler is invalid.
      * @private
      */
     Donkeycraft.EntityRenderer.prototype._removeContextLossListener = function () {
-        if (this._contextLossHandler && this._gl) {
+        if (this._contextLossHandler && this._gl && this._gl.canvas) {
             var gl = this._gl;
             gl.canvas.removeEventListener('webglcontextlost', this._contextLossHandler);
             gl.canvas.removeEventListener('webglcontextrestored', this._contextLossHandler);
@@ -1543,7 +1611,8 @@
 
     /**
      * _setupContextLossListener — Register a listener for WebGL context loss/restoration events.
-     * Ensures only one handler is registered and existing ones are removed first.
+     * Ensures only one handler is registered by removing existing listeners first.
+     * The handler dispatches to `_onContextLost` and `_restoreFromContextLoss` based on event type.
      * @private
      */
     Donkeycraft.EntityRenderer.prototype._setupContextLossListener = function () {
@@ -1616,31 +1685,15 @@
             }
         }
 
-        // Check required uniforms.
-        var requiredUniforms = ['uModel', 'uColor'];
-        for (var j = 0; j < requiredUniforms.length; j++) {
-            var uniName = requiredUniforms[j];
-            if (typeof this._shaderManager.setMat4 !== 'function' && uniName === 'uModel') {
-                result.valid = false;
-                result.missingUniforms.push(uniName);
-                result.errors.push('Missing setMat4 method on ShaderManager — uModel uniform cannot be set.');
-            }
-            if (typeof this._shaderManager.setVec3 !== 'function' && uniName === 'uColor') {
-                result.valid = false;
-                result.missingUniforms.push(uniName);
-                result.errors.push('Missing setVec3 method on ShaderManager — uColor uniform cannot be set.');
-            }
-        }
-
-        // Check that setMat4 and setVec3 methods exist (independent of uniform presence).
+        // Check that required setter methods exist on the ShaderManager.
         if (typeof this._shaderManager.setMat4 !== 'function') {
             result.valid = false;
-            result.missingUniforms.push('uModel (setMat4 method missing)');
+            result.missingUniforms.push('uModel');
             result.errors.push('ShaderManager lacks setMat4 method — uModel uniform cannot be set.');
         }
         if (typeof this._shaderManager.setVec3 !== 'function') {
             result.valid = false;
-            result.missingUniforms.push('uColor (setVec3 method missing)');
+            result.missingUniforms.push('uColor');
             result.errors.push('ShaderManager lacks setVec3 method — uColor uniform cannot be set.');
         }
 
@@ -1667,10 +1720,9 @@
     // ============================================================
 
     // Wrap the original constructor to automatically register WebGL context loss/restoration
-    // listeners. The setup is deferred via requestAnimationFrame (not setTimeout) to ensure
-    // it runs after the constructor completes and the canvas is fully initialized, while
-    // still executing synchronously before the next paint — eliminating the race condition
-    // where a render call could occur before the listener is registered.
+    // listeners. The setup runs synchronously at the end of construction to ensure the
+    // listener is registered before any render calls can occur, eliminating the race
+    // condition where a render call could happen before the listener is attached.
     (function () {
         var origConstructor = Donkeycraft.EntityRenderer;
 
@@ -1682,15 +1734,10 @@
          */
         Donkeycraft.EntityRenderer = function (gl, shaderManager) {
             origConstructor.call(this, gl, shaderManager);
-            // Defer to next animation frame so the constructor is fully complete and
-            // the canvas exists, but before any rendering occurs.
-            var self = this;
-            if (typeof requestAnimationFrame === 'function') {
-                requestAnimationFrame(function () { self._setupContextLossListener(); });
-            } else {
-                // Fallback if rAF is unavailable
-                setTimeout(function () { self._setupContextLossListener(); }, 0);
-            }
+            // Register context loss listener synchronously — the canvas is already
+            // attached to the context by this point, and this ensures no render call
+            // can occur before we are listening for context loss events.
+            this._setupContextLossListener();
         };
 
         // Copy all prototype methods from the original constructor
@@ -1700,6 +1747,9 @@
                 Donkeycraft.EntityRenderer.prototype[key] = proto[key];
             }
         }
+
+        // Restore correct prototype.constructor reference for instanceof checks
+        Donkeycraft.EntityRenderer.prototype.constructor = Donkeycraft.EntityRenderer;
     })();
 
 })();
