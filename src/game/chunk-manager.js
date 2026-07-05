@@ -338,29 +338,36 @@
         var chunk = this._chunks.get(key);
         if (!chunk || chunk.generated) return false;
 
+        // Attempt to generate terrain
         var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
+        var success = false;
 
         switch (currentDim) {
             case Donkeycraft.DimensionType.NETHER: // Nether
-                _generateNetherChunk(this, chunk, chunkX, chunkZ);
+                try { _generateNetherChunk(this, chunk, chunkX, chunkZ); success = true; } catch (e) { /* skip */ }
                 break;
             case Donkeycraft.DimensionType.END: // End
-                _generateEndChunk(this, chunk, chunkX, chunkZ);
+                try { _generateEndChunk(this, chunk, chunkX, chunkZ); success = true; } catch (e) { /* skip */ }
                 break;
             default: // Overworld
                 if (this.useStructureGenerator && Donkeycraft.StructureGenerator &&
                     Donkeycraft.StructureGenerator.generateChunkFull) {
                     try {
                         Donkeycraft.StructureGenerator.generateChunkFull(chunk, chunk.biomeId);
+                        success = true;
                     } catch (e) {
                         Donkeycraft.Logger.error('ChunkManager', 'StructureGenerator failed: ' + e.message);
                         _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                        success = true;
                     }
                 } else {
                     _generateOverworldChunk(this, chunk, chunkX, chunkZ);
+                    success = true;
                 }
                 break;
         }
+
+        return success;
     };
 
     // ============================================================

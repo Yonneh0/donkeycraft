@@ -1526,11 +1526,18 @@
         var localX = ((wx % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
         var localZ = ((wz % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
 
-        // Get chunk from manager — use getChunk to auto-create/unload chunks that haven't been
-        // generated yet. This ensures the terrain renderer can query block data for all chunks
-        // within render distance, triggering onChunkLoad → terrain generation when needed.
+        // Get chunk from manager — use getChunk to auto-create chunks that haven't been
+        // generated yet. The onChunkLoad callback (wired in dimension.js) triggers
+        // synchronous terrain generation, so block data is always available after this call.
         var chunk = this._chunkManager.getChunk(chunkX, chunkZ);
-        if (!chunk || !chunk.generated) return 0;
+        if (!chunk) return 0;
+
+        // If the chunk exists but hasn't been generated yet (e.g., onChunkLoad failed),
+        // try to generate terrain now. This handles cases where dependencies were
+        // missing during initial chunk creation.
+        if (!chunk.generated && this._chunkManager.generateChunkTerrain) {
+            this._chunkManager.generateChunkTerrain(chunkX, chunkZ);
+        }
 
         return chunk.getBlock(localX, wy, localZ);
     };

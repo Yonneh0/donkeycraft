@@ -61,6 +61,7 @@
 }
 
 .dk-debug-info .dk-debug-section {
+    display: grid;
     margin-bottom: 4px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 4px;
@@ -137,7 +138,7 @@
 
 /* Debug terrain toggle button */
 .dk-debug-terrain-toggle {
-    display: inline-block;
+    display: grid;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 10px;
     padding: 3px 8px;
@@ -217,8 +218,8 @@
 
 /* Debug controls section — interactive stat manipulation buttons */
 .dk-debug-info .dk-debug-controls {
-    margin-top: 6px;
-    padding-top: 4px;
+    /*margin-top: 6px;
+    padding-top: 4px;*/
     border-top: 1px solid rgba(100, 100, 100, 0.5);
 }
 
@@ -237,9 +238,11 @@
 .dk-debug-btn-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px;
+    gap: 0px;
     padding-left: 2px;
     margin-top: 1px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
 }
 
 .dk-debug-ctrl-btn {
@@ -253,10 +256,12 @@
     background: rgba(40, 40, 40, 0.8);
     color: #ccc;
     border: 1px solid #555;
-    border-radius: 2px;
+    border-radius: 3px;
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+    margin-left: -3px;
+    z-index: 101;
 }
 
 .dk-debug-ctrl-btn:hover {
@@ -275,6 +280,7 @@
 .dk-debug-ctrl-btn-special {
     color: #f39c12;
     border-color: rgba(243, 156, 18, 0.4);
+    z-index: 102;
 }
 
 .dk-debug-ctrl-btn-special:hover {

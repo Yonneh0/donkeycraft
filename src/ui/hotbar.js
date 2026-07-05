@@ -36,6 +36,7 @@
         this._staminaPulse = null;
         this._prevStamina = 100;  // Matches initial stamina value — prevents spurious pulse on first update
         this._pulseTimeout = null;
+        this._animationTimeout = null;
 
         // Build DOM if container provided
         if (this._container) {
@@ -165,11 +166,44 @@
         // Calculate fill percentage and clamp to [0, 100]
         var pct = Math.min(100, Math.max(0, (stamina / maxStamina) * 100));
 
+        // Determine if stamina increased, decreased, or stayed the same
+        var delta = stamina - this._prevStamina;
+
         // Update fill width with CSS transition
         this._staminaFill.style.width = pct + '%';
 
-        // Trigger pulse animation whenever stamina changes from previous value
-        if (this._prevStamina !== stamina) {
+        // Clear any existing animation timeout to prevent overlapping animations
+        if (this._animationTimeout) {
+            clearTimeout(this._animationTimeout);
+            this._animationTimeout = null;
+        }
+
+        // Remove any existing animation classes to reset state
+        this._staminaFill.classList.remove('stamina-filling', 'stamina-draining');
+
+        // Trigger appropriate animation based on stamina change direction
+        if (delta > 0) {
+            // Stamina gained — trigger fill animation (brightness flash)
+            this._staminaFill.classList.add('stamina-filling');
+            this._animationTimeout = setTimeout(function () {
+                if (this._staminaFill) {
+                    this._staminaFill.classList.remove('stamina-filling');
+                }
+                this._animationTimeout = null;
+            }.bind(this), 500);
+        } else if (delta < 0) {
+            // Stamina lost — trigger drain animation (dimming pulse)
+            this._staminaFill.classList.add('stamina-draining');
+            this._animationTimeout = setTimeout(function () {
+                if (this._staminaFill) {
+                    this._staminaFill.classList.remove('stamina-draining');
+                }
+                this._animationTimeout = null;
+            }.bind(this), 400);
+        }
+
+        // Trigger pulse overlay whenever stamina changes from previous value
+        if (delta !== 0) {
             this._triggerStaminaPulse();
         }
 
@@ -424,10 +458,14 @@
      * Unsubscribes from stamina:changed events and nulls all internal references.
      */
     Donkeycraft.Hotbar.prototype.destroy = function () {
-        // Clear pulse timeout
+        // Clear all timeouts
         if (this._pulseTimeout) {
             clearTimeout(this._pulseTimeout);
             this._pulseTimeout = null;
+        }
+        if (this._animationTimeout) {
+            clearTimeout(this._animationTimeout);
+            this._animationTimeout = null;
         }
 
         // Unsubscribe from stamina events

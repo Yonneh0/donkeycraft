@@ -346,21 +346,28 @@
                             try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
-                    default: // Overworld — delegate to ChunkManager's built-in generation
+        default: // Overworld — delegate to ChunkManager's built-in generation
                         if (chunkManager.generateChunkTerrain) {
-                            chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
-                            terrainGenerated = true;
+                            var genResult = chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
+                            terrainGenerated = !!genResult;
                         }
                         break;
                 }
 
                 // Fallback: if terrain generation callback didn't run, try direct generation
                 if (!terrainGenerated && chunkManager.generateChunkTerrain) {
-                    try { chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ); } catch (e) { /* skip */ }
+                    try {
+                        var fbResult = chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
+                        terrainGenerated = !!fbResult;
+                    } catch (e) { /* skip */ }
                 }
 
-                // Mark as generated so getChunk won't attempt regeneration on future lookups
-                chunk.generated = true;
+                // Only mark as generated if terrain generation actually succeeded.
+                // If generation failed (e.g., missing dependencies), leave chunk.generated = false
+                // so that _getBlockAt can retry generation when the chunk is queried for block data.
+                if (terrainGenerated) {
+                    chunk.generated = true;
+                }
 
                 // Apply lighting after terrain generation
                 if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.updateChunkLighting) {
