@@ -233,10 +233,8 @@
 
         this._attackCooldown = this.attackInterval;
 
-        // Deal damage to player — check available damage systems
-        if (this._targetPlayer.hurtBox && typeof this._targetPlayer.hurtBox.takeDamage === 'function') {
-            this._targetPlayer.hurtBox.takeDamage(this.damage, this.type);
-        } else if (typeof this._targetPlayer.takeDamage === 'function') {
+        // Deal damage to player — Player is the single source of truth
+        if (typeof this._targetPlayer.takeDamage === 'function') {
             this._targetPlayer.takeDamage(this.damage, this.type);
         } else if (this._targetPlayer.health !== undefined) {
             this._targetPlayer.health = Math.max(0, this._targetPlayer.health - this.damage);

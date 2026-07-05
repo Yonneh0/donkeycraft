@@ -10,10 +10,10 @@
     /**
      * HealthBar — manages the health bar DOM, animations, and overlay effects.
      * @param {HTMLElement} container - Parent container for health bar DOM.
-     * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance to observe.
+     * @param {Donkeycraft.Player} player - Player instance (single source of truth for vitals).
      */
-    Donkeycraft.HealthBar = function (container, hurtBox) {
-        this._hurtBox = hurtBox;
+    Donkeycraft.HealthBar = function (container, player) {
+        this._player = player;
         this._container = container;
 
         // DOM element references (set by _buildDOM)
@@ -36,8 +36,8 @@
 
         // Capture initial values BEFORE update to prevent spurious animation delta.
         // _prevHealth is set inside updateFromHealth, so we call it without triggering animations.
-        var initHealth = hurtBox.getHealth();
-        var initMaxHealth = hurtBox.getMaxHealth();
+        var initHealth = this._player.getHealth();
+        var initMaxHealth = this._player.getMaxHealth();
         this._prevHealth = initHealth;
 
         this.updateFromHealth({
@@ -441,7 +441,7 @@
         }
 
         // Null out references
-        this._hurtBox = null;
+        this._player = null;
         this._container = null;
         this._row = null;
         this._heartContainers = [];

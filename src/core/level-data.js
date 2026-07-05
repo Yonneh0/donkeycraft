@@ -77,7 +77,7 @@
 
     /**
      * _ensurePlayerData — ensure player data object exists, initializing defaults if needed.
-     * Creates a player data object with default values (health=20, hunger=20, inventory=[], etc.)
+     * Creates a player data object with default values (health=20, food=12, hydration=6, inventory=[], etc.)
      * if `_playerData` is currently null.
      * @private
      */
@@ -90,8 +90,8 @@
                 maxHealth: 20,
                 gameMode: this._gameMode,
                 inventory: [],
-                hunger: 20,
-                hydration: 0,
+                foodLevel: 12,
+                hydration: 6.0,
                 experience: { levels: 0, points: 0 },
                 fallDistance: 0,
                 alive: true
@@ -225,8 +225,8 @@
                 maxHealth: data.maxHealth || 20,
                 gameMode: data.gameMode || this._gameMode,
                 inventory: data.inventory || [],
-                hunger: data.hunger !== undefined ? data.hunger : 20,
-                hydration: data.hydration || 0,
+                foodLevel: data.foodLevel !== undefined ? data.foodLevel : 12,
+                hydration: data.hydration !== undefined ? data.hydration : 6.0,
                 experience: data.experience || { levels: 0, points: 0 },
                 fallDistance: data.fallDistance || 0,
                 alive: data.alive !== undefined ? data.alive : true
@@ -250,8 +250,8 @@
             maxHealth: this._playerData.maxHealth,
             gameMode: this._playerData.gameMode,
             inventory: this._playerData.inventory ? this._playerData.inventory.slice() : [],
-            hunger: this._playerData.hunger,
-            hydration: this._playerData.hydration,
+            foodLevel: this._playerData.foodLevel !== undefined ? this._playerData.foodLevel : 12,
+            hydration: this._playerData.hydration !== undefined ? this._playerData.hydration : 6.0,
             experience: { levels: this._playerData.experience.levels, points: this._playerData.experience.points },
             fallDistance: this._playerData.fallDistance,
             alive: this._playerData.alive
@@ -329,37 +329,37 @@
     };
 
     /**
-     * Update hunger level.
-     * @param {number} hunger — Hunger value (0-20).
+     * Update food level (max 12).
+     * @param {number} foodLevel — Food value (0-12).
      */
-    Donkeycraft.LevelData.prototype.setHunger = function (hunger) {
+    Donkeycraft.LevelData.prototype.setHunger = function (foodLevel) {
         this._ensurePlayerData();
-        this._playerData.hunger = Donkeycraft.clamp(Math.round(hunger || 0), 0, 20);
+        this._playerData.foodLevel = Donkeycraft.clamp(Math.round(foodLevel || 0), 0, 12);
     };
 
     /**
-     * Get hunger level.
-     * @returns {number} Hunger value (0-20).
+     * Get food level.
+     * @returns {number} Food value (0-12).
      */
     Donkeycraft.LevelData.prototype.getHunger = function () {
-        return this._playerData ? this._playerData.hunger : 20;
+        return this._playerData ? (this._playerData.foodLevel !== undefined ? this._playerData.foodLevel : 12) : 12;
     };
 
     /**
      * Update hydration level.
-     * @param {number} hydration — Hydration value (0-hunger).
+     * @param {number} hydration — Hydration value (0-6).
      */
     Donkeycraft.LevelData.prototype.setHydration = function (hydration) {
         this._ensurePlayerData();
-        this._playerData.hydration = Donkeycraft.clamp(hydration || 0, 0, this._playerData.hunger);
+        this._playerData.hydration = Donkeycraft.clamp(hydration || 0, 0, 6);
     };
 
     /**
      * Get hydration level.
-     * @returns {number} Hydration value.
+     * @returns {number} Hydration value (0-6).
      */
     Donkeycraft.LevelData.prototype.getHydration = function () {
-        return this._playerData ? this._playerData.hydration : 0;
+        return this._playerData ? (this._playerData.hydration !== undefined ? this._playerData.hydration : 6.0) : 6.0;
     };
 
     /**
@@ -468,12 +468,12 @@
             this._playerData = {
                 position: data.playerData.position || { x: 0, y: 64, z: 0 },
                 rotation: data.playerData.rotation || { yaw: 0, pitch: 0 },
-                health: data.playerData.health || 20,
+                health: data.playerData.health !== undefined ? data.playerData.health : 20,
                 maxHealth: data.playerData.maxHealth || 20,
                 gameMode: data.playerData.gameMode || this._gameMode,
                 inventory: data.playerData.inventory || [],
-                hunger: data.playerData.hunger !== undefined ? data.playerData.hunger : 20,
-                hydration: data.playerData.hydration || 0,
+                foodLevel: data.playerData.foodLevel !== undefined ? data.playerData.foodLevel : 12,
+                hydration: data.playerData.hydration !== undefined ? data.playerData.hydration : 6.0,
                 experience: data.playerData.experience || { levels: 0, points: 0 },
                 fallDistance: data.playerData.fallDistance || 0,
                 alive: data.playerData.alive !== undefined ? data.playerData.alive : true

@@ -1,60 +1,43 @@
 // Donkeycraft — Hunger System
-// Hunger mechanics: food level, hydration, starvation damage, auto-regeneration.
+// Food and hydration state holder with UI event emission.
+// All vitals (food, hydration) are stored on the Player object — this class delegates to it.
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var Config = Donkeycraft.Config;
+    var EventBus = Donkeycraft.EventBus;
 
     /**
-     * Hunger — manages player hunger and hydration as a pure state holder.
+     * Hunger — manages player food and hydration as a thin compatibility layer.
      *
-     * Food and hydration are tracked separately:
-     * - **Food**: max 12 points, displayed as 6 drumstick icons (2 points per icon).
-     * - **Hydration**: max 6 points, displayed as 3 water drop icons (2 points per icon).
-     *
-     * This is a state holder only — no drain logic, no tick processing.
-     * All change detection and animations are handled by the UI layer (HungerBar).
-     * Debug overlay buttons call add/sub methods directly to test input validation.
+     * All state is stored on the Player object. This class provides:
+     * - Convenience methods for adding/subtracting food/hydration
+     * - UI event emission (hunger:changed)
+     * - Backward compatibility with existing code that references Hunger
      *
      * @param {Donkeycraft.Player} player - Player entity instance.
-     * @param {Donkeycraft.HurtBox} [hurtBox=null] - Optional HurtBox reference (not used for game logic).
      */
-    Donkeycraft.Hunger = function (player, hurtBox) {
+    Donkeycraft.Hunger = function (player) {
         this._player = player;
-        this._hurtBox = hurtBox || null;
-
-        /**
-         * Current food level (0-12, displayed as 6 drumstick icons).
-         * Each icon represents 2 food points.
-         * @type {number}
-         * @private
-         */
-        this._foodLevel = 12;
-
-        /**
-         * Current hydration level (0-6, displayed as 3 water drop icons).
-         * Each icon represents 2 hydration points.
-         * @type {number}
-         * @private
-         */
-        this._hydration = 6.0;
     };
 
     /**
-     * Set the reference to the player's HurtBox system.
-     * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance.
+     * @deprecated setHurtBox has been removed. Vitals are now stored on Player directly.
      */
-    Donkeycraft.Hunger.prototype.setHurtBox = function (hurtBox) {
-        this._hurtBox = hurtBox;
+    Donkeycraft.Hunger.prototype.setHurtBox = function () {
+        // No-op: HurtBox removed, vitals delegated to Player
     };
+
+    // ============================================================
+    // Food Level — Delegates to Player
+    // ============================================================
 
     /**
      * Get the current food level.
      * @returns {number} Food level (0-12).
      */
     Donkeycraft.Hunger.prototype.getFoodLevel = function () {
-        return this._foodLevel;
+        return this._player.getFoodLevel();
     };
 
     /**
@@ -62,105 +45,7 @@
      * @param {number} level - Food level to set (0-12).
      */
     Donkeycraft.Hunger.prototype.setFoodLevel = function (level) {
-        var oldLevel = this._foodLevel;
-        this._foodLevel = Math.max(0, Math.min(12, level));
-
-        // Emit hunger change event if food level actually changed
-        if (oldLevel !== this._foodLevel && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    delta: this._foodLevel - oldLevel
-                });
-            } catch (e) { }
-        }
-    };
-
-    /**
-     * Get the current hydration level.
-     * @returns {number} Hydration level (0-6).
-     */
-    Donkeycraft.Hunger.prototype.getHydration = function () {
-        return this._hydration;
-    };
-
-    /**
-     * Set the hydration level.
-     * @param {number} hydration - Hydration value to set (0-6).
-     */
-    Donkeycraft.Hunger.prototype.setHydration = function (hydration) {
-        var oldHydration = this._hydration;
-        this._hydration = Math.max(0, Math.min(6, hydration));
-
-        // Emit hunger change event if hydration actually changed
-        if (oldHydration !== this._hydration && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    hydration: this._hydration,
-                    hydrationDelta: this._hydration - oldHydration
-                });
-            } catch (e) { }
-        }
-    };
-
-    /**
-     * Check if the player is starving (food level = 0).
-     * @returns {boolean} True if food level is at zero.
-     */
-    Donkeycraft.Hunger.prototype.isStarving = function () {
-        return this._foodLevel <= 0;
-    };
-
-    /**
-     * Starvation damage timer (seconds toward 1 HP damage when food = 0).
-     * @type {number}
-     * @private
-     */
-    Donkeycraft.Hunger.prototype._starvationTimer = 0;
-
-    /**
-     * Tick the hunger system — handle starvation damage and auto-regeneration.
-     *
-     * Starvation: when food level is 0, deals 1 HP damage every 4 seconds (only if health <= min(5, maxHealth/2)).
-     * Natural regeneration: when food > 10 (of 12), heals 1 HP at ~25% per second (only if health < max).
-     *
-     * @param {number} deltaTime - Time since last tick in seconds.
-     */
-    Donkeycraft.Hunger.prototype.tick = function (deltaTime) {
-        if (!this._player.isAlive()) {
-            return;
-        }
-
-        // Starvation damage: when food level = 0
-        if (this._foodLevel <= 0) {
-            this._starvationTimer += deltaTime;
-            if (this._starvationTimer >= 4.0) {
-                this._starvationTimer = 0;
-
-                if (this._hurtBox) {
-                    // Only take starvation damage if health <= 5 (or half max, whichever is lower)
-                    var currentHealth = this._hurtBox.getHealth();
-                    var threshold = Math.min(5, this._hurtBox.getMaxHealth() / 2);
-                    if (currentHealth <= threshold) {
-                        this._hurtBox.takeDamage(1, 'starvation');
-                    }
-                }
-            }
-        } else {
-            // Reset starvation timer when food is available
-            this._starvationTimer = 0;
-        }
-
-        // Natural regeneration: when food > 10 (of 12) and health < max
-        if (this._foodLevel > 10 && this._hurtBox) {
-            if (this._hurtBox.getHealth() < this._hurtBox.getMaxHealth()) {
-                // Regen chance: ~25% per second
-                if (Math.random() < deltaTime * 0.25) {
-                    this._hurtBox.heal(1);
-                }
-            }
-        }
+        this._player.setFoodLevel(level);
     };
 
     /**
@@ -170,19 +55,7 @@
      * @param {number} amount - Food points to add (positive number).
      */
     Donkeycraft.Hunger.prototype.addFood = function (amount) {
-        var oldLevel = this._foodLevel;
-        this.setFoodLevel(this._foodLevel + amount);
-
-        // Emit event only if value actually changed after clamping
-        if (this._foodLevel !== oldLevel && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    hydration: this._hydration,
-                    delta: this._foodLevel - oldLevel
-                });
-            } catch (e) { }
-        }
+        this._player.adjustFoodLevel(amount);
     };
 
     /**
@@ -192,19 +65,43 @@
      * @param {number} amount - Food points to subtract (positive number).
      */
     Donkeycraft.Hunger.prototype.subtractFood = function (amount) {
-        var oldLevel = this._foodLevel;
-        this.setFoodLevel(this._foodLevel - amount);
+        this._player.adjustFoodLevel(-amount);
+    };
 
-        // Emit event only if value actually changed after clamping
-        if (this._foodLevel !== oldLevel && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    hydration: this._hydration,
-                    delta: this._foodLevel - oldLevel
-                });
-            } catch (e) { }
-        }
+    /**
+     * Check if the player is starving (food level = 0).
+     * @returns {boolean} True if food level is at zero.
+     */
+    Donkeycraft.Hunger.prototype.isStarving = function () {
+        return this._player.isStarving();
+    };
+
+    /**
+     * Check if the player has any food remaining.
+     * @returns {boolean} True if food level is greater than zero.
+     */
+    Donkeycraft.Hunger.prototype.hasFood = function () {
+        return this._player.hasFood();
+    };
+
+    // ============================================================
+    // Hydration — Delegates to Player
+    // ============================================================
+
+    /**
+     * Get the current hydration level.
+     * @returns {number} Hydration level (0-6).
+     */
+    Donkeycraft.Hunger.prototype.getHydration = function () {
+        return this._player.getHydration();
+    };
+
+    /**
+     * Set the hydration level.
+     * @param {number} hydration - Hydration value to set (0-6).
+     */
+    Donkeycraft.Hunger.prototype.setHydration = function (hydration) {
+        this._player.setHydration(hydration);
     };
 
     /**
@@ -214,19 +111,7 @@
      * @param {number} amount - Hydration points to add (positive number).
      */
     Donkeycraft.Hunger.prototype.addHydration = function (amount) {
-        var oldHydration = this._hydration;
-        this.setHydration(this._hydration + amount);
-
-        // Emit event only if value actually changed after clamping
-        if (this._hydration !== oldHydration && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    hydration: this._hydration,
-                    hydrationDelta: this._hydration - oldHydration
-                });
-            } catch (e) { }
-        }
+        this._player.adjustHydration(amount);
     };
 
     /**
@@ -236,50 +121,34 @@
      * @param {number} amount - Hydration points to subtract (positive number).
      */
     Donkeycraft.Hunger.prototype.subtractHydration = function (amount) {
-        var oldHydration = this._hydration;
-        this.setHydration(this._hydration - amount);
-
-        // Emit event only if value actually changed after clamping
-        if (this._hydration !== oldHydration && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: this._foodLevel,
-                    hydration: this._hydration,
-                    hydrationDelta: this._hydration - oldHydration
-                });
-            } catch (e) { }
-        }
+        this._player.adjustHydration(-amount);
     };
+
+    // ============================================================
+    // Tick — No longer handles starvation/regeneration (moved to Player.tickVitals)
+    // ============================================================
 
     /**
-     * Check if the player has any food remaining.
-     * @returns {boolean} True if food level is greater than zero.
+     * Tick the hunger system.
+     * Starvation and regeneration are now handled by Player.tickVitals().
+     * This method is a no-op retained for backward compatibility.
+     * @param {number} deltaTime - Time since last tick in seconds.
      */
-    Donkeycraft.Hunger.prototype.hasFood = function () {
-        return this._foodLevel > 0;
+    Donkeycraft.Hunger.prototype.tick = function (deltaTime) {
+        // No-op: starvation and regeneration are handled by Player.tickVitals()
+        // This method is retained for backward compatibility with game.js tick order
     };
+
+    // ============================================================
+    // Reset — Delegates to Player
+    // ============================================================
 
     /**
      * Reset the hunger system to full state.
-     *
-     * Restores food to 12 and hydration to 6, emitting a change event.
+     * Delegates to player.resetVitals().
      */
     Donkeycraft.Hunger.prototype.reset = function () {
-        var oldLevel = this._foodLevel;
-        var oldHydration = this._hydration;
-        this._foodLevel = 12;
-        this._hydration = 6.0;
-
-        // Emit event for reset
-        if ((oldLevel !== 12 || oldHydration !== 6.0) && Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('hunger:changed', {
-                    foodLevel: 12,
-                    hydration: 6.0,
-                    delta: 12 - oldLevel
-                });
-            } catch (e) { }
-        }
+        this._player.resetVitals();
     };
 
     /**
@@ -287,7 +156,6 @@
      */
     Donkeycraft.Hunger.prototype.destroy = function () {
         this._player = null;
-        this._hurtBox = null;
     };
 
 })();

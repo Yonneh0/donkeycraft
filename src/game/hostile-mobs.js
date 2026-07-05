@@ -227,11 +227,8 @@
 
         this._attackCooldown = this.attackInterval;
 
-        // Deal damage to player through available systems
-        if (this._targetPlayer.hurtBox && typeof this._targetPlayer.hurtBox.takeDamage === 'function') {
-            // Player has full damage system (from damage.js)
-            this._targetPlayer.hurtBox.takeDamage(this.damage, this.type);
-        } else if (typeof this._targetPlayer.takeDamage === 'function') {
+        // Deal damage to player through available systems — Player is the single source of truth
+        if (typeof this._targetPlayer.takeDamage === 'function') {
             // Player has direct takeDamage method
             this._targetPlayer.takeDamage(this.damage, this.type);
         } else if (this._targetPlayer.health !== undefined) {

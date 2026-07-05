@@ -864,13 +864,10 @@ void main() {
                         }
                     }
 
-                    // --- Wire up HurtBox & Hunger systems (deferred from setSystems — player created in init()) ---
+                    // --- Wire up Hunger system (deferred from setSystems — player created in init()) ---
+                    // Note: HurtBox removed — all vitals stored on Player directly
                     try {
-                        var hurtBox = new Donkeycraft.HurtBox(game2._player);
-                        game2._hurtBox = hurtBox;
-                        Donkeycraft._hurtBox = hurtBox;
-
-                        var hunger = new Donkeycraft.Hunger(game2._player, hurtBox);
+                        var hunger = new Donkeycraft.Hunger(game2._player);
                         game2._hungerSystem = hunger;
                         Donkeycraft._hungerSystem = hunger;
 
@@ -878,25 +875,18 @@ void main() {
                         if (game2._movementSystem) {
                             try { game2._movementSystem.setHungerSystem(hunger); } catch (e3) { }
                         }
-
-                        // Wire HurtBox into Movement for fall damage application
-                        if (game2._movementSystem) {
-                            try { game2._movementSystem.setHurtBox(hurtBox); } catch (e4) {
-                                Donkeycraft.Logger.warn('Game', 'Failed to wire HurtBox into Movement: ' + e4.message);
-                            }
-                        }
                     } catch (e) {
-                        Donkeycraft.Logger.error('Game', 'HurtBox/Hunger deferred init failed: ' + e.message);
+                        Donkeycraft.Logger.error('Game', 'Hunger deferred init failed: ' + e.message);
                     }
 
                     // --- Wire up Health Bar UI ---
                     try {
                         var healthBarContainer = document.getElementById('dk-health-bar-wrapper');
-                        if (healthBarContainer && Donkeycraft.HealthBar && game2._hurtBox) {
-                            var healthBar = new Donkeycraft.HealthBar(healthBarContainer, game2._hurtBox);
+                        if (healthBarContainer && Donkeycraft.HealthBar && game2._player) {
+                            var healthBar = new Donkeycraft.HealthBar(healthBarContainer, game2._player);
                             Donkeycraft._healthBar = healthBar;
                         } else {
-                            Donkeycraft.Logger.warn('Game', 'HealthBar skipped - container:', !!healthBarContainer, 'class:', typeof Donkeycraft.HealthBar, 'hurtBox:', !!game2._hurtBox);
+                            Donkeycraft.Logger.warn('Game', 'HealthBar skipped - container:', !!healthBarContainer, 'class:', typeof Donkeycraft.HealthBar, 'player:', !!game2._player);
                         }
                     } catch (e) {
                         Donkeycraft.Logger.error('Game', 'HealthBar error: ' + e.message);

@@ -1,21 +1,25 @@
 // Donkeycraft — Player Entity
-// Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode.
+// Player entity: position, velocity, rotation, dimensions (1.8×0.6), game mode, and all vitals.
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
     var Config = Donkeycraft.Config;
+    var EventBus = Donkeycraft.EventBus;
 
     /**
-     * Player — represents the player entity with position, velocity, rotation, and game mode.
+     * Player — represents the player entity with position, velocity, rotation, dimensions, game mode, and vitals.
      *
      * The player is the central entity that all player subsystems operate on. It holds state
-     * (position, velocity, rotation, game mode) while physics are applied by Movement,
+     * (position, velocity, rotation, game mode, vitals) while physics are applied by Movement,
      * collision is resolved by Collision, jumping is handled by Jumping, and flying state
      * is managed by Flying.
      *
      * Position is stored as a center point (not corner). Yaw is normalized to [0, 2π).
      * Pitch is clamped to [-π/2, π/2] (straight down to straight up).
+     *
+     * Vitals (health, stamina, food, hydration) are the single source of truth — other classes
+     * reference them from this object rather than duplicating state.
      *
      * @param {object} [config] - Configuration overrides.
      * @param {number} [config.x=0] - Initial X position in blocks.
@@ -117,11 +121,86 @@
 
         /**
          * Whether the player is alive.
-         * Set to `false` by HurtBox on death (health reaches 0).
+         * Set to `false` when health reaches 0.
          * Checked by Movement (no movement when dead), Jumping (no jumping when dead).
          * @type {boolean}
          */
         this.alive = true;
+
+        // ============================================================
+        // VITALS — Single source of truth for player state
+        // All vitals are stored here. Other classes reference these values.
+        // ============================================================
+
+        /**
+         * Current health points (0-20).
+         * @type {number}
+         * @private
+         */
+        this._health = 20;
+
+        /**
+         * Maximum health points.
+         * @type {number}
+         */
+        this.maxHealth = 20;
+
+        /**
+         * Current stamina points (yellow health). Always capped at 100.
+         * @type {number}
+         */
+        this.maxStamina = 100;
+
+        /**
+         * Current stamina points (yellow health). Starts at full capacity (100 points).
+         * @type {number}
+         * @private
+         */
+        this._stamina = 100;
+
+        /**
+         * Stamina regeneration timer (seconds since last regeneration).
+         * @type {number}
+         * @private
+         */
+        this._staminaRegenTimer = 0;
+
+        /**
+         * Current food level (0-12, displayed as 6 drumstick icons).
+         * Each icon represents 2 food points.
+         * @type {number}
+         * @private
+         */
+        this._foodLevel = 12;
+
+        /**
+         * Current hydration level (0-6, displayed as 3 water drop icons).
+         * Each icon represents 2 hydration points.
+         * @type {number}
+         * @private
+         */
+        this._hydration = 6.0;
+
+        /**
+         * Whether the player is currently on fire.
+         * @type {boolean}
+         * @private
+         */
+        this._onFire = false;
+
+        /**
+         * Fire damage timer (seconds toward next fire damage tick).
+         * @type {number}
+         * @private
+         */
+        this._fireDamageTimer = 0;
+
+        /**
+         * Starvation damage timer (seconds toward 1 HP damage when food = 0).
+         * @type {number}
+         * @private
+         */
+        this._starvationTimer = 0;
 
         /**
          * Event subscribers for tick updates.
@@ -131,7 +210,18 @@
          * @private
          */
         this._subscribers = [];
+
+        /**
+         * Death event callback.
+         * @type {Function|null}
+         * @private
+         */
+        this._onDeathCallback = null;
     };
+
+    // ============================================================
+    // Position, Velocity, Rotation (existing)
+    // ============================================================
 
     /**
      * Get the player's current position (center point at feet level).
@@ -197,11 +287,8 @@
      * @param {number} pitch - Pitch angle in radians. Clamped to [-π/2, π/2].
      */
     Donkeycraft.Player.prototype.setRotation = function (yaw, pitch) {
-        // Normalize yaw to [0, 2π) using modulo arithmetic (O(1) vs O(n) while loops)
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
-
-        // Clamp pitch to [-π/2, π/2] (straight down to straight up)
         this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
     };
 
@@ -229,6 +316,10 @@
             Math.PI / 2
         );
     };
+
+    // ============================================================
+    // Dimensions & Game Mode (existing)
+    // ============================================================
 
     /**
      * Get the player's collision dimensions.
@@ -262,15 +353,17 @@
     Donkeycraft.Player.prototype.setGameMode = function (mode) {
         var validModes = ['survival', 'creative', 'spectator'];
         if (validModes.indexOf(mode) === -1) {
-            return; // Invalid mode — ignore
+            return;
         }
         this.gameMode = mode;
-
-        // Disable flying when switching to survival
         if (mode === 'survival') {
             this.flyEnabled = false;
         }
     };
+
+    // ============================================================
+    // Alive Status (existing)
+    // ============================================================
 
     /**
      * Check if the player is alive.
@@ -285,13 +378,583 @@
      * Set whether the player is alive or dead.
      * 
      * When set to `false`, Movement and Jumping systems stop processing.
-     * Set to `false` by HurtBox when health reaches 0.
+     * Set to `false` when health reaches 0.
      * 
      * @param {boolean} alive - True if alive, false if dead.
      */
     Donkeycraft.Player.prototype.setAlive = function (alive) {
         this.alive = !!alive;
     };
+
+    // ============================================================
+    // Health — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Get the player's current health.
+     * 
+     * @returns {number} Current HP (0-20).
+     */
+    Donkeycraft.Player.prototype.getHealth = function () {
+        return this._health;
+    };
+
+    /**
+     * Set the player's health value with clamping and event emission.
+     * 
+     * Clamps to [0, maxHealth]. Emits `health:changed` event via EventBus.
+     * If health drops to 0, triggers death handling.
+     * 
+     * @param {number} value - Health value to set.
+     */
+    Donkeycraft.Player.prototype.setHealth = function (value) {
+        var oldHealth = this._health;
+        var clampedValue = Math.max(0, Math.min(this.maxHealth, Math.round(value)));
+        this._health = clampedValue;
+
+        // Emit health change event via EventBus
+        if (EventBus && clampedValue !== oldHealth) {
+            try {
+                EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: this._health - oldHealth
+                });
+            } catch (e) { }
+        }
+
+        // Check for death
+        if (this._health <= 0 && this.alive) {
+            this._onDeath('generic');
+        }
+    };
+
+    /**
+     * Adjust the player's health by a delta amount.
+     * 
+     * Positive values heal, negative values deal damage.
+     * Clamps to [0, maxHealth] and emits `health:changed` event.
+     * If health drops to 0, triggers death handling.
+     * 
+     * @param {number} delta - Health change (positive = heal, negative = damage).
+     */
+    Donkeycraft.Player.prototype.adjustHealth = function (delta) {
+        var oldHealth = this._health;
+        this.setHealth(this._health + delta);
+
+        // Emit event with actual delta after clamping
+        if (EventBus && this._health !== oldHealth) {
+            try {
+                EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: this._health - oldHealth
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Get the maximum health points.
+     * 
+     * @returns {number}
+     */
+    Donkeycraft.Player.prototype.getMaxHealth = function () {
+        return this.maxHealth;
+    };
+
+    // ============================================================
+    // Stamina — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Get the current stamina (yellow health) points.
+     * 
+     * @returns {number}
+     */
+    Donkeycraft.Player.prototype.getStamina = function () {
+        return this._stamina;
+    };
+
+    /**
+     * Set the stamina value with clamping and event emission.
+     * 
+     * Clamps to [0, maxStamina] (always capped at 100).
+     * Emits `stamina:changed` event via EventBus.
+     * 
+     * @param {number} amount - Stamina points to set.
+     */
+    Donkeycraft.Player.prototype.setStamina = function (amount) {
+        var oldStamina = this._stamina;
+        this._stamina = Math.min(this.maxStamina, Math.max(0, amount));
+
+        // Emit stamina:changed event for UI systems
+        if (EventBus && this._stamina !== oldStamina) {
+            try {
+                EventBus.emitSafe('stamina:changed', {
+                    stamina: this._stamina,
+                    maxStamina: this.maxStamina,
+                    delta: this._stamina - oldStamina
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Adjust the player's stamina by a delta amount.
+     * 
+     * Positive values restore stamina, negative values consume it.
+     * Clamps to [0, maxStamina] and emits `stamina:changed` event.
+     * 
+     * @param {number} delta - Stamina change (positive = restore, negative = consume).
+     */
+    Donkeycraft.Player.prototype.adjustStamina = function (delta) {
+        var oldStamina = this._stamina;
+        this.setStamina(this._stamina + delta);
+
+        if (EventBus && this._stamina !== oldStamina) {
+            try {
+                EventBus.emitSafe('stamina:changed', {
+                    stamina: this._stamina,
+                    maxStamina: this.maxStamina,
+                    delta: this._stamina - oldStamina
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Get the maximum stamina points.
+     * 
+     * @returns {number}
+     */
+    Donkeycraft.Player.prototype.getMaxStamina = function () {
+        return this.maxStamina;
+    };
+
+    // ============================================================
+    // Food Level — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Get the current food level.
+     * 
+     * @returns {number} Food level (0-12).
+     */
+    Donkeycraft.Player.prototype.getFoodLevel = function () {
+        return this._foodLevel;
+    };
+
+    /**
+     * Set the food level with clamping and event emission.
+     * 
+     * Clamps to [0, 12]. Emits `hunger:changed` event via EventBus.
+     * 
+     * @param {number} level - Food level to set (0-12).
+     */
+    Donkeycraft.Player.prototype.setFoodLevel = function (level) {
+        var oldLevel = this._foodLevel;
+        this._foodLevel = Math.max(0, Math.min(12, level));
+
+        // Emit hunger change event if food level actually changed
+        if (EventBus && this._foodLevel !== oldLevel) {
+            try {
+                EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    hydration: this._hydration,
+                    delta: this._foodLevel - oldLevel
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Adjust the player's food level by a delta amount.
+     * 
+     * Positive values add food, negative values subtract food.
+     * Clamps to [0, 12] and emits `hunger:changed` event.
+     * 
+     * @param {number} delta - Food change (positive = eat, negative = starve).
+     */
+    Donkeycraft.Player.prototype.adjustFoodLevel = function (delta) {
+        var oldLevel = this._foodLevel;
+        this.setFoodLevel(this._foodLevel + delta);
+
+        if (EventBus && this._foodLevel !== oldLevel) {
+            try {
+                EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    hydration: this._hydration,
+                    delta: this._foodLevel - oldLevel
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Check if the player is starving (food level = 0).
+     * 
+     * @returns {boolean} True if food level is at zero.
+     */
+    Donkeycraft.Player.prototype.isStarving = function () {
+        return this._foodLevel <= 0;
+    };
+
+    /**
+     * Check if the player has any food remaining.
+     * 
+     * @returns {boolean} True if food level is greater than zero.
+     */
+    Donkeycraft.Player.prototype.hasFood = function () {
+        return this._foodLevel > 0;
+    };
+
+    // ============================================================
+    // Hydration — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Get the current hydration level.
+     * 
+     * @returns {number} Hydration level (0-6).
+     */
+    Donkeycraft.Player.prototype.getHydration = function () {
+        return this._hydration;
+    };
+
+    /**
+     * Set the hydration level with clamping and event emission.
+     * 
+     * Clamps to [0, 6]. Emits `hunger:changed` event via EventBus.
+     * 
+     * @param {number} hydration - Hydration value to set (0-6).
+     */
+    Donkeycraft.Player.prototype.setHydration = function (hydration) {
+        var oldHydration = this._hydration;
+        this._hydration = Math.max(0, Math.min(6, hydration));
+
+        // Emit hunger change event if hydration actually changed
+        if (EventBus && this._hydration !== oldHydration) {
+            try {
+                EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    hydration: this._hydration,
+                    hydrationDelta: this._hydration - oldHydration
+                });
+            } catch (e) { }
+        }
+    };
+
+    /**
+     * Adjust the player's hydration by a delta amount.
+     * 
+     * Positive values add hydration, negative values subtract it.
+     * Clamps to [0, 6] and emits `hunger:changed` event.
+     * 
+     * @param {number} delta - Hydration change (positive = drink, negative = dehydrate).
+     */
+    Donkeycraft.Player.prototype.adjustHydration = function (delta) {
+        var oldHydration = this._hydration;
+        this.setHydration(this._hydration + delta);
+
+        if (EventBus && this._hydration !== oldHydration) {
+            try {
+                EventBus.emitSafe('hunger:changed', {
+                    foodLevel: this._foodLevel,
+                    hydration: this._hydration,
+                    hydrationDelta: this._hydration - oldHydration
+                });
+            } catch (e) { }
+        }
+    };
+
+    // ============================================================
+    // Fire Status — Accessors & Mutators
+    // ============================================================
+
+    /**
+     * Check if the player is on fire.
+     * 
+     * @returns {boolean}
+     */
+    Donkeycraft.Player.prototype.isOnFire = function () {
+        return this._onFire;
+    };
+
+    /**
+     * Set whether the player is on fire.
+     * 
+     * @param {boolean} onFire - True to set on fire, false to extinguish.
+     */
+    Donkeycraft.Player.prototype.setOnFire = function (onFire) {
+        this._onFire = !!onFire;
+        if (!onFire) {
+            this._fireDamageTimer = 0;
+        }
+    };
+
+    // ============================================================
+    // Damage & Healing — Core Logic
+    // ============================================================
+
+    /**
+     * Receive damage from a specified source.
+     * 
+     * Applies damage to stamina first, then health. Respects game mode immunity
+     * (creative mode is immune). Emits `health:changed` event via EventBus.
+     * 
+     * @param {number} amount - Damage amount.
+     * @param {string} [source='generic'] - Damage source: 'generic', 'fall', 'fire', 'attack', 'lava', 'suffocation', 'starvation'.
+     * @returns {number} Actual damage dealt (0 if immune).
+     */
+    Donkeycraft.Player.prototype.takeDamage = function (amount, source) {
+        source = source || 'generic';
+
+        // Creative mode: immune to most damage sources
+        if (this.gameMode === 'creative') {
+            return 0;
+        }
+
+        // Don't take damage if already dead
+        if (!this.alive || this._health <= 0) {
+            return 0;
+        }
+
+        var healthBeforeDamage = this._health;
+        var remainingDamage = amount;
+
+        // Apply damage to stamina first, then health
+        if (this._stamina > 0) {
+            var absorbed = Math.min(this._stamina, remainingDamage);
+            var oldStaminaForDamage = this._stamina;
+            this._stamina -= absorbed;
+            remainingDamage -= absorbed;
+
+            // Emit stamina:changed event for UI systems
+            if (absorbed > 0 && EventBus) {
+                try {
+                    EventBus.emitSafe('stamina:changed', {
+                        stamina: this._stamina,
+                        maxStamina: this.maxStamina,
+                        delta: -(oldStaminaForDamage - this._stamina)
+                    });
+                } catch (e) { }
+            }
+        }
+
+        if (remainingDamage > 0) {
+            this._health -= remainingDamage;
+            this._health = Math.max(0, this._health);
+        }
+
+        // Check for death
+        if (this._health <= 0 && this.alive) {
+            this._onDeath(source);
+        }
+
+        // Emit health change event via EventBus
+        var actualDelta = healthBeforeDamage - this._health;
+        if (actualDelta > 0 && EventBus) {
+            try {
+                EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: -actualDelta
+                });
+            } catch (e) { }
+        }
+
+        return amount;
+    };
+
+    /**
+     * Heal the player by the given amount.
+     * 
+     * Clamps to [0, maxHealth] and emits `health:changed` event via EventBus.
+     * 
+     * @param {number} amount - Health points to restore.
+     * @returns {number} Actual health restored.
+     */
+    Donkeycraft.Player.prototype.heal = function (amount) {
+        if (!this.alive) {
+            return 0;
+        }
+
+        var oldHealth = this._health;
+        this._health += amount;
+        this._health = Math.min(this._health, this.maxHealth);
+
+        var delta = this._health - oldHealth;
+
+        // Emit health change event via EventBus
+        if (delta > 0 && EventBus) {
+            try {
+                EventBus.emitSafe('health:changed', {
+                    health: this._health,
+                    maxHealth: this.maxHealth,
+                    delta: delta
+                });
+            } catch (e) { }
+        }
+
+        return delta;
+    };
+
+    /**
+     * Calculate fall damage based on distance fallen.
+     * 
+     * Formula: max(0, (fallDistance - threshold) × FALL_DAMAGE_MULTIPLIER).
+     * The first 3 blocks of free fall deal no damage (vanilla Minecraft behavior).
+     * Each block beyond the threshold deals `FALL_DAMAGE_MULTIPLIER` HP of damage.
+     * 
+     * @param {number} [fallDistance=0] - Distance fallen in blocks.
+     * @returns {number} Damage dealt in HP (0 if no fall damage).
+     */
+    Donkeycraft.Player.prototype.calculateFallDamage = function (fallDistance) {
+        fallDistance = fallDistance || this.maxFallDistance;
+
+        if (fallDistance <= Config.FALL_DAMAGE_THRESHOLD) {
+            return 0;
+        }
+
+        var damage = (fallDistance - Config.FALL_DAMAGE_THRESHOLD) * Config.FALL_DAMAGE_MULTIPLIER;
+        return damage;
+    };
+
+    /**
+     * Apply fall damage based on tracked fall distance, then reset tracking.
+     * 
+     * Calculates damage using the formula: max(0, (fallDistance - 3) × FALL_DAMAGE_MULTIPLIER).
+     * Damage is applied via `takeDamage()`, which respects game mode immunity.
+     * Fall distance is always reset after calling this method.
+     * 
+     * @returns {number} Damage dealt in HP (0 if no fall damage or creative mode).
+     */
+    Donkeycraft.Player.prototype.applyFallDamage = function () {
+        var damage = this.calculateFallDamage();
+
+        if (damage > 0) {
+            this.takeDamage(damage, 'fall');
+        }
+
+        // Reset fall distance after applying damage
+        this.maxFallDistance = 0;
+
+        return damage;
+    };
+
+    /**
+     * Register a death callback that fires when the player dies.
+     * 
+     * @param {Function} callback - Function called with (deathSource) on death.
+     */
+    Donkeycraft.Player.prototype.setOnDeath = function (callback) {
+        this._onDeathCallback = callback;
+    };
+
+    /**
+     * Handle player death — triggers death event via EventBus.
+     * 
+     * @param {string} [deathSource='generic'] - Cause of death.
+     * @private
+     */
+    Donkeycraft.Player.prototype._onDeath = function (deathSource) {
+        deathSource = deathSource || 'generic';
+
+        // Mark player as dead
+        this.setAlive(false);
+
+        // Clear knockback
+        this.clearKnockback();
+
+        // Trigger death callback
+        if (this._onDeathCallback) {
+            try {
+                this._onDeathCallback(deathSource);
+            } catch (e) { }
+        }
+
+        // Emit death event via global EventBus
+        if (EventBus) {
+            try {
+                EventBus.emitSafe('player:death', {
+                    source: deathSource,
+                    health: 0,
+                    player: this
+                });
+            } catch (e) { }
+        }
+    };
+
+    // ============================================================
+    // Vitals Tick — Starvation, Regeneration, Fire Damage
+    // ============================================================
+
+    /**
+     * Tick all vitals: fire damage, stamina regeneration, starvation, natural healing.
+     * 
+     * Called every game tick by the game loop. Handles:
+     * 1. Fire damage (1 HP every 0.5s while on fire)
+     * 2. Stamina regeneration (+1 per 2s when below max)
+     * 3. Starvation damage (1 HP every 4s when food = 0, only if health <= min(5, maxHealth/2))
+     * 4. Natural regeneration (heal 1 HP at ~25% per second when food > 10)
+     * 
+     * @param {number} deltaTime - Time since last tick in seconds.
+     */
+    Donkeycraft.Player.prototype.tickVitals = function (deltaTime) {
+        if (!this.alive) {
+            return;
+        }
+
+        // Fire damage — 1 HP every 0.5 seconds while on fire
+        if (this._onFire) {
+            this._fireDamageTimer += deltaTime;
+            if (this._fireDamageTimer >= 0.5) {
+                this._fireDamageTimer = 0;
+                this.takeDamage(1, 'fire');
+            }
+        } else {
+            this._fireDamageTimer = 0;
+        }
+
+        // Stamina regeneration: +1 stamina per 2 seconds when below max (all game modes)
+        if (this._stamina < this.maxStamina) {
+            this._staminaRegenTimer += deltaTime;
+            if (this._staminaRegenTimer >= 2.0) {
+                this._staminaRegenTimer = 0;
+                this.setStamina(this._stamina + 1);
+            }
+        }
+
+        // Starvation damage: when food level = 0
+        if (this._foodLevel <= 0) {
+            this._starvationTimer += deltaTime;
+            if (this._starvationTimer >= 4.0) {
+                this._starvationTimer = 0;
+
+                // Only take starvation damage if health <= min(5, maxHealth/2)
+                var threshold = Math.min(5, this.maxHealth / 2);
+                if (this._health <= threshold) {
+                    this.takeDamage(1, 'starvation');
+                }
+            }
+        } else {
+            // Reset starvation timer when food is available
+            this._starvationTimer = 0;
+        }
+
+        // Natural regeneration: when food > 10 (of 12) and health < max
+        if (this._foodLevel > 10 && this._health < this.maxHealth) {
+            // Regen chance: ~25% per second
+            if (Math.random() < deltaTime * 0.25) {
+                this.heal(1);
+            }
+        }
+    };
+
+    // ============================================================
+    // Reset & Utility Methods
+    // ============================================================
 
     /**
      * Get the player's eye position for raycasting and camera rendering.
@@ -404,8 +1067,7 @@
      * Track maximum fall distance for fall damage calculation.
      * 
      * Call with positive deltaY values (downward displacement) to accumulate fall distance.
-     * The reset on landing is handled by Movement._tickSurvival() after collision resolution,
-     * keeping fall damage logic centralized in the Movement system.
+     * The reset on landing is handled by Movement._tickSurvival() after collision resolution.
      * 
      * Fall damage formula: `(maxFallDistance - FALL_DAMAGE_THRESHOLD) × FALL_DAMAGE_MULTIPLIER` HP
      * 
@@ -415,8 +1077,6 @@
         if (deltaY > 0) {
             this.maxFallDistance += deltaY;
         }
-        // Note: Reset on landing is handled by Movement._tickSurvival() after collision resolution.
-        // This keeps fall damage logic in one place and avoids redundant reset code.
     };
 
     /**
@@ -426,6 +1086,25 @@
      */
     Donkeycraft.Player.prototype.getFallDistance = function () {
         return this.maxFallDistance;
+    };
+
+    /**
+     * Reset all vitals to default values.
+     * 
+     * Restores health to maxHealth, stamina to full (maxStamina), food to 12, hydration to 6.
+     * Clears fire status and resets all timers. Sets alive = true.
+     */
+    Donkeycraft.Player.prototype.resetVitals = function () {
+        this._health = this.maxHealth;
+        this._stamina = this.maxStamina;
+        this._foodLevel = 12;
+        this._hydration = 6.0;
+        this._onFire = false;
+        this._fireDamageTimer = 0;
+        this._starvationTimer = 0;
+        this._staminaRegenTimer = 0;
+        this.alive = true;
+        this.maxFallDistance = 0;
     };
 
     /**
@@ -458,7 +1137,6 @@
             try {
                 this._subscribers[i](deltaTime);
             } catch (e) {
-                // Error isolation — log subscriber errors so debugging is possible
                 if (Donkeycraft.Logger) {
                     Donkeycraft.Logger.error('Subscriber error in Player tick:', e);
                 }
@@ -477,6 +1155,7 @@
         this._velocity = null;
         this._knockback = null;
         this._subscribers = [];
+        this._onDeathCallback = null;
     };
 
 })();

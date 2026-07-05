@@ -46,8 +46,7 @@
         // Audio context (shared with init-sequence AudioSystem)
         this._audioContext = null;
 
-        // Survival subsystems (health, hunger) for HUD rendering (set by setSystems())
-        this._hurtBox = null;
+        // Hunger system for HUD rendering (set by setSystems())
         this._hungerSystem = null;
 
         // Game systems (initialized in init())
@@ -670,15 +669,6 @@
             Donkeycraft.Logger.warn('Game', 'No movement system provided');
         }
 
-        // Wire up HurtBox reference into Hunger system for health-based regen/starvation
-        if (this._hungerSystem && this._hurtBox) {
-            try {
-                this._hungerSystem.setHurtBox(this._hurtBox);
-            } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'Failed to wire Hunger to HurtBox: ' + e.message);
-            }
-        }
-
         // Wire up Movement reference into Flying system for input-based speed queries
         if (this._flyingSystem && this._movementSystem) {
             // Flying already has its own input reference — no additional wiring needed
@@ -725,21 +715,10 @@
         this._blockPlacementSystem = blockPlacementSystem;
         this._interactableBlocksSystem = interactableBlocksSystem;
 
-        // Wire up HurtBox and Hunger systems (if passed as constructor functions, instantiate them)
-        if (hurtBoxConstructor && typeof hurtBoxConstructor === 'function') {
-            try {
-                this._hurtBox = new hurtBoxConstructor(this._player);
-            } catch (e) {
-                Donkeycraft.Logger.error('Game', 'HurtBox instantiation failed: ' + e.message);
-                this._hurtBox = null;
-            }
-        } else if (hurtBoxConstructor) {
-            this._hurtBox = hurtBoxConstructor;
-        }
-
+        // Instantiate Hunger system (player is the single source of truth for vitals — HurtBox deprecated)
         if (hungerConstructor && typeof hungerConstructor === 'function') {
             try {
-                this._hungerSystem = new hungerConstructor(this._player, this._hurtBox || null);
+                this._hungerSystem = new hungerConstructor(this._player);
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Hunger instantiation failed: ' + e.message);
                 this._hungerSystem = null;
@@ -1603,8 +1582,8 @@
         // 1. Flying — state management (toggle, speed queries)
         // 2. Movement — physics, gravity, swimming, collision resolution, fall damage
         // 3. Jumping — jump input, cooldown, water swimming boost
-        // 4. HurtBox — fire damage tick (applied BEFORE hunger to prevent double-heal)
-        // 5. Hunger — starvation, hydration drain, food-based regeneration
+        // 4. Player.tickVitals() — consolidated: fire damage, stamina regen, starvation, natural healing
+        //    (HurtBox.tick() and Hunger.tick() are now no-ops/delegates to player.tickVitals)
         if (this._flyingSystem) {
             try { this._flyingSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Flying tick error: ' + e.message); }
         }
@@ -1614,9 +1593,11 @@
         if (this._jumpSystem) {
             try { this._jumpSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Jump tick error: ' + e.message); }
         }
-        if (this._hurtBox) {
-            try { this._hurtBox.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'HurtBox tick error: ' + e.message); }
+        // Vitals tick — consolidated into Player.tickVitals() for single source of truth
+        if (this._player) {
+            try { this._player.tickVitals(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Player vitals tick error: ' + e.message); }
         }
+        // Hunger tick delegates to player.tickVitals() — kept for backward compat
         if (this._hungerSystem) {
             try { this._hungerSystem.tick(dt); } catch (e) { Donkeycraft.Logger.error('Game', 'Hunger tick error: ' + e.message); }
         }
@@ -2099,12 +2080,12 @@
 
         // Render GUI overlay (crosshair, HUD elements)
         if (this._renderGUI && this._guiRenderer && this._canvas) {
-            // Gather health/food values from HurtBox and Hunger systems.
+            // Gather health/food values from Player (single source of truth) and Hunger system.
             var health = 20, maxHealth = 20, food = 20, maxFood = 20;
             try {
-                if (this._hurtBox) {
-                    health = this._hurtBox.getHealth !== undefined ? this._hurtBox.getHealth() : 20;
-                    maxHealth = this._hurtBox.getMaxHealth !== undefined ? this._hurtBox.getMaxHealth() : 20;
+                if (this._player) {
+                    health = this._player.getHealth !== undefined ? this._player.getHealth() : 20;
+                    maxHealth = this._player.getMaxHealth !== undefined ? this._player.getMaxHealth() : 20;
                 }
             } catch (e) { /* ignore */ }
             try {

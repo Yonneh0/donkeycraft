@@ -66,11 +66,11 @@
     };
 
     /**
-     * Set the HurtBox reference for fall damage application.
-     * @param {Donkeycraft.HurtBox} hurtBox - HurtBox instance.
+     * Set the Player reference for fall damage application.
+     * @param {Donkeycraft.Player} player - Player instance.
      */
-    Donkeycraft.Movement.prototype.setHurtBox = function (hurtBox) {
-        this._hurtBox = hurtBox;
+    Donkeycraft.Movement.prototype.setPlayer = function (player) {
+        this._playerRef = player;
     };
 
     /**
@@ -389,9 +389,9 @@
         if (result.onGround) {
             if (anyInLava) {
                 // Landing in lava: lava does NOT absorb fall damage — apply it normally.
-                if (player.maxFallDistance > Config.FALL_DAMAGE_THRESHOLD && this._hurtBox) {
+                if (player.maxFallDistance > Config.FALL_DAMAGE_THRESHOLD && this._playerRef) {
                     try {
-                        var fallDmg = this._hurtBox.applyFallDamage();
+                        var fallDmg = this._playerRef.applyFallDamage();
                         if (fallDmg > 0) {
                             Donkeycraft.Logger.info('Movement', 'Player took ' + fallDmg.toFixed(1) + ' fall damage');
                         }
@@ -406,9 +406,9 @@
                 player.maxFallDistance = 0;
             } else {
                 // Landing on solid ground: apply fall damage if threshold exceeded.
-                if (player.maxFallDistance > Config.FALL_DAMAGE_THRESHOLD && this._hurtBox) {
+                if (player.maxFallDistance > Config.FALL_DAMAGE_THRESHOLD && this._playerRef) {
                     try {
-                        var fallDmg2 = this._hurtBox.applyFallDamage();
+                        var fallDmg2 = this._playerRef.applyFallDamage();
                         if (fallDmg2 > 0) {
                             Donkeycraft.Logger.info('Movement', 'Player took ' + fallDmg2.toFixed(1) + ' fall damage');
                         }

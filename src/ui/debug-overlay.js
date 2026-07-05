@@ -785,13 +785,13 @@
     Donkeycraft.DebugOverlay.prototype._onDebugControlClick = function (action, args) {
         var self2 = this;
 
-        // Helper: get the HurtBox instance (global or via game)
-        var hurtBox = null;
+        // Helper: get the Player instance (global or via game) — Player is the single source of truth for vitals
+        var player = null;
         try {
-            if (typeof Donkeycraft !== 'undefined' && Donkeycraft._hurtBox) {
-                hurtBox = Donkeycraft._hurtBox;
-            } else if (window._dkGame && window._dkGame._hurtBox) {
-                hurtBox = window._dkGame._hurtBox;
+            if (typeof Donkeycraft !== 'undefined' && Donkeycraft._playerInstance) {
+                player = Donkeycraft._playerInstance;
+            } else if (window._dkGame && window._dkGame._player) {
+                player = window._dkGame._player;
             }
         } catch (e) { }
 
@@ -834,9 +834,9 @@
 
         switch (action) {
             case 'health': {
-                if (!hurtBox) { Donkeycraft.Logger.warn('DebugOverlay', 'HurtBox not available'); break; }
-                var currentHealth = hurtBox._health !== undefined ? hurtBox._health : 20;
-                var maxHealth = hurtBox.maxHealth || 20;
+                if (!player) { Donkeycraft.Logger.warn('DebugOverlay', 'Player not available'); break; }
+                var currentHealth = player.getHealth() !== undefined ? player.getHealth() : 20;
+                var maxHealth = player.getMaxHealth() || 20;
                 var newHealth = currentHealth;
 
                 if (parsedArgs === 'full') {
@@ -847,21 +847,11 @@
                     newHealth = currentHealth + parsedArgs;
                 }
 
-                // Clamp to [0, maxHealth]
+                // Clamp to [0, maxHealth] and apply directly to Player
                 newHealth = Math.max(0, Math.min(maxHealth, Math.round(newHealth)));
 
-                hurtBox._health = newHealth;
+                player.heal(newHealth - currentHealth); // heal() handles both healing and damage
 
-                // Emit health change event for UI updates
-                if (Donkeycraft.EventBus) {
-                    try {
-                        Donkeycraft.EventBus.emitSafe('health:changed', {
-                            health: newHealth,
-                            maxHealth: maxHealth,
-                            delta: newHealth - currentHealth
-                        });
-                    } catch (e) { }
-                }
                 refreshDebug();
                 break;
             }
@@ -909,13 +899,13 @@
             }
 
             case 'stamina': {
-                if (!hurtBox) { Donkeycraft.Logger.warn('DebugOverlay', 'HurtBox not available'); break; }
-                var currentAbs = hurtBox.getStamina();
+                if (!player) { Donkeycraft.Logger.warn('DebugOverlay', 'Player not available'); break; }
+                var currentAbs = player.getStamina();
                 var newAbs = currentAbs;
 
                 if (parsedArgs === 'full') {
                     // Set to max stamina (100 points)
-                    newAbs = hurtBox.maxStamina || 100;
+                    newAbs = player.getMaxStamina() || 100;
                 } else if (parsedArgs === 'empty') {
                     newAbs = 0;
                 } else if (typeof parsedArgs === 'number') {
@@ -923,9 +913,9 @@
                 }
 
                 // Clamp to [0, maxStamina]
-                newAbs = Math.min(hurtBox.maxStamina || 100, Math.max(0, Math.round(newAbs)));
+                newAbs = Math.min(player.getMaxStamina() || 100, Math.max(0, Math.round(newAbs)));
 
-                hurtBox.setStamina(newAbs);
+                player.setStamina(newAbs);
                 refreshDebug();
                 break;
             }
