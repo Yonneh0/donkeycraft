@@ -52,6 +52,15 @@
     var MAX_RENDER_DISTANCE = 64;
 
     /**
+     * Default color for entities with invalid/unparseable color strings.
+     * Magenta (#FF00FF) is used as the standard debug/missing-texture color
+     * in game engines, making configuration errors visually obvious.
+     * @constant {string}
+     * @default "#FF00FF"
+     */
+    var DEFAULT_INVALID_COLOR = '#FF00FF';
+
+    /**
      * Frustum forward-facing check factor — dot product threshold for culling
      * entities that are within range but behind or to the side of the camera view.
      * The dot product of (entityDirection, cameraForward) ranges from -1 (directly behind)
@@ -73,14 +82,6 @@
     var FRUSTUM_MIN_DISTANCE = 0.001;
 
     /**
-     * Vertex component stride for entity meshes — number of floats per vertex
-     * (position: 3, normal: 3, UV: 2).
-     * @constant {number}
-     * @default 8
-     */
-    var VERTEX_COMPONENT_STRIDE = 8;
-
-    /**
      * Bytes per float in WebGL.
      * @constant {number}
      * @default 4
@@ -88,18 +89,19 @@
     var BYTES_PER_FLOAT = 4;
 
     /**
+     * Vertex byte stride — total bytes per vertex including all components.
+     * Computed from position (3) + normal (3) + UV (2) = 8 floats × 4 bytes.
+     * @constant {number}
+     * @default 32
+     */
+    var VERTEX_BYTE_STRIDE = 8 * BYTES_PER_FLOAT;
+
+    /**
      * Number of indices per triangle (vertices).
      * @constant {number}
      * @default 3
      */
     var INDICES_PER_TRIANGLE = 3;
-
-    /**
-     * Vertex byte stride — total bytes per vertex including all components.
-     * @constant {number}
-     * @default 32 (8 floats × 4 bytes)
-     */
-    var VERTEX_BYTE_STRIDE = VERTEX_COMPONENT_STRIDE * BYTES_PER_FLOAT;
 
     // ============================================================
     // Entity Mesh Builder — Generates simple blocky entity meshes
@@ -200,7 +202,9 @@
      * var mesh = Donkeycraft.EntityMeshBuilder.createCylinderMesh(0.1, 0.7, 8);
      */
     Donkeycraft.EntityMeshBuilder.createCylinderMesh = function (radius, height, segments) {
-        segments = segments || 8;
+        // Use explicit null check so that passing 0 segments is handled gracefully
+        // rather than silently defaulting to 8.
+        segments = segments != null ? segments : 8;
         var vertices = [];
         var indices = [];
 
@@ -515,25 +519,49 @@
     }
 
     /**
+     * _toArray — Convert an iterable (Array, Set, Map, or other list-like object)
+     * to a plain Array. This ensures compatibility with EntityManager implementations
+     * that may return Sets or Maps from getNearEntities/getFarEntities.
+     * @private
+     * @param {*} iterable - Value to convert to an array.
+     * @returns {Array} Plain array containing the same elements, or empty array if null/undefined.
+     */
+    function _toArray(iterable) {
+        if (iterable == null) return [];
+        if (Array.isArray(iterable)) return iterable;
+        if (iterable instanceof Set) return Array.from(iterable);
+        if (iterable instanceof Map) {
+            var result = [];
+            iterable.forEach(function (v) { result.push(v); });
+            return result;
+        }
+        // Fallback: assume array-like (has length property)
+        if (typeof iterable.length === 'number') {
+            return Array.prototype.slice.call(iterable);
+        }
+        return [];
+    }
+
+    /**
      * _normalizeMeshKey — Generate a robust cache key from mesh type and dimensions.
-     * Rounds floating-point values to 3 decimal places to avoid precision-based cache misses
-     * while preserving enough granularity for visually correct mesh selection.
+     * Rounds floating-point values to 4 decimal places to avoid precision-based cache misses
+     * while preserving visually significant differences in mesh dimensions (0.0001 resolution).
      * @private
      * @param {string} meshType - Mesh type ('box' or 'cylinder').
      * @param {Object} dimensions - Dimension properties (w/h/d for boxes, r/h for cylinders).
      * @returns {string} Normalized cache key string.
      */
     function _normalizeMeshKey(meshType, dimensions) {
-        // Round to 3 decimal places to avoid floating-point precision issues
+        // Round to 4 decimal places to avoid floating-point precision issues
         // while preserving visually significant differences in mesh dimensions.
-        var round3 = function (v) { return Math.round(v * 1000) / 1000; };
+        var round4 = function (v) { return Math.round(v * 10000) / 10000; };
 
         if (meshType === 'box') {
             var d = dimensions || {};
-            return 'box:' + round3(d.w || 1) + ':' + round3(d.h || 1) + ':' + round3(d.d || 1);
+            return 'box:' + round4(d.w || 1) + ':' + round4(d.h || 1) + ':' + round4(d.d || 1);
         } else if (meshType === 'cylinder') {
             var dim = dimensions || {};
-            return 'cyl:' + round3(dim.r || 0.1) + ':' + round3(dim.h || 1);
+            return 'cyl:' + round4(dim.r || 0.1) + ':' + round4(dim.h || 1);
         }
         return meshType + ':unknown';
     }
@@ -621,9 +649,9 @@
         this.enableAlphaBlending = false;
 
         /**
-         * Statistics: total entities rendered last frame (updated each render call).
-         * Note: This counts individual entity instances drawn, not body parts or draw calls.
-         * For part-level statistics, use getStats() which returns accurate per-frame data.
+         * Statistics: total entity instances rendered last frame (updated each render call).
+         * This counts individual entities drawn, not body parts or draw calls.
+         * For complete per-frame statistics including cached mesh count, use getStats().
          * @type {number}
          */
         this.entitiesRendered = 0;
@@ -714,13 +742,36 @@
 
         if (!meshData) return null;
 
-        // Create vertex buffer object (VBO)
+        // Validate mesh data has non-empty vertex and index arrays before GPU upload.
+        if (!meshData.vertices || meshData.vertices.length === 0 ||
+            !meshData.indices || meshData.indices.length === 0) {
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityRenderer', 'Empty mesh data for key "' + key + '" — skipping GPU upload.');
+            }
+            return null;
+        }
+
+        // Create vertex buffer object (VBO) with error checking.
         var vbo = gl.createBuffer();
+        if (!vbo) {
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityRenderer', 'gl.createBuffer() failed for VBO — context may be lost.');
+            }
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
         gl.bufferData(gl.ARRAY_BUFFER, meshData.vertices, gl.STATIC_DRAW);
 
-        // Create index buffer object (IBO)
+        // Create index buffer object (IBO) with error checking.
         var ibo = gl.createBuffer();
+        if (!ibo) {
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityRenderer', 'gl.createBuffer() failed for IBO — context may be lost.');
+            }
+            // Clean up VBO to prevent GPU memory leak
+            gl.deleteBuffer(vbo);
+            return null;
+        }
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, meshData.indices, gl.STATIC_DRAW);
 
@@ -851,12 +902,14 @@
      * @returns {{r: number, g: number, b: number}} RGB values in [0, 1] range.
      */
     Donkeycraft.EntityRenderer.prototype._parseHexColor = function (color) {
-        // Default to black for invalid colors — invisible rather than masking bugs with mid-gray.
-        var DEFAULT_RED = 0, DEFAULT_GREEN = 0, DEFAULT_BLUE = 0;
+        // Default to magenta (#FF00FF) for invalid colors — the standard debug/missing-texture
+        // color in game engines. This makes configuration errors visually obvious rather than
+        // producing invisible entities that are hard to debug.
+        var DEFAULT_RED = 1, DEFAULT_GREEN = 0, DEFAULT_BLUE = 1;
 
         if (!color || typeof color !== 'string' || color.charAt(0) !== '#') {
             if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-                Donkeycraft.Logger.warn('EntityRenderer', 'Invalid color string "' + color + '" — rendering as black.');
+                Donkeycraft.Logger.warn('EntityRenderer', 'Invalid color string "' + color + '" — rendering as magenta (#FF00FF).');
             }
             return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
         }
@@ -871,7 +924,7 @@
             // Validate that all hex pairs are valid
             if (isNaN(red) || isNaN(green) || isNaN(blue)) {
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color "' + color + '" — rendering as black.');
+                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color "' + color + '" — rendering as magenta (#FF00FF).');
                 }
                 return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
             }
@@ -884,7 +937,7 @@
             // Validate that all hex pairs are valid
             if (isNaN(r2) || isNaN(g2) || isNaN(b2)) {
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid shorthand hex color "' + color + '" — rendering as black.');
+                    Donkeycraft.Logger.warn('EntityRenderer', 'Invalid shorthand hex color "' + color + '" — rendering as magenta (#FF00FF).');
                 }
                 return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
             }
@@ -893,7 +946,7 @@
 
         // Invalid length
         if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-            Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as black.');
+            Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as magenta (#FF00FF).');
         }
         return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
     };
@@ -1018,10 +1071,10 @@
         // result = proj × view
         var m = new Float32Array(16);
         for (var j = 0; j < 4; j++) {
-            m[j]     = projData[0] * viewData[j]   + projData[4] * viewData[j+4]   + projData[8] * viewData[j+8]   + projData[12] * viewData[j+12];
-            m[j+4]   = projData[1] * viewData[j]   + projData[5] * viewData[j+4]   + projData[9] * viewData[j+8]   + projData[13] * viewData[j+12];
-            m[j+8]   = projData[2] * viewData[j]   + projData[6] * viewData[j+4]   + projData[10] * viewData[j+8]  + projData[14] * viewData[j+12];
-            m[j+12]  = projData[3] * viewData[j]   + projData[7] * viewData[j+4]   + projData[11] * viewData[j+8]  + projData[15] * viewData[j+12];
+            m[j] = projData[0] * viewData[j] + projData[4] * viewData[j + 4] + projData[8] * viewData[j + 8] + projData[12] * viewData[j + 12];
+            m[j + 4] = projData[1] * viewData[j] + projData[5] * viewData[j + 4] + projData[9] * viewData[j + 8] + projData[13] * viewData[j + 12];
+            m[j + 8] = projData[2] * viewData[j] + projData[6] * viewData[j + 4] + projData[10] * viewData[j + 8] + projData[14] * viewData[j + 12];
+            m[j + 12] = projData[3] * viewData[j] + projData[7] * viewData[j + 4] + projData[11] * viewData[j + 8] + projData[15] * viewData[j + 12];
         }
 
         // Extract 6 frustum planes from the combined matrix.
@@ -1087,13 +1140,13 @@
      * @param {number} cy - Box center Y.
      * @param {number} cz - Box center Z.
      * @param {number} halfW - Half-width (X extent).
-     * @param {number} halfH - Full height; halfH = halfH / 2 for Y extent.
+     * @param {number} fullH - Full height of the box (internally divided by 2 for Y extent).
      * @param {number} halfD - Half-depth (Z extent).
      * @param {Array<{nx:number, ny:number, nz:number, d:number}>} planes - Frustum planes from _extractFrustumPlanes.
      * @returns {boolean} True if the box intersects the frustum.
      */
-    Donkeycraft.EntityRenderer.prototype._isAABBInFrustum = function (cx, cy, cz, halfW, halfH, halfD, planes) {
-        var halfH2 = halfH / 2;
+    Donkeycraft.EntityRenderer.prototype._isAABBInFrustum = function (cx, cy, cz, halfW, fullH, halfD, planes) {
+        var halfH2 = fullH / 2;
 
         // For each plane, check if all 8 AABB corners are on the negative side.
         for (var i = 0; i < planes.length; i++) {
@@ -1147,13 +1200,14 @@
         if (distSq > renderDistSq) return false;
 
         // Stage 2: Forward-facing check — cull entities behind the camera.
-        var forward = this._camera.getForwardDirection && this._camera.getForwardDirection();
-        if (forward) {
+        // Store in `camForward` for reuse in Stage 3 fallback to avoid redundant call.
+        var camForward = this._camera.getForwardDirection && this._camera.getForwardDirection();
+        if (camForward) {
             var dist = Math.sqrt(distSq);
             // Only apply forward-facing check for entities beyond minimum distance
             // to avoid division by near-zero and prevent culling adjacent entities.
             if (dist > FRUSTUM_MIN_DISTANCE) {
-                var dot = (dx * forward.x + dy * forward.y + dz * forward.z) / dist;
+                var dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / dist;
                 if (dot < FRUSTUM_FORWARD_THRESHOLD) return false;
             }
         }
@@ -1176,14 +1230,14 @@
             // simplified angle check relative to the camera's forward direction.
             // This is less accurate than full frustum testing but prevents rendering
             // entities that are clearly outside the viewing cone.
-            var forward = this._camera.getForwardDirection && this._camera.getForwardDirection();
-            if (forward) {
+            // Reuse camForward from Stage 2 to avoid redundant call.
+            if (camForward) {
                 var horizDist = Math.sqrt(dx * dx + dz * dz);
                 // Compute dot product of entity direction and camera forward direction.
                 // When dot > 0, entity is in front of camera; when dot < 0, behind.
                 var entDist = Math.sqrt(horizDist * horizDist + dy * dy);
                 if (entDist > FRUSTUM_MIN_DISTANCE) {
-                    var dot = (dx * forward.x + dy * forward.y + dz * forward.z) / entDist;
+                    var dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / entDist;
                     // If the entity is beyond a wide angle threshold from camera forward,
                     // cull it. Using a generous threshold to compensate for lack of
                     // proper frustum plane testing.
@@ -1202,23 +1256,21 @@
      * Far-to-near sorting ensures transparent entities render correctly and distant
      * entities are drawn first for better depth buffer coverage.
      *
-     * When the camera is unavailable, returns an empty array since distance-based
-     * sorting cannot be performed without a reference point.
+     * When the camera is unavailable, returns all alive entities unsorted (with distSq = 0)
+     * so that rendering still proceeds — just without distance-based ordering.
      *
      * @private
      * @param {Array<number>} entityIds - Array of entity IDs to sort.
-     * @returns {Array<{id: number, distSq: number}>} Sorted array (far to near), filtered by render distance. Empty if camera unavailable.
+     * @returns {Array<{id: number, distSq: number}>} Sorted array (far to near), filtered by render distance. Unsorted alive entities if camera unavailable.
      */
     Donkeycraft.EntityRenderer.prototype._sortEntitiesByDistance = function (entityIds) {
-        // Return empty array when camera is unavailable — distance sorting requires
-        // a reference point. The caller should handle this gracefully.
-        if (!this._camera || !this._camera.getPosition) {
-            return [];
-        }
+        var camPos = null;
 
-        var camPos = this._camera.getPosition();
-        if (!camPos) {
-            return [];
+        // Try to get camera position for distance-based sorting.
+        // If no camera is available, return all alive entities unsorted so rendering
+        // still proceeds (prevents the "no camera = nothing renders" bug).
+        if (this._camera && this._camera.getPosition) {
+            camPos = this._camera.getPosition();
         }
 
         var renderDistSq = this.renderDistance * this.renderDistance;
@@ -1231,19 +1283,27 @@
             var pos = entity.getPosition();
             if (!pos) continue;
 
-            var dx = pos.x - camPos.x;
-            var dy = pos.y - camPos.y;
-            var dz = pos.z - camPos.z;
-            var distSq = dx * dx + dy * dy + dz * dz;
+            var distSq = 0;
 
-            // Filter by render distance — only include entities within range
-            if (distSq <= renderDistSq) {
-                result.push({ id: entityIds[i], distSq: distSq });
+            if (camPos) {
+                // Compute distance from camera for sorting.
+                var dx = pos.x - camPos.x;
+                var dy = pos.y - camPos.y;
+                var dz = pos.z - camPos.z;
+                distSq = dx * dx + dy * dy + dz * dz;
+
+                // Filter by render distance — only include entities within range
+                if (distSq > renderDistSq) continue;
             }
+
+            result.push({ id: entityIds[i], distSq: distSq });
         }
 
-        // Sort far to near (descending distance)
-        result.sort(function (a, b) { return b.distSq - a.distSq; });
+        // Sort far to near (descending distance) when camera is available.
+        // When no camera is available, return unsorted since all distSq values are 0.
+        if (camPos) {
+            result.sort(function (a, b) { return b.distSq - a.distSq; });
+        }
 
         return result;
     };
@@ -1252,8 +1312,9 @@
      * _applyRenderState — Apply common WebGL render state for entity rendering.
      * Saves the current WebGL state so it can be restored via _restoreRenderState().
      * Enables depth testing and face culling unconditionally; alpha blending is
-     * controlled by the alphaEnabled parameter. Depth write mask is explicitly read
-     * and restored.
+     * controlled by the alphaEnabled parameter. Depth write mask is set based on
+     * alpha blending: disabled when alpha is enabled (to prevent z-fighting on
+     * transparent surfaces), enabled otherwise.
      *
      * If a WebGL state query fails (indicating a lost or invalid context), defaults
      * are assumed rather than silently swallowing the error — this makes context
@@ -1290,8 +1351,14 @@
         gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
 
-        // Ensure depth writing is enabled
-        gl.depthMask(true);
+        // Disable depth write when alpha blending is enabled to prevent z-fighting
+        // on transparent surfaces. Transparent fragments should sort by depth but
+        // not overwrite depth values of fragments behind them.
+        if (alphaEnabled) {
+            gl.depthMask(false);
+        } else {
+            gl.depthMask(true);
+        }
 
         // Optionally enable alpha blending for transparent entities
         if (alphaEnabled) {
@@ -1389,8 +1456,25 @@
         var partsRendered = 0;
         var drawCalls = 0;
 
+        // Cache bone lookup: build a Map from bone name to definition for O(1) lookup.
+        // This avoids O(n^2) linear searches when iterating shapeDefs × bones array.
+        var boneMap = null;
+        if (bones && Array.isArray(bones)) {
+            boneMap = new Map();
+            for (var bi = 0; bi < bones.length; bi++) {
+                boneMap.set(bones[bi].name, bones[bi]);
+            }
+        }
+
         for (var i = 0; i < shapeDefs.length; i++) {
             var shapeDef = shapeDefs[i];
+
+            // Warn if bone definition is not found in entity's bones array.
+            // This helps debug missing or mismatched bone configurations.
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function'
+                && boneMap !== null && !boneMap.has(shapeDef.name)) {
+                Donkeycraft.Logger.warn('EntityRenderer', 'Bone "' + shapeDef.name + '" not found in entity "' + entity.type + '" — using default offset/pivot.');
+            }
 
             // Get or build mesh cache for this body part
             var meshCache = this._getOrBuildMesh(shapeDef);
@@ -1494,34 +1578,24 @@
         }
 
         try {
-            // Get entities to render based on awareness tier (cached to avoid double calls)
+            // Get entities to render based on awareness tier.
+            // Convert Set/Map returns from EntityManager to arrays for compatibility.
             var nearRaw = this._entityManager.getNearEntities();
-            var nearIds = Array.isArray(nearRaw) ? nearRaw : [];
             var farRaw = this._entityManager.getFarEntities();
-            var farIds = Array.isArray(farRaw) ? farRaw : [];
+            var nearIds = _toArray(nearRaw);
+            var farIds = _toArray(farRaw);
 
-            // Combine entity IDs from both tiers, respecting the render limit
-            var maxEntities = this.maxRenderEntities;
-            var totalCandidates = Math.min(nearIds.length + farIds.length, maxEntities);
-            var allIds = new Array(totalCandidates);
+            // Combine entity IDs from both tiers — collect ALL candidates first,
+            // THEN sort by distance, THEN cap to maxRenderEntities. This prevents
+            // flickering caused by pre-sort truncation which biased toward NEAR tier.
+            var allIds = nearIds.concat(farIds);
 
-            var idx = 0;
-            for (var i = 0; i < nearIds.length && idx < maxEntities; i++) {
-                allIds[idx++] = nearIds[i];
-            }
-            for (var j = 0; j < farIds.length && idx < maxEntities; j++) {
-                allIds[idx++] = farIds[j];
-            }
-            // Trim array to actual count (handles case where totalCandidates was capped)
-            if (idx < allIds.length) {
-                allIds.length = idx;
-            }
-
-            // Sort by distance from camera (far to near), filtered by render distance
+            // Sort by distance from camera (far to near), filtered by render distance.
+            // _sortEntitiesByDistance handles the render distance filter internally.
             var sorted = this._sortEntitiesByDistance(allIds);
 
-            // Limit to max entities
-            var renderList = sorted.slice(0, maxEntities);
+            // Cap to max entities AFTER sorting so the farthest entities are preferred.
+            var renderList = sorted.slice(0, this.maxRenderEntities);
 
             // Render each entity
             for (var k = 0; k < renderList.length; k++) {
@@ -1548,6 +1622,7 @@
      *
      * Useful for rendering a specific entity without going through the full batch pipeline,
      * such as highlighting a selected entity or rendering a debug representation.
+     * Activates the terrain shader program before rendering.
      * WebGL state is saved before rendering and restored afterward via try-finally.
      *
      * @param {Donkeycraft.Entity} entity - Entity to render. Must be alive (isAlive() returns true).
@@ -1556,6 +1631,12 @@
         if (!this._gl || !entity || !entity.isAlive() || this._contextLost) return;
 
         var gl = this._gl;
+        var shaderManager = this._shaderManager;
+
+        // Activate terrain shader for entity rendering
+        if (shaderManager) {
+            shaderManager.use('terrain');
+        }
 
         // Apply render state (saves previous state for restoration)
         this._applyRenderState(this.enableAlphaBlending);
