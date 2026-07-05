@@ -160,6 +160,7 @@ src/                # Sauce
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
     entity.js             # Base entity class with animation and bone support
+    entity-ai.js          # A* pathfinding, line-of-sight
     entity-engine.js      # Animation clips, skeletal animation, kinematics, skeleton templates
     entity-manager.js     # Entity lifecycle, spatial hash, awareness tiers
     experience.js         # XP levels and orbs
@@ -170,7 +171,6 @@ src/                # Sauce
     interactable-blocks.js# Right-click interactions (doors, chests, etc.)
     jumping.js            # Jump mechanics
     lighting-engine.js    # Block light propagation (BFS flood fill)
-    mob-ai.js             # A* pathfinding, line-of-sight
     movement.js           # Walking, sprinting, swimming, flying speeds
     observers.js          # Observer blocks
     passive-mobs.js       # Cow, pig, sheep, chicken

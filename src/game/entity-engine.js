@@ -1,98 +1,53 @@
-// Donkeycraft — Entity Engine
-// Handles individual entity animations, movement kinematics, bone transforms, and state machines.
-// Provides lifelike fluid animations for entities via keyframe-based skeletal animation
-// and semi-implicit Euler integration for physics.
+﻿// Donkeycraft — Entity Engine
+// Handles entity animations, movement kinematics, bone transforms, and state machines.
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
     if (!Donkeycraft) return;
 
-    // ============================================================
-    // Constants — Animation and physics tuning parameters
-    // ============================================================
-
     /**
-     * Default Catmull-Rom tension parameter for spline interpolation.
-     * 0 = loose curves, 0.5 = standard Catmull-Rom, 1 = tight curves.
+     * Catmull-Rom tension parameter for spline interpolation (0=loose, 0.5=standard, 1=tight).
      * @constant {number}
-     * @default 0.5
      */
     var CATMULL_ROM_TENSION = 0.5;
 
-    /**
-     * Default animation transition duration in seconds.
-     * @constant {number}
-     * @default 0.2
-     */
+    /** Default animation transition duration in seconds. */
     var DEFAULT_TRANSITION_DURATION = 0.2;
 
-    /**
-     * Default animation playback speed multiplier.
-     * @constant {number}
-     * @default 1.0
-     */
+    /** Default animation playback speed multiplier. */
     var DEFAULT_ANIMATION_SPEED = 1.0;
 
-    /**
-     * Minimum delta time for physics updates (prevents physics explosions on tab switch).
-     * @constant {number}
-     * @default 0.1
-     */
+    /** Maximum delta time for physics updates (prevents physics explosions on tab switch). */
     var MAX_DELTA_TIME = 0.1;
 
-    /**
-     * Default ground friction damping factor per second.
-     * @constant {number}
-     * @default 0.85
-     */
+    /** Ground friction damping factor per second. */
     var DEFAULT_GROUND_FRICTION = 0.85;
 
-    /**
-     * Default air damping factor per second (1.0 = no damping).
-     * @constant {number}
-     * @default 0.98
-     */
+    /** Air damping factor per second (1.0 = no damping). */
     var DEFAULT_AIR_DAMPING = 0.98;
 
-    /**
-     * Default gravity constant in blocks/second² (negative = downward).
-     * @constant {number}
-     * @default -20.0
-     */
+    /** Gravity constant in blocks/second² (negative = downward). */
     var DEFAULT_GRAVITY = -20.0;
 
-    /**
-     * Terminal velocity in blocks/second (minimum Y velocity — max fall speed).
-     * @constant {number}
-     * @default -60.0
-     */
+    /** Terminal velocity in blocks/second (max fall speed). */
     var TERMINAL_VELOCITY = -60.0;
 
-    /**
-     * Default jump impulse velocity in blocks/second upward.
-     * @constant {number}
-     * @default 8.0
-     */
+    /** Jump impulse velocity in blocks/second upward. */
     var JUMP_VELOCITY = 8.0;
 
-    /**
-     * Maximum jump cooldown duration in seconds.
-     * @constant {number}
-     * @default 0.1
-     */
+    /** Maximum jump cooldown duration in seconds. */
     var MAX_JUMP_COOLDOWN = 0.1;
 
     // ============================================================
-    // Animation System — Keyframe-based skeletal animation with cubic Hermite interpolation
+    // Animation System — Keyframe-based skeletal animation
     // ============================================================
 
     /**
      * AnimationClip — Defines a single animation with bone keyframes.
-     * Each keyframe specifies rotation (in radians) for specific bones at a given time.
-     * Uses Catmull-Rom splines for smooth C1-continuous interpolation between keyframes.
+     * Uses Catmull-Rom splines for smooth interpolation between keyframes.
      * @constructor
-     * @param {string} name - Animation name (e.g., 'walk', 'idle', 'run').
+     * @param {string} name - Animation name (e.g., 'idle', 'walk', 'run').
      * @param {number} duration - Animation duration in seconds.
      * @param {boolean} [loop=true] - Whether the animation loops.
      * @param {Object.<string, Array>} keyframes - Map of bone name to array of {time, rx, ry, rz}.
@@ -136,9 +91,7 @@
 
     /**
      * _computeTangents — Pre-compute Catmull-Rom tangents for each bone's keyframe array.
-     * For Catmull-Rom splines, the tangent in and tangent out at each knot are equal,
-     * which produces a smooth C1-continuous curve passing through all control points.
-     * Validates that keyframe times are strictly increasing to prevent division-by-zero.
+     * Validates that keyframe times are strictly increasing.
      * @private
      */
     Donkeycraft.AnimationClip.prototype._computeTangents = function () {
@@ -153,7 +106,7 @@
                 for (var v = 1; v < kf.length; v++) {
                     if (kf[v].time <= kf[v - 1].time) {
                         if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-                            Donkeycraft.Logger.warn('AnimationClip', 'Keyframe times for bone "' + boneName + '" are not strictly increasing — animation may behave unexpectedly.');
+                            Donkeycraft.Logger.warn('AnimationClip', 'Keyframe times for bone "' + boneName + '" are not strictly increasing.');
                         }
                         break;
                     }
@@ -166,9 +119,8 @@
 
                 var dt = (next.time - prev.time);
                 if (dt === 0) {
-                    dt = 1.0; // Prevent division by zero when keyframes share the same time
+                    dt = 1.0;
                 }
-
 
                 tangents.push({
                     tangentIn: {
@@ -190,12 +142,8 @@
 
     /**
      * Evaluate bone rotations at a given time using cubic Hermite interpolation.
-     * Uses the pre-computed Catmull-Rom tangents to produce smooth, C1-continuous
-     * interpolation between keyframe rotations.
-     * @param {number} time - Current animation time in seconds (will be wrapped to duration if looping).
+     * @param {number} time - Current animation time in seconds (wrapped to duration if looping).
      * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Interpolated rotation per bone name.
-     *   Each bone present in the clip's keyframes will have an entry; bones without keyframes
-     *   at this time will return {rx: 0, ry: 0, rz: 0}.
      */
     Donkeycraft.AnimationClip.prototype.evaluate = function (time) {
         var result = {};
@@ -252,7 +200,7 @@
     };
 
     // ============================================================
-    // Animation State Machine — Manages animation transitions and blending
+    // Animation State Machine
     // ============================================================
 
     /**
@@ -303,6 +251,12 @@
     /**
      * AnimationStateMachine — Manages animation states, transitions, and blending.
      * @constructor
+     * @property {Object.<string, Donkeycraft.AnimationState>} _states - Registered animation states.
+     * @property {string|null} _activeState - Currently active state name.
+     * @property {Donkeycraft.AnimationState|null} _previousState - Previous state for blending.
+     * @property {number} _transitionTime - Time spent in current transition.
+     * @property {Object.<string, {rx: number, ry: number, rz: number}>} _boneTransforms - Cached bone transforms.
+     * @property {Array<string>} _allBones - All tracked bone names.
      */
     Donkeycraft.AnimationStateMachine = function () {
         /**
@@ -369,8 +323,6 @@
 
     /**
      * setState — Switch to a named animation state with optional transition.
-     * Saves the previous state's current time so the transition blends smoothly
-     * from where that animation left off, rather than from its beginning.
      * @param {string} name - Target state name.
      * @param {number} [transitionDuration=0.2] - Transition time in seconds.
      */
@@ -402,11 +354,8 @@
 
     /**
      * tick — Update animation state machine for one frame.
-     * Advances the active animation time, handles loop wrapping, and blends
-     * between the previous and current state during transitions.
      * @param {number} deltaTime - Time since last frame in seconds.
      * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Interpolated bone transforms.
-     *   Returns an empty object if no active state is set.
      */
     Donkeycraft.AnimationStateMachine.prototype.tick = function (deltaTime) {
         if (!this._activeState || !this._states[this._activeState]) {
@@ -429,29 +378,22 @@
         // Evaluate current state animation
         var currentTransforms = active.clip ? active.clip.evaluate(active.time) : {};
 
-        // Handle transition blending — smooth crossfade from previous state to current state.
-        // blendT progresses from 0 (start) to 1 (end of transition).
-        // At blendT=0: result is 100% current state (previous state's last frame).
-        // At blendT=1: result is 100% previous state (transition complete).
-        // The blend ensures no visual popping during state changes.
+        // Handle transition blending — smooth crossfade from previous to current state.
         if (prev && prev.clip && this._transitionTime < prev.transitionDuration) {
             this._transitionTime += deltaTime;
             var blendT = Math.min(1, this._transitionTime / prev.transitionDuration);
 
-            // Evaluate previous state at its current play time (advanced independently).
+            // Evaluate previous state at its current play time.
             var prevTransforms = prev.clip.evaluate(prev.clip.loop ?
                 ((prev.time % prev.clip.duration) + prev.clip.duration) % prev.clip.duration :
                 Math.min(prev.time, prev.clip.duration));
 
-            // Advance previous animation time during transition for smooth playback.
+            // Advance previous animation time during transition.
             if (prev.time !== undefined) {
                 prev.time += deltaTime * (prev.speed || DEFAULT_ANIMATION_SPEED);
             }
 
             // Blend: current fades IN as blendT goes 0→1, previous fades OUT.
-            // Formula: result = current * blendT + previous * (1 - blendT)
-            // At blendT=0: 100% previous (seamless handoff from previous tick).
-            // At blendT=1: 100% current (transition complete).
             for (var i = 0; i < this._allBones.length; i++) {
                 var bn = this._allBones[i];
                 var curr = currentTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
@@ -465,8 +407,6 @@
             }
         } else {
             // No transition — use current transforms directly.
-            // Build a fresh object with all tracked bones set to zero if not animated,
-            // preventing stale transforms from persisting across state changes.
             this._boneTransforms = {};
             for (var j = 0; j < this._allBones.length; j++) {
                 var boneName = this._allBones[j];
@@ -484,7 +424,7 @@
     };
 
     // ============================================================
-    // Bone Hierarchy — Skeletal bone definitions and hierarchy
+    // Bone Hierarchy
     // ============================================================
 
     /**
@@ -525,20 +465,16 @@
     };
 
     // ============================================================
-    // Skeleton Database — Pre-defined skeleton templates for entity types
+    // Skeleton Templates
     // ============================================================
 
     /**
      * SkeletonTemplates — Pre-defined skeleton definitions for common entity types.
-     * Each template defines a hierarchy of bones with offsets and pivots.
      * @type {Object.<string, Array<Donkeycraft.BoneDefinition>>}
      */
     Donkeycraft.SkeletonTemplates = {
 
-        /**
-         * Bipedal skeleton — For humanoid entities (player, zombies, skeletons, etc.).
-         * Bones: root → spine → head, leftArm, rightArm; spine → leftLeg, rightLeg.
-         */
+        /** Bipedal skeleton — For humanoid entities. */
         bipedal: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
             new Donkeycraft.BoneDefinition('spine', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
@@ -549,10 +485,7 @@
             new Donkeycraft.BoneDefinition('rightLeg', { parent: 'root', offset: new Donkeycraft.Vector3(0.2, 0, 0), pivot: new Donkeycraft.Vector3(0.1, 0.45, 0) })
         ],
 
-        /**
-         * Quadruped skeleton — For four-legged animals (cow, pig, donkey, etc.).
-         * Bones: root → body, head; body → frontLeftArm, frontRightArm, rearLeftLeg, rearRightLeg.
-         */
+        /** Quadruped skeleton — For four-legged animals. */
         quadruped: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
             new Donkeycraft.BoneDefinition('body', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.7, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
@@ -563,55 +496,41 @@
             new Donkeycraft.BoneDefinition('rearRightLeg', { parent: 'root', offset: new Donkeycraft.Vector3(-0.4, 0, -0.3), pivot: new Donkeycraft.Vector3(-0.2, 0.45, -0.15) })
         ],
 
-        /**
-         * Small entity skeleton — For chickens and small animals.
-         * Bones: root → body, head (no legs — bob animation instead).
-         */
+        /** Small entity skeleton — For chickens and small animals. */
         small: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
             new Donkeycraft.BoneDefinition('body', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.3, 0), pivot: new Donkeycraft.Vector3(0, 0.15, 0) }),
             new Donkeycraft.BoneDefinition('head', { parent: 'body', offset: new Donkeycraft.Vector3(0.2, 0.2, 0), pivot: new Donkeycraft.Vector3(0.1, 0, 0) })
         ],
 
-        /**
-         * Static object skeleton — For doors, sign posts, chests (no animated bones).
-         */
+        /** Static object skeleton — For doors, sign posts, chests. */
         static: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
         ],
 
-        /**
-         * Door skeleton — For interactive door blocks.
-         * Bones: root → doorPanel (the swinging part).
-         */
+        /** Door skeleton — For interactive door blocks. */
         door: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) }),
             new Donkeycraft.BoneDefinition('doorPanel', { parent: 'root', offset: new Donkeycraft.Vector3(0, 0.9, 0), pivot: new Donkeycraft.Vector3(-0.45, 0, 0) })
         ],
 
-        /**
-         * Projectile skeleton — For arrows, snowballs, ender pearls.
-         */
+        /** Projectile skeleton — For arrows, snowballs, ender pearls. */
         projectile: [
             new Donkeycraft.BoneDefinition('root', { offset: new Donkeycraft.Vector3(0, 0, 0), pivot: new Donkeycraft.Vector3(0, 0, 0) })
         ]
     };
 
     // ============================================================
-    // Animation Definitions — Pre-defined animation clips for each animation type
+    // Animation Definitions
     // ============================================================
 
     /**
      * AnimationDefinitions — Standard animation clips for entity behaviors.
-     * Each animation defines bone rotations at keyframe times.
      * @type {Object.<string, Object>}
      */
     Donkeycraft.AnimationDefinitions = {
 
-        /**
-         * Idle animation — Subtle breathing bob for stationary entities.
-         * Applies to spine (slight vertical movement) and head (gentle nod).
-         */
+        /** Idle animation — Subtle breathing bob for stationary entities. */
         idle: {
             duration: 2.0,
             loop: true,
@@ -629,10 +548,7 @@
             }
         },
 
-        /**
-         * Walk animation — Classic side-to-side limb swing for bipedal entities.
-         * Arms and legs swing in opposition (left arm + right leg forward at same time).
-         */
+        /** Walk animation — Side-to-side limb swing for bipedal entities. */
         walk: {
             duration: 0.8,
             loop: true,
@@ -682,9 +598,7 @@
             }
         },
 
-        /**
-         * Run animation — Faster, more exaggerated limb swing for running entities.
-         */
+        /** Run animation — Faster, exaggerated limb swing. */
         run: {
             duration: 0.4,
             loop: true,
@@ -722,9 +636,7 @@
             }
         },
 
-        /**
-         * Attack animation — Forward arm swing for melee combat.
-         */
+        /** Attack animation — Forward arm swing for melee combat. */
         attack: {
             duration: 0.5,
             loop: false,
@@ -750,9 +662,7 @@
             }
         },
 
-        /**
-         * Defend animation — Arms crossed in front for blocking.
-         */
+        /** Defend animation — Arms crossed for blocking. */
         defend: {
             duration: 0.3,
             loop: true,
@@ -768,9 +678,7 @@
             }
         },
 
-        /**
-         * Hurt animation — Brief recoil and head shake.
-         */
+        /** Hurt animation — Brief recoil and head shake. */
         hurt: {
             duration: 0.4,
             loop: false,
@@ -790,9 +698,7 @@
             }
         },
 
-        /**
-         * Quadruped walk animation — Diagonal leg pairs swing together.
-         */
+        /** Quadruped walk animation — Diagonal leg pairs swing together. */
         quadrupedWalk: {
             duration: 0.8,
             loop: true,
@@ -842,9 +748,7 @@
             }
         },
 
-        /**
-         * Chicken bob animation — Gentle up-down bob with head pecking.
-         */
+        /** Chicken bob animation — Gentle up-down bob with head pecking. */
         chickenBob: {
             duration: 0.6,
             loop: true,
@@ -864,9 +768,7 @@
             }
         },
 
-        /**
-         * Door open animation — Smooth rotation around hinge pivot.
-         */
+        /** Door open animation — Smooth rotation around hinge pivot. */
         doorOpen: {
             duration: 1.0,
             loop: false,
@@ -878,9 +780,7 @@
             }
         },
 
-        /**
-         * Door close animation — Smooth rotation back to closed position.
-         */
+        /** Door close animation — Smooth rotation back to closed position. */
         doorClose: {
             duration: 0.8,
             loop: false,
@@ -894,12 +794,11 @@
     };
 
     // ============================================================
-    // Movement Kinematics — Semi-implicit Euler integration with ground detection
+    // Movement Kinematics
     // ============================================================
 
     /**
      * KinematicState — Physics state for entity movement.
-     * Uses semi-implicit Euler integration for stable, lifelike motion.
      * @constructor
      */
     Donkeycraft.KinematicState = function () {
@@ -972,20 +871,14 @@
 
     /**
      * tick — Update kinematic state for one frame using semi-implicit Euler integration.
-     * This method is more stable than explicit Euler because velocity is updated
-     * before position, ensuring energy conservation in simple oscillators.
-     * Delta times larger than MAX_DELTA_TIME are clamped to prevent physics explosions
-     * that can occur when the browser tab is inactive.
      * @param {number} deltaTime - Time since last frame in seconds.
-     * @param {Function} [groundCheck] - Optional function returning Y of ground at entity position, or null if no ground.
+     * @param {Function} [groundCheck] - Optional function returning Y of ground at entity position, or null.
      * @returns {{onGround: boolean, groundY: number|null}} Ground detection result.
      */
     Donkeycraft.KinematicState.prototype.tick = function (deltaTime, groundCheck) {
-        // Clamp delta time to prevent physics explosions on tab switch or lag spikes.
         if (deltaTime <= 0) return { onGround: this.onGround, groundY: this.groundHeight };
         if (deltaTime > MAX_DELTA_TIME) deltaTime = MAX_DELTA_TIME;
 
-        // Apply gravity to acceleration
         this.acceleration.y += this.gravity;
 
         // Semi-implicit Euler: update velocity first, then position
@@ -993,19 +886,13 @@
         this.velocity.y += this.acceleration.y * deltaTime;
         this.velocity.z += this.acceleration.z * deltaTime;
 
-        // Apply terminal velocity clamp
         if (this.velocity.y < this.terminalVelocity) {
             this.velocity.y = this.terminalVelocity;
         }
 
-        // Apply air damping to horizontal velocity
         var damping = Math.pow(this.airDamping, deltaTime);
         this.velocity.x *= damping;
         this.velocity.z *= damping;
-
-        // Update position using new velocity
-        // Note: position is managed by the Entity class — we only compute target velocity
-        // The actual position update happens in Entity.tick() via velocity * deltaTime
 
         // Ground detection
         this.onGround = false;
@@ -1035,7 +922,6 @@
             if (this.jumpCooldown < 0) this.jumpCooldown = 0;
         }
 
-        // Reset acceleration (gravity is re-applied each frame)
         this.acceleration.x = 0;
         this.acceleration.z = 0;
 
@@ -1044,8 +930,7 @@
 
     /**
      * jump — Apply upward impulse for jumping.
-     * Only works if entity is on ground and jump cooldown has expired.
-     * @param {boolean} [canJump=true] - Whether jumping is allowed (checks ground + cooldown).
+     * @param {boolean} [canJump=true] - Whether jumping is allowed.
      */
     Donkeycraft.KinematicState.prototype.jump = function (canJump) {
         canJump = canJump !== undefined ? !!canJump : true;
@@ -1067,13 +952,23 @@
     };
 
     // ============================================================
-    // Entity Animation Controller — Ties everything together per entity
+    // Entity Animation Controller
     // ============================================================
 
     /**
      * EntityAnimationController — Per-entity animation and kinematics controller.
-     * Manages the animation state machine, bone transforms, and physics simulation.
      * @constructor
+     * @property {Donkeycraft.AnimationStateMachine} _stateMachine - Animation state machine.
+     * @property {Donkeycraft.KinematicState} _kinematics - Kinematic physics state.
+     * @property {number} animationSpeedMultiplier - Animation speed multiplier.
+     * @property {number} _lastSpeed - Last known horizontal speed.
+     * @property {number} walkSpeedThreshold - Speed threshold for walk animation.
+     * @property {number} runSpeedThreshold - Speed threshold for run animation.
+     * @property {string|null} forcedState - Currently forced animation state.
+     * @property {number} forcedStateDuration - Forced state duration in seconds.
+     * @property {number} _forcedStateTimer - Remaining forced state time.
+     * @property {Object.<string, {rx: number, ry: number, rz: number}>} _cachedTransforms - Cached bone transforms.
+     * @property {boolean} _transformsDirty - Whether transforms need recomputation.
      */
     Donkeycraft.EntityAnimationController = function () {
         /**
@@ -1152,8 +1047,6 @@
 
     /**
      * registerAnimations — Register all animation states for an entity type.
-     * Each clip's name is used as the state identifier in the animation state machine.
-     * Duplicate registrations (same name) will overwrite previous clips.
      * @param {Array<Donkeycraft.AnimationClip>} clips - Array of AnimationClip objects to register.
      */
     Donkeycraft.EntityAnimationController.prototype.registerAnimations = function (clips) {
@@ -1165,8 +1058,6 @@
 
     /**
      * setForcedState — Force a specific animation state for a duration.
-     * While forced, the animation state machine will not auto-select states based on speed.
-     * If duration is 0, the force persists until cleared via clearForcedState().
      * @param {string} state - Animation state name (e.g., 'attack', 'hurt').
      * @param {number} [duration=0] - Duration in seconds (0 = until cleared).
      */
@@ -1178,7 +1069,6 @@
 
     /**
      * clearForcedState — Clear any forced animation state, returning to auto-selection.
-     * The state machine will next tick based on movement speed (idle/walk/run).
      */
     Donkeycraft.EntityAnimationController.prototype.clearForcedState = function () {
         this.forcedState = null;
@@ -1188,12 +1078,9 @@
 
     /**
      * tick — Update animation and kinematics for one frame.
-     * Auto-selects animation state based on movement speed if no forced state is active.
-     * Updates the animation state machine and kinematic physics simulation.
      * @param {number} deltaTime - Time since last frame in seconds.
-     * @param {Function} [groundCheck] - Optional ground detection callback returning ground Y level or null.
-     * @returns {{transforms: Object, kinematics: Donkeycraft.KinematicState, ground: {onGround: boolean, groundY: number|null}}}
-     *   Bone transforms, kinematic state, and ground detection result.
+     * @param {Function} [groundCheck] - Optional ground detection callback.
+     * @returns {{transforms: Object, kinematics: Donkeycraft.KinematicState, ground: {onGround: boolean, groundY: number|null}}} Bone transforms, kinematics, and ground result.
      */
     Donkeycraft.EntityAnimationController.prototype.tick = function (deltaTime, groundCheck) {
         // Update forced state timer
@@ -1235,16 +1122,14 @@
 
     /**
      * getBoneTransforms — Get the current bone rotation transforms computed last tick.
-     * Returns an empty object if tick() has not been called this frame.
-     * @returns {Object.<string, {rx: number, ry: number, rz: number}>}
-     *   Map of bone name to rotation in radians.
+     * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Map of bone name to rotation in radians.
      */
     Donkeycraft.EntityAnimationController.prototype.getBoneTransforms = function () {
         return this._cachedTransforms;
     };
 
     /**
-     * getKinematics — Get the kinematic state for manual inspection/modification.
+     * getKinematics — Get the kinematic state for inspection/modification.
      * @returns {Donkeycraft.KinematicState} The current kinematic state.
      */
     Donkeycraft.EntityAnimationController.prototype.getKinematics = function () {
@@ -1253,7 +1138,6 @@
 
     /**
      * setSpeed — Set entity horizontal movement speed and direction.
-     * Triggers animation state changes based on walkSpeedThreshold and runSpeedThreshold.
      * @param {number} speed - Speed in blocks/second (absolute value used).
      * @param {number} yaw - Movement direction in radians (0 = negative Z / forward).
      */
@@ -1264,8 +1148,6 @@
 
     /**
      * applyVelocity — Directly set kinematic velocity components.
-     * Bypasses setHorizontalSpeed and sets each axis independently.
-     * Useful for projectiles, knockback, or jump impulses.
      * @param {number} vx - X velocity (blocks/s).
      * @param {number} vy - Y velocity (blocks/s).
      * @param {number} vz - Z velocity (blocks/s).
@@ -1276,34 +1158,23 @@
         this._kinematics.velocity.z = vz || 0;
     };
 
-    /**
-     * _animationClipCache — Cache of pre-built AnimationClip instances by name.
-     * Prevents creating new clip objects for frequently-played animations (e.g., attack, hurt).
-     * @type {Object.<string, Donkeycraft.AnimationClip>}
-     * @private
-     */
+    /** Animation clip cache to avoid redundant object creation. */
     var _animationClipCache = {};
 
     /**
      * playAnimation — Immediately play a named animation (bypasses state machine auto-selection).
-     * Uses an internal clip cache to avoid creating new AnimationClip objects on each call.
-     * The clip is registered as a temporary state and played immediately.
-     * For animations with loop: false, the forced state mechanism should be used instead,
-     * as this method does not automatically clear the animation after completion.
      * @param {string} name - Animation clip name (must exist in Donkeycraft.AnimationDefinitions).
      */
     Donkeycraft.EntityAnimationController.prototype.playAnimation = function (name) {
         var def = Donkeycraft.AnimationDefinitions[name];
         if (!def) return;
 
-        // Reuse cached clip definition to avoid redundant object creation.
         var cachedClip = _animationClipCache[name];
         if (!cachedClip) {
             cachedClip = new Donkeycraft.AnimationClip(name, def.duration, def.loop, def.keyframes);
             _animationClipCache[name] = cachedClip;
         }
 
-        // Create a fresh copy to prevent state leakage between uses.
         var animationClip = new Donkeycraft.AnimationClip(
             cachedClip.name,
             cachedClip.duration,
@@ -1315,11 +1186,11 @@
     };
 
     // ============================================================
-    // Entity Type Database — Defines skeleton and animations per entity type
+    // Entity Type Database
     // ============================================================
 
     /**
-     * EntityTypeDatabase — Complete definition of each entity type's skeleton, animations, and stats.
+     * EntityTypeDatabase — Entity type definitions (skeleton, animations, dimensions).
      * @type {Object.<string, {skeleton: string, animations: string[], height: number, width: number}>}
      */
     Donkeycraft.EntityTypeDB = {
