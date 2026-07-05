@@ -1,5 +1,6 @@
 /* ============================================================
     HEALTH BAR
+    Vertical proportional heart masking — each heart = 10 HP
     ============================================================ */
 
 .dk-health-bar-wrapper {
@@ -42,10 +43,18 @@
     display: block;
 }
 
-.dk-heart-full .dk-heart {
+/* Full heart — bright glow */
+.dk-heart-full .dk-heart,
+.dk-heart-full .dk-heart-fill path:last-of-type {
     filter: drop-shadow(0 0 2px rgba(231, 76, 60, 0.5));
 }
 
+/* Partial heart — subtle glow on filled portion */
+.dk-heart-partial .dk-heart-fill {
+    filter: drop-shadow(0 0 1px rgba(231, 76, 60, 0.3));
+}
+
+/* Flash animations for damage/healing */
 .dk-heart-flash {
     animation: heart-damage-flash 200ms ease-out;
 }
@@ -69,15 +78,17 @@
     background: radial-gradient(ellipse at center, rgba(220, 0, 0, 0.3) 0%, rgba(140, 0, 0, 0.6) 100%);
 }
 
+/* ============================================================
+    ANIMATIONS
+    ============================================================ */
+
 @keyframes heart-damage-flash {
     0% {
         filter: brightness(1);
     }
-
     50% {
         filter: brightness(2) drop-shadow(0 0 6px rgba(231, 76, 60, 0.8));
     }
-
     100% {
         filter: brightness(1);
     }
@@ -87,79 +98,67 @@
     0% {
         filter: brightness(1);
     }
-
     50% {
         filter: brightness(1.8) drop-shadow(0 0 6px rgba(46, 204, 113, 0.8));
     }
-
     100% {
         filter: brightness(1);
     }
 }
 
 @keyframes health-shake {
-
-    0%,
-    100% {
+    0%, 100% {
         transform: translateX(0);
     }
-
-    10%,
-    30%,
-    50%,
-    70%,
-    90% {
+    10%, 30%, 50%, 70%, 90% {
         transform: translateX(-2px);
     }
-
-    20%,
-    40%,
-    60%,
-    80% {
+    20%, 40%, 60%, 80% {
         transform: translateX(2px);
     }
 }
 
 @keyframes screen-shake-health {
-
-    0%,
-    100% {
+    0%, 100% {
         transform: translate(0, 0);
     }
-
     10% {
         transform: translate(-2px, -1px);
     }
-
     20% {
         transform: translate(2px, 1px);
     }
-
     30% {
         transform: translate(-1px, 2px);
     }
-
     40% {
         transform: translate(1px, -2px);
     }
-
     50% {
         transform: translate(-2px, 1px);
     }
-
     60% {
         transform: translate(2px, -1px);
     }
-
     70% {
         transform: translate(-1px, -2px);
     }
-
     80% {
         transform: translate(1px, 2px);
     }
-
     90% {
         transform: translate(-2px, -2px);
+    }
+}
+
+/* Floating +/- text animation */
+@keyframes float-text-up {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
     }
 }

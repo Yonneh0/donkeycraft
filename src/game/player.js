@@ -133,17 +133,17 @@
         // ============================================================
 
         /**
-         * Current health points (0-20).
+         * Current health points (0-100).
          * @type {number}
          * @private
          */
-        this._health = 20;
+        this._health = 100;
 
         /**
          * Maximum health points.
          * @type {number}
          */
-        this.maxHealth = 20;
+        this.maxHealth = 100;
 
         /**
          * Current stamina points (yellow health). Always capped at 100.

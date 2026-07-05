@@ -1,5 +1,6 @@
 // Donkeycraft — Health Bar UI
-// Heart-based health display: 10 heart containers with half-heart granularity.
+// Heart-based health display: 10 heart containers, each representing 10 HP.
+// Each heart uses vertical proportional masking (bottom-to-top fill).
 // Listens to health:changed events and updates DOM with animations.
 (function () {
     'use strict';
@@ -35,7 +36,6 @@
         this._subscribeToEvents();
 
         // Capture initial values BEFORE update to prevent spurious animation delta.
-        // _prevHealth is set inside updateFromHealth, so we call it without triggering animations.
         var initHealth = this._player.getHealth();
         var initMaxHealth = this._player.getMaxHealth();
         this._prevHealth = initHealth;
@@ -79,11 +79,11 @@
         row.className = 'dk-health-bar-row';
         row.style.overflow = 'visible'; // Allow floating text to render outside row bounds
 
-        // Create 10 heart containers
+        // Create 10 heart containers (each represents 10 HP)
         for (var i = 0; i < 10; i++) {
             var heartContainer = document.createElement('div');
             heartContainer.className = 'dk-heart-container dk-heart-empty';
-            heartContainer.innerHTML = this._getHeartSVG('empty');
+            heartContainer.innerHTML = this._getHeartSVG(0); // Start with 0 fill
             row.appendChild(heartContainer);
             this._heartContainers.push(heartContainer);
         }
@@ -93,50 +93,61 @@
     };
 
     /**
-     * _getHeartState — determine the visual state for a given HP value at a specific heart index.
+     * _getHeartFillLevel — determine the fill level (0-10) for a given HP value at a specific heart index.
      * @private
-     * @param {number} hp - Current health points (0-20).
+     * @param {number} health - Current total health points (0-100).
      * @param {number} index - Heart container index (0-9).
-     * @returns {string} 'full', 'half', or 'empty'.
+     * @returns {number} Fill level from 0 (empty) to 10 (full).
      */
-    Donkeycraft.HealthBar.prototype._getHeartState = function (hp, index) {
-        hp = Math.max(0, Math.round(hp));
-        var remaining = hp - (index * 2); // HP remaining after filling hearts before this one
-        if (remaining >= 2) return 'full';
-        if (remaining === 1) return 'half';
-        return 'empty';
+    Donkeycraft.HealthBar.prototype._getHeartFillLevel = function (health, index) {
+        health = Math.max(0, Math.round(health));
+        var hpPerHeart = 10;
+        var startHP = index * hpPerHeart;       // HP this heart starts at
+        var endHP = startHP + hpPerHeart;        // HP this heart ends at
+        
+        if (health <= startHP) return 0;          // Heart is empty
+        if (health >= endHP) return 10;           // Heart is full
+        return health - startHP;                  // Partial fill (1-9)
     };
 
     /**
-     * _getHeartSVG — return SVG markup for a heart in the given state.
+     * _getHeartSVG — return SVG markup for a heart with vertical proportional masking.
+     * The heart fills from bottom to top based on fillLevel (0-10).
      * @private
-     * @param {string} state - 'full', 'half', or 'empty'.
+     * @param {number} fillLevel - Number of segments filled (0-10).
      * @returns {string} SVG markup string.
      */
-    Donkeycraft.HealthBar.prototype._getHeartSVG = function (state) {
-        if (state === 'half') {
-            // Full heart outline with bottom half filled red, top half dark
-            return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-half">' +
-                '<defs>' +
-                '<clipPath id="dk-heart-clip-bottom"><rect x="0" y="9" width="16" height="9"/></clipPath>' +
-                '<clipPath id="dk-heart-clip-top"><rect x="0" y="0" width="16" height="9"/></clipPath>' +
-                '</defs>' +
-                // Dark outline (always visible)
+    Donkeycraft.HealthBar.prototype._getHeartSVG = function (fillLevel) {
+        fillLevel = Math.max(0, Math.min(10, Math.round(fillLevel)));
+        
+        // Calculate clip rectangle: height percentage and Y position
+        var fillPercent = fillLevel / 10;
+        var clipHeight = fillPercent * 18; // SVG viewBox height is 18
+        var clipY = 18 - clipHeight;       // Bottom-aligned clip
+        
+        // Unique ID for clipPath to avoid conflicts
+        var clipId = 'dk-hb-' + Math.random().toString(36).substr(2, 9);
+
+        if (fillLevel === 0) {
+            // Empty heart — dark outline only
+            return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-empty-svg">' +
                 '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="rgba(50,30,30,0.3)" stroke="#5a1a1a" stroke-width="0.8"/>' +
-                // Bottom half filled red
-                '<g clip-path="url(#dk-heart-clip-bottom)">' +
-                '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="none"/>' +
-                '</g>' +
                 '</svg>';
         }
-        if (state === 'full') {
-            return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-full">' +
-                '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="#5a1a1a" stroke-width="0.8"/>' +
-                '</svg>';
-        }
-        // Empty — dark outline only
-        return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-empty-svg">' +
+
+        // Heart with proportional vertical fill
+        return '<svg viewBox="0 0 16 18" class="dk-heart dk-heart-fill">' +
+            '<defs>' +
+            '<clipPath id="' + clipId + '">' +
+            '<rect x="-1" y="' + clipY + '" width="18" height="' + clipHeight + '"/>' +
+            '</clipPath>' +
+            '</defs>' +
+            // Dark outline (always visible underneath)
             '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="rgba(50,30,30,0.3)" stroke="#5a1a1a" stroke-width="0.8"/>' +
+            // Red fill (clipped to fill level)
+            '<g clip-path="url(#' + clipId + ')">' +
+            '<path d="M8 16 L2 10 C-1 6 3 2 8 6 C13 2 17 6 14 10 Z" fill="#e74c3c" stroke="none"/>' +
+            '</g>' +
             '</svg>';
     };
 
@@ -146,7 +157,7 @@
      * @param {Object} data - { health, maxHealth, delta }.
      */
     Donkeycraft.HealthBar.prototype.updateFromHealth = function (data) {
-        var maxHealth = data.maxHealth || 20;
+        var maxHealth = data.maxHealth || 100;
         var oldHealth = this._prevHealth;
 
         // Clamp to valid range [0, maxHealth]
@@ -156,7 +167,7 @@
         var delta = newHealth - oldHealth;
 
         // Update each heart container
-        this._renderHearts(newHealth, maxHealth);
+        this._renderHearts(newHealth);
 
         // Animate on change (only if health actually changed)
         if (delta !== 0) {
@@ -172,21 +183,27 @@
 
     /**
      * _renderHearts — update all 10 heart containers to reflect current health.
-     * Fills from left (index 0) to right (index 9), matching Minecraft's behavior.
+     * Each heart represents 10 HP and fills proportionally from bottom to top.
      * @private
-     * @param {number} health - Current health points (0-20).
-     * @param {number} maxHealth - Maximum health points.
+     * @param {number} health - Current total health points (0-100).
      */
-    Donkeycraft.HealthBar.prototype._renderHearts = function (health, maxHealth) {
+    Donkeycraft.HealthBar.prototype._renderHearts = function (health) {
         for (var i = 0; i < 10; i++) {
             var container = this._heartContainers[i];
             if (!container) continue;
 
-            var state = this._getHeartState(health, i);
+            var fillLevel = this._getHeartFillLevel(health, i);
 
             // Update class and SVG
-            container.className = 'dk-heart-container dk-heart-' + state;
-            container.innerHTML = this._getHeartSVG(state);
+            container.className = 'dk-heart-container';
+            if (fillLevel === 10) {
+                container.classList.add('dk-heart-full');
+            } else if (fillLevel === 0) {
+                container.classList.add('dk-heart-empty');
+            } else {
+                container.classList.add('dk-heart-partial');
+            }
+            container.innerHTML = this._getHeartSVG(fillLevel);
         }
     };
 
@@ -203,18 +220,18 @@
             this._triggerShake();
             this._flashDamagedHearts(delta, oldHealth, newHealth);
 
-            // Screen shake if health drops below 3 hearts (6 HP)
-            if (newHealth < 6) {
+            // Screen shake if health drops below 30 HP (3 hearts)
+            if (newHealth < 30) {
                 this._triggerScreenShake();
             }
         } else if (delta > 0) {
-            // Healing — flash healed hearts white
+            // Healing — flash healed hearts white/green
             this._flashHealedHearts(delta, oldHealth, newHealth);
         }
     };
 
     /**
-     * _triggerShake — shake the health bar container for 0.5s.
+     * _triggerShake — shake the health bar container for 500ms.
      * @private
      */
     Donkeycraft.HealthBar.prototype._triggerShake = function () {
@@ -265,17 +282,16 @@
     Donkeycraft.HealthBar.prototype._flashDamagedHearts = function (delta, oldHealth, newHealth) {
         if (!this._row) return;
 
-        // Hearts change from oldHealth down to newHealth.
-        // Heart i covers HP range [i*2, i*2+1].
-        // The damaged hearts are those whose index is between floor(newHealth/2) and floor((oldHealth-1)/2).
-        var startIdx = Math.min(9, Math.floor((oldHealth - 1) / 2)); // rightmost damaged heart
-        var endIdx = Math.floor(newHealth / 2);                        // leftmost damaged heart
+        // Hearts that changed: from oldHealth down to newHealth.
+        // Heart i covers HP range [i*10, i*10+10).
+        var startIdx = Math.min(9, Math.floor((oldHealth - 1) / 10)); // rightmost affected heart
+        var endIdx = Math.floor(newHealth / 10);                        // leftmost affected heart
 
         // Ensure valid range
         if (startIdx < 0) startIdx = 0;
         if (endIdx > 9) endIdx = 9;
 
-        // Flash each damaged heart
+        // Flash each affected heart
         for (var i = startIdx; i >= endIdx && i >= 0; i--) {
             var container = this._heartContainers[i];
             if (!container) continue;
@@ -301,10 +317,9 @@
     Donkeycraft.HealthBar.prototype._flashHealedHearts = function (delta, oldHealth, newHealth) {
         if (!this._row) return;
 
-        // Hearts change from oldHealth up to newHealth.
-        // The healed hearts are those whose index is between floor(oldHealth/2) and floor((newHealth-1)/2).
-        var startIdx = Math.floor(oldHealth / 2);       // leftmost healed heart
-        var endIdx = Math.min(9, Math.floor((newHealth - 1) / 2)); // rightmost healed heart
+        // Hearts that changed: from oldHealth up to newHealth.
+        var startIdx = Math.floor(oldHealth / 10);       // leftmost healed heart
+        var endIdx = Math.min(9, Math.floor((newHealth - 1) / 10)); // rightmost healed heart
 
         // Ensure valid range
         if (startIdx > 9) startIdx = 9;
@@ -360,17 +375,17 @@
     /**
      * _updateRedOverlay — update the full-screen red overlay opacity based on health.
      * @private
-     * @param {number} health - Current health (0-20).
-     * @param {number} maxHealth - Maximum health (20).
+     * @param {number} health - Current health (0-100).
+     * @param {number} maxHealth - Maximum health (100).
      */
     Donkeycraft.HealthBar.prototype._updateRedOverlay = function (health, maxHealth) {
         if (!this._overlay) return;
 
-        var h = Math.max(0, Math.min(maxHealth || 20, health));
-        // 85% opacity at 0 HP → 0% opacity at 6 HP → stays 0% above 6 HP
+        var h = Math.max(0, Math.min(maxHealth || 100, health));
+        // 85% opacity at 0 HP → 0% opacity at 30 HP → stays 0% above 30 HP
         var opacity = 0;
-        if (h < 6) {
-            opacity = 0.85 - ((h / 6) * 0.85); // 0.85 at h=0, 0 at h=6
+        if (h < 30) {
+            opacity = 0.85 - ((h / 30) * 0.85); // 0.85 at h=0, 0 at h=30
         }
         this._overlay.style.opacity = Math.max(0, opacity);
     };
