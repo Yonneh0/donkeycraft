@@ -131,6 +131,15 @@
          */
         this._subscribers = [];
 
+        /**
+         * Ground detection callback (injected by EntityManager or game logic).
+         * Returns the Y coordinate of the ground surface at the entity's position,
+         * or null if no ground is detected.
+         * @type {Function|null}
+         * @private
+         */
+        this._groundCheck = null;
+
         // ============================================================
         // Animation & Skeleton System
         // ============================================================
@@ -274,13 +283,14 @@
 
     /**
      * Get the entity's current position.
+     * Returns a copy to prevent external mutation of internal state.
      * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getPosition = function () {
         if (this._destroyed || !this._position) {
             return null;
         }
-        return this._position;
+        return new Donkeycraft.Vector3(this._position.x, this._position.y, this._position.z);
     };
 
     /**
@@ -298,13 +308,14 @@
 
     /**
      * Get the entity's current velocity.
+     * Returns a copy to prevent external mutation of internal state.
      * @returns {Donkeycraft.Vector3|null}
      */
     Donkeycraft.Entity.prototype.getVelocity = function () {
         if (this._destroyed || !this._velocity) {
             return null;
         }
-        return this._velocity;
+        return new Donkeycraft.Vector3(this._velocity.x, this._velocity.y, this._velocity.z);
     };
 
     /**
@@ -322,13 +333,14 @@
 
     /**
      * Get the entity's current rotation.
+     * Returns a copy to prevent external mutation of internal state.
      * @returns {{yaw: number, pitch: number}|null} Rotation in radians.
      */
     Donkeycraft.Entity.prototype.getRotation = function () {
         if (this._destroyed || !this._rotation) {
             return null;
         }
-        return this._rotation;
+        return { yaw: this._rotation.yaw, pitch: this._rotation.pitch };
     };
 
     /**
@@ -341,6 +353,18 @@
         var twoPi = Math.PI * 2;
         this._rotation.yaw = ((yaw % twoPi) + twoPi) % twoPi;
         this._rotation.pitch = Donkeycraft.clamp(pitch, -Math.PI / 2, Math.PI / 2);
+    };
+
+    /**
+     * setGroundCheck — Inject a ground detection callback.
+     * The callback should return the Y coordinate of the ground surface at the entity's
+     * current position, or null if no solid ground exists below the entity.
+     * This is typically called by EntityManager during tick to provide chunk-based ground detection.
+     * @param {Function|null} groundCheck - Function returning ground Y level or null.
+     */
+    Donkeycraft.Entity.prototype.setGroundCheck = function (groundCheck) {
+        if (this._destroyed) return;
+        this._groundCheck = typeof groundCheck === 'function' ? groundCheck : null;
     };
 
     // ============================================================
@@ -600,27 +624,23 @@
     /**
      * Tick method — called every game tick. Override for entity-specific logic.
      * Updates animation controller and applies velocity to position.
+     * The ground detection callback is injected via setGroundCheck() by EntityManager
+     * or the game's logic layer. If no callback is set, entities will fall through the world.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function (deltaTime) {
-        if (this._destroyed) return;
+        if (this._destroyed || !this._position) return;
+
+        // Use injected ground check if available, otherwise fall back to internal placeholder
+        var groundCheck = this._groundCheck || null;
 
         // Update animation controller if available
         if (this._animationController) {
-            // Ground detection callback: check if there's a solid block below the entity
-            var self = this;
-            var groundCheck = function () {
-                if (!self._position) return null;
-                var footY = Math.floor(self._position.y);
-                // Check if block at feet position is solid (simplified — real check uses chunk manager)
-                // For now, assume entities on the world surface are grounded
-                // This will be overridden by EntityManager with proper ground checking
-                return null; // Placeholder — ground detection handled externally
-            };
-
             var result = this._animationController.tick(deltaTime, groundCheck);
 
-            // Apply kinematic velocity to entity position
+            // Apply kinematic velocity to entity position.
+            // The animation controller's kinematics module computes velocity based on
+            // movement speed thresholds and physics simulation.
             var kinematics = result.kinematics;
             if (kinematics) {
                 this._velocity.x = kinematics.velocity.x;
@@ -629,17 +649,18 @@
             }
         }
 
-        // Apply velocity to position
+        // Apply velocity to position using semi-implicit Euler integration.
+        // Position delta = velocity * deltaTime ensures frame-rate-independent movement.
         this._position.x += this._velocity.x * deltaTime;
         this._position.y += this._velocity.y * deltaTime;
         this._position.z += this._velocity.z * deltaTime;
 
-        // Call subscribers
+        // Notify tick subscribers
         for (var i = 0; i < this._subscribers.length; i++) {
             try {
                 this._subscribers[i](deltaTime);
             } catch (e) {
-                // Error isolation
+                // Error isolation — a failing subscriber should not break the entity
             }
         }
     };
@@ -715,6 +736,7 @@
     /**
      * Destroy the entity and free resources.
      * After calling destroy(), all getter methods return null.
+     * This method is idempotent — calling it multiple times is safe.
      */
     Donkeycraft.Entity.prototype.destroy = function () {
         if (this._destroyed) return; // Guard against double-destroy
@@ -725,6 +747,8 @@
         this._velocity = null;
         this._rotation = null;
         this._subscribers = [];
+        this._groundCheck = null;
+        this.bones = null;
         this._animationController = null;
     };
 

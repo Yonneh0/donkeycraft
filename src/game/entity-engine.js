@@ -60,6 +60,8 @@
 
     /**
      * _computeTangents — Pre-compute Catmull-Rom tangents for each bone's keyframe array.
+     * For Catmull-Rom splines, the tangent in and tangent out at each knot are equal,
+     * which produces a smooth C1-continuous curve passing through all control points.
      * @private
      */
     Donkeycraft.AnimationClip.prototype._computeTangents = function () {
@@ -96,8 +98,10 @@
 
     /**
      * Evaluate bone rotations at a given time using cubic Hermite interpolation.
+     * Uses the pre-computed Catmull-Rom tangents to produce smooth, C1-continuous
+     * interpolation between keyframe rotations.
      * @param {number} time - Current animation time in seconds (will be wrapped to duration if looping).
-     * @returns {{rx: number, ry: number, rz: number}} Interpolated rotation for each animated bone.
+     * @returns {Object.<string, {rx: number, ry: number, rz: number}>} Interpolated rotation per bone name.
      */
     Donkeycraft.AnimationClip.prototype.evaluate = function (time) {
         var result = {};
@@ -118,15 +122,15 @@
             // Find surrounding keyframes
             var prevKf = kf[0];
             var nextKf = kf[kf.length - 1];
-            var prevTan = tan[0];
-            var nextTan = tan[tan.length - 1];
+            var prevTanOut = { rx: 0, ry: 0, rz: 0 };
+            var nextTanIn = { rx: 0, ry: 0, rz: 0 };
 
             for (var i = 0; i < kf.length - 1; i++) {
                 if (wrappedTime >= kf[i].time && wrappedTime <= kf[i + 1].time) {
                     prevKf = kf[i];
                     nextKf = kf[i + 1];
-                    prevTan = tan[i] ? tan[i].tangentOut : { rx: 0, ry: 0, rz: 0 };
-                    nextTan = tan[i + 1] ? tan[i + 1].tangentIn : { rx: 0, ry: 0, rz: 0 };
+                    prevTanOut = tan[i] ? tan[i].tangentOut : { rx: 0, ry: 0, rz: 0 };
+                    nextTanIn = tan[i + 1] ? tan[i + 1].tangentIn : { rx: 0, ry: 0, rz: 0 };
                     break;
                 }
             }
@@ -135,7 +139,7 @@
             var t = (nextKf.time - prevKf.time) > 0 ? (wrappedTime - prevKf.time) / (nextKf.time - prevKf.time) : 0;
             t = Math.max(0, Math.min(1, t));
 
-            // Cubic Hermite interpolation
+            // Cubic Hermite interpolation (Catmull-Rom formulation)
             var t2 = t * t;
             var t3 = t2 * t;
             var h00 = 2 * t3 - 3 * t2 + 1;
@@ -144,9 +148,9 @@
             var h11 = t3 - t2;
 
             result[boneName] = {
-                rx: h00 * prevKf.rx + h10 * prevTan.rx + h01 * nextKf.rx + h11 * nextTan.rx,
-                ry: h00 * prevKf.ry + h10 * prevTan.ry + h01 * nextKf.ry + h11 * nextTan.ry,
-                rz: h00 * prevKf.rz + h10 * prevTan.rz + h01 * nextKf.rz + h11 * nextTan.rz
+                rx: h00 * prevKf.rx + h10 * prevTanOut.rx + h01 * nextKf.rx + h11 * nextTanIn.rx,
+                ry: h00 * prevKf.ry + h10 * prevTanOut.ry + h01 * nextKf.ry + h11 * nextTanIn.ry,
+                rz: h00 * prevKf.rz + h10 * prevTanOut.rz + h01 * nextKf.rz + h11 * nextTanIn.rz
             };
         }
 
@@ -332,9 +336,9 @@
                 Math.min(prev.time, prev.clip.duration));
 
             // Blend transforms: current * blendT + previous * (1 - blendT)
-            for (var boneName in this._allBones) {
-                if (!this._allBones.hasOwnProperty(boneName)) continue;
-                var bn = this._allBones[boneName];
+            // Use index-based loop since _allBones is an Array, not an Object
+            for (var i = 0; i < this._allBones.length; i++) {
+                var bn = this._allBones[i];
                 var curr = currentTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
                 var prv = prevTransforms[bn] || { rx: 0, ry: 0, rz: 0 };
 
@@ -345,12 +349,13 @@
                 };
             }
         } else {
-            // No transition — use current transforms directly
+            // No transition — use current transforms directly.
+            // Build a fresh object with all tracked bones set to zero if not animated,
+            // preventing stale transforms from persisting across state changes.
             this._boneTransforms = {};
-            for (var bone in currentTransforms) {
-                if (currentTransforms.hasOwnProperty(bone)) {
-                    this._boneTransforms[bone] = currentTransforms[bone];
-                }
+            for (var j = 0; j < this._allBones.length; j++) {
+                var boneName = this._allBones[j];
+                this._boneTransforms[boneName] = currentTransforms[boneName] || { rx: 0, ry: 0, rz: 0 };
             }
         }
 

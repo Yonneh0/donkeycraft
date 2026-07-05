@@ -528,9 +528,16 @@
             iterable.forEach(function (v) { result.push(v); });
             return result;
         }
-        // Fallback: assume array-like (has length property)
+        // Fallback: assume array-like (has length property).
+        // Wrap in try-catch to guard against hostile objects with a getter
+        // on 'length' that throws an exception.
         if (typeof iterable.length === 'number') {
-            return Array.prototype.slice.call(iterable);
+            try {
+                return Array.prototype.slice.call(iterable);
+            } catch (e) {
+                // If slice fails, fall through to empty array.
+                return [];
+            }
         }
         return [];
     }
@@ -539,6 +546,8 @@
      * _normalizeMeshKey — Generate a robust cache key from mesh type and dimensions.
      * Rounds floating-point values to 4 decimal places to avoid precision-based cache misses
      * while preserving visually significant differences in mesh dimensions (0.0001 resolution).
+     * Unknown mesh types include the full mesh type string prefixed with 'unknown:' to prevent
+     * collisions between different unrecognized mesh types.
      * @private
      * @param {string} meshType - Mesh type ('box' or 'cylinder').
      * @param {Object} dimensions - Dimension properties (w/h/d for boxes, r/h for cylinders).
@@ -554,7 +563,8 @@
             var dim = dimensions || {};
             return 'cyl:' + round4(dim.r || 0.1) + ':' + round4(dim.h || 1);
         }
-        return meshType + ':unknown';
+        // Prefix with 'unknown:' to prevent collisions between different unrecognized mesh types.
+        return 'unknown:' + meshType;
     }
 
     // ============================================================
@@ -895,7 +905,16 @@
     };
 
     /**
+     * _colorCache — Cache for parsed hex colors to avoid redundant string parsing.
+     * Key: normalized hex string (e.g., '#8B4513'), Value: {r, g, b} in [0, 1].
+     * @type {Object.<string, {r: number, g: number, b: number}>}
+     * @private
+     */
+    var _colorCache = {};
+
+    /**
      * _parseHexColor — Parse a hex color string (#RGB or #RRGGBB) to normalized RGB values.
+     * Results are cached by normalized color key to avoid redundant parsing on subsequent calls.
      * Logs a warning via Donkeycraft.Logger (if available) for invalid color strings.
      * @private
      * @param {string} color - Hex color string (e.g., '#8B4513' or '#F00').
@@ -911,7 +930,19 @@
             return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
         }
 
+        // Use normalized key for cache lookup.
+        var cacheKey = color;
+        if (color.length === 4) {
+            // Expand shorthand #RGB to #RRGGBB for caching.
+            cacheKey = '#' + color.charAt(1) + color.charAt(1) + color.charAt(2) + color.charAt(2) + color.charAt(3) + color.charAt(3);
+        }
+
+        if (_colorCache[cacheKey]) {
+            return _colorCache[cacheKey];
+        }
+
         var hex = color.substring(1);
+        var result = null;
 
         if (hex.length === 6) {
             var red = parseInt(hex.substring(0, 2), 16);
@@ -921,9 +952,10 @@
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
                     Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color "' + color + '" — rendering as magenta (#FF00FF).');
                 }
-                return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+                result = { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+            } else {
+                result = { r: red / 255, g: green / 255, b: blue / 255 };
             }
-            return { r: red / 255, g: green / 255, b: blue / 255 };
         } else if (hex.length === 3) {
             var r2 = parseInt(hex.charAt(0) + hex.charAt(0), 16);
             var g2 = parseInt(hex.charAt(1) + hex.charAt(1), 16);
@@ -932,15 +964,20 @@
                 if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
                     Donkeycraft.Logger.warn('EntityRenderer', 'Invalid shorthand hex color "' + color + '" — rendering as magenta (#FF00FF).');
                 }
-                return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+                result = { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+            } else {
+                result = { r: r2 / 255, g: g2 / 255, b: b2 / 255 };
             }
-            return { r: r2 / 255, g: g2 / 255, b: b2 / 255 };
+        } else {
+            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as magenta (#FF00FF).');
+            }
+            result = { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
         }
 
-        if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
-            Donkeycraft.Logger.warn('EntityRenderer', 'Invalid hex color length "' + color + '" — rendering as magenta (#FF00FF).');
-        }
-        return { r: DEFAULT_RED, g: DEFAULT_GREEN, b: DEFAULT_BLUE };
+        // Cache the result (use normalized key for shorthand colors).
+        _colorCache[cacheKey] = result;
+        return result;
     };
 
     /**
@@ -1119,19 +1156,17 @@
      * @param {number} cx - Box center X.
      * @param {number} cy - Box center Y.
      * @param {number} cz - Box center Z.
-     * @param {number} halfW - Half-width (X extent).
-     * @param {number} fullH - Full height of the box (internally divided by 2 for Y extent).
-     * @param {number} halfD - Half-depth (Z extent).
+     * @param {number} halfW - Half-width (X extent of the AABB).
+     * @param {number} halfH - Half-height (Y extent of the AABB).
+     * @param {number} halfD - Half-depth (Z extent of the AABB).
      * @param {Array<{nx:number, ny:number, nz:number, d:number}>} planes - Frustum planes from _extractFrustumPlanes.
      * @returns {boolean} True if the box intersects the frustum.
      */
-    Donkeycraft.EntityRenderer.prototype._isAABBInFrustum = function (cx, cy, cz, halfW, fullH, halfD, planes) {
-        var halfH2 = fullH / 2;
-
+    Donkeycraft.EntityRenderer.prototype._isAABBInFrustum = function (cx, cy, cz, halfW, halfH, halfD, planes) {
         for (var i = 0; i < planes.length; i++) {
             var p = planes[i];
             var dist = cx * p.nx + cy * p.ny + cz * p.nz + p.d;
-            var radius = halfW * Math.abs(p.nx) + halfH2 * Math.abs(p.ny) + halfD * Math.abs(p.nz);
+            var radius = halfW * Math.abs(p.nx) + halfH * Math.abs(p.ny) + halfD * Math.abs(p.nz);
 
             if (dist < -radius) {
                 return false;
@@ -1198,12 +1233,13 @@
 
             // Fallback: if the camera doesn't provide view/projection matrices, use a
             // simplified angle check relative to the camera's forward direction.
+            // Uses FRUSTUM_FORWARD_THRESHOLD for consistency with the main path.
             if (camForward) {
                 var horizDist = Math.sqrt(dx * dx + dz * dz);
                 var entDist = Math.sqrt(horizDist * horizDist + dy * dy);
                 if (entDist > FRUSTUM_MIN_DISTANCE) {
                     var dot = (dx * camForward.x + dy * camForward.y + dz * camForward.z) / entDist;
-                    if (dot < 0.0) { // ~90° from camera forward direction
+                    if (dot < FRUSTUM_FORWARD_THRESHOLD) {
                         return false;
                     }
                 }
@@ -1469,6 +1505,8 @@
      * compatibility with the larger render pipeline. State restoration is guaranteed
      * via try-finally even if rendering errors occur.
      *
+     * Updates `this.entitiesRendered` and `this.drawCalls` statistics each frame.
+     *
      * Prerequisites:
      * - EntityManager must be set via setEntityManager()
      * - Camera must be set via setCamera() for frustum culling
@@ -1530,6 +1568,8 @@
      * such as highlighting a selected entity or rendering a debug representation.
      * Activates the terrain shader program before rendering.
      * WebGL state is saved before rendering and restored afterward via try-finally.
+     *
+     * Updates `this.entitiesRendered` (set to 1) and `this.drawCalls` (actual draw call count).
      *
      * @param {Donkeycraft.Entity} entity - Entity to render. Must be alive (isAlive() returns true).
      */

@@ -65,7 +65,10 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Experience** — XP levels, orb pickup, spending on enchanting/anvil
 
 ### Entities & Mobs
+- **Entity engine** — Keyframe-based skeletal animation with Catmull-Rom cubic Hermite interpolation for smooth bone transforms, animation state machine with blend transitions, semi-implicit Euler physics integration (src/game/entity-engine.js)
 - **Entity renderer** — Bone-based skeletal animation with per-mesh draw calls, pivot-point rotation centers, mesh caching (VBO/IBO), frustum culling (AABB vs 6-plane test + forward-facing cone check), depth-sorted batch rendering, and WebGL context loss handling with automatic mesh rebuild (src/render/entity-renderer.js)
+- **Entity lifecycle** — Spawn/despawn management, spatial hash for O(1) proximity queries, player-centric awareness tiers (NEAR/FAR/DISTANT) for render culling, ground check injection system (src/game/entity-manager.js)
+- **Base entity class** — Position/velocity/rotation API with immutable getters, skeleton templates (bipedal, quadruped, small, static, door, projectile), animation controller with forced states (attack, hurt, defend), ground detection integration (src/game/entity.js)
 - **Passive mobs** — Cow, pig, sheep, chicken with wandering, fleeing, and item drops
 - **Hostile mobs** — Zombie, skeleton, spider, creeper (proximity ignition/explosion), enderman
 - **Boss mobs** — Ender Dragon and Wither with phase-based behavior (fly/land/breath/attack/death)
@@ -168,8 +171,9 @@ src/                   # Source.
     damage.js             # Hitbox, damage, knockback, fall damage, stamina management
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
-    entity-manager.js     # Spawn/despawn/tick management
-    entity.js             # Base entity class
+    entity-engine.js      # Animation clips, skeletal animation, kinematics, skeleton templates
+    entity-manager.js     # Entity lifecycle, spatial hash, awareness tiers
+    entity.js             # Base entity class with animation and bone support
     experience.js         # XP levels and orbs
     flying.js             # Creative/spectator flying
     game-mode.js          # Survival/Creative/Spectator modes
