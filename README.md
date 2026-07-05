@@ -123,10 +123,10 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-src/                   # Source.
+src/
   core.css           # Base styles: full-screen canvas, overlay positioning
-  game.js             # Main game class: loop, init, pause/resume
-  core/                 # Core infrastructure
+  game.js            # Main game class: loop, init, pause/resume
+  core/
     audio.js              # Web Audio API wrapper
     cache.js              # Asset cache (texture atlases, sounds)
     config.js             # Game configuration constants
@@ -139,23 +139,7 @@ src/                   # Source.
     namespace.js          # Global Donkeycraft namespace object
     timer.js              # Delta-time accumulator, tick scheduler
     world-store.js        # IndexedDB chunk storage
-  gen/                  # Procedural generation
-    cave-generator.js     # 3D noise-based cave systems
-    end-generator.js      # End terrain: island classification, end cities
-    mob-spawning.js       # Spawn definitions, chunk/light/biome checks, mob caps
-    nether-generator.js   # Nether terrain: bedrock, lava, basalt columns
-    noise.js              # Permutation table, fade, lerp, grad, 2D Perlin, FBM, Mulberry32
-    ore-generator.js      # Ore vein placement per biome/Y-level
-    sound-manager.js      # SoundGenerator, AssetManager, AssetGenerator
-    structure-generator.js# Surface structures
-    terrain-generator.js  # Heightmap generation with Perlin noise layers
-    texture-blocks.js     # Block textures: ores, metals, concrete/wool families
-    texture-core.js       # TextureGenerator core: canvas, cache, base generators
-    texture-decorative.js # Plants, redstone components, furniture, block mapping
-    texture-special.js    # Nether/end textures: basalt, ancient debris, magma
-    texture-terrain.js    # Terrain textures: sand, snow, ice, lava, bedrock
-    water-generator.js    # Lake detection, surface water flow
-  game/                 # Game logic
+  game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification
     block-action.js       # Block breaking with tool multipliers
@@ -204,7 +188,23 @@ src/                   # Source.
     tool.js               # 7 material tiers
     wiring.js             # Redstone dust/wire
     world-utils.js        # Coordinate utilities
-  render/               # WebGL rendering engine
+  gen/
+    cave-generator.js     # 3D noise-based cave systems
+    end-generator.js      # End terrain: island classification, end cities
+    mob-spawning.js       # Spawn definitions, chunk/light/biome checks, mob caps
+    nether-generator.js   # Nether terrain: bedrock, lava, basalt columns
+    noise.js              # Permutation table, fade, lerp, grad, 2D Perlin, FBM, Mulberry32
+    ore-generator.js      # Ore vein placement per biome/Y-level
+    sound-manager.js      # SoundGenerator, AssetManager, AssetGenerator
+    structure-generator.js# Surface structures
+    terrain-generator.js  # Heightmap generation with Perlin noise layers
+    texture-blocks.js     # Block textures: ores, metals, concrete/wool families
+    texture-core.js       # TextureGenerator core: canvas, cache, base generators
+    texture-decorative.js # Plants, redstone components, furniture, block mapping
+    texture-special.js    # Nether/end textures: basalt, ancient debris, magma
+    texture-terrain.js    # Terrain textures: sand, snow, ice, lava, bedrock
+    water-generator.js    # Lake detection, surface water flow
+  render/
     break-particles.js    # Block breaking particles
     camera.js             # First-person camera
     chunk-mesh.js         # Per-chunk GPU buffer management
@@ -221,32 +221,48 @@ src/                   # Source.
     sky.js                # Sky dome rendering
     terrain-renderer.js   # Chunk rendering with frustum culling
     weather.js            # Weather particle effects
-  ui/                   # Inventory, HUD, GUI screens
-    anvil-ui.js             # Anvil UI (rename/repair)
-    anvil-ui.css            # Anvil UI Styles
-    chest-ui.js             # Chest GUI
-    crafting-grid.js        # 3×3 crafting table
-    creative-inventory.js   # Creative item browser
-    debug-overlay.js        # F3 debug screen
-    enchanting-ui.js        # Enchanting GUI
-    furnace-ui.js           # Furnace GUI
-    gamemode-badge.js       # Game mode badge (SURVIVAL/CREATIVE) with click-to-swap
-    gui-core.css            # GUI styles: panels, tabs, slots, buttons
-    gui-elements.js         # DOM UI components (drag-drop, tabs, buttons)
-    gui-manager.js          # Screen open/close system
-    health-bar.js           # Health HUD overlay
-    hotbar.js               # Hotbar UI (9 slots)
-    hotbar.js               # Hotbar UI with integrated stamina bar (yellow progress, semi-transparent, animated)
-    hunger-bar.js           # Hunger HUD overlay
-    inventory.js            # Multi-slot inventories
-    item-stack.js           # Item stacks with NBT-like tags
-    keybindings-panel.js    # Keybind configuration UI
-    loading-screen.js       # Loading screen UI
-    speed-indicator.js      # Speed indicator/control (sneak/walk/run/turbo buttons)
-    xp-bar.js               # XP level bar
-    
+  ui/
+    anvil-ui.css          # Anvil UI styles
+    anvil-ui.js           # Anvil UI (rename/repair)
+    chest-ui.css          # Chest GUI styles
+    chest-ui.js           # Chest GUI
+    crafting-grid.css     # Crafting table styles
+    crafting-grid.js      # 3×3 crafting table
+    creative-inventory.css# Creative inventory styles
+    creative-inventory.js # Creative item browser
+    debug-overlay.css     # Debug screen styles
+    debug-overlay.js      # F3 debug screen
+    enchanting-ui.css     # Enchanting GUI styles
+    enchanting-ui.js      # Enchanting GUI
+    furnace-ui.css        # Furnace GUI styles
+    furnace-ui.js         # Furnace GUI
+    gamemode-badge.css    # Game mode badge styles
+    gamemode-badge.js     # Game mode badge (SURVIVAL/CREATIVE) with click-to-swap
+    gui-core.css          # Core GUI styles: panels, tabs, slots, buttons
+    gui-elements.css      # UI element styles
+    gui-elements.js       # DOM UI components (drag-drop, tabs, buttons)
+    gui-manager.css       # GUI manager styles
+    gui-manager.js        # Screen open/close system
+    health-bar.css        # Health bar styles
+    health-bar.js         # Health HUD overlay
+    hotbar.css            # Hotbar styles
+    hotbar.js             # Hotbar UI with integrated stamina bar
+    hunger-bar.css        # Hunger bar styles
+    hunger-bar.js         # Hunger HUD overlay
+    inventory.css         # Inventory panel styles
+    inventory.js          # Multi-slot inventories
+    item-stack.css        # Item stack styles
+    item-stack.js         # Item stacks with NBT-like tags
+    keybindings-panel.css # Keybinds panel styles
+    keybindings-panel.js  # Keybind configuration UI
+    loading-screen.css    # Loading screen styles
+    loading-screen.js     # Loading screen UI
+    speed-indicator.css   # Speed indicator styles
+    speed-indicator.js    # Speed indicator/control (sneak/walk/run/turbo buttons)
+    xp-bar.css            # XP bar styles
+    xp-bar.js             # XP level bar
 
-README.md           # This file
+README.md               # This file
 ```
 
 ## License
