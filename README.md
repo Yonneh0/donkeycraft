@@ -123,7 +123,11 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-src/
+terrain.html        # Singlefile Terrain Generator Viewer/Debugger
+textures.html       # Singlefile Texture Extractor, to create js assets from tile sets
+README.md           # This file
+ref/                # Temporary development references (local)
+src/                # Sauce
   core.css           # Base styles: full-screen canvas, overlay positioning
   game.js            # Main game class: loop, init, pause/resume
   core/
@@ -142,22 +146,22 @@ src/
   game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification
+    block.js              # Block definitions (257 blocks)
     block-action.js       # Block breaking with tool multipliers
     block-models.js       # Face/texture models with AO
     block-placement.js    # Block placement with collision checks
     block-state.js        # Block state variants (direction, color)
     block-types.js        # Block classification (solid, transparent, liquid)
-    block.js              # Block definitions (257 blocks)
     boss-mobs.js          # Ender Dragon, Wither
-    chunk-manager.js      # Chunk loading/unloading
     chunk.js              # 16×256×16 chunk volume
+    chunk-manager.js      # Chunk loading/unloading
     collision.js          # AABB collision detection
     damage.js             # Hitbox, damage, knockback, fall damage, stamina management
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
+    entity.js             # Base entity class with animation and bone support
     entity-engine.js      # Animation clips, skeletal animation, kinematics, skeleton templates
     entity-manager.js     # Entity lifecycle, spatial hash, awareness tiers
-    entity.js             # Base entity class with animation and bone support
     experience.js         # XP levels and orbs
     flying.js             # Creative/spectator flying
     game-mode.js          # Survival/Creative/Spectator modes
@@ -262,7 +266,6 @@ src/
     xp-bar.css            # XP bar styles
     xp-bar.js             # XP level bar
 
-README.md               # This file
 ```
 
 ## License
