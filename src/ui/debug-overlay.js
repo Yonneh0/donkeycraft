@@ -162,7 +162,7 @@
         this._cache.gameMode = el.querySelector('.mode-val');
 
         // Renderer toggle keys in display order
-        const rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui'];
+        const rendererKeys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui', 'entity'];
         const togglesContainer = el.querySelector('.dk-renderer-toggles');
 
         for (let _i = 0; _i < rendererKeys.length; _i++) {
@@ -570,7 +570,7 @@
         const toggles = {};
         if (!this._game || typeof this._game.getRendererVisibility !== 'function') return toggles;
 
-        const keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui'];
+        const keys = ['sky', 'terrain', 'particles', 'hand', 'weather', 'gui', 'entity'];
         for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
             try {

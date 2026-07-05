@@ -65,6 +65,7 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Experience** — XP levels, orb pickup, spending on enchanting/anvil
 
 ### Entities & Mobs
+- **Entity renderer** — Bone-based skeletal animation with per-mesh draw calls, pivot-point rotation centers, mesh caching (VBO/IBO), frustum culling (AABB vs 6-plane test + forward-facing cone check), depth-sorted batch rendering, and WebGL context loss handling with automatic mesh rebuild (src/render/entity-renderer.js)
 - **Passive mobs** — Cow, pig, sheep, chicken with wandering, fleeing, and item drops
 - **Hostile mobs** — Zombie, skeleton, spider, creeper (proximity ignition/explosion), enderman
 - **Boss mobs** — Ender Dragon and Wither with phase-based behavior (fly/land/breath/attack/death)
@@ -219,6 +220,7 @@ src/
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     weather.js            # Weather particle effects
     map-renderer.js       # 2D overhead map, rotating minimap, time-of-day dial, surface cache
+    entity-renderer.js  # Bone-based skeletal animation, mesh caching, frustum culling, context loss recovery
   ui/                 # Inventory, HUD, GUI screens (19 files, ~7,800 lines)
     gui-core.css            # GUI styles: panels, tabs, slots, buttons
     item-stack.js           # Item stacks with NBT-like tags

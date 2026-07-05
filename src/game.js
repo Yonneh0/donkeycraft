@@ -99,6 +99,7 @@
         this._renderHand = true;
         this._renderWeather = true;
         this._renderGUI = true;
+        this._renderEntity = true;
 
         // GuiManager reference for GUI screen management (set externally after init)
         this._guiManager = null;
@@ -660,7 +661,8 @@
         return {
             'sky': '_renderSky', 'terrain': '_renderTerrain',
             'particles': '_renderParticles', 'hand': '_renderHand',
-            'weather': '_renderWeather', 'gui': '_renderGUI'
+            'weather': '_renderWeather', 'gui': '_renderGUI',
+            'entity': '_renderEntity'
         };
     };
 

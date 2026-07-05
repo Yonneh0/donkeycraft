@@ -419,15 +419,18 @@
     function _rotateMat4X(mat, rad) {
         var c = Math.cos(rad);
         var s = Math.sin(rad);
-        // Post-multiply by R_x(θ): column 1 = col1*c + col2*s, column 2 = -col1*s + col2*c
+        // Post-multiply by R_x(θ): column 1 = col1*c + col2*s, column 2 = -col1*s + col2*c.
+        // Also updates row-0 components (indices 4, 8) of columns 1 and 2.
+        var m4 = mat[4] * c + mat[8] * s;
         var m5 = mat[5] * c + mat[9] * s;
         var m6 = mat[6] * c + mat[10] * s;
         var m7 = mat[7] * c + mat[11] * s;
+        var m8 = -mat[4] * s + mat[8] * c;
         var m9 = -mat[5] * s + mat[9] * c;
         var m10 = -mat[6] * s + mat[10] * c;
         var m11 = -mat[7] * s + mat[11] * c;
-        mat[5] = m5; mat[6] = m6; mat[7] = m7;
-        mat[9] = m9; mat[10] = m10; mat[11] = m11;
+        mat[4] = m4; mat[5] = m5; mat[6] = m6; mat[7] = m7;
+        mat[8] = m8; mat[9] = m9; mat[10] = m10; mat[11] = m11;
         return mat;
     }
 
@@ -441,15 +444,18 @@
     function _rotateMat4Y(mat, rad) {
         var c = Math.cos(rad);
         var s = Math.sin(rad);
-        // Post-multiply by R_y(θ): column 0 = col0*c - col2*s, column 2 = col0*s + col2*c
+        // Post-multiply by R_y(θ): column 0 = col0*c - col2*s, column 1 = col1*c - col3*s,
+        // column 2 = col0*s + col2*c, column 3 = col1*s + col3*c.
         var m0 = mat[0] * c - mat[8] * s;
+        var m1 = mat[1] * c - mat[9] * s;
         var m2 = mat[2] * c - mat[10] * s;
         var m3 = mat[3] * c - mat[11] * s;
         var m8 = mat[0] * s + mat[8] * c;
+        var m9 = mat[1] * s + mat[9] * c;
         var m10 = mat[2] * s + mat[10] * c;
         var m11 = mat[3] * s + mat[11] * c;
-        mat[0] = m0; mat[2] = m2; mat[3] = m3;
-        mat[8] = m8; mat[10] = m10; mat[11] = m11;
+        mat[0] = m0; mat[1] = m1; mat[2] = m2; mat[3] = m3;
+        mat[8] = m8; mat[9] = m9; mat[10] = m10; mat[11] = m11;
         return mat;
     }
 
@@ -770,6 +776,11 @@
      * The resulting matrix transforms vertices as: M × v = R × v + T, where R is the
      * rotation submatrix and T is the translation vector.
      *
+     * When a pivot is provided, the translation is adjusted so that rotations occur
+     * around the pivot point rather than the mesh center. The adjustment is:
+     *   T' = P - R × P  (where P is the pivot position)
+     * This ensures the pivot point remains fixed during rotation.
+     *
      * @private
      * @param {number} px - World X position.
      * @param {number} py - World Y position.
@@ -777,9 +788,10 @@
      * @param {number} rx - Rotation around X axis in radians.
      * @param {number} ry - Rotation around Y axis in radians.
      * @param {number} rz - Rotation around Z axis in radians.
+     * @param {Object} [pivot] - Optional pivot point {x, y, z} for rotation center.
      * @returns {Float32Array} New column-major 4x4 model matrix (16 elements).
      */
-    Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz) {
+    Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz, pivot) {
         var m = _createMat4();
 
         // Apply rotations (YXZ order — yaw first, then pitch, then roll)
@@ -787,8 +799,25 @@
         if (rx !== 0) _rotateMat4X(m, rx);
         if (rz !== 0) _rotateMat4Z(m, rz);
 
+        // Adjust translation for pivot-based rotation.
+        // When a pivot is defined, the model matrix must compensate so that
+        // rotations occur around the pivot point: T' = P - R × P.
+        var tx = px, ty = py, tz = pz;
+        if (pivot) {
+            var pxv = pivot.x || 0;
+            var pyv = pivot.y || 0;
+            var pzv = pivot.z || 0;
+            // R × P for rotation-only matrix (only indices 0-10 matter, 12-14 are zero)
+            var rxp = m[0] * pxv + m[1] * pyv + m[2] * pzv;
+            var ryp = m[4] * pxv + m[5] * pyv + m[6] * pzv;
+            var rzp = m[8] * pxv + m[9] * pyv + m[10] * pzv;
+            tx = px - rxp;
+            ty = py - ryp;
+            tz = pz - rzp;
+        }
+
         // Apply translation
-        _translateMat4(m, px, py, pz);
+        _translateMat4(m, tx, ty, tz);
 
         return m;
     };
@@ -800,19 +829,20 @@
      * Bone rotations are kept in entity-local space (the animation controller provides
      * rotations relative to the entity's facing direction).
      *
-     * If a bone has a pivot (rotation center), rotations are applied around that pivot point
-     * by translating to pivot, rotating, and translating back. This ensures limbs rotate
-     * naturally from their joints rather than from the origin.
+     * The bone's `offset` determines its world-space position relative to the entity origin.
+     * The bone's `pivot` (when defined) is used for rotation adjustment — it specifies the
+     * point around which bone rotations occur, ensuring limbs rotate naturally from their
+     * joints rather than from the mesh center.
      *
      * @private
      * @param {Object} entity - Entity instance with getPosition(), getRotation(), getBones() methods.
      * @param {string} boneName - Bone name to compute transform for.
      * @param {Object.<string, {rx: number, ry: number, rz: number}>} boneTransforms - Bone rotation transforms from animation controller.
-     * @returns {{x: number, y: number, z: number, rx: number, ry: number, rz: number}} World-space position and local rotation.
+     * @returns {{x: number, y: number, z: number, rx: number, ry: number, rz: number, pivot: Object|null}} World-space position (at offset), local rotation, and pivot for rotation adjustment.
      */
     Donkeycraft.EntityRenderer.prototype._computeBoneWorldTransform = function (entity, boneName, boneTransforms) {
         var pos = entity.getPosition();
-        if (!pos) return { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
+        if (!pos) return { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, pivot: null };
 
         var rot = entity.getRotation();
         var bones = entity.getBones();
@@ -830,28 +860,22 @@
         }
 
         var offset = boneDef && boneDef.offset ? boneDef.offset : { x: 0, y: 0, z: 0 };
-        var pivot = boneDef && boneDef.pivot ? boneDef.pivot : { x: 0, y: 0, z: 0 };
+        var pivot = boneDef && boneDef.pivot ? boneDef.pivot : null;
 
-        // Apply entity yaw rotation to bone offset and pivot for correct world-space positioning.
+        // Apply entity yaw rotation to bone offset for correct world-space positioning.
         var yaw = rot ? rot.yaw : 0;
         var cosYaw = Math.cos(yaw);
         var sinYaw = Math.sin(yaw);
 
-        // Rotate the offset by entity yaw
+        // Rotate the offset by entity yaw (only XZ plane since yaw is Y-axis rotation)
         var localOffsetX = offset.x * cosYaw - offset.z * sinYaw;
         var localOffsetZ = offset.x * sinYaw + offset.z * cosYaw;
         var localOffsetY = offset.y;
 
-        // Rotate the pivot by entity yaw (pivot is in bone-local space)
-        var localPivotX = pivot.x * cosYaw - pivot.z * sinYaw;
-        var localPivotZ = pivot.x * sinYaw + pivot.z * cosYaw;
-        var localPivotY = pivot.y;
-
-        // When a pivot is defined, the bone position is placed at the pivot point so that
-        // rotations occur around the joint center rather than the mesh center.
-        var finalX = pos.x + localPivotX;
-        var finalY = pos.y + localPivotY;
-        var finalZ = pos.z + localPivotZ;
+        // World-space position uses the rotated offset (not pivot).
+        var finalX = pos.x + localOffsetX;
+        var finalY = pos.y + localOffsetY;
+        var finalZ = pos.z + localOffsetZ;
 
         // Use Number() with fallback to handle falsy animation values (0, null, undefined)
         // without treating 0 radians as "no rotation" — 0 is a valid rotation.
@@ -865,7 +889,8 @@
             z: finalZ,
             rx: animRx,
             ry: animRy,
-            rz: animRz
+            rz: animRz,
+            pivot: pivot
         };
     };
 
@@ -966,15 +991,16 @@
      * @param {number} ry - Rotation Y in radians.
      * @param {number} rz - Rotation Z in radians.
      * @param {string} color - Hex color string (e.g., '#8B4513').
+     * @param {Object} [pivot] - Optional pivot point {x, y, z} for rotation center adjustment.
      * @returns {boolean} True if the draw call was issued successfully.
      */
-    Donkeycraft.EntityRenderer.prototype._drawMesh = function (meshCache, px, py, pz, rx, ry, rz, color) {
+    Donkeycraft.EntityRenderer.prototype._drawMesh = function (meshCache, px, py, pz, rx, ry, rz, color, pivot) {
         var gl = this._gl;
         var shaderManager = this._shaderManager;
         if (!gl || !meshCache || !shaderManager) return false;
 
         var rgb = this._parseHexColor(color);
-        var modelMatrix = this._buildModelMatrix(px, py, pz, rx, ry, rz);
+        var modelMatrix = this._buildModelMatrix(px, py, pz, rx, ry, rz, pivot);
 
         if (!this._bindMeshAttributes(meshCache, shaderManager)) {
             return false;
@@ -1393,7 +1419,8 @@
                 worldTransform.rx,
                 worldTransform.ry,
                 worldTransform.rz,
-                shapeDef.color
+                shapeDef.color,
+                worldTransform.pivot
             );
 
             if (success) {
