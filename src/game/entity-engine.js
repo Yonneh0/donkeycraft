@@ -1,4 +1,4 @@
-﻿// Donkeycraft — Entity Engine
+// Donkeycraft — Entity Engine
 // Handles entity animations, movement kinematics, bone transforms, and state machines.
 (function () {
     'use strict';
@@ -21,10 +21,10 @@
     /** Maximum delta time for physics updates (prevents physics explosions on tab switch). */
     var MAX_DELTA_TIME = 0.1;
 
-    /** Ground friction damping factor per second. */
+    /** Ground friction damping factor per second (applied when on solid ground). */
     var DEFAULT_GROUND_FRICTION = 0.85;
 
-    /** Air damping factor per second (1.0 = no damping). */
+    /** Air damping factor per second (1.0 = no damping, 0.95 = light air resistance). */
     var DEFAULT_AIR_DAMPING = 0.98;
 
     /** Gravity constant in blocks/second² (negative = downward). */
@@ -38,6 +38,12 @@
 
     /** Maximum jump cooldown duration in seconds. */
     var MAX_JUMP_COOLDOWN = 0.1;
+
+    /** Base rate multiplier for ground friction (prevents frame-rate dependency). */
+    var GROUND_FRICTION_BASE_RATE = 5.0;
+
+    /** Maximum animation clip cache size (LRU eviction when exceeded). */
+    var MAX_ANIMATION_CACHE_SIZE = 64;
 
     // ============================================================
     // Animation System — Keyframe-based skeletal animation
@@ -909,8 +915,8 @@
                     this.velocity.y = 0;
                 }
 
-                // Apply ground friction to horizontal movement
-                var frictionDamp = Math.pow(this.groundFriction, deltaTime * 10);
+                // Apply ground friction to horizontal movement (frame-rate independent).
+                var frictionDamp = Math.pow(this.groundFriction, deltaTime * GROUND_FRICTION_BASE_RATE);
                 this.velocity.x *= frictionDamp;
                 this.velocity.z *= frictionDamp;
             }
@@ -949,6 +955,19 @@
      */
     Donkeycraft.KinematicState.prototype.getHorizontalSpeed = function () {
         return Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+    };
+
+    /**
+     * setHorizontalSpeed — Set the horizontal speed magnitude and direction from an angle.
+     * Converts a speed (blocks/s) and yaw (radians) into velocity components on the XZ plane.
+     * Yaw of 0 points toward negative Z (forward), consistent with the entity rotation system.
+     * @param {number} speed - Horizontal speed in blocks/second (non-negative).
+     * @param {number} yaw - Direction angle in radians (0 = negative Z / forward).
+     */
+    Donkeycraft.KinematicState.prototype.setHorizontalSpeed = function (speed, yaw) {
+        if (speed < 0) speed = 0;
+        this.velocity.x = -Math.sin(yaw) * speed;
+        this.velocity.z = -Math.cos(yaw) * speed;
     };
 
     // ============================================================
@@ -1158,23 +1177,83 @@
         this._kinematics.velocity.z = vz || 0;
     };
 
-    /** Animation clip cache to avoid redundant object creation. */
+    /**
+     * Animation clip cache to avoid redundant object creation.
+     * @type {Object.<string, Donkeycraft.AnimationClip>}
+     * @private
+     */
     var _animationClipCache = {};
 
     /**
+     * LRU access order for cache eviction: [key1, key2, ...] (most recent at end).
+     * @type {Array<string>}
+     * @private
+     */
+    var _animationCacheOrder = [];
+
+    /**
+     * _getCachedClip — Retrieve a cached animation clip, promoting it to most-recently-used.
+     * Returns null if the clip is not cached.
+     * @private
+     * @param {string} name - Clip name.
+     * @returns {Donkeycraft.AnimationClip|null} Cached clip or null.
+     */
+    function _getCachedClip (name) {
+        var idx = _animationCacheOrder.indexOf(name);
+        if (idx === -1) return null;
+
+        // Promote to most-recently-used
+        _animationCacheOrder.splice(idx, 1);
+        _animationCacheOrder.push(name);
+        return _animationClipCache[name];
+    }
+
+    /**
+     * _cacheClip — Cache an animation clip with LRU eviction when full.
+     * @private
+     * @param {string} name - Clip name.
+     * @param {Donkeycraft.AnimationClip} clip - Clip to cache.
+     */
+    function _cacheClip (name, clip) {
+        // Evict least-recently-used if at capacity
+        while (_animationCacheOrder.length >= MAX_ANIMATION_CACHE_SIZE) {
+            var oldest = _animationCacheOrder.shift();
+            delete _animationClipCache[oldest];
+        }
+
+        _animationClipCache[name] = clip;
+
+        var existingIdx = _animationCacheOrder.indexOf(name);
+        if (existingIdx !== -1) {
+            _animationCacheOrder.splice(existingIdx, 1);
+        }
+        _animationCacheOrder.push(name);
+    }
+
+    /**
+     * clearAnimationClipCache — Clear all cached animation clips. Useful for memory management.
+     */
+    Donkeycraft.clearAnimationClipCache = function () {
+        _animationClipCache = {};
+        _animationCacheOrder = [];
+    };
+
+    /**
      * playAnimation — Immediately play a named animation (bypasses state machine auto-selection).
+     * Uses cached clips when available to avoid redundant object creation.
      * @param {string} name - Animation clip name (must exist in Donkeycraft.AnimationDefinitions).
      */
     Donkeycraft.EntityAnimationController.prototype.playAnimation = function (name) {
         var def = Donkeycraft.AnimationDefinitions[name];
         if (!def) return;
 
-        var cachedClip = _animationClipCache[name];
+        var cachedClip = _getCachedClip(name);
         if (!cachedClip) {
             cachedClip = new Donkeycraft.AnimationClip(name, def.duration, def.loop, def.keyframes);
-            _animationClipCache[name] = cachedClip;
+            _cacheClip(name, cachedClip);
         }
 
+        // Clone the cached clip so each entity gets its own independent instance.
         var animationClip = new Donkeycraft.AnimationClip(
             cachedClip.name,
             cachedClip.duration,

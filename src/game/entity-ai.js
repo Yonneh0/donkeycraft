@@ -504,7 +504,8 @@
      */
     Donkeycraft.AStarPathfinder.prototype.findPath = function (startX, startY, startZ, endX, endY, endZ, maxSteps, includeVertical) {
         maxSteps = maxSteps || Donkeycraft.AStarDefaults.MAX_STEPS;
-        includeVertical = includeVertical !== false;
+        // Default to ground-level pathfinding only (no vertical movement).
+        includeVertical = includeVertical === true;
 
         if (typeof startX !== 'number' || typeof startY !== 'number' || typeof startZ !== 'number' ||
             typeof endX !== 'number' || typeof endY !== 'number' || typeof endZ !== 'number') {
@@ -708,7 +709,7 @@
     };
 
     // ============================================================
-    // Shared Movement Helper
+    // Shared Movement Helper (private — scoped within IIFE)
     // ============================================================
 
     /**
@@ -723,7 +724,7 @@
      *   - useFallback: Whether to use direct movement as fallback
      * @returns {boolean} True if movement was applied.
      */
-    Donkeycraft._followPathToTarget = function (context) {
+    var _followPathToTarget = function (context) {
         var ai = context.ai;
         var speed = context.speed || 1.0;
         var currentPath = context.currentPath;
@@ -1015,7 +1016,7 @@
             this._recalcWanderPath();
         }
 
-        var moved = Donkeycraft._followPathToTarget({
+        var moved = _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.WANDER,
             currentPath: this._currentPath,
@@ -1115,7 +1116,7 @@
             this._recalcChasePath(targetPos);
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.CHASE,
             currentPath: this._currentPath,
@@ -1217,7 +1218,7 @@
             this._recalcFleePath(target.getPosition());
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.FLEE,
             currentPath: this._currentPath,
@@ -1309,7 +1310,7 @@
             this._recalcStalkPath(targetPos);
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.AMBUSH,
             currentPath: this._currentPath,
@@ -1413,7 +1414,7 @@
             this._recalcAttackPath(targetPos);
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.ATTACK,
             currentPath: this._currentPath,
@@ -1566,7 +1567,7 @@
             this._recalcFollowPath(targetPos);
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.FOLLOW,
             currentPath: this._currentPath,
@@ -1704,7 +1705,7 @@
             }
         }
 
-        Donkeycraft._followPathToTarget({
+        _followPathToTarget({
             ai: this.ai,
             speed: Donkeycraft.AISpeeds.PATROL,
             currentPath: this._currentPath,
@@ -1742,6 +1743,8 @@
 
     /**
      * HurtState — Entity reacts to being damaged with brief stun behavior.
+     * The state stores the damage source internally for potential flee decisions,
+     * and recovers to the previous state (or IDLE) once the stun duration expires.
      * @constructor
      * @param {number} [stunDuration=0.5] - Duration of stun in seconds.
      */
@@ -1749,16 +1752,29 @@
         Donkeycraft.AIStateInstance.call(this, Donkeycraft.AIState.HURT);
         this._stunDuration = stunDuration || 0.5;
         this._damageSource = null;
+
+        /** Internal reference to the previous state name for recovery after stun. */
+        this._recoveryState = null;
     };
     Donkeycraft.HurtState.prototype = Object.create(Donkeycraft.AIStateInstance.prototype);
     Donkeycraft.HurtState.prototype.constructor = Donkeycraft.HurtState;
 
     /**
      * setDamageSource — Set the source of damage for potential flee behavior.
+     * Also stores the current state as the recovery target.
      * @param {Donkeycraft.Entity} source - Entity that dealt damage.
      */
     Donkeycraft.HurtState.prototype.setDamageSource = function (source) {
         this._damageSource = source;
+    };
+
+    /**
+     * setRecoveryState — Set the state to return to after the stun ends.
+     * This decouples HurtState from external _previousState tracking.
+     * @param {string} stateName - State name to recover to.
+     */
+    Donkeycraft.HurtState.prototype.setRecoveryState = function (stateName) {
+        this._recoveryState = stateName || null;
     };
 
     Donkeycraft.HurtState.prototype.enter = function () {
@@ -1772,6 +1788,10 @@
         Donkeycraft.AIStateInstance.prototype.update.call(this, deltaTime);
 
         if (this.elapsedTime >= this._stunDuration) {
+            // Recover to the explicitly-set previous state, or fall back to IDLE.
+            if (this._recoveryState) {
+                return this._recoveryState;
+            }
             if (this.ai && this.ai._previousState) {
                 return this.ai._previousState;
             }
@@ -1798,6 +1818,8 @@
      * @param {Donkeycraft.Entity} entity - The entity this AI controls.
      */
     Donkeycraft.AIComponent = function (entity) {
+        // Hurt state instance — created early so other states can reference it.
+        var hurtStateInstance = new Donkeycraft.HurtState(0.5);
         /** Reference to the parent entity. */
         this.entity = entity || null;
 
@@ -1842,7 +1864,6 @@
         var attackState = new Donkeycraft.AttackState();
         var followState = new Donkeycraft.FollowState();
         var patrolState = new Donkeycraft.PatrolState([]);
-        var hurtState = new Donkeycraft.HurtState(0.5);
 
         this.stateMachine.registerState(idleState);
         this.stateMachine.registerState(wanderState);
@@ -1852,13 +1873,14 @@
         this.stateMachine.registerState(attackState);
         this.stateMachine.registerState(followState);
         this.stateMachine.registerState(patrolState);
-        this.stateMachine.registerState(hurtState);
+        this.stateMachine.registerState(hurtStateInstance);
 
         this.stateMachine.setAIComponent(this);
     };
 
     /**
      * setProfile — Set the behavior profile for this AI component.
+     * Also updates the HurtState's recovery reference with the current state.
      * @param {string|Object} profile - Profile name (e.g., 'zombie', 'cow') or custom profile object.
      */
     Donkeycraft.AIComponent.prototype.setProfile = function (profile) {
@@ -1876,6 +1898,12 @@
         }
 
         this.stateMachine.setState(Donkeycraft.AIState.IDLE);
+
+        // Update the hurt state's recovery target if it exists in the machine.
+        var hurtState = this.stateMachine._states && this.stateMachine._states[Donkeycraft.AIState.HURT];
+        if (hurtState && typeof hurtState.setRecoveryState === 'function') {
+            hurtState.setRecoveryState(Donkeycraft.AIState.IDLE);
+        }
     };
 
     /**
@@ -1899,6 +1927,7 @@
 
     /**
      * setTarget — Set the current AI target.
+     * Also triggers hurt state recovery if the target is the damage source.
      * @param {Donkeycraft.Entity} target - Target entity.
      */
     Donkeycraft.AIComponent.prototype.setTarget = function (target) {
@@ -2047,6 +2076,12 @@
             this._previousState = currentState;
         }
 
+        // Update the hurt state's recovery target with the current non-hurt state.
+        var hurtState = this.stateMachine._states && this.stateMachine._states[Donkeycraft.AIState.HURT];
+        if (hurtState && typeof hurtState.setRecoveryState === 'function' && currentState !== Donkeycraft.AIState.HURT) {
+            hurtState.setRecoveryState(currentState);
+        }
+
         this.stateMachine.tick(deltaTime);
 
         var newState = this.stateMachine.getState();
@@ -2066,18 +2101,43 @@
             if (vel && pos) {
                 var speed = Math.sqrt((vel.x || 0) * (vel.x || 0) + (vel.z || 0) * (vel.z || 0));
 
+                // Set animation speed to match AI movement behavior.
                 switch (stateName) {
-                    case Donkeycraft.AIState.ATTACK:
+                    case Donkeycraft.AIState.IDLE:
+                        this.entity._animationController.setSpeed(0, Math.atan2(vel.x || 0, vel.z || 0));
+                        break;
+                    case Donkeycraft.AIState.WANDER:
+                        if (speed < 0.5) {
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.WANDER, Math.atan2(vel.x || 0, vel.z || 0));
+                        }
+                        break;
+                    case Donkeycraft.AIState.PATROL:
+                        if (speed < 0.5) {
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.PATROL, Math.atan2(vel.x || 0, vel.z || 0));
+                        }
+                        break;
+                    case Donkeycraft.AIState.FOLLOW:
+                        if (speed < 0.5) {
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FOLLOW, Math.atan2(vel.x || 0, vel.z || 0));
+                        }
                         break;
                     case Donkeycraft.AIState.FLEE:
                         if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(3.0, Math.atan2(vel.x || 0, vel.z || 0));
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FLEE, Math.atan2(vel.x || 0, vel.z || 0));
                         }
                         break;
                     case Donkeycraft.AIState.CHASE:
                         if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(2.5, Math.atan2(vel.x || 0, vel.z || 0));
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.CHASE, Math.atan2(vel.x || 0, vel.z || 0));
                         }
+                        break;
+                    case Donkeycraft.AIState.AMBUSH:
+                        if (speed < 0.5) {
+                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.AMBUSH, Math.atan2(vel.x || 0, vel.z || 0));
+                        }
+                        break;
+                    case Donkeycraft.AIState.ATTACK:
+                        // Attack animation is handled by _performAttack via forced state.
                         break;
                     default:
                         break;

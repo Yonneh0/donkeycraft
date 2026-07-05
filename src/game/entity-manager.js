@@ -305,46 +305,61 @@
     };
 
     /**
-     * _injectWorldQueries — Inject world query callbacks into all AI-enabled entities.
-     * Sets up navmesh, block queries, and target references for autonomous behavior.
+     * _ensureNavMesh — Initialize the shared NavMesh if it doesn't exist yet.
      * @private
+     * @returns {Donkeycraft.NavMesh|null} NavMesh instance or null.
      */
-    Donkeycraft.EntityManager.prototype._injectWorldQueries = function () {
-        // Initialize shared NavMesh if not already created
+    Donkeycraft.EntityManager.prototype._ensureNavMesh = function () {
         if (!this._navMesh && Donkeycraft.NavMesh) {
             this._navMesh = new Donkeycraft.NavMesh(1);
         }
+        return this._navMesh;
+    };
 
-        var entities = this.getAllEntities();
-        for (var i = 0; i < entities.length; i++) {
-            var entity = entities[i];
+    /**
+     * _wireAINav — Wire AI navigation (navmesh, block query, player target) onto a single entity.
+     * @private
+     * @param {Donkeycraft.Entity} entity - Entity to wire.
+     */
+    Donkeycraft.EntityManager.prototype._wireAINav = function (entity) {
+        // Skip player entities
+        if (entity.type === 'player') return;
 
-            // Skip player entities
-            if (entity.type === 'player') continue;
+        // Ensure navmesh exists
+        var navMesh = this._ensureNavMesh();
 
-            // Set navmesh reference
-            if (entity.setAINavMesh && this._navMesh) {
-                entity.setAINavMesh(this._navMesh);
-            }
+        // Set navmesh reference
+        if (entity.setAINavMesh && navMesh) {
+            entity.setAINavMesh(navMesh);
+        }
 
-            // Set block query callback for navigation
-            if (entity.setAIBlockQuery && this._getBlockIdFn) {
-                entity.setAIBlockQuery(this._getBlockIdFn);
-            }
+        // Set block query callback for navigation
+        if (entity.setAIBlockQuery && this._getBlockIdFn) {
+            entity.setAIBlockQuery(this._getBlockIdFn);
+        }
 
-            // Set player as default target for hostile entities
-            if (entity.setAITarget && this._playerEntity && this._playerEntity.isAlive()) {
-                var profile = entity.profile || {};
-                var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
-                var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
+        // Set player as default target for hostile entities
+        if (entity.setAITarget && this._playerEntity && this._playerEntity.isAlive()) {
+            var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
+            var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
 
-                // Hostile entities (zombie, skeleton, spider, creeper) target the player
-                if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
-                    if (!entity.getAITarget || !entity.getAITarget()) {
-                        entity.setAITarget(this._playerEntity);
-                    }
+            // Hostile entities (zombie, skeleton, spider, creeper) target the player
+            if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
+                if (!entity.getAITarget || !entity.getAITarget()) {
+                    entity.setAITarget(this._playerEntity);
                 }
             }
+        }
+    };
+
+    /**
+     * _injectWorldQueries — Inject world query callbacks into all AI-enabled entities.
+     * @private
+     */
+    Donkeycraft.EntityManager.prototype._injectWorldQueries = function () {
+        var entities = this.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            this._wireAINav(entities[i]);
         }
     };
 
@@ -472,33 +487,12 @@
 
     /**
      * _spawnAIIntegration — Wire up AI navigation for a newly spawned entity.
+     * Delegates to _wireAINav for consistency with _injectWorldQueries.
      * @private
      * @param {Donkeycraft.Entity} entity - The spawned entity.
      */
     Donkeycraft.EntityManager.prototype._spawnAIIntegration = function (entity) {
-        // Initialize shared navmesh if needed
-        if (!this._navMesh && Donkeycraft.NavMesh) {
-            this._navMesh = new Donkeycraft.NavMesh(1);
-        }
-
-        // Set navmesh reference
-        if (entity.setAINavMesh && this._navMesh) {
-            entity.setAINavMesh(this._navMesh);
-        }
-
-        // Set block query callback for navigation
-        if (entity.setAIBlockQuery && this._getBlockIdFn) {
-            entity.setAIBlockQuery(this._getBlockIdFn);
-        }
-
-        // Set player target for hostile entities
-        if (entity.setAITarget && this._playerEntity && this._playerEntity.isAlive()) {
-            var aiComp = entity.getAIComponent ? entity.getAIComponent() : null;
-            var entityProfile = aiComp && aiComp.profile ? aiComp.profile : {};
-            if (entityProfile.chaseDistance > 0 || entityProfile.attackDamage > 0) {
-                entity.setAITarget(this._playerEntity);
-            }
-        }
+        this._wireAINav(entity);
     };
 
     /**
@@ -523,6 +517,7 @@
     /**
      * getEntitiesInRange — Get all alive entities within a spherical or horizontal range from a point.
      * Supports both 2D (cx, cz, radius) and 3D (cx, cy, cz, range) signatures.
+     * In 2D mode, iterates across all Y cells to ensure no entities are missed regardless of height.
      * @param {number} cx - Center X coordinate (or center Z if 2 args).
      * @param {number} [cy] - Center Y coordinate (3D) or radius (2D).
      * @param {number} [cz] - Center Z coordinate (3D only).
@@ -579,6 +574,7 @@
             var radius = cy || 10;
             var radiusSq = radius * radius;
             var cz2 = cz;
+            var cellSize = this._cellSize;
             var minCellX2 = Math.floor((cx - radius) / cellSize);
             var maxCellX2 = Math.floor((cx + radius) / cellSize);
             var minCellZ2 = Math.floor((cz2 - radius) / cellSize);
@@ -587,28 +583,35 @@
             var result2 = [];
             var visited2 = new Set();
 
-            for (var cellX2 = minCellX2; cellX2 <= maxCellX2; cellX2++) {
-                for (var cellZ2 = minCellZ2; cellZ2 <= maxCellZ2; cellZ2++) {
-                    var key2 = cellX2 + ',0,' + cellZ2;
-                    var cellSet2 = this._spatialHash[key2];
-                    if (!cellSet2) continue;
+            // Iterate across all Y cells within the radius to catch entities at any height.
+            var minCellY2 = Math.floor(-radius / cellSize);
+            var maxCellY2 = Math.floor(radius / cellSize);
 
-                    cellSet2.forEach(function (entityId) {
-                        if (visited2.has(entityId)) return;
-                        visited2.add(entityId);
+            for (var cellY2 = minCellY2; cellY2 <= maxCellY2; cellY2++) {
+                for (var cellX2 = minCellX2; cellX2 <= maxCellX2; cellX2++) {
+                    for (var cellZ2 = minCellZ2; cellZ2 <= maxCellZ2; cellZ2++) {
+                        var key2 = cellX2 + ',' + cellY2 + ',' + cellZ2;
+                        var cellSet2 = this._spatialHash[key2];
+                        if (!cellSet2) continue;
 
-                        var entity2 = this._entities[entityId];
-                        if (!entity2 || !entity2.isAlive() || !entity2.getPosition) return;
+                        cellSet2.forEach(function (entityId) {
+                            if (visited2.has(entityId)) return;
+                            visited2.add(entityId);
 
-                        var pos2 = entity2.getPosition();
-                        if (!pos2) return;
+                            var entity2 = this._entities[entityId];
+                            if (!entity2 || !entity2.isAlive() || !entity2.getPosition) return;
 
-                        var dx2 = pos2.x - cx;
-                        var dz2 = pos2.z - cz2;
-                        if (dx2 * dx2 + dz2 * dz2 <= radiusSq) {
-                            result2.push(entity2);
-                        }
-                    }, this);
+                            var pos2 = entity2.getPosition();
+                            if (!pos2) return;
+
+                            // 2D query: only check XZ distance (ignore Y).
+                            var dx2 = pos2.x - cx;
+                            var dz2 = pos2.z - cz2;
+                            if (dx2 * dx2 + dz2 * dz2 <= radiusSq) {
+                                result2.push(entity2);
+                            }
+                        }, this);
+                    }
                 }
             }
 
@@ -678,13 +681,19 @@
         // Inject world queries for AI navigation
         this._injectWorldQueries();
 
+        // Single-pass tick: update alive entities and collect dead ones.
         var toDespawn = [];
 
         for (var id in this._entities) {
             if (!this._entities.hasOwnProperty(id)) continue;
 
             var entity = this._entities[id];
-            if (!entity.isAlive()) continue;
+
+            // Collect dead entities for despawn after the tick loop.
+            if (!entity.isAlive()) {
+                toDespawn.push(parseInt(id, 10));
+                continue;
+            }
 
             try {
                 entity.tick(deltaTime);
@@ -693,26 +702,14 @@
                     this._updateSpatialHash(parseInt(id, 10), newPos);
                 }
             } catch (e) {
+                // Entity threw during tick — mark for despawn.
                 toDespawn.push(parseInt(id, 10));
             }
         }
 
-        var despawnedSet = new Set(toDespawn);
-        for (var id2 in this._entities) {
-            if (!this._entities.hasOwnProperty(id2)) continue;
-            var entity2 = this._entities[id2];
-            var entityId2 = parseInt(id2, 10);
-            if (despawnedSet.has(entityId2)) continue;
-            if (!entity2.isAlive()) {
-                despawnedSet.add(entityId2);
-                this.despawn(entityId2);
-            }
-        }
+        // Despawn all collected dead entities in a single pass.
         for (var i = 0; i < toDespawn.length; i++) {
-            var errorId = toDespawn[i];
-            if (!despawnedSet.has(errorId)) {
-                this.despawn(errorId);
-            }
+            this.despawn(toDespawn[i]);
         }
     };
 
