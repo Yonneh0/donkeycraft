@@ -409,11 +409,11 @@
     /**
      * takeDamage — Take damage from a source.
      * @param {number} amount - Damage amount.
-     * @param {string} [source='generic'] - Damage source type.
+     * @param {string} [source='mob'] - Damage source type (e.g., 'zombie', 'arrow', 'lava'). Defaults to 'mob' if falsy.
      * @returns {number} Actual damage dealt.
      */
     Donkeycraft.Entity.prototype.takeDamage = function (amount, source) {
-        source = source || 'generic';
+        source = source || 'mob';
         if (!this.isAlive() || this._destroyed) return 0;
 
         amount = Math.floor(amount);
@@ -672,7 +672,10 @@
             try {
                 this._subscribers[i](deltaTime);
             } catch (e) {
-                // A failing subscriber should not break the entity
+                // A failing subscriber should not break the entity — log for debugging.
+                if (typeof console !== 'undefined' && typeof console.error === 'function') {
+                    console.error('[Entity] Tick subscriber error for entity type "' + this.type + '" (id=' + this._id + '):', e);
+                }
             }
         }
     };

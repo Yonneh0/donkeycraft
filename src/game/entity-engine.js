@@ -15,29 +15,8 @@
     /** Default animation transition duration in seconds. */
     var DEFAULT_TRANSITION_DURATION = 0.2;
 
-    /** Default animation playback speed multiplier. */
-    var DEFAULT_ANIMATION_SPEED = 1.0;
-
     /** Maximum delta time for physics updates (prevents physics explosions on tab switch). */
     var MAX_DELTA_TIME = 0.1;
-
-    /** Ground friction damping factor per second (applied when on solid ground). */
-    var DEFAULT_GROUND_FRICTION = 0.85;
-
-    /** Air damping factor per second (1.0 = no damping, 0.95 = light air resistance). */
-    var DEFAULT_AIR_DAMPING = 0.98;
-
-    /** Gravity constant in blocks/second² (negative = downward). */
-    var DEFAULT_GRAVITY = -20.0;
-
-    /** Terminal velocity in blocks/second (max fall speed). */
-    var TERMINAL_VELOCITY = -60.0;
-
-    /** Jump impulse velocity in blocks/second upward. */
-    var JUMP_VELOCITY = 8.0;
-
-    /** Maximum jump cooldown duration in seconds. */
-    var MAX_JUMP_COOLDOWN = 0.1;
 
     /** Base rate multiplier for ground friction (prevents frame-rate dependency). */
     var GROUND_FRICTION_BASE_RATE = 5.0;
@@ -124,8 +103,14 @@
                 var next = i < kf.length - 1 ? kf[i + 1] : kf[kf.length <= 1 ? kf.length - 1 : 0];
 
                 var dt = (next.time - prev.time);
+                // Guard against zero-delta: when there's only one keyframe or adjacent keys share the same time,
+                // use a default delta to avoid division by zero. The tangent values will be zero (no interpolation).
                 if (dt === 0) {
-                    dt = 1.0;
+                    tangents.push({
+                        tangentIn: { rx: 0, ry: 0, rz: 0 },
+                        tangentOut: { rx: 0, ry: 0, rz: 0 }
+                    });
+                    continue;
                 }
 
                 tangents.push({
@@ -396,7 +381,7 @@
 
             // Advance previous animation time during transition.
             if (prev.time !== undefined) {
-                prev.time += deltaTime * (prev.speed || DEFAULT_ANIMATION_SPEED);
+                prev.time += deltaTime * (prev.speed || 1.0);
             }
 
             // Blend: current fades IN as blendT goes 0→1, previous fades OUT.

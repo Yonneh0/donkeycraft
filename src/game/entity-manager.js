@@ -57,9 +57,6 @@
         /** Cached far-tier entity IDs for rendering. */
         this._farEntities = [];
 
-        /** Cached ground check function reference to avoid redundant injection. */
-        this._groundCheckRef = null;
-
         // AI Navigation System
         /** Shared NavMesh instance for entity pathfinding. */
         this._navMesh = null;
@@ -285,13 +282,11 @@
 
     /**
      * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
-     * Skips injection if the same function was already injected last tick.
      * @private
      * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
      */
     Donkeycraft.EntityManager.prototype._injectGroundCheck = function (groundCheckFn) {
         if (!groundCheckFn || typeof groundCheckFn !== 'function') return;
-        if (groundCheckFn === this._groundCheckRef) return;
 
         var entities = this.getAllEntities();
         for (var i = 0; i < entities.length; i++) {
@@ -300,8 +295,6 @@
                 entity.setGroundCheck(groundCheckFn);
             }
         }
-
-        this._groundCheckRef = groundCheckFn;
     };
 
     /**

@@ -2100,41 +2100,33 @@
 
             if (vel && pos) {
                 var speed = Math.sqrt((vel.x || 0) * (vel.x || 0) + (vel.z || 0) * (vel.z || 0));
+                var yaw = Math.atan2(vel.x || 0, vel.z || 0);
 
                 // Set animation speed to match AI movement behavior.
+                // Always update animation speed when in a movement state —
+                // the old `speed < 0.5` guard caused animations to stick at
+                // their previous speed when the entity started/stopped moving.
                 switch (stateName) {
                     case Donkeycraft.AIState.IDLE:
-                        this.entity._animationController.setSpeed(0, Math.atan2(vel.x || 0, vel.z || 0));
+                        this.entity._animationController.setSpeed(0, yaw);
                         break;
                     case Donkeycraft.AIState.WANDER:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.WANDER, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.WANDER, yaw);
                         break;
                     case Donkeycraft.AIState.PATROL:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.PATROL, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.PATROL, yaw);
                         break;
                     case Donkeycraft.AIState.FOLLOW:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FOLLOW, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FOLLOW, yaw);
                         break;
                     case Donkeycraft.AIState.FLEE:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FLEE, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.FLEE, yaw);
                         break;
                     case Donkeycraft.AIState.CHASE:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.CHASE, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.CHASE, yaw);
                         break;
                     case Donkeycraft.AIState.AMBUSH:
-                        if (speed < 0.5) {
-                            this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.AMBUSH, Math.atan2(vel.x || 0, vel.z || 0));
-                        }
+                        this.entity._animationController.setSpeed(Donkeycraft.AISpeeds.AMBUSH, yaw);
                         break;
                     case Donkeycraft.AIState.ATTACK:
                         // Attack animation is handled by _performAttack via forced state.
