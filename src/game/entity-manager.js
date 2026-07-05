@@ -282,6 +282,7 @@
 
     /**
      * _injectGroundCheck — Inject ground detection callbacks into all alive entities.
+     * Only injects once per entity (checked via _groundCheckInjected flag).
      * @private
      * @param {Function} groundCheckFn - Ground detection function returning ground Y level or null.
      */
@@ -291,8 +292,11 @@
         var entities = this.getAllEntities();
         for (var i = 0; i < entities.length; i++) {
             var entity = entities[i];
+            // Skip if already injected (prevents O(n) re-injection every tick)
+            if (entity._groundCheckInjected) continue;
             if (entity.setGroundCheck) {
                 entity.setGroundCheck(groundCheckFn);
+                entity._groundCheckInjected = true;
             }
         }
     };
@@ -311,12 +315,16 @@
 
     /**
      * _wireAINav — Wire AI navigation (navmesh, block query, player target) onto a single entity.
+     * Sets the _aiWired flag on the entity to prevent re-wiring on subsequent calls.
      * @private
      * @param {Donkeycraft.Entity} entity - Entity to wire.
      */
     Donkeycraft.EntityManager.prototype._wireAINav = function (entity) {
         // Skip player entities
         if (entity.type === 'player') return;
+
+        // Mark as wired to prevent redundant wiring in _injectWorldQueries
+        entity._aiWired = true;
 
         // Ensure navmesh exists
         var navMesh = this._ensureNavMesh();
@@ -347,12 +355,17 @@
 
     /**
      * _injectWorldQueries — Inject world query callbacks into all AI-enabled entities.
+     * Only wires entities that haven't been wired yet (checked via _aiWired flag).
      * @private
      */
     Donkeycraft.EntityManager.prototype._injectWorldQueries = function () {
         var entities = this.getAllEntities();
         for (var i = 0; i < entities.length; i++) {
-            this._wireAINav(entities[i]);
+            var entity = entities[i];
+            // Skip if already wired (prevents redundant setAITarget/setAINavMesh calls every tick)
+            if (entity._aiWired) continue;
+            this._wireAINav(entity);
+            entity._aiWired = true;
         }
     };
 

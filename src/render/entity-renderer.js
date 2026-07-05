@@ -849,7 +849,139 @@
     };
 
     /**
-     * _computeBoneWorldTransform — Compute the world-space transform for a bone.
+     * _buildBoneHierarchy — Build a hierarchical bone transform map from root to leaves.
+     *
+     * Processes bones in topological order (root → children → grandchildren) so that each
+     * child bone's world transform is computed relative to its parent's world transform.
+     * This ensures correct skeletal animation where limb segments rotate around their joints.
+     *
+     * World transform = parentWorldMatrix × entityYawRotation × boneLocalOffset × boneAnimationRotation
+     *
+     * @private
+     * @param {Object} entity - Entity instance with getPosition(), getRotation(), getBones() methods.
+     * @param {Object.<string, {rx: number, ry: number, rz: number}>} boneTransforms - Bone rotation transforms from animation controller.
+     * @returns {Object.<string, {x: number, y: number, z: number, rx: number, ry: number, rz: number, pivot: Object|null, parentWorld: Object|null}>} Bone world transforms keyed by bone name.
+     */
+    Donkeycraft.EntityRenderer.prototype._buildBoneHierarchy = function (entity, boneTransforms) {
+        var pos = entity.getPosition();
+        if (!pos) return {};
+
+        var rot = entity.getRotation();
+        var bones = entity.getBones();
+        if (!bones || !Array.isArray(bones)) return {};
+
+        // Build a Map: boneName → boneDef for O(1) lookup
+        var boneMap = new Map();
+        for (var bi = 0; bi < bones.length; bi++) {
+            boneMap.set(bones[bi].name, bones[bi]);
+        }
+
+        // Separate root bones (no parent or parent not in skeleton) from child bones
+        var rootBones = [];
+        var childBones = [];
+        for (var j = 0; j < bones.length; j++) {
+            var b = bones[j];
+            if (b.parent && boneMap.has(b.parent)) {
+                childBones.push(b);
+            } else {
+                rootBones.push(b);
+            }
+        }
+
+        // World transform cache: boneName → {x, y, z, rx, ry, rz, pivot}
+        var worldTransforms = {};
+
+        // Helper: compute world transform for a bone given its parent's world transform (or entity origin)
+        var self = this;
+        function computeBoneWorld(boneDef, parentWorld, boneAnim) {
+            var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
+            var pivot = boneDef.pivot || null;
+
+            // Entity yaw is needed for both root and child bones — declare at top of scope.
+            var yaw = rot ? rot.yaw : 0;
+
+            if (!parentWorld) {
+                // Root bone: transform is entity position + bone offset
+                var cosYaw = Math.cos(yaw);
+                var sinYaw = Math.sin(yaw);
+
+                var localOffsetX = offset.x * cosYaw - offset.z * sinYaw;
+                var localOffsetZ = offset.x * sinYaw + offset.z * cosYaw;
+                var localOffsetY = offset.y;
+
+                return {
+                    x: pos.x + localOffsetX,
+                    y: pos.y + localOffsetY,
+                    z: pos.z + localOffsetZ,
+                    rx: 0, ry: 0, rz: 0,
+                    pivot: pivot,
+                    parentWorld: null
+                };
+            }
+
+            // Child bone: position is parent world position + rotated offset
+            // The offset is in the parent's local space, so we rotate it by the parent's yaw-adjusted orientation
+            var px = parentWorld.x;
+            var py = parentWorld.y;
+            var pz = parentWorld.z;
+
+            // For hierarchical bones, the offset is relative to parent's local coordinate system.
+            // We apply entity yaw to the offset (same as root bone) since animation rotations
+            // are in entity-local space.
+            var cosYaw = Math.cos(yaw);
+            var sinYaw = Math.sin(yaw);
+
+            var localOffsetX = offset.x * cosYaw - offset.z * sinYaw;
+            var localOffsetZ = offset.x * sinYaw + offset.z * cosYaw;
+            var localOffsetY = offset.y;
+
+            var finalX = px + localOffsetX;
+            var finalY = py + localOffsetY;
+            var finalZ = pz + localOffsetZ;
+
+            // Use Number() with fallback to handle falsy animation values (0, null, undefined)
+            var animRx = boneAnim.rx != null ? Number(boneAnim.rx) : 0;
+            var animRy = boneAnim.ry != null ? Number(boneAnim.ry) : 0;
+            var animRz = boneAnim.rz != null ? Number(boneAnim.rz) : 0;
+
+            return {
+                x: finalX,
+                y: finalY,
+                z: finalZ,
+                rx: animRx,
+                ry: animRy,
+                rz: animRz,
+                pivot: pivot,
+                parentWorld: parentWorld
+            };
+        }
+
+        var yaw = rot ? rot.yaw : 0;
+
+        // Process root bones first
+        for (var k = 0; k < rootBones.length; k++) {
+            var rb = rootBones[k];
+            var boneAnim = boneTransforms[rb.name] || { rx: 0, ry: 0, rz: 0 };
+            worldTransforms[rb.name] = computeBoneWorld(rb, null, boneAnim);
+        }
+
+        // Process child bones (topological order — parents are already processed)
+        for (var m = 0; m < childBones.length; m++) {
+            var cb = childBones[m];
+            var parentWorld = worldTransforms[cb.parent];
+            var boneAnim = boneTransforms[cb.name] || { rx: 0, ry: 0, rz: 0 };
+            worldTransforms[cb.name] = computeBoneWorld(cb, parentWorld || null, boneAnim);
+        }
+
+        return worldTransforms;
+    };
+
+    /**
+     * _computeBoneWorldTransform — Compute the world-space transform for a bone (legacy single-bone version).
+     *
+     * This method is retained for backward compatibility when only a single bone needs
+     * computation (e.g., single-entity rendering without hierarchy). For batch rendering,
+     * prefer _buildBoneHierarchy which processes all bones in topological order.
      *
      * Combines entity position + yaw rotation with bone offset/pivot for correct positioning.
      * Bone rotations are kept in entity-local space (the animation controller provides
@@ -1415,6 +1547,8 @@
     /**
      * _renderEntityParts — Render all body parts for a single entity.
      * Shared code path for both batch and single-entity rendering.
+     * Uses hierarchical bone transforms: each child bone's world position is computed
+     * relative to its parent bone's world transform, ensuring correct skeletal animation.
      * @private
      * @param {Donkeycraft.Entity} entity - Entity to render.
      * @param {boolean} [isBatch=false] - Whether called from batch render (for stats tracking).
@@ -1446,40 +1580,35 @@
         var partsRendered = 0;
         var drawCalls = 0;
 
-        var bones = entity.getBones();
-
-        // Cache bone lookup: build a Map from bone name to definition for O(1) lookup.
-        var boneMap = null;
-        if (bones && Array.isArray(bones)) {
-            boneMap = new Map();
-            for (var bi = 0; bi < bones.length; bi++) {
-                boneMap.set(bones[bi].name, bones[bi]);
-            }
-        }
+        // Build hierarchical bone transforms (root → children → grandchildren)
+        var boneHierarchy = this._buildBoneHierarchy(entity, boneTransforms);
 
         for (var i = 0; i < shapeDefs.length; i++) {
             var shapeDef = shapeDefs[i];
 
-            if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function'
-                && boneMap !== null && !boneMap.has(shapeDef.name)) {
-                Donkeycraft.Logger.warn('EntityRenderer', 'Bone "' + shapeDef.name + '" not found in entity "' + entity.type + '" — using default offset/pivot.');
+            // Look up the bone's world transform from the hierarchy
+            var boneWorld = boneHierarchy[shapeDef.name];
+
+            if (!boneWorld) {
+                if (Donkeycraft.Logger && typeof Donkeycraft.Logger.warn === 'function') {
+                    Donkeycraft.Logger.warn('EntityRenderer', 'Bone "' + shapeDef.name + '" not found in entity "' + entity.type + '" — skipping.');
+                }
+                continue;
             }
 
             var meshCache = this._getOrBuildMesh(shapeDef);
             if (!meshCache) continue;
 
-            var worldTransform = this._computeBoneWorldTransform(entity, shapeDef.name, boneTransforms);
-
             var success = this._drawMesh(
                 meshCache,
-                worldTransform.x,
-                worldTransform.y,
-                worldTransform.z,
-                worldTransform.rx,
-                worldTransform.ry,
-                worldTransform.rz,
+                boneWorld.x,
+                boneWorld.y,
+                boneWorld.z,
+                boneWorld.rx,
+                boneWorld.ry,
+                boneWorld.rz,
                 shapeDef.color,
-                worldTransform.pivot
+                boneWorld.pivot
             );
 
             if (success) {

@@ -30,6 +30,7 @@
     <link rel="stylesheet" href="src/ui/keybindings-panel.css"> <!-- keybindings-panel (Info Display) -->
     <link rel="stylesheet" href="src/ui/speed-indicator.css"> <!-- speed-indicator (UI Indicator/Control) -->
     <link rel="stylesheet" href="src/ui/debug-overlay.css"> <!-- debug-overlay (Engine/UI Testing Interface) -->
+    <link rel="stylesheet" href="src/ui/nametags.css"> <!-- nametags (Entity Nametag CSS Overlay) -->
 
     <style>
         /* Inline styles for dynamically-created elements */
@@ -104,6 +105,9 @@
     <!-- Health & Hunger bars (outside overlay to avoid CSS conflicts) -->
     <div id="dk-health-bar-wrapper-external" class="dk-health-bar-wrapper dk-interactive" style="display:none;"></div>
     <div id="dk-hunger-bar-wrapper-external" class="dk-hunger-bar-wrapper dk-interactive" style="display:none;"></div>
+
+    <!-- Nametag Overlay Container (positioned over canvas for CSS-based nametags) -->
+    <div id="dk-nametags-container"></div>
 
     <!-- Error Screen (shown on fatal errors) -->
     <div id="dk-error-screen">
@@ -211,6 +215,10 @@
     <script src="src/game/animals.js"></script>
     <script src="src/gen/mob-spawning.js"></script>
 
+    <!-- Custom Entity Definitions -->
+    <script src="src/entities/cow.js"></script>
+    <script src="src/entities/elegant_stone_double_door.js"></script>
+
     <!-- Redstone -->
     <script src="src/game/redstone-engine.js"></script>
     <script src="src/game/wiring.js"></script>
@@ -259,6 +267,9 @@
 
     <!-- Speed Indicator UI -->
     <script src="src/ui/speed-indicator.js"></script>
+
+    <!-- Nametag Renderer (CSS overlay system) -->
+    <script src="src/ui/nametags.js"></script>
 
     <!-- Shader Sources (embedded for file:/// compatibility) -->
     <script type="text/plain" id="dk-vertex-shaders">
@@ -1346,6 +1357,24 @@ void main() {
                         }
                     } catch (e) {
                         Donkeycraft.Logger.warn('Game', 'Map Renderer setup error: ' + e.message);
+                    }
+
+                    // ============================================================
+                    // Wire up Nametag Renderer (CSS overlay system)
+                    // ============================================================
+                    try {
+                        if (Donkeycraft.NametagRenderer && game2._entityManager && game2._camera) {
+                            var nametagRenderer = new Donkeycraft.NametagRenderer({
+                                entityManager: game2._entityManager,
+                                camera: game2._camera,
+                                gl: game2._gl || null
+                            });
+                            nametagRenderer.init();
+                            game2._nametagRenderer = nametagRenderer;
+                            Donkeycraft.Logger.info('Game', 'Nametag Renderer initialized');
+                        }
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'Nametag Renderer initialization failed: ' + e.message);
                     }
 
                     // ============================================================

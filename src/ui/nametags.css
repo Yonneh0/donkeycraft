@@ -1,0 +1,68 @@
+/* Nametag container — positioned absolutely over canvas */
+#dk-nametags-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; /* Allow clicks to pass through */
+    z-index: 100;
+    overflow: hidden;
+}
+
+/* Individual nametag */
+.dk-nametag {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    transition: opacity 0.2s ease;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Color coding by aggressiveness */
+.dk-nametag.neutral {
+    background-color: rgba(144, 238, 144, 0.7); /* Light green */
+    color: #003300;
+}
+
+.dk-nametag.hostile {
+    background-color: rgba(220, 50, 50, 0.7); /* Red */
+    color: #ffffff;
+}
+
+.dk-nametag.passive {
+    background-color: rgba(200, 200, 200, 0.6); /* Gray */
+    color: #333333;
+}
+
+.dk-nametag.boss {
+    background-color: rgba(148, 0, 211, 0.7); /* Purple */
+    color: #ffffff;
+}
+
+/* HP bar within nametag */
+.dk-nametag-hp-bar {
+    width: 100%;
+    height: 3px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 2px;
+    margin-top: 2px;
+}
+
+.dk-nametag-hp-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.dk-nametag-hp-fill.high { background-color: #4CAF50; }
+.dk-nametag-hp-fill.medium { background-color: #FFC107; }
+.dk-nametag-hp-fill.low { background-color: #F44336; }

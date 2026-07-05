@@ -1476,6 +1476,14 @@
          * @type {boolean}
          */
         this._examplesSpawned = false;
+
+        /**
+         * Entity type-to-constructor mapping for spawning type-specific instances.
+         * Maps entity type strings (e.g., 'cow', 'zombie') to their constructor functions.
+         * @type {Object.<string, Function>}
+         * @private
+         */
+        this._entityConstructors = null;
     };
 
     /**
@@ -1518,12 +1526,39 @@
     };
 
     /**
-     * setBlockQuery — Set the block ID query callback for AI navigation.
-     * @param {Function} getBlockId - Callback(x, y, z) → blockId.
+     * setPhysicsSystem — Inject the collision system for physics-based movement on all entities.
+     * Called by game.js when setEntitySystems() is invoked.
+     * @param {Donkeycraft.Collision} physics - Collision system instance.
      */
-    Donkeycraft.EntityEngine.prototype.setBlockQuery = function (getBlockId) {
+    Donkeycraft.EntityEngine.prototype.setPhysicsSystem = function (physics) {
         if (!this.initialize()) return;
-        this._entityManager.setBlockQuery(getBlockId);
+        this._physicsSystem = physics || null;
+
+        // Wire physics and block query onto all existing entities
+        var entities = this._entityManager.getAllEntities();
+        for (var i = 0; i < entities.length; i++) {
+            if (physics) {
+                entities[i].setPhysicsSystem(physics);
+            }
+            if (this._getBlockIdFn) {
+                entities[i].setBlockQuery(this._getBlockIdFn);
+            }
+        }
+    };
+
+    /**
+     * _injectEntitySystems — Wire physics and block query onto a newly spawned entity.
+     * @private
+     * @param {Donkeycraft.Entity} entity - Entity to wire.
+     */
+    Donkeycraft.EntityEngine.prototype._injectEntitySystems = function (entity) {
+        if (!this.initialize()) return;
+        if (this._physicsSystem) {
+            entity.setPhysicsSystem(this._physicsSystem);
+        }
+        if (this._getBlockIdFn) {
+            entity.setBlockQuery(this._getBlockIdFn);
+        }
     };
 
     /**
@@ -1546,13 +1581,81 @@
     };
 
     /**
-     * spawn — Spawn a new entity.
+     * registerEntityConstructor — Register a constructor for an entity type so that
+     * _spawnExamples spawns type-specific instances instead of generic Entity.
+     * @param {string} type - Entity type string (e.g., 'cow', 'zombie').
+     * @param {Function} constructor - Constructor function (e.g., Donkeycraft.Cow).
+     */
+    Donkeycraft.EntityEngine.prototype.registerEntityConstructor = function (type, constructor) {
+        if (!this._entityConstructors) this._entityConstructors = {};
+        this._entityConstructors[type] = constructor;
+    };
+
+    /**
+     * _resolveConstructor — Resolve a constructor for an entity type.
+     * Checks registered constructors first, then falls back to Donkeycraft namespace,
+     * then finally to generic Entity.
+     * @private
+     * @param {string} type - Entity type string.
+     * @returns {Function} Constructor function.
+     */
+    Donkeycraft.EntityEngine.prototype._resolveConstructor = function (type) {
+        // 1. Check registered constructors
+        if (this._entityConstructors && this._entityConstructors[type]) {
+            return this._entityConstructors[type];
+        }
+
+        // 2. Try Donkeycraft namespace (e.g., Donkeycraft.Cow, Donkeycraft.Zombie)
+        var ctorName = type.charAt(0).toUpperCase() + type.slice(1);
+        if (Donkeycraft[ctorName] && typeof Donkeycraft[ctorName] === 'function') {
+            return Donkeycraft[ctorName];
+        }
+
+        // 3. Fall back to generic Entity
+        return Donkeycraft.Entity;
+    };
+
+    /**
+     * initializeEntityConstructors — Auto-register known entity constructors.
+     * Called once during engine initialization to wire up all registered types.
+     */
+    Donkeycraft.EntityEngine.prototype.initializeEntityConstructors = function () {
+        if (this._entityConstructors) return; // Already initialized
+        this._entityConstructors = {};
+
+        // Map entity type strings to their constructor names in the Donkeycraft namespace.
+        var typeMap = [
+            'cow', 'pig', 'sheep', 'chicken',   // Passive mobs
+            'zombie', 'skeleton', 'spider', 'creeper', 'enderman', // Hostile mobs
+            'donkey'                            // Custom animals
+        ];
+
+        for (var i = 0; i < typeMap.length; i++) {
+            var ctorName = typeMap[i].charAt(0).toUpperCase() + typeMap[i].slice(1);
+            if (Donkeycraft[ctorName] && typeof Donkeycraft[ctorName] === 'function') {
+                this._entityConstructors[typeMap[i]] = Donkeycraft[ctorName];
+            }
+        }
+
+        // Register custom entity constructors
+        if (Donkeycraft.ElegantStoneDoubleDoor) {
+            this._entityConstructors['elegant_stone_double_door'] = Donkeycraft.ElegantStoneDoubleDoor;
+            this._entityConstructors['door'] = Donkeycraft.ElegantStoneDoubleDoor;
+        }
+    };
+
+    /**
+     * spawn — Spawn a new entity with physics and block query wiring.
      * @param {Donkeycraft.Entity} entity - Entity to spawn.
      * @returns {number|null} Entity ID, or null if spawn failed.
      */
     Donkeycraft.EntityEngine.prototype.spawn = function (entity) {
         if (!this.initialize()) return null;
-        return this._entityManager.spawn(entity);
+        var id = this._entityManager.spawn(entity);
+        if (id !== null) {
+            this._injectEntitySystems(entity);
+        }
+        return id;
     };
 
     /**
@@ -1584,13 +1687,14 @@
             playerPos = this._playerEntity.getPosition();
         }
 
-        // Tick the entity manager — this handles awareness updates, spatial hash, and entity ticks
+        // Tick the entity manager — this handles awareness updates, spatial hash, and entity ticks.
+        // CRITICAL: Forward groundCheck so entities get ground detection for physics-based movement.
         try {
             if (playerPos) {
-                this._entityManager.tick(dt, playerPos.x, playerPos.y, playerPos.z);
+                this._entityManager.tick(dt, playerPos.x, playerPos.y, playerPos.z, groundCheck);
             } else {
                 // If no player entity is available, still tick entities but skip awareness.
-                this._entityManager.tick(dt);
+                this._entityManager.tick(dt, undefined, undefined, undefined, groundCheck);
             }
         } catch (e) {
             if (typeof console !== 'undefined' && typeof console.error === 'function') {
@@ -1681,8 +1785,11 @@
                     groundY = Math.max(1, Math.min(groundY, worldHeight - 1));
                 }
 
-                // Create entity with proper position
-                var entity = new Donkeycraft.Entity({
+                // Resolve constructor for this entity type (uses type-specific class if available)
+                var Constructor = self._resolveConstructor(ex.type);
+
+                // Create entity with proper position using resolved constructor
+                var entity = new Constructor({
                     type: ex.type,
                     x: spawnX + 0.5,
                     y: groundY,
@@ -1695,6 +1802,10 @@
                     // Set ground detection for physics
                     entity.setGroundCheck(groundCheck);
                 }
+
+                // Note: Physics system and block query are already injected by
+                // EntityManager.spawn() → _spawnAIIntegration() → _injectEntitySystems().
+                // No duplicate injection needed here.
 
                 // Play initial animation via the animation controller
                 if (ex.anim && entity._animationController) {

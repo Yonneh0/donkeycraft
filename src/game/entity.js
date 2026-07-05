@@ -83,6 +83,15 @@
         /** Custom name tag (if set by player). */
         this.nameTag = null;
 
+        /** Display name shown on nametag (null = use entity type name). */
+        this.displayName = config.displayName || null;
+
+        /** Whether the entity is hostile/aggressive (internal). */
+        this._isAggro = config.isAggro || false;
+
+        /** Toggle nametag visibility. */
+        this.showNametag = config.showNametag !== undefined ? !!config.showNametag : true;
+
         /** Event subscribers for tick updates. */
         this._subscribers = [];
 
@@ -112,6 +121,13 @@
         /** Whether AI is enabled for this entity. */
         this._aiEnabled = false;
 
+        // Physics collision system integration
+        /** Collision system reference (injected by EntityEngine). */
+        this._physicsSystem = null;
+
+        /** Block ID query callback for collision detection. */
+        this._getBlockIdFn = null;
+
         this._initAnimationSystem();
         this._initAIComponent();
     };
@@ -121,6 +137,11 @@
      * @private
      */
     Donkeycraft.Entity.prototype._initAnimationSystem = function () {
+        // Early return: already fully initialized (bones + controller ready).
+        if (this.bones && Array.isArray(this.bones) && this._animationController && this._animationController.getState) {
+            return;
+        }
+
         var typeDef = Donkeycraft.EntityTypeDB ? Donkeycraft.EntityTypeDB[this.type] : null;
 
         if (typeDef) {
@@ -134,9 +155,15 @@
         if (this.skeleton && Donkeycraft.SkeletonTemplates) {
             var skeletonTemplate = Donkeycraft.SkeletonTemplates[this.skeleton];
             if (skeletonTemplate && Array.isArray(skeletonTemplate)) {
-                this.bones = skeletonTemplate;
-                this.useAnimation = true;
-                this._createAnimationController(typeDef);
+                // Set bones if not already set.
+                if (!this.bones) {
+                    this.bones = skeletonTemplate;
+                    this.useAnimation = true;
+                }
+                // Create animation controller if not already created.
+                if (!this._animationController) {
+                    this._createAnimationController(typeDef);
+                }
             }
         }
 
@@ -176,6 +203,25 @@
                 this._animationController.setState('idle');
             }
         }
+    };
+
+    /**
+     * setPhysicsSystem — Inject the collision system for physics-based movement.
+     * Called by EntityEngine during entity initialization.
+     * @param {Donkeycraft.Collision|null} physics - Collision system instance or null.
+     */
+    Donkeycraft.Entity.prototype.setPhysicsSystem = function (physics) {
+        if (this._destroyed) return;
+        this._physicsSystem = physics;
+    };
+
+    /**
+     * setBlockQuery — Inject the block ID query callback for collision detection.
+     * @param {Function|null} getBlockId - Callback(x, y, z) → blockId or null.
+     */
+    Donkeycraft.Entity.prototype.setBlockQuery = function (getBlockId) {
+        if (this._destroyed) return;
+        this._getBlockIdFn = typeof getBlockId === 'function' ? getBlockId : null;
     };
 
     /**
@@ -633,17 +679,75 @@
     };
 
     // ============================================================
+    // Display & Nametag API
+    // ============================================================
+
+    /**
+     * getDisplayName — Get the entity's display name.
+     * @returns {string|null} Display name or null.
+     */
+    Donkeycraft.Entity.prototype.getDisplayName = function () {
+        return this.displayName;
+    };
+
+    /**
+     * setDisplayName — Set the entity's display name.
+     * @param {string|null} name - Display name.
+     */
+    Donkeycraft.Entity.prototype.setDisplayName = function (name) {
+        this.displayName = name;
+    };
+
+    /**
+     * isAggro — Check if the entity is hostile/aggressive.
+     * @returns {boolean}
+     */
+    Donkeycraft.Entity.prototype.isAggro = function () {
+        return this._isAggro;
+    };
+
+    /**
+     * setAggro — Set whether the entity is hostile/aggressive.
+     * @param {boolean} aggro - True if hostile.
+     */
+    Donkeycraft.Entity.prototype.setAggro = function (aggro) {
+        this._isAggro = !!aggro;
+    };
+
+    /**
+     * shouldShowNametag — Check if the entity should show its nametag.
+     * @returns {boolean}
+     */
+    Donkeycraft.Entity.prototype.shouldShowNametag = function () {
+        return this.showNametag;
+    };
+
+    /**
+     * setShowNametag — Set nametag visibility.
+     * @param {boolean} show - True to show nametag.
+     */
+    Donkeycraft.Entity.prototype.setShowNametag = function (show) {
+        this.showNametag = !!show;
+    };
+
+    // ============================================================
     // Tick & Lifecycle API
     // ============================================================
 
     /**
      * tick — Called every game tick to update entity state.
      * Update flow: 1) Update AI component, 2) Update animation controller,
-     * 3) Apply velocity to position, 4) Notify tick subscribers.
+     * 3) Apply physics collision against world blocks, 4) Apply velocity to position,
+     * 5) Notify tick subscribers.
      * @param {number} deltaTime - Time since last tick in seconds.
      */
     Donkeycraft.Entity.prototype.tick = function (deltaTime) {
         if (this._destroyed || !this._position) return;
+
+        // Retry animation system initialization (handles deferred skeleton template loading).
+        // When SkeletonTemplates load after entity construction, bones won't be set yet.
+        // This ensures all entities (not just Cow subclasses) get their animations.
+        this._initAnimationSystem();
 
         // 1) Update AI component first (it may modify velocity)
         if (this._aiEnabled && this._aiComponent && this._aiComponent.enabled) {
@@ -663,12 +767,17 @@
             }
         }
 
-        // 3) Apply velocity to position
-        this._position.x += this._velocity.x * deltaTime;
-        this._position.y += this._velocity.y * deltaTime;
-        this._position.z += this._velocity.z * deltaTime;
+        // 3) Apply physics collision against world blocks
+        if (this._physicsSystem && this._getBlockIdFn) {
+            this._resolvePhysicsCollision(deltaTime);
+        } else {
+            // 4) Apply velocity to position (no collision)
+            this._position.x += this._velocity.x * deltaTime;
+            this._position.y += this._velocity.y * deltaTime;
+            this._position.z += this._velocity.z * deltaTime;
+        }
 
-        // 4) Notify tick subscribers
+        // 5) Notify tick subscribers
         for (var i = 0; i < this._subscribers.length; i++) {
             try {
                 this._subscribers[i](deltaTime);
@@ -679,6 +788,49 @@
                 }
             }
         }
+    };
+
+    /**
+     * _resolvePhysicsCollision — Resolve physics collision against world blocks.
+     * Uses per-axis collision resolution (X → Y → Z order) for frame-rate-independent movement.
+     * @private
+     * @param {number} deltaTime - Time since last tick in seconds.
+     */
+    Donkeycraft.Entity.prototype._resolvePhysicsCollision = function (deltaTime) {
+        if (!this._physicsSystem || !this._getBlockIdFn || deltaTime <= 0) return;
+
+        // Clamp delta time to prevent physics explosions on tab switch
+        var clampedDelta = Math.min(deltaTime, 0.1);
+
+        // Get collision system
+        var collision = this._physicsSystem;
+        if (!collision || typeof collision.resolveMovementWithDelta !== 'function') return;
+
+        // Resolve movement with collision detection
+        var resolution = collision.resolveMovementWithDelta(
+            this._position,
+            this._velocity,
+            this.width,
+            this.height,
+            clampedDelta
+        );
+
+        // Update position from resolved values
+        if (resolution.newX !== undefined) this._position.x = resolution.newX;
+        if (resolution.newY !== undefined) this._position.y = resolution.newY;
+        if (resolution.newZ !== undefined) this._position.z = resolution.newZ;
+
+        // Update velocity: horizontal velocity is cancelled on wall collision,
+        // vertical velocity is zeroed on ground collision.
+        // The collision system already handles this internally via resolveMovementWithDelta.
+    };
+
+    /**
+     * getMaxDeltaTime — Get the maximum delta time for physics updates.
+     * @returns {number} Maximum delta time in seconds (default 0.1).
+     */
+    Donkeycraft.Entity.getMaxDeltaTime = function () {
+        return 0.1;
     };
 
     /**
@@ -728,6 +880,9 @@
             health: this.health,
             maxHealth: this.maxHealth,
             nameTag: this.nameTag,
+            displayName: this.displayName,
+            isAggro: this._isAggro,
+            showNametag: this.showNametag,
             alive: this.isAlive()
         };
     };
@@ -745,6 +900,9 @@
         if (data.health !== undefined) this.health = data.health;
         if (data.maxHealth !== undefined) this.maxHealth = data.maxHealth;
         if (data.nameTag !== undefined) this.nameTag = data.nameTag;
+        if (data.displayName !== undefined) this.displayName = data.displayName;
+        if (data.isAggro !== undefined) this._isAggro = !!data.isAggro;
+        if (data.showNametag !== undefined) this.showNametag = !!data.showNametag;
     };
 
     /**

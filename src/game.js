@@ -2159,6 +2159,15 @@
             }
         }
 
+        // Render entity nametags (CSS overlay — projects 3D positions to 2D screen space)
+        if (this._nametagRenderer) {
+            try {
+                this._nametagRenderer.render();
+            } catch (e) {
+                Donkeycraft.Logger.error('Game', 'Nametag render failed: ' + e.message);
+            }
+        }
+
         // Render map view (2D overhead map + minimap) — always update each frame
         if (this._mapRenderer && this._player) {
             try {

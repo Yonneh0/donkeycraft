@@ -164,4 +164,20 @@
         }
     };
 
+    /**
+     * Safely register a listener on the globally-registered EventBus instance.
+     * This is the correct method for standalone modules (entities, redstone, interaction)
+     * that do not have a direct reference to their owning EventBus instance.
+     * Call EventBus.setGlobal() during game initialization to register the global instance.
+     * @param {string} event - Event name (no namespace prefix — uses the global instance directly).
+     * @param {Function} callback - Function to call when event fires.
+     * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the global instance.
+     * @returns {Function} Unsubscribe function that removes this listener without firing, or null if no global instance is registered.
+     */
+    Donkeycraft.EventBus.onSafe = function (event, callback, context) {
+        var globalInstance = Donkeycraft.EventBus._global;
+        if (!globalInstance || typeof globalInstance.on !== 'function') return null;
+        return globalInstance.on(event, callback, context || globalInstance);
+    };
+
 })();
