@@ -835,7 +835,15 @@ void main() {
     // === Alpha: Fresnel-based transparency ===
     // Steeper angles (grazing) = more opaque (more reflection)
     // Direct overhead view = more transparent
-    float alpha = mix(0.55, 0.85, fresnel);
+    // Use uWaterAlpha uniform for configurable base transparency
+    float alpha = mix(uWaterAlpha, uWaterAlpha * 1.54, fresnel); // 0.55 * 1.54 ≈ 0.85
+
+    // Use uWaterLevel to adjust alpha based on camera height above water surface
+    // Camera closer to water surface = slightly more transparent
+    float camHeightAboveWater = uCameraPos.y - uWaterLevel;
+    if (camHeightAboveWater > 0.0 && camHeightAboveWater < 10.0) {
+        alpha *= 1.0 - (1.0 - camHeightAboveWater / 10.0) * 0.1;
+    }
     alpha *= (1.0 - reflectionBlend * 0.2); // slightly reduce alpha where reflection is strong
 
     // Dithering: subtle per-pixel variation to prevent banding

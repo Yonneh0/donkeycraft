@@ -21,6 +21,7 @@
 
     /**
      * Initialize the block color lookup table. Called once on first render.
+     * Populates colors for all 257+ block IDs including terrain, ores, nether, end, and decorative blocks.
      * @returns {Object.<number, string>} The completed color map.
      * @private
      */
@@ -203,9 +204,11 @@
     }
 
     /**
-     * Get the color for a block ID.
-     * @param {number} blockId - The block ID.
+     * Get the color for a block ID from the initialized lookup table.
+     * Automatically initializes the table if not already done.
+     * @param {number} blockId - The block ID (0-257+).
      * @returns {string} CSS color string, or '#555555' as fallback.
+     * @private
      */
     function _getBlockColor(blockId) {
         if (!_blockColors) _initBlockColors();
@@ -256,6 +259,8 @@
 
     /**
      * Initialize all sub-modules. Must be called before any rendering operations.
+     * Sets up block color lookup, creates minimap/map panel/TOD UI instances,
+     * and registers the Escape key handler for closing the full map panel.
      * @returns {boolean} True if initialized successfully.
      */
     Donkeycraft.MapRenderer.prototype.init = function () {
@@ -269,6 +274,11 @@
             var minimapOk = this._minimapUI.init();
             var mapPanelOk = this._mapPanelUI.init();
             var todOk = this._todUI.init();
+
+            // Register Escape key handler to close the full map panel
+            if (this._mapPanelUI && typeof this._mapPanelUI.registerEscapeHandler === 'function') {
+                this._mapPanelUI.registerEscapeHandler();
+            }
 
             return minimapOk && mapPanelOk && todOk;
         } catch (e) {
@@ -284,6 +294,11 @@
      */
     Donkeycraft.MapRenderer.prototype.setCanvases = function (fullMapCanvas, minimapCanvas) {
         if (this._mapPanelUI) this._mapPanelUI.setCanvases(fullMapCanvas, minimapCanvas);
+        // MinimapUI looks up its canvas by ID during init(), but we can also
+        // provide the reference here if the DOM element isn't ready yet.
+        if (this._minimapUI && minimapCanvas) {
+            this._minimapUI.setCanvas(minimapCanvas);
+        }
     };
 
     /**
@@ -326,7 +341,9 @@
 
     /**
      * Set callback for time changes from slider.
-     * @param {Function} cb - Receives (tod: number|null).
+     * The callback receives (tod: number|null) where tod is in [0, 1) or null on reset.
+     * Also delegates to TimeOfDayUI's setOnTimeChange method.
+     * @param {Function} cb - Callback function receiving (tod: number|null).
      */
     Donkeycraft.MapRenderer.prototype.setOnTimeChange = function (cb) {
         this._onTimeChange = typeof cb === 'function' ? cb : null;
@@ -397,10 +414,15 @@
 
     /**
      * Called when the chunk manager switches dimensions.
+     * Clears surface maps and notifies sub-modules for fresh terrain data.
      * @param {string} dimName - New dimension name.
      */
     Donkeycraft.MapRenderer.prototype.onDimensionChange = function (dimName) {
         if (this._mapPanelUI) this._mapPanelUI.onDimensionChange(dimName);
+        // Clear minimap surface maps using the dedicated utility method
+        if (this._chunkManager) {
+            Donkeycraft.MinimapUI.invalidateAllSurfaceMaps(this._chunkManager);
+        }
     };
 
     /**
@@ -429,6 +451,8 @@
 
     /**
      * Destroy and free all resources.
+     * Removes all event listeners, detaches DOM elements, and nullifies references
+     * to sub-modules (MinimapUI, MapPanelUI, TimeOfDayUI) and chunk manager.
      */
     Donkeycraft.MapRenderer.prototype.destroy = function () {
         if (this._destroyed) return;
@@ -450,7 +474,8 @@
 
     /**
      * Get the color for a block ID (static method for backward compatibility).
-     * @param {number} blockId - The block ID.
+     * Delegates to private _getBlockColor function.
+     * @param {number} blockId - The block ID (0-257+).
      * @returns {string} CSS color string, or '#555555' as fallback.
      */
     Donkeycraft.MapRenderer._getBlockColor = function (blockId) {
@@ -460,6 +485,7 @@
     /**
      * Invalidate the per-chunk surface map for a given chunk.
      * Called when blocks are placed or broken in that chunk.
+     * Surface maps are rebuilt lazily on next render access.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */

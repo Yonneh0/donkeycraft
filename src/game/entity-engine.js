@@ -1214,7 +1214,7 @@
      * @param {string} name - Clip name.
      * @returns {Donkeycraft.AnimationClip|null} Cached clip or null.
      */
-    function _getCachedClip (name) {
+    function _getCachedClip(name) {
         var idx = _animationCacheOrder.indexOf(name);
         if (idx === -1) return null;
 
@@ -1230,7 +1230,7 @@
      * @param {string} name - Clip name.
      * @param {Donkeycraft.AnimationClip} clip - Clip to cache.
      */
-    function _cacheClip (name, clip) {
+    function _cacheClip(name, clip) {
         // Evict least-recently-used if at capacity
         while (_animationCacheOrder.length >= MAX_ANIMATION_CACHE_SIZE) {
             var oldest = _animationCacheOrder.shift();
@@ -1700,122 +1700,6 @@
             if (typeof console !== 'undefined' && typeof console.error === 'function') {
                 console.error('[EntityEngine] EntityManager tick error:', e);
             }
-        }
-
-        // Auto-spawn example entities on first tick (proof-of-concept demo)
-        this._spawnExamples(dt, groundCheck);
-    };
-
-    /**
-     * _spawnExamples — Spawn proof-of-concept example entities near the player.
-     * Uses _playerEntity (set via setPlayerEntity) for position-relative spawning.
-     * Falls back to world center if no player is available.
-     * @private
-     * @param {number} dt - Delta time.
-     * @param {Function} [groundCheck] - Ground detection callback.
-     */
-    Donkeycraft.EntityEngine.prototype._spawnExamples = function (dt, groundCheck) {
-        if (this._examplesSpawned || !this._entityManager) return;
-
-        // Spawn after ~2 seconds of gameplay
-        var elapsed = this._timer ? this._timer.getElapsed() : 0;
-        if (elapsed < 2.0) return;
-
-        this._examplesSpawned = true;
-
-        // Get player position for offset-based spawning from _playerEntity field.
-        // This is set via setPlayerEntity() by game.js, which is the authoritative source.
-        var entityManager = this._entityManager;
-        var playerPos = null;
-        if (this._playerEntity && this._playerEntity.isAlive && this._playerEntity.isAlive()) {
-            playerPos = this._playerEntity.getPosition();
-        }
-
-        // Fallback to world center if no player is available.
-        var worldHeight = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 64;
-        if (!playerPos) {
-            playerPos = { x: 0, y: worldHeight / 2, z: 0 };
-        }
-
-        // Define example entities to spawn near the player
-        var examples = [
-            { type: 'cow', offsetX: 5, offsetY: 0, offsetZ: 3, anim: 'quadrupedWalk' },
-            { type: 'chicken', offsetX: -4, offsetY: 0, offsetZ: 5, anim: 'chickenBob' },
-            { type: 'zombie', offsetX: 7, offsetY: 0, offsetZ: -3, anim: 'walk' },
-            { type: 'donkey', offsetX: -6, offsetY: 0, offsetZ: -4, anim: 'quadrupedWalk' },
-            { type: 'sign_post', offsetX: 3, offsetY: 0, offsetZ: -7, anim: null },
-            { type: 'door', offsetX: -3, offsetY: 0, offsetZ: 8, anim: null }
-        ];
-
-        var self = this;
-        for (var i = 0; i < examples.length; i++) {
-            (function () {
-                var ex = examples[i];
-
-                // Calculate spawn position relative to player
-                var spawnX = Math.floor(playerPos.x + ex.offsetX);
-                var spawnY = Math.floor(playerPos.y + ex.offsetY);
-                var spawnZ = Math.floor(playerPos.z + ex.offsetZ);
-
-                // Find ground level at spawn position using downward scan.
-                // Start from a generous height above the player to ensure we reach terrain,
-                // even if the player is on a cliff or underground. The scan range of 128 blocks
-                // covers the full world height for safety.
-                var groundY = null;
-                var scanStartY = Math.min(spawnY + 128, worldHeight - 1);
-
-                if (self._getBlockIdFn) {
-                    for (var gy = scanStartY; gy >= 0; gy--) {
-                        var bid = self._getBlockIdFn(spawnX, gy, spawnZ);
-                        if (bid && Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(bid)) {
-                            groundY = gy + 1;
-                            break;
-                        }
-                    }
-                }
-
-                // Multi-tier fallback:
-                // 1. If ground scan failed, use player Y + a small offset (safe surface position).
-                // 2. Last resort: use the world's default spawn Y from config.
-                if (groundY === null) {
-                    // Use player's Y as reference — entities spawn on the same surface level.
-                    groundY = Math.floor(playerPos.y) + 1;
-
-                    // Ensure we don't spawn below the world or above the world height.
-                    groundY = Math.max(1, Math.min(groundY, worldHeight - 1));
-                }
-
-                // Resolve constructor for this entity type (uses type-specific class if available)
-                var Constructor = self._resolveConstructor(ex.type);
-
-                // Create entity with proper position using resolved constructor
-                var entity = new Constructor({
-                    type: ex.type,
-                    x: spawnX + 0.5,
-                    y: groundY,
-                    z: spawnZ + 0.5
-                });
-
-                var id = entityManager.spawn(entity);
-
-                if (id && groundCheck) {
-                    // Set ground detection for physics
-                    entity.setGroundCheck(groundCheck);
-                }
-
-                // Note: Physics system and block query are already injected by
-                // EntityManager.spawn() → _spawnAIIntegration() → _injectEntitySystems().
-                // No duplicate injection needed here.
-
-                // Play initial animation via the animation controller
-                if (ex.anim && entity._animationController) {
-                    entity._animationController.playAnimation(ex.anim);
-                }
-
-                if (typeof console !== 'undefined' && typeof console.log === 'function') {
-                    console.log('[EntityEngine] Spawned ' + ex.type + ' at (' + spawnX + ',' + groundY + ',' + spawnZ + ') id=' + id);
-                }
-            })();
         }
     };
 
