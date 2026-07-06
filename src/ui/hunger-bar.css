@@ -1,5 +1,7 @@
 /* ============================================================
-   HUNGER BAR
+   HUNGER BAR — Vertical proportional fill (matches health bar)
+   Hunger: 5 drumstick icons, 10 steps each (total 50)
+   Hydration: 2 water drop icons, 10 steps each (total 20)
    ============================================================ */
 
 .dk-hunger-bar-wrapper {
@@ -43,38 +45,6 @@
     display: block;
 }
 
-.dk-drumstick-eat-pulse {
-    animation: drumstick-eat-pulse 400ms ease-out;
-}
-
-.dk-drumstick-dim {
-    animation: drumstick-dim 300ms ease-out;
-}
-
-.dk-hunger-text {
-    position: absolute;
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    pointer-events: none;
-    animation: float-text-up 800ms ease-out forwards;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
-    z-index: 10;
-}
-
-.dk-hunger-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0;
-    transition: opacity 300ms ease;
-    background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
-}
-
 .dk-drop-container {
     width: 18px;
     height: 20px;
@@ -93,16 +63,162 @@
     display: block;
 }
 
-.dk-drop-full .dk-drop {
+/* ============================================================
+   FULL ICON GLOW (matches health bar full heart glow)
+   ============================================================ */
+
+.dk-drumstick-full .dk-drumstick-fill {
+    filter: drop-shadow(0 0 2px rgba(222, 145, 33, 0.5));
+}
+
+.dk-drop-full .dk-drop-fill {
     filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.5));
+}
+
+/* ============================================================
+   PARTIAL ICON SUBTLE GLOW
+   ============================================================ */
+
+.dk-drumstick-partial .dk-drumstick-fill {
+    filter: drop-shadow(0 0 1px rgba(222, 145, 33, 0.3));
+}
+
+.dk-drop-partial .dk-drop-fill {
+    filter: drop-shadow(0 0 1px rgba(52, 152, 219, 0.3));
+}
+
+/* ============================================================
+   EATING/DRINKING PULSE ANIMATIONS
+   ============================================================ */
+
+.dk-drumstick-eat-pulse {
+    animation: drumstick-eat-pulse 400ms ease-out;
 }
 
 .dk-drop-drink-pulse {
     animation: drop-drink-pulse 400ms ease-out;
 }
 
+@keyframes drumstick-eat-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+@keyframes drop-drink-pulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+    50% {
+        transform: scale(1.35);
+        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+}
+
+/* ============================================================
+   DEPLETION DIM ANIMATION
+   ============================================================ */
+
+.dk-drumstick-dim {
+    animation: drumstick-dim 300ms ease-out;
+}
+
 .dk-drop-dim {
     animation: drop-dim 300ms ease-out;
+}
+
+@keyframes drumstick-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}
+
+@keyframes drop-dim {
+    0% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+    50% {
+        opacity: 0.4;
+        filter: brightness(0.6) saturate(0.3);
+    }
+    100% {
+        opacity: 1;
+        filter: brightness(1) saturate(1);
+    }
+}
+
+/* ============================================================
+   ESCALATING SHAKE ANIMATIONS
+   Triggered on all subtractions, intensity increases as bars deplete.
+   Uses Web Animations API for dynamic parameters — these CSS
+   keyframes serve as fallback and for reference.
+   ============================================================ */
+
+/* Mild shake: 30-60% remaining */
+@keyframes hunger-shake-mild {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(1.5px); }
+    50% { transform: translateX(-1.5px); }
+    75% { transform: translateX(1.5px); }
+}
+
+/* Moderate shake: 15-35% remaining */
+@keyframes hunger-shake-moderate {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(2.5px); }
+    40% { transform: translateX(-2.5px); }
+    60% { transform: translateX(2.5px); }
+    80% { transform: translateX(-2.5px); }
+}
+
+/* Intense shake: <15% remaining */
+@keyframes hunger-shake-intense {
+    0%, 100% { transform: translateX(0); }
+    14% { transform: translateX(4px); }
+    28% { transform: translateX(-4px); }
+    42% { transform: translateX(4px); }
+    57% { transform: translateX(-4px); }
+    71% { transform: translateX(4px); }
+    85% { transform: translateX(-4px); }
+}
+
+/* ============================================================
+   FLOATING +/- TEXT
+   ============================================================ */
+
+.dk-hunger-text {
+    position: absolute;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    pointer-events: none;
+    animation: float-text-up 800ms ease-out forwards;
+    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+    z-index: 10;
 }
 
 .dk-hydration-text {
@@ -116,6 +232,34 @@
     z-index: 10;
 }
 
+@keyframes float-text-up {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+}
+
+/* ============================================================
+   FULL-SCREEN OVERLAYS (low vital warnings)
+   ============================================================ */
+
+.dk-hunger-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 300ms ease;
+    background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
+}
+
 .dk-hydration-overlay {
     position: fixed;
     top: 0;
@@ -127,72 +271,4 @@
     opacity: 0;
     transition: opacity 300ms ease;
     background: radial-gradient(ellipse at center, rgba(0, 100, 200, 0.3) 0%, rgba(0, 60, 120, 0.6) 100%);
-}
-
-@keyframes drumstick-eat-pulse {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-
-    50% {
-        transform: scale(1.35);
-        filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
-    }
-
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-}
-
-@keyframes drumstick-dim {
-    0% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
-
-    50% {
-        opacity: 0.4;
-        filter: brightness(0.6) saturate(0.3);
-    }
-
-    100% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
-}
-
-@keyframes drop-drink-pulse {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-
-    50% {
-        transform: scale(1.35);
-        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
-    }
-
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-}
-
-@keyframes drop-dim {
-    0% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
-
-    50% {
-        opacity: 0.4;
-        filter: brightness(0.6) saturate(0.3);
-    }
-
-    100% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
 }

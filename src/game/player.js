@@ -186,20 +186,20 @@
         this._manaRegenTimer = 0;
 
         /**
-         * Current food level (0-12, displayed as 6 drumstick icons).
-         * Each icon represents 2 food points.
+         * Current food level (0-50, displayed as 5 drumstick icons).
+         * Each icon represents 10 food points, fills vertically in 10 steps.
          * @type {number}
          * @private
          */
-        this._foodLevel = 12;
+        this._foodLevel = 50;
 
         /**
-         * Current hydration level (0-6, displayed as 3 water drop icons).
-         * Each icon represents 2 hydration points.
+         * Current hydration level (0-20, displayed as 2 water drop icons).
+         * Each icon represents 10 hydration points, fills vertically in 10 steps.
          * @type {number}
          * @private
          */
-        this._hydration = 6.0;
+        this._hydration = 20.0;
 
         /**
          * Whether the player is currently on fire.
@@ -1005,7 +1005,7 @@
     /**
      * Get the current food level.
      * 
-     * @returns {number} Food level (0-12).
+     * @returns {number} Food level (0-50).
      */
     Donkeycraft.Player.prototype.getFoodLevel = function () {
         return this._foodLevel;
@@ -1014,13 +1014,13 @@
     /**
      * Set the food level with clamping and event emission.
      * 
-     * Clamps to [0, 12]. Emits `hunger:changed` event via EventBus.
+     * Clamps to [0, 50]. Emits `hunger:changed` event via EventBus.
      * 
-     * @param {number} level - Food level to set (0-12).
+     * @param {number} level - Food level to set (0-50).
      */
     Donkeycraft.Player.prototype.setFoodLevel = function (level) {
         var oldLevel = this._foodLevel;
-        this._foodLevel = Math.max(0, Math.min(12, level));
+        this._foodLevel = Math.max(0, Math.min(50, level));
 
         // Emit hunger change event if food level actually changed
         if (EventBus && this._foodLevel !== oldLevel) {
@@ -1038,7 +1038,7 @@
      * Adjust the player's food level by a delta amount.
      * 
      * Positive values add food, negative values subtract food.
-     * Clamps to [0, 12] and emits `hunger:changed` event.
+     * Clamps to [0, 50] and emits `hunger:changed` event.
      * 
      * @param {number} delta - Food change (positive = eat, negative = starve).
      */
@@ -1082,7 +1082,7 @@
     /**
      * Get the current hydration level.
      * 
-     * @returns {number} Hydration level (0-6).
+     * @returns {number} Hydration level (0-20).
      */
     Donkeycraft.Player.prototype.getHydration = function () {
         return this._hydration;
@@ -1091,13 +1091,13 @@
     /**
      * Set the hydration level with clamping and event emission.
      * 
-     * Clamps to [0, 6]. Emits `hunger:changed` event via EventBus.
+     * Clamps to [0, 20]. Emits `hunger:changed` event via EventBus.
      * 
-     * @param {number} hydration - Hydration value to set (0-6).
+     * @param {number} hydration - Hydration value to set (0-20).
      */
     Donkeycraft.Player.prototype.setHydration = function (hydration) {
         var oldHydration = this._hydration;
-        this._hydration = Math.max(0, Math.min(6, hydration));
+        this._hydration = Math.max(0, Math.min(20, hydration));
 
         // Emit hunger change event if hydration actually changed
         if (EventBus && this._hydration !== oldHydration) {
@@ -1115,7 +1115,7 @@
      * Adjust the player's hydration by a delta amount.
      * 
      * Positive values add hydration, negative values subtract it.
-     * Clamps to [0, 6] and emits `hunger:changed` event.
+     * Clamps to [0, 20] and emits `hunger:changed` event.
      * 
      * @param {number} delta - Hydration change (positive = drink, negative = dehydrate).
      */
@@ -1419,8 +1419,8 @@
             this._starvationTimer = 0;
         }
 
-        // Natural regeneration: when food > 10 (of 12) and health < max
-        if (this._foodLevel > 10 && this._health < this.maxHealth) {
+        // Natural regeneration: when food > 45 (of 50) and health < max
+        if (this._foodLevel > 45 && this._health < this.maxHealth) {
             // Regen chance: ~25% per second
             if (Math.random() < deltaTime * 0.25) {
                 this.heal(1);
@@ -1568,14 +1568,14 @@
      * Reset all vitals to default values.
      * 
      * Restores health to maxHealth, stamina to full (maxStamina), mana to full (maxMana),
-     * food to 12, hydration to 6. Clears fire status and resets all timers. Sets alive = true.
+     * food to 50, hydration to 20. Clears fire status and resets all timers. Sets alive = true.
      */
     Donkeycraft.Player.prototype.resetVitals = function () {
         this._health = this.maxHealth;
         this._stamina = this.maxStamina;
         this._mana = this.maxMana;
-        this._foodLevel = 12;
-        this._hydration = 6.0;
+        this._foodLevel = 50;
+        this._hydration = 20.0;
         this._onFire = false;
         this._fireDamageTimer = 0;
         this._starvationTimer = 0;

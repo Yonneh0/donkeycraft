@@ -890,21 +890,21 @@
             case 'health': {
                 if (!player) { Donkeycraft.Logger.warn('DebugOverlay', 'Player not available'); break; }
                 var currentHealth = player.getHealth() !== undefined ? player.getHealth() : 20;
-                var maxHealth = player.getMaxHealth() || 20;
                 var newHealth = currentHealth;
 
                 if (parsedArgs === 'full') {
-                    newHealth = maxHealth;
+                    // Debug: set to arbitrary high value for testing
+                    newHealth = 9999;
                 } else if (parsedArgs === 'empty') {
-                    newHealth = 0;
+                    newHealth = -9999;
                 } else if (typeof parsedArgs === 'number') {
                     newHealth = currentHealth + parsedArgs;
                 }
 
-                // Clamp to [0, maxHealth] and apply directly to Player
-                newHealth = Math.max(0, Math.min(maxHealth, Math.round(newHealth)));
+                // No clamping — debug buttons should allow any value for testing
+                newHealth = Math.round(newHealth);
 
-                player.adjustHealth(newHealth - currentHealth); // adjustHealth() handles both healing and damage
+                player.setHealth(newHealth);
 
                 refreshDebug();
                 break;
@@ -916,15 +916,16 @@
                 var newFood = currentFood;
 
                 if (parsedArgs === 'full') {
-                    newFood = 12;
+                    // Debug: set to arbitrary high value for testing
+                    newFood = 9999;
                 } else if (parsedArgs === 'empty') {
-                    newFood = 0;
+                    newFood = -9999;
                 } else if (typeof parsedArgs === 'number') {
                     newFood = currentFood + parsedArgs;
                 }
 
-                // Clamp to [0, 12] (max food level)
-                newFood = Math.max(0, Math.min(12, Math.round(newFood)));
+                // No clamping — debug buttons should allow any value for testing
+                newFood = Math.round(newFood);
 
                 hunger.setFoodLevel(newFood);
                 refreshDebug();
@@ -937,15 +938,16 @@
                 var newHydration = currentHydration;
 
                 if (parsedArgs === 'full') {
-                    newHydration = 6;
+                    // Debug: set to arbitrary high value for testing
+                    newHydration = 9999;
                 } else if (parsedArgs === 'empty') {
-                    newHydration = 0;
+                    newHydration = -9999;
                 } else if (typeof parsedArgs === 'number') {
                     newHydration = currentHydration + parsedArgs;
                 }
 
-                // Clamp to [0, 6] (max hydration cap)
-                newHydration = Math.max(0, Math.min(6, Math.round(newHydration * 10) / 10));
+                // No clamping — debug buttons should allow any value for testing
+                newHydration = Math.round(newHydration * 10) / 10;
 
                 hunger.setHydration(newHydration);
                 refreshDebug();
@@ -958,16 +960,16 @@
                 var newAbs = currentAbs;
 
                 if (parsedArgs === 'full') {
-                    // Set to max stamina (100 points)
-                    newAbs = player.getMaxStamina() || 100;
+                    // Debug: set to arbitrary high value for testing
+                    newAbs = 9999;
                 } else if (parsedArgs === 'empty') {
-                    newAbs = 0;
+                    newAbs = -9999;
                 } else if (typeof parsedArgs === 'number') {
                     newAbs = currentAbs + parsedArgs;
                 }
 
-                // Clamp to [0, maxStamina]
-                newAbs = Math.min(player.getMaxStamina() || 100, Math.max(0, Math.round(newAbs)));
+                // No clamping — debug buttons should allow any value for testing
+                newAbs = Math.round(newAbs);
 
                 player.setStamina(newAbs);
                 refreshDebug();
@@ -980,16 +982,16 @@
                 var newMana = currentMana;
 
                 if (parsedArgs === 'full') {
-                    // Set to max mana (100 points)
-                    newMana = player.getMaxMana() || 100;
+                    // Debug: set to arbitrary high value for testing
+                    newMana = 9999;
                 } else if (parsedArgs === 'empty') {
-                    newMana = 0;
+                    newMana = -9999;
                 } else if (typeof parsedArgs === 'number') {
                     newMana = currentMana + parsedArgs;
                 }
 
-                // Clamp to [0, maxMana]
-                newMana = Math.min(player.getMaxMana() || 100, Math.max(0, Math.round(newMana)));
+                // No clamping — debug buttons should allow any value for testing
+                newMana = Math.round(newMana);
 
                 player.setMana(newMana);
                 refreshDebug();
