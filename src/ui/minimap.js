@@ -29,7 +29,7 @@
         this._minimapRadius = Config && Config.MAP_MINIMAP_RADIUS ? Config.MAP_MINIMAP_RADIUS : 32;
 
         /** @type {number} @private */
-        this._blockPixelSize = 1.0; // Base tile size multiplier
+        this._blockPixelSize = 2.66; // Base tile size multiplier
 
         /** @type {boolean} @private */
         this._destroyed = false;
@@ -184,7 +184,7 @@
 
         // Rotate context so player's forward direction is "up" on screen.
         ctx.translate(halfSize, halfSize);
-        ctx.rotate(-yaw + Math.PI);
+        ctx.rotate(yaw);
 
         // Draw terrain tiles around the player
         var tileWorldSize = worldUnitsPerPixel * this._blockPixelSize;
