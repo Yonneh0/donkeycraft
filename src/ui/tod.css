@@ -89,7 +89,7 @@
     white-space: nowrap;
 }
 
-/* Time dial slider popup */
+/* Time dial slider popup — active classes used by tod.js */
 .dk-time-dial-popup {
     position: fixed;
     z-index: 600;
@@ -190,11 +190,4 @@
     transform: scale(1.1);
 }
 
-/* ============================================================
-   NOTE: Duplicate orphaned CSS section removed.
-   The active popup classes are defined above (lines 93–191):
-     .dk-time-dial-popup, .dk-time-header, .dk-time-freeze-btn, .dk-time-close,
-     .dk-time-slider-row, .dk-time-label, .dk-time-slider, etc.
-   The removed section used unused class names (.dk-time-dial-header, .dk-time-dial-freeze,
-   .dk-time-dial-slider, etc.) that were never referenced by tod.js.
-   ============================================================ */
+/* End of Time-of-Day Dial Styles */

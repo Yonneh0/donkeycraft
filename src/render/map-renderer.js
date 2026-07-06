@@ -1,7 +1,4 @@
-// Donkeycraft — Lightweight 2D Map Renderer (Facade)
-// Delegates minimap rendering, full map panel UI, and time-of-day dial
-// to separate UI modules in src/ui/.
-// This file provides backward-compatible API for game.js integration.
+// Donkeycraft — Lightweight 2D Map Renderer
 (function () {
     'use strict';
 
@@ -44,7 +41,7 @@
         colors[10] = '#d4c478';           // sand (desert)
         colors[11] = '#c0a060';           // sand (badlands)
         colors[12] = '#d4c478';           // sand (generic)
-        colors[13] = 'rgba(48,96,192,0.55)';  // water (semi-transparent)
+        colors[13] = '#3060c0';  // water (opaque for map display — WebGL handles transparency)
         colors[14] = '#f0f0f0';           // snow_layer
         colors[15] = '#e8e8e8';           // ice
         colors[16] = '#3a6a2c';           // mossy_cobblestone
@@ -99,12 +96,12 @@
         colors[59] = '#6a6a8a';           // nether_quartz_ore
 
         // Special blocks
-        colors[60] = 'rgba(180,50,0,0.7)';    // lava (semi-transparent)
+        colors[60] = '#b43200';    // lava (opaque for map display — WebGL handles transparency)
         colors[61] = '#f0e060';           // glowstone
         colors[62] = '#80c0f0';           // sea_lantern
         colors[63] = '#4a3a2a';           // sugar_cane
         colors[64] = '#6a5a4a';           // bamboo
-        colors[65] = 'rgba(180,220,255,0.4)';  // glass (semi-transparent)
+        colors[65] = '#c8ecff';  // glass (opaque for map display — WebGL handles transparency)
         colors[66] = '#2a2a2a';           // bedrock
         colors[67] = '#e0e0e0';           // white_concrete
         colors[68] = '#d04040';           // red_concrete
@@ -155,8 +152,8 @@
         colors[107] = '#e0d0b0';          // stone_stairs
         colors[108] = '#4a3a2a';          // fence_gate
         colors[109] = '#6a5a4a';          // iron_bars
-        colors[110] = '#3a3a3a';          // redstone_torch_off
-        colors[111] = '#ff4444';          // redstone_torch_on
+        colors[110] = '#5a5a5a';          // redstone_torch_off (dim gray)
+        colors[111] = '#ffaa44';          // redstone_torch_on (bright orange — lit state)
         colors[112] = '#8a6a3a';          // redstone_wire
         colors[113] = '#aa4444';          // repeater_closed
         colors[114] = '#aa4444';          // repeater_open
@@ -206,13 +203,26 @@
     /**
      * Get the color for a block ID from the initialized lookup table.
      * Automatically initializes the table if not already done.
+     * Logs a warning for unknown block IDs to help catch missing entries.
      * @param {number} blockId - The block ID (0-257+).
      * @returns {string} CSS color string, or '#555555' as fallback.
      * @private
      */
     function _getBlockColor(blockId) {
         if (!_blockColors) _initBlockColors();
-        return _blockColors[blockId] || '#555555';
+        var color = _blockColors[blockId];
+        if (color === undefined) {
+            // Log unknown block IDs for debugging — only once per unique ID
+            if (!(_blockColors._unknownLog || 0)) {
+                _blockColors._unknownLog = 0;
+            }
+            if (_blockColors._unknownLog < 10) {
+                Donkeycraft.Logger.warn('MapRenderer', 'Unknown block ID: ' + blockId + ' — using fallback color #555555');
+                _blockColors._unknownLog++;
+            }
+            return '#555555';
+        }
+        return color;
     }
 
     // ============================================================
@@ -237,17 +247,9 @@
         this._minimapUI = null;
         /** @type {Donkeycraft.MapPanelUI|null} @private */
         this._mapPanelUI = null;
-        /** @type {Donkeycraft.TimeOfDayUI|null} @private */
-        this._todUI = null;
 
         /** @type {boolean} @private */
         this._visible = false;
-        /** @type {number|null} @private */
-        this._timeOfDay = null;
-        /** @type {string|null} @private */
-        this._gameMode = null;
-        /** @type {Function|null} @private */
-        this._onTimeChange = null;
         /** @type {boolean} @private */
         this._destroyed = false;
 
@@ -269,18 +271,16 @@
 
             this._minimapUI = new Donkeycraft.MinimapUI({ chunkManager: this._chunkManager });
             this._mapPanelUI = new Donkeycraft.MapPanelUI({ chunkManager: this._chunkManager });
-            this._todUI = new Donkeycraft.TimeOfDayUI({ onTimeChange: this._onTimeChange });
 
             var minimapOk = this._minimapUI.init();
             var mapPanelOk = this._mapPanelUI.init();
-            var todOk = this._todUI.init();
 
             // Register Escape key handler to close the full map panel
             if (this._mapPanelUI && typeof this._mapPanelUI.registerEscapeHandler === 'function') {
                 this._mapPanelUI.registerEscapeHandler();
             }
 
-            return minimapOk && mapPanelOk && todOk;
+            return minimapOk && mapPanelOk;
         } catch (e) {
             Donkeycraft.Logger.error('MapRenderer', 'Initialization failed: ' + e.message);
             return false;
@@ -317,37 +317,6 @@
      */
     Donkeycraft.MapRenderer.prototype.setDimensionName = function (name) {
         if (this._mapPanelUI) this._mapPanelUI.setDimensionName(name);
-    };
-
-    /**
-     * Set the current time of day for the dial display.
-     * @param {number} tod - Time of day in [0, 1).
-     */
-    Donkeycraft.MapRenderer.prototype.setTimeOfDay = function (tod) {
-        if (typeof tod === 'number' && !isNaN(tod)) {
-            this._timeOfDay = ((tod % 1) + 1) % 1;
-            if (this._todUI) this._todUI.setTimeOfDay(this._timeOfDay);
-        }
-    };
-
-    /**
-     * Set the current game mode for interactivity detection.
-     * @param {string|null} mode - 'survival', 'creative', or null.
-     */
-    Donkeycraft.MapRenderer.prototype.setGameMode = function (mode) {
-        this._gameMode = mode || null;
-        if (this._todUI) this._todUI.setGameMode(mode);
-    };
-
-    /**
-     * Set callback for time changes from slider.
-     * The callback receives (tod: number|null) where tod is in [0, 1) or null on reset.
-     * Also delegates to TimeOfDayUI's setOnTimeChange method.
-     * @param {Function} cb - Callback function receiving (tod: number|null).
-     */
-    Donkeycraft.MapRenderer.prototype.setOnTimeChange = function (cb) {
-        this._onTimeChange = typeof cb === 'function' ? cb : null;
-        if (this._todUI) this._todUI.setOnTimeChange(cb);
     };
 
     /**
@@ -388,21 +357,6 @@
      */
     Donkeycraft.MapRenderer.prototype.isVisible = function () {
         return this._visible;
-    };
-
-    /**
-     * Check if slider is visible.
-     * @returns {boolean}
-     */
-    Donkeycraft.MapRenderer.prototype.isSliderVisible = function () {
-        return this._todUI && this._todUI.isSliderVisible();
-    };
-
-    /**
-     * Hide the time slider popup.
-     */
-    Donkeycraft.MapRenderer.prototype.hideSlider = function () {
-        if (this._todUI) this._todUI.hideSlider();
     };
 
     /**
@@ -460,11 +414,9 @@
 
         if (this._minimapUI) this._minimapUI.destroy();
         if (this._mapPanelUI) this._mapPanelUI.destroy();
-        if (this._todUI) this._todUI.destroy();
 
         this._minimapUI = null;
         this._mapPanelUI = null;
-        this._todUI = null;
         this._chunkManager = null;
     };
 
@@ -474,9 +426,10 @@
 
     /**
      * Get the color for a block ID (static method for backward compatibility).
-     * Delegates to private _getBlockColor function.
+     * Delegates to private _getBlockColor function. Automatically initializes
+     * the color lookup table if not already done.
      * @param {number} blockId - The block ID (0-257+).
-     * @returns {string} CSS color string, or '#555555' as fallback.
+     * @returns {string} CSS color string, or '#555555' as fallback for unknown blocks.
      */
     Donkeycraft.MapRenderer._getBlockColor = function (blockId) {
         return _getBlockColor(blockId);
@@ -485,12 +438,21 @@
     /**
      * Invalidate the per-chunk surface map for a given chunk.
      * Called when blocks are placed or broken in that chunk.
-     * Surface maps are rebuilt lazily on next render access.
+     * Surface maps are rebuilt lazily on next render access by MinimapUI/MapPanelUI.
+     * Also invalidates MapPanelUI's surface maps to prevent stale data.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      */
     Donkeycraft.MapRenderer.invalidateChunkSurfaceMap = function (chunkX, chunkZ) {
-        // Surface map will be rebuilt on next access by minimap/map panel modules
+        // Invalidate MinimapUI surface map for this chunk
+        if (Donkeycraft.MinimapUI && typeof Donkeycraft.MinimapUI.invalidateChunkSurfaceMap === 'function') {
+            Donkeycraft.MinimapUI.invalidateChunkSurfaceMap(chunkX, chunkZ);
+        }
+        // Also invalidate MapPanelUI surface maps — they use the same _mapSurfaceMap property
+        // but may have their own caching. Clearing ensures both views rebuild fresh data.
+        if (Donkeycraft.MapPanelUI && typeof Donkeycraft.MapPanelUI.invalidateChunkSurfaceMap === 'function') {
+            Donkeycraft.MapPanelUI.invalidateChunkSurfaceMap(chunkX, chunkZ);
+        }
     };
 
 })();

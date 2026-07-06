@@ -510,23 +510,19 @@
 
     /**
      * Get the color for a block ID.
-     * Delegates to MapRenderer's master block color lookup.
+     * Always delegates to MapRenderer's master block color lookup for consistency.
      * @param {number} blockId - The block ID.
      * @returns {string} CSS color string.
      * @private
      */
     Donkeycraft.MapPanelUI.prototype._getBlockColor = function (blockId) {
-        // Always delegate to MapRenderer's master color lookup
+        // Always delegate to MapRenderer's master color lookup — fallback table removed
+        // to prevent color inconsistencies between map panel and minimap views.
         if (Donkeycraft.MapRenderer && typeof Donkeycraft.MapRenderer._getBlockColor === 'function') {
             return Donkeycraft.MapRenderer._getBlockColor(blockId);
         }
-        // Final fallback (only used if MapRenderer is not available)
-        var colors = {};
-        colors[0] = 'transparent';         // air
-        colors[1] = '#7a7a7a';             // stone
-        colors[8] = '#4a8c2c';             // grass_block
-        colors[13] = 'rgba(48,96,192,0.55)'; // water
-        return colors[blockId] || '#555555';
+        // Ultimate fallback only when MapRenderer is completely unavailable
+        return '#555555';
     };
 
     /**

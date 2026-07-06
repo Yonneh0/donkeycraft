@@ -131,6 +131,9 @@
         this._entityEngine = null;
         this._entityManager = null;
         this._entityRenderer = null;
+
+        // Time-of-day dial UI (standalone, separate from map renderer)
+        this._todUI = null;
     };
 
     /**
@@ -429,6 +432,18 @@
                 var dimChunkManager = Donkeycraft.Dimensions.getChunkManagerForDimension(currentDim);
                 Donkeycraft.Portal.init(this._eventBus, dimChunkManager || this._chunkManager, currentDim);
             }
+
+            // Create standalone TimeOfDayUI for creative mode time dial.
+            // The callback freezes time at the selected value when the slider changes.
+            var self = this;
+            this._todUI = new Donkeycraft.TimeOfDayUI({
+                onTimeChange: function (tod) {
+                    if (typeof tod === 'number' && !isNaN(tod)) {
+                        self.setFrozenTime(tod);
+                    }
+                }
+            });
+            this._todUI.init();
 
             return true;
 
@@ -1225,6 +1240,12 @@
             } catch (e) { }
         }
 
+        // Clean up TimeOfDayUI
+        if (this._todUI) {
+            try { this._todUI.destroy(); } catch (e) { Donkeycraft.Logger.warn('Game', 'TimeOfDayUI destroy error: ' + e.message); }
+            this._todUI = null;
+        }
+
         // Clean up auto-save timer
         this._autoSaveTimer = 0;
         this._worldStore = null;
@@ -1627,6 +1648,10 @@
                 // Emit gameMode:changed event for UI systems (speed indicator, gamemode badge)
                 if (this._eventBus) {
                     try { this._eventBus.emit('gameMode:changed', { newMode: newMode }); } catch (e2) { }
+                }
+                // Notify TimeOfDayUI of game mode change for interactive dial
+                if (this._todUI) {
+                    this._todUI.setGameMode(newMode);
                 }
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Game mode cycle error: ' + e.message);
@@ -2241,19 +2266,23 @@
             }
         }
 
+        // Update time-of-day dial directly (standalone, separate from map renderer)
+        if (this._todUI && this._player) {
+            try {
+                var todTime = this._getTimeOfDay();
+                this._todUI.setTimeOfDay(todTime);
+                var todMode = this._player.getGameMode ? this._player.getGameMode() : null;
+                this._todUI.setGameMode(todMode);
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'TimeOfDayUI update error: ' + e.message);
+            }
+        }
+
         // Render map view (2D overhead map + minimap) — always update each frame
         if (this._mapRenderer && this._player) {
             try {
                 var playerPos = this._player.getPosition();
                 var playerRot = this._player.getRotation();
-
-                // Update time of day on the map renderer for the time dial display
-                var timeOfDay = this._getTimeOfDay();
-                this._mapRenderer.setTimeOfDay(timeOfDay);
-
-                // Update game mode on the map renderer for interactive time dial
-                var playerGameMode = this._player.getGameMode ? this._player.getGameMode() : null;
-                this._mapRenderer.setGameMode(playerGameMode);
 
                 this._mapRenderer.renderFullMap(playerPos, playerRot.yaw, playerRot.pitch);
                 this._mapRenderer.renderMinimap(playerPos, playerRot.yaw, playerRot.pitch);

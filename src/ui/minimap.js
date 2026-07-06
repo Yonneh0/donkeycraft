@@ -85,7 +85,7 @@
      * Uses pre-built surface map for O(1) lookup per block.
      * Builds the surface map lazily on first access by scanning from top to bottom.
      * Result is cached in `chunk._mapSurfaceMap[lx][lz]` for subsequent calls.
-     * @param {Donkeycraft.ChunkManager} chunkManager - The chunk manager to query.
+     * @param {Donkeycraft.ChunkManager|null} chunkManager - The chunk manager to query.
      * @param {number} wx - World X coordinate.
      * @param {number} wz - World Z coordinate.
      * @returns {number} The block ID of the surface block, or 1 (stone) as fallback.
@@ -242,29 +242,19 @@
 
     /**
      * Get the color for a block ID.
-     * Delegates to MapRenderer's master block color lookup if available, otherwise uses built-in fallback table.
+     * Always delegates to MapRenderer's master block color lookup for consistency.
      * @param {number} blockId - The block ID.
      * @returns {string} CSS color string (e.g., '#7a7a7a').
      * @private
      */
     Donkeycraft.MinimapUI.prototype._getBlockColor = function (blockId) {
-        // Always delegate to MapRenderer's master color lookup first
+        // Always delegate to MapRenderer's master color lookup — fallback table removed
+        // to prevent color inconsistencies between minimap and full map views.
         if (Donkeycraft.MapRenderer && typeof Donkeycraft.MapRenderer._getBlockColor === 'function') {
             return Donkeycraft.MapRenderer._getBlockColor(blockId);
         }
-
-        // Fallback color table (only used if MapRenderer is not available)
-        var colors = {};
-        colors[0] = 'transparent';         // air
-        colors[1] = '#7a7a7a';             // stone
-        colors[8] = '#4a8c2c';             // grass_block
-        colors[13] = 'rgba(48,96,192,0.55)'; // water
-        colors[17] = '#6b4c2a';            // oak_log
-        colors[18] = '#2d5a1e';            // oak_leaves
-        colors[76] = '#8a3a3a';            // netherrack
-        colors[90] = '#c8b8a0';            // end_stone
-
-        return colors[blockId] || '#555555';
+        // Ultimate fallback only when MapRenderer is completely unavailable
+        return '#555555';
     };
 
     /**
