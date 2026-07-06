@@ -472,6 +472,53 @@
          */
         this._onContextRestoredHandler = null;
 
+        // ============================================================
+        // Texture references
+        // ============================================================
+
+        /**
+         * Texture atlas for water color sampling.
+         * Set via setTextureAtlas() from Game instance.
+         * @type {Donkeycraft.TextureAtlas|null}
+         * @private
+         */
+        this._textureAtlas = null;
+
+        /**
+         * Placeholder texture for reflection sampler (prevents black sampling).
+         * A sky-blue tinted 1x1 texture that provides consistent non-black values
+         * when the reflection sampler is active but no planar reflection pass exists.
+         * @type {WebGLTexture|null}
+         * @private
+         */
+        this._reflectionPlaceholder = null;
+
+        // ============================================================
+        // Cached identity matrix (avoids per-frame allocation)
+        // ============================================================
+
+        /**
+         * Cached identity model matrix Float32Array data.
+         * @type {Float32Array}
+         * @private
+         */
+        this._identityMatrixData = new Float32Array([
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        ]);
+
+        /**
+         * Matrix wrapper for cached identity matrix.
+         * @type {{getData: Function}}
+         * @private
+         */
+        var selfIdentity = this;
+        this._identityMatrix = {
+            getData: function () { return selfIdentity._identityMatrixData; }
+        };
+
         // Initialize GPU buffers and context loss handling
         this._initBuffers();
     };
@@ -541,8 +588,47 @@
         // Initialize the UV column cache for mesh building
         _initUVColumnCache();
 
+        // Create reflection placeholder texture (sky-blue 1x1)
+        this._createReflectionPlaceholder();
+
         // Register WebGL context loss handlers
         this._registerContextLossHandlers();
+    };
+
+    /**
+     * Create a sky-blue 1x1 placeholder texture for the reflection sampler.
+     * Prevents black artifacts when sampling uReflectionTex at grazing angles
+     * where Fresnel reflection is strong but no planar reflection pass exists.
+     *
+     * @private
+     */
+    Donkeycraft.WaterRenderer.prototype._createReflectionPlaceholder = function () {
+        var gl = this._gl;
+        if (!gl) return;
+
+        // Sky-blue tinted 1x1 pixel: (0.5, 0.7, 0.9, 1.0)
+        var data = new Uint8Array([
+            Math.floor(0.5 * 255), // R: 128
+            Math.floor(0.7 * 255), // G: 179
+            Math.floor(0.9 * 255), // B: 230
+            255                    // A: 255
+        ]);
+
+        var tex = gl.createTexture();
+        if (!tex) {
+            Donkeycraft.Logger.error(this._loggerNamespace, '_createReflectionPlaceholder: texture creation failed');
+            return;
+        }
+
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        this._reflectionPlaceholder = tex;
+        Donkeycraft.Logger.debug(this._loggerNamespace, 'Reflection placeholder texture created');
     };
 
     /**
@@ -679,6 +765,17 @@
             return;
         }
         this._renderDistance = distance;
+    };
+
+    /**
+     * Set the texture atlas for water color sampling.
+     * The atlas is bound to WebGL texture unit 0 before rendering
+     * so the water shader can sample terrain textures for proper coloring.
+     *
+     * @param {Donkeycraft.TextureAtlas} atlas - Texture atlas instance.
+     */
+    Donkeycraft.WaterRenderer.prototype.setTextureAtlas = function (atlas) {
+        this._textureAtlas = atlas;
     };
 
     // ============================================================
@@ -1098,7 +1195,39 @@
         // Bind index buffer
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
 
-        // --- Set water shader uniforms with error checking ---
+        // --- Set water shader uniforms with per-uniform error checking ---
+
+        var _setVec3Checked = function (name, x, y, z) {
+            if (!this._shaderManager.setVec3(name, x, y, z)) {
+                Donkeycraft.Logger.warn(this._loggerNamespace, 'render: failed to set uniform ' + name + ' (vec3)');
+                return false;
+            }
+            return true;
+        }.bind(this);
+
+        var _setFloatChecked = function (name, value) {
+            if (!this._shaderManager.setFloat(name, value)) {
+                Donkeycraft.Logger.warn(this._loggerNamespace, 'render: failed to set uniform ' + name + ' (float)');
+                return false;
+            }
+            return true;
+        }.bind(this);
+
+        var _setMat4Checked = function (name, value) {
+            if (!this._shaderManager.setMat4(name, value)) {
+                Donkeycraft.Logger.warn(this._loggerNamespace, 'render: failed to set uniform ' + name + ' (mat4)');
+                return false;
+            }
+            return true;
+        }.bind(this);
+
+        var _setSamplerChecked = function (name, unit) {
+            if (!this._shaderManager.setSampler(name, unit)) {
+                Donkeycraft.Logger.warn(this._loggerNamespace, 'render: failed to set uniform ' + name + ' (sampler)');
+                return false;
+            }
+            return true;
+        }.bind(this);
 
         var uniformsOk = true;
 
@@ -1113,77 +1242,70 @@
                 if (bc) { fogR = bc.r * 0.3; fogG = bc.g * 0.3; fogB = bc.b * 0.3; }
             }
         }
-        uniformsOk = uniformsOk && this._shaderManager.setVec3('uFogColor', fogR, fogG, fogB);
+        uniformsOk = uniformsOk && _setVec3Checked('uFogColor', fogR, fogG, fogB);
 
         // Fog density
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uFogDensity', WATER_FOG_DENSITY);
+        uniformsOk = uniformsOk && _setFloatChecked('uFogDensity', WATER_FOG_DENSITY);
 
         // Light factor — pass through from lighting system for proper brightness
         if (lighting && lighting.getLightFactor) {
             var lightFactor = lighting.getLightFactor();
-            uniformsOk = uniformsOk && this._shaderManager.setFloat('uLightFactor', lightFactor);
+            uniformsOk = uniformsOk && _setFloatChecked('uLightFactor', lightFactor);
         } else {
-            uniformsOk = uniformsOk && this._shaderManager.setFloat('uLightFactor', 1.0);
+            uniformsOk = uniformsOk && _setFloatChecked('uLightFactor', 1.0);
         }
 
         // Water alpha (base transparency)
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uWaterAlpha', WATER_ALPHA_BASE);
+        uniformsOk = uniformsOk && _setFloatChecked('uWaterAlpha', WATER_ALPHA_BASE);
 
         // Reflection strength (Fresnel blend factor)
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uReflectionStrength', WATER_REFLECTION_STRENGTH);
+        uniformsOk = uniformsOk && _setFloatChecked('uReflectionStrength', WATER_REFLECTION_STRENGTH);
 
         // Animation time
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uTime', this._time);
+        uniformsOk = uniformsOk && _setFloatChecked('uTime', this._time);
 
         // Camera position
-        uniformsOk = uniformsOk && this._shaderManager.setVec3('uCameraPos', camPos.x, camPos.y, camPos.z);
+        uniformsOk = uniformsOk && _setVec3Checked('uCameraPos', camPos.x, camPos.y, camPos.z);
 
         // Water level
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uWaterLevel', this._waterLevel);
+        uniformsOk = uniformsOk && _setFloatChecked('uWaterLevel', this._waterLevel);
 
         // Sun direction
-        uniformsOk = uniformsOk && this._shaderManager.setVec3('uSunDir', sunDir.x, sunDir.y, sunDir.z);
+        uniformsOk = uniformsOk && _setVec3Checked('uSunDir', sunDir.x, sunDir.y, sunDir.z);
 
         // Wave scale — FBM UV multiplier (must match shader's expected value)
-        uniformsOk = uniformsOk && this._shaderManager.setFloat('uWaveScale', FBM_WAVE_SCALE);
+        uniformsOk = uniformsOk && _setFloatChecked('uWaveScale', FBM_WAVE_SCALE);
 
         if (!uniformsOk) {
-            Donkeycraft.Logger.warn(this._loggerNamespace, 'render: some water shader uniforms failed to set');
+            Donkeycraft.Logger.warn(this._loggerNamespace, 'render: some water shader uniforms failed to set — see individual warnings above for which ones');
         }
 
-        // --- Texture binding ---
+        // --- Texture binding (FIX: bind BEFORE setSampler for correct order) ---
 
-        // FIX: Bind terrain texture for water color mixing (texture unit 0).
-        // This ensures the water shader has a valid texture to sample for the base
-        // water color. Without this, sampling from an unbound texture produces
-        // undefined results that may cause random color artifacts.
-        if (this._shaderManager.setSampler) {
-            this._shaderManager.setSampler('uTexture', 0);
+        // 1. Bind texture atlas to unit 0 FIRST, then set sampler uniform
+        // This ensures the water shader samples a valid texture for water color mixing.
+        if (this._textureAtlas) {
+            gl.activeTexture(gl.TEXTURE0);
+            this._textureAtlas.bind(gl);
         }
+        this._shaderManager.setSampler('uTexture', 0);
 
-        // FIX: Reflection texture — bind null to unit 1 since no planar reflection pass exists.
-        // The water fragment shader handles this by using directWater color when the
-        // reflection is null (texture returns black, which gets blended out).
-        if (this._shaderManager.setSampler) {
-            this._shaderManager.setSampler('uReflectionTex', 1);
+        // 2. Bind reflection placeholder to unit 1 FIRST, then set sampler uniform
+        // The sky-blue placeholder prevents black artifacts at grazing angles where
+        // Fresnel reflection is strong but no planar reflection pass exists.
+        if (this._reflectionPlaceholder) {
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, this._reflectionPlaceholder);
         }
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        this._shaderManager.setSampler('uReflectionTex', 1);
 
         // Set projection and view matrices
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
 
-        // Identity model matrix (water is in world space).
-        // Uses a cached Float32Array to avoid per-frame allocation.
-        var identityData = new Float32Array([
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        ]);
-        var identityMatrix = { getData: function () { return identityData; } };
-        this._shaderManager.setMat4('uModel', identityMatrix);
+        // Use cached identity model matrix (water is in world space).
+        // Avoids per-frame Float32Array allocation.
+        this._shaderManager.setMat4('uModel', this._identityMatrix);
 
         // --- WebGL state for transparent rendering ---
 
@@ -1202,7 +1324,7 @@
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         // Disable depth writes — transparent surfaces must not occlude behind ones
-        gl.disable(gl.DEPTH_MASK);
+        gl.depthMask(false);
 
         // Disable back-face culling — water faces may be wound either way in perspective
         gl.disable(gl.CULL_FACE);

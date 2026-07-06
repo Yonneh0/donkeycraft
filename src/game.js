@@ -260,6 +260,10 @@
                         waterLevel = Donkeycraft.TerrainGenerator.getWaterLevel();
                     }
                     this._waterRenderer.setWaterLevel(waterLevel);
+                    // Wire texture atlas onto water renderer for proper texture sampling
+                    if (this._textureAtlas && this._waterRenderer.setTextureAtlas) {
+                        this._waterRenderer.setTextureAtlas(this._textureAtlas);
+                    }
                 } catch (e) {
                     Donkeycraft.Logger.error('Game', 'WaterRenderer initialization failed: ' + e.message);
                 }
