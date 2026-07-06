@@ -95,11 +95,13 @@
         this._geometryUsesUint32 = false;
 
         // Cached attribute locations (populated on first draw call).
-        // -1 indicates uninitialised. Cached to avoid repeated shader manager lookups.
-        this._attrPosition = -1;
-        this._attrLight = -1;
-        this._attrUV = -1;
-        this._attrNormal = -1;
+        // null indicates uninitialised. After first lookup, stores the actual location
+        // (-1 if not found in shader, or >= 0 if found). Using null instead of -1
+        // prevents conflating "not yet initialized" with "attribute not found at location 0".
+        this._attrPosition = null;
+        this._attrLight = null;
+        this._attrUV = null;
+        this._attrNormal = null;
 
         // Listen for context loss/restore on the source canvas
         if (gl && gl.canvas) {
@@ -214,7 +216,8 @@
         }
 
         // Cache attribute locations on first draw call to avoid repeated shader manager lookups.
-        if (this._attrPosition === -1 && this._shaderManager) {
+        // Uses null check — after first lookup, stores the actual result (-1 or >= 0).
+        if (this._attrPosition === null && this._shaderManager) {
             this._attrPosition = this._shaderManager.getAttribute('aPosition');
             this._attrLight = this._shaderManager.getAttribute('aLight');
             this._attrUV = this._shaderManager.getAttribute('aUV');
@@ -226,28 +229,28 @@
 
         // Position attribute (3 floats at offset 0, stride VERTEX_BYTE_STRIDE bytes)
         var posLoc = this._attrPosition;
-        if (posLoc >= 0) {
+        if (posLoc !== null && posLoc >= 0) {
             gl.enableVertexAttribArray(posLoc);
             gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, VERTEX_BYTE_STRIDE, POS_OFFSET * 4);
         }
 
         // Light attribute (1 float at offset LIGHT_OFFSET, stride VERTEX_BYTE_STRIDE bytes)
         var lightLoc = this._attrLight;
-        if (lightLoc >= 0) {
+        if (lightLoc !== null && lightLoc >= 0) {
             gl.enableVertexAttribArray(lightLoc);
             gl.vertexAttribPointer(lightLoc, 1, gl.FLOAT, false, VERTEX_BYTE_STRIDE, LIGHT_OFFSET * 4);
         }
 
         // UV attribute (2 floats at offset UV_OFFSET, stride VERTEX_BYTE_STRIDE bytes)
         var uvLoc = this._attrUV;
-        if (uvLoc >= 0) {
+        if (uvLoc !== null && uvLoc >= 0) {
             gl.enableVertexAttribArray(uvLoc);
             gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, VERTEX_BYTE_STRIDE, UV_OFFSET * 4);
         }
 
         // Normal attribute (3 floats at offset NORMAL_OFFSET, stride VERTEX_BYTE_STRIDE bytes)
         var normLoc = this._attrNormal;
-        if (normLoc >= 0) {
+        if (normLoc !== null && normLoc >= 0) {
             gl.enableVertexAttribArray(normLoc);
             gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, VERTEX_BYTE_STRIDE, NORMAL_OFFSET * 4);
         }
@@ -256,11 +259,11 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._indexBuffer);
         gl.drawElements(gl.TRIANGLES, this._indexCount, indexType, 0);
 
-        // Disable attribute pointers.
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-        if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
-        if (normLoc >= 0) gl.disableVertexAttribArray(normLoc);
-        if (lightLoc >= 0) gl.disableVertexAttribArray(lightLoc);
+        // Disable attribute pointers (only if they were enabled, i.e., loc >= 0).
+        if (posLoc !== null && posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+        if (uvLoc !== null && uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
+        if (normLoc !== null && normLoc >= 0) gl.disableVertexAttribArray(normLoc);
+        if (lightLoc !== null && lightLoc >= 0) gl.disableVertexAttribArray(lightLoc);
 
         return true;
     };
@@ -339,10 +342,11 @@
         this._destroyed = true;
 
         // Invalidate cached attribute locations (shader program may have changed).
-        this._attrPosition = -1;
-        this._attrLight = -1;
-        this._attrUV = -1;
-        this._attrNormal = -1;
+        // Reset to null so next draw call re-queries the new shader.
+        this._attrPosition = null;
+        this._attrLight = null;
+        this._attrUV = null;
+        this._attrNormal = null;
     };
 
 })();

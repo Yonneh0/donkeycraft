@@ -1682,8 +1682,9 @@
 
         this._applyRenderState(alphaEnabled);
 
+        // Use the dedicated entity shader program which supports flat color rendering.
         if (shaderManager) {
-            shaderManager.use('terrain');
+            shaderManager.use('entity');
         }
 
         try {
@@ -1755,8 +1756,9 @@
         var gl = this._gl;
         var shaderManager = this._shaderManager;
 
+        // Use the dedicated entity shader program which supports flat color rendering.
         if (shaderManager) {
-            shaderManager.use('terrain');
+            shaderManager.use('entity');
         }
 
         this._applyRenderState(this.enableAlphaBlending);

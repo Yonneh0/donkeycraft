@@ -150,15 +150,18 @@
     };
 
     /**
-     * Build a star field as point sprites using a seeded PRNG for reproducible positions.
+     * Build a star field as small triangle sprite billboards using a seeded PRNG.
+     * Each star is a 2-triangle quad (6 vertices) so it renders correctly without
+     * needing GLSL changes — no gl_PointSize required since WebGL 1 has no gl.pointSize().
      * Stars are distributed only on the upper hemisphere (sky visible above horizon).
-     * Each vertex includes position(3) + color(4) = 7 floats with white RGB and variable alpha.
+     * Vertex layout: position(3) + color(4) = 7 floats per vertex.
      * @private
      * @returns {void}
      */
     Donkeycraft.Sky.prototype._buildStarField = function () {
         var starData = [];
         var seed = 42;
+        var STAR_SIZE = 1.5; // Billboard size in world units
 
         // Simple seeded PRNG for reproducible star positions
         function seededRandom() {
@@ -172,54 +175,42 @@
             var phi = seededRandom() * (Math.PI / 2); // only upper hemisphere
             var r = 390;
 
+            var sx = r * Math.sin(phi) * Math.cos(theta);
+            var sy = r * Math.cos(phi);
+            var sz = r * Math.sin(phi) * Math.sin(theta);
+            var alpha = 0.8 + seededRandom() * 0.2;
+
+            // Build a 2-triangle billboard quad centered at (sx, sy, sz).
+            // Billboard is aligned with world axes — sufficient for distant stars.
             starData.push(
-                r * Math.sin(phi) * Math.cos(theta), // x
-                r * Math.cos(phi),                    // y
-                r * Math.sin(phi) * Math.sin(theta), // z
-                1.0,                                   // color r (white)
-                1.0,                                   // color g
-                1.0,                                   // color b
-                0.8 + seededRandom() * 0.2            // color a (0.8-1.0 brightness)
+                // Triangle 1: bottom-left
+                sx - STAR_SIZE, sy - STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha,
+                // Triangle 1: top-right
+                sx + STAR_SIZE, sy + STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha,
+                // Triangle 1: bottom-right
+                sx + STAR_SIZE, sy - STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha,
+
+                // Triangle 2: bottom-left
+                sx - STAR_SIZE, sy - STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha,
+                // Triangle 2: top-left
+                sx - STAR_SIZE, sy + STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha,
+                // Triangle 2: top-right
+                sx + STAR_SIZE, sy + STAR_SIZE, sz,
+                1.0, 1.0, 1.0, alpha
             );
         }
 
         this._starGeometry = {
             data: new Float32Array(starData),
-            count: this._starCount,
+            count: this._starCount * 6, // 6 vertices per star (2 triangles)
+            indexCount: this._starCount * 6,
             floatsPerVertex: 7 // position(3) + color(4)
         };
-    };
-
-    /**
-     * Set whether stars are visible.
-     * @param {boolean} visible - True to show stars.
-     */
-    Donkeycraft.Sky.prototype.setStarsVisible = function (visible) {
-        this._starsVisible = !!visible;
-    };
-
-    /**
-     * Check if stars are currently visible.
-     * @returns {boolean} True if stars are enabled.
-     */
-    Donkeycraft.Sky.prototype.getStarsVisible = function () {
-        return this._starsVisible;
-    };
-
-    /**
-     * Set whether sun and moon are visible in the sky.
-     * @param {boolean} visible - True to show sun/moon.
-     */
-    Donkeycraft.Sky.prototype.setSunMoonVisible = function (visible) {
-        this._sunMoonVisible = !!visible;
-    };
-
-    /**
-     * Check if sun and moon are currently visible.
-     * @returns {boolean} True if sun/moon rendering is enabled.
-     */
-    Donkeycraft.Sky.prototype.getSunMoonVisible = function () {
-        return this._sunMoonVisible;
     };
 
     /**
@@ -448,15 +439,18 @@
     };
 
     /**
-     * Render the star field as point sprites using the sky shader with per-vertex color.
-     * Stars are rendered as gl.POINTS with position(3) + color(4) interleaved at 7 floats/vertex.
+     * Render the star field as triangle sprite billboards using the sky shader with per-vertex color.
+     * Each star is a small quad (2 triangles, 6 vertices) rendered with TRIANGLES mode.
+     * This avoids the need for gl.pointSize() which doesn't exist in WebGL 1 — point size
+     * must be set via the vertex shader's gl_PointSize built-in, which would require GLSL changes.
      * Depth write must be disabled so stars render as translucent overlays on terrain.
+     *
      * @private
      * @returns {boolean} True if rendered successfully.
      */
     Donkeycraft.Sky.prototype._renderStars = function () {
         var gl = this._gl;
-        if (!gl || !this._starVertBuf || !this._starGeometry) return;
+        if (!gl || !this._starVertBuf || !this._starGeometry) return false;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this._starVertBuf);
 
@@ -472,19 +466,35 @@
             gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, this._starGeometry.floatsPerVertex * 4, 12);
         }
 
-        // Render as points (one per star).
-        gl.drawArrays(gl.POINTS, 0, this._starGeometry.count);
+        try {
+            // Render as triangles — each star is a 6-vertex billboard quad.
+            gl.drawArrays(gl.TRIANGLES, 0, this._starGeometry.count);
+        } finally {
+            // Always disable attribute arrays to prevent state leakage.
+            if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+            if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        }
 
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        return true;
     };
 
     /**
      * Render the sky dome, sun, moon, and stars using the sky shader program.
-     * Depth write is disabled for the dome so terrain renders on top.
-     * Face culling is disabled because the camera is inside the sky dome —
-     * outward-facing triangles would otherwise be culled as back-faces.
-     * uHasColorOverlay is reset to 0 after sun/moon rendering to ensure stars use default gradient passthrough.
+     *
+     * Rendering order:
+     * 1. Sky dome (depth write disabled, face culling disabled)
+     * 2. Sun disc (translucent overlay, depth write disabled)
+     * 3. Moon disc (translucent overlay, depth write disabled)
+     * 4. Stars (translucent point sprites, depth write disabled)
+     *
+     * CRITICAL: All rendering uses depthMask(false). A try/finally block ensures
+     * depthMask(true) is always restored before returning, preventing terrain/particles/GUI
+     * from silently depth-failing on subsequent frames.
+     *
+     * Face culling is disabled because the camera is inside the sky dome — outward-facing
+     * triangles would otherwise be culled as back-faces. The original CULL_FACE state is
+     * saved and restored to avoid affecting subsequent renderers.
+     *
      * @param {Donkeycraft.Camera} camera - The camera instance.
      * @param {Lighting} lighting - The lighting system instance.
      */
@@ -492,118 +502,124 @@
         var gl = this._gl;
         if (!gl || !this._shaderManager) return;
 
-        // ---- Sky dome (always drawn first, depth write disabled) ----
-        gl.depthMask(false);
+        // Save current GL state for restoration after sky rendering.
+        var prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
+        var prevCullFace = false;
+        try { prevCullFace = gl.isEnabled(gl.CULL_FACE); } catch (e) { /* context may be lost */ }
 
+        // ---- Enable depth write protection and disable face culling ----
         // CRITICAL: Disable face culling — camera is inside the sky dome.
-        // Outward-facing normals + inside camera = all triangles appear as back-faces
-        // and would be culled by gl.CULL_FACE, making the sky invisible.
-        var cullWasEnabled = gl.isContextLost ? false : gl.isEnabled(gl.CULL_FACE);
+        // Outward-facing normals + inside camera = all triangles appear as back-faces.
         gl.disable(gl.CULL_FACE);
 
-        if (!this._shaderManager.use('sky')) {
-            // CRITICAL: Always restore depth writes even on shader failure.
-            // If we return with depthMask(false), terrain/particles/hand/GUI
-            // cannot write to the depth buffer and will silently depth-fail.
-            gl.depthMask(true);
-            return;
-        }
-
-        var matrices = camera.getMatrices();
-        this._shaderManager.setMat4('uProjection', matrices.projection);
-
-        // Zero out view translation to keep sky fixed at world center.
-        var viewData = matrices.view.getData();
-        for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
-        this._skyViewTemp[12] = 0;
-        this._skyViewTemp[13] = 0;
-        this._skyViewTemp[14] = 0;
-        var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
-
-        this._shaderManager.setMat4('uView', skyViewMatrix);
-
-        // Set sky colors from lighting
-        var skyColor = lighting.getSkyColor();
-        var sunIntensity = lighting.getSunIntensity();
-
-        this._shaderManager.setVec3('uTopColor',
-            skyColor.r * (0.5 + 0.5 * sunIntensity),
-            skyColor.g * (0.5 + 0.5 * sunIntensity),
-            skyColor.b * (0.5 + 0.5 * sunIntensity)
-        );
-
-        this._shaderManager.setVec3('uBottomColor',
-            skyColor.r * 0.8,
-            skyColor.g * 0.8,
-            skyColor.b * 0.8
-        );
-
-        this._shaderManager.setFloat('uHorizon', 0.1);
-
-        // Draw sky dome — only aPosition is needed since uHasColorOverlay=0 uses gradient.
-        // The aColor attribute will have default [0,0,0,1] when not enabled, which is fine
-        // because the fragment shader ignores vColor when uHasColorOverlay=0.
-        gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
-        var posLoc = this._shaderManager.getAttribute('aPosition');
-
-        if (posLoc >= 0) {
-            gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 3 * 4, 0);
-        }
-
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
-        gl.drawElements(gl.TRIANGLES, this._skyDomeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
-
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-
-        // Restore face culling for terrain rendering (sky is opaque at this point).
-        if (cullWasEnabled) gl.enable(gl.CULL_FACE);
-
-        // ---- Sun disc (visible during day) — translucent overlay, depth write disabled ----
-        if (this._sunMoonVisible && sunIntensity > 0.1) {
-            var sunDir = lighting.getSunDirection();
-            this._renderSunDisc(camera, sunDir, sunIntensity);
-        }
-
-        // ---- Moon disc (visible at night or twilight — translucent overlay) ----
-        if (this._sunMoonVisible && sunIntensity < 0.8) {
-            var sunD = lighting.getSunDirection();
-            var moonDir = new Donkeycraft.Vector3(-sunD.x, -sunD.y, -sunD.z).normalized();
-            this._renderMoonDisc(camera, moonDir);
-        }
-
-        // Reset color overlay flag after sun/moon rendering so stars use default gradient passthrough.
-        // Always reset regardless of whether stars are visible.
-        this._shaderManager.setInt('uHasColorOverlay', 0);
-
-        // ---- Stars (visible at night, translucent point sprites — disable depth write) ----
-        if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
+        try {
+            // ---- Sky dome (always drawn first, depth write disabled) ----
             gl.depthMask(false);
 
-            // Re-ensure sky shader is active for stars (uses same aPosition + aColor attributes).
             if (!this._shaderManager.use('sky')) {
-                gl.depthMask(true);
+                Donkeycraft.Logger.warn('Sky', 'render: sky shader not available — skipping sky render');
                 return;
             }
 
-            var starMatrices = camera.getMatrices();
-            this._shaderManager.setMat4('uProjection', starMatrices.projection);
+            var matrices = camera.getMatrices();
+            this._shaderManager.setMat4('uProjection', matrices.projection);
 
-            // Zero out view translation for stars (keep sky fixed at world center).
-            for (var i = 0; i < 16; i++) this._skyViewTemp[i] = starMatrices.view.getData()[i];
+            // Zero out view translation to keep sky fixed at world center.
+            var viewData = matrices.view.getData();
+            for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
             this._skyViewTemp[12] = 0;
             this._skyViewTemp[13] = 0;
             this._skyViewTemp[14] = 0;
-            var starViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
-            this._shaderManager.setMat4('uView', starViewMatrix);
-            this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+            var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
 
-            // Enable color overlay so stars render with their per-vertex white/bright colors
-            // instead of the sky gradient.
-            this._shaderManager.setInt('uHasColorOverlay', 1);
+            this._shaderManager.setMat4('uView', skyViewMatrix);
 
-            this._renderStars();
-            gl.depthMask(true);
+            // Set sky colors from lighting
+            var skyColor = lighting.getSkyColor();
+            var sunIntensity = lighting.getSunIntensity();
+
+            this._shaderManager.setVec3('uTopColor',
+                skyColor.r * (0.5 + 0.5 * sunIntensity),
+                skyColor.g * (0.5 + 0.5 * sunIntensity),
+                skyColor.b * (0.5 + 0.5 * sunIntensity)
+            );
+
+            this._shaderManager.setVec3('uBottomColor',
+                skyColor.r * 0.8,
+                skyColor.g * 0.8,
+                skyColor.b * 0.8
+            );
+
+            this._shaderManager.setFloat('uHorizon', 0.1);
+
+            // Draw sky dome — only aPosition is needed since uHasColorOverlay=0 uses gradient.
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
+            var posLoc = this._shaderManager.getAttribute('aPosition');
+
+            if (posLoc >= 0) {
+                gl.enableVertexAttribArray(posLoc);
+                gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 3 * 4, 0);
+            }
+
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
+            gl.drawElements(gl.TRIANGLES, this._skyDomeGeometry.indexCount, gl.UNSIGNED_SHORT, 0);
+
+            if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+
+            // ---- Sun disc (visible during day) — translucent overlay ----
+            if (this._sunMoonVisible && sunIntensity > 0.1) {
+                var sunDir = lighting.getSunDirection();
+                this._renderSunDisc(camera, sunDir, sunIntensity);
+            }
+
+            // ---- Moon disc (visible at night or twilight — translucent overlay) ----
+            if (this._sunMoonVisible && sunIntensity < 0.8) {
+                var sunD = lighting.getSunDirection();
+                var moonDir = new Donkeycraft.Vector3(-sunD.x, -sunD.y, -sunD.z).normalized();
+                this._renderMoonDisc(camera, moonDir);
+            }
+
+            // Reset color overlay flag after sun/moon rendering so stars use default gradient passthrough.
+            this._shaderManager.setInt('uHasColorOverlay', 0);
+
+            // ---- Stars (visible at night, translucent point sprites) ----
+            if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
+                gl.depthMask(false);
+
+                // Re-ensure sky shader is active for stars.
+                if (!this._shaderManager.use('sky')) {
+                    Donkeycraft.Logger.warn('Sky', 'render: sky shader unavailable during star pass — skipping');
+                } else {
+                    var starMatrices = camera.getMatrices();
+                    this._shaderManager.setMat4('uProjection', starMatrices.projection);
+
+                    // Zero out view translation for stars (keep sky fixed at world center).
+                    for (var si = 0; si < 16; si++) this._skyViewTemp[si] = starMatrices.view.getData()[si];
+                    this._skyViewTemp[12] = 0;
+                    this._skyViewTemp[13] = 0;
+                    this._skyViewTemp[14] = 0;
+                    var starViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+                    this._shaderManager.setMat4('uView', starViewMatrix);
+                    this._shaderManager.setMat4('uModel', Donkeycraft.Matrix4.createIdentity());
+
+                    // Enable color overlay so stars render with their per-vertex white/bright colors.
+                    this._shaderManager.setInt('uHasColorOverlay', 1);
+
+                    this._renderStars();
+                }
+            }
+        } finally {
+            // CRITICAL: Always restore depth writes before returning.
+            // If we exit with depthMask(false), terrain/particles/hand/GUI
+            // cannot write to the depth buffer and will silently depth-fail.
+            gl.depthMask(prevDepthMask);
+
+            // Restore face culling state.
+            if (prevCullFace) {
+                gl.enable(gl.CULL_FACE);
+            } else {
+                gl.disable(gl.CULL_FACE);
+            }
         }
     };
 

@@ -537,14 +537,28 @@
         if (!breakVert || !guiFrag) return null;
         var breakProg = this.createProgram('break', breakVert, guiFrag);
 
+        // Create water program (water vertex + water fragment — semi-transparent water surface)
+        var waterVert = vertexShaders.WATER_VERTEX_SHADER;
+        var waterFrag = fragmentShaders.WATER_FRAGMENT_SHADER;
+        if (!waterVert || !waterFrag) return null;
+        var waterProg = this.createProgram('water', waterVert, waterFrag);
+
+        // Create entity program (entity vertex + entity fragment — flat-color animated entities)
+        var entityVert = vertexShaders.ENTITY_VERTEX_SHADER;
+        var entityFrag = fragmentShaders.ENTITY_FRAGMENT_SHADER;
+        if (!entityVert || !entityFrag) return null;
+        var entityProg = this.createProgram('entity', entityVert, entityFrag);
+
         // Verify all programs were created
-        if (!terrainProg || !skyProg || !guiProg || !breakProg) return null;
+        if (!terrainProg || !skyProg || !guiProg || !breakProg || !waterProg || !entityProg) return null;
 
         return {
             terrain: terrainProg,
             sky: skyProg,
             gui: guiProg,
-            break: breakProg
+            break: breakProg,
+            water: waterProg,
+            entity: entityProg
         };
     };
 

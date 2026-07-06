@@ -708,20 +708,31 @@
     /**
      * Render the terrain — sets up shaders, matrices, and draws all visible chunks.
      *
-     * This method:
-     * 1. Validates WebGL context and shader availability
-     * 2. Sets camera projection/view matrices
-     * 3. Extracts frustum planes for culling
-     * 4. Binds the texture atlas (or placeholder)
-     * 5. Applies fog and lighting uniforms
-     * 6. Draws each visible chunk via _drawChunk()
+     * Rendering pipeline:
+     * 1. Validate all prerequisites (WebGL context, shader manager, block getter, camera)
+     * 2. Set up depth testing, polygon offset, and face culling state
+     * 3. Activate terrain shader and set camera matrices
+     * 4. Extract frustum planes for chunk culling
+     * 5. Bind texture atlas (or placeholder) and lighting uniforms
+     * 6. Draw each visible chunk via _drawChunk()
+     * 7. Restore all modified GL state before returning
+     *
+     * CRITICAL: All GL state changes (DEPTH_TEST, POLYGON_OFFSET_FILL, CULL_FACE,
+     * DEPTH_WRITEMASK, DEPTH_FUNC) are wrapped in try/finally to ensure restoration
+     * even when early returns or errors occur.
      *
      * @param {Donkeycraft.Camera} camera - Camera instance for view/projection matrices.
      */
     Donkeycraft.TerrainRenderer.prototype.render = function (camera) {
         var gl = this._gl;
+
+        // ---- Early validation — no GL state changes until all checks pass ----
         if (!gl) {
-            Donkeycraft.Logger.error('TerrainRenderer', 'WebGL context is null — cannot render');
+            Donkeycraft.Logger.error('TerrainRenderer', 'render skipped: WebGL context is null');
+            return;
+        }
+        if (gl.isContextLost) {
+            Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: WebGL context is lost');
             return;
         }
         if (!this._shaderManager) {
@@ -737,97 +748,108 @@
             return;
         }
 
-
-        // Enable depth testing for proper terrain rendering.
-        gl.enable(gl.DEPTH_TEST);
-        gl.depthFunc(gl.LEQUAL);
-
-        // Enable polygon offset to prevent z-fighting between adjacent block faces.
-        // When blocks share edges at identical world coordinates, floating-point
-        // depth precision causes triangles within quads to flicker. POLYGON_OFFSET_FILL
-        // adds a small depth bias to push each face slightly away from the camera,
-        // eliminating the wireframe artifact on side faces.
-        gl.enable(gl.POLYGON_OFFSET_FILL);
-        gl.polygonOffset(0.5, 0.5);
-
-        if (!this._shaderManager.use('terrain')) {
-            Donkeycraft.Logger.error('TerrainRenderer', 'terrain shader program not available!');
-            return;
+        // Save current GL state for restoration after terrain rendering.
+        var prevDepthTest = gl.isEnabled(gl.DEPTH_TEST);
+        var prevDepthFunc = gl.getParameter(gl.DEPTH_FUNC);
+        var prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);
+        var prevPolyOffsetFill = gl.isEnabled(gl.POLYGON_OFFSET_FILL);
+        var prevPolyOffsetFactor, prevPolyOffsetUnits;
+        try {
+            prevPolyOffsetFactor = gl.getParameter(gl.POLYGON_OFFSET_FACTOR);
+            prevPolyOffsetUnits = gl.getParameter(gl.POLYGON_OFFSET_UNITS);
+        } catch (e) {
+            prevPolyOffsetFactor = 0;
+            prevPolyOffsetUnits = 0;
         }
-
-        // Set camera matrices.
-        var matrices = camera.getMatrices();
-        this._shaderManager.setMat4('uProjection', matrices.projection);
-        this._shaderManager.setMat4('uView', matrices.view);
-
-        // Cache matrix data for frustum extraction.
-        this._cachedProjData = matrices.projection.getData();
-        this._cachedViewData = matrices.view.getData();
-
-        // Extract frustum planes only when matrices change.
-        var cacheKey = this._getFrustumCacheKey();
-        if (cacheKey !== this._lastFrustumKey) {
-            var planes = this._extractFrustumPlanes();
-            if (!planes || planes.length === 0) {
-                Donkeycraft.Logger.warn('TerrainRenderer',
-                    'Frustum extraction failed — rendering all chunks (no culling)');
-                // When frustum extraction fails, fall back to rendering all chunks
-                // by setting a flag that bypasses culling in _isBoxInFrustum.
-                this._frustumPlanes = null;
-            }
-            this._lastFrustumKey = cacheKey;
-        }
-
-        // Set model matrix (identity for world-space rendering) — use cached identity.
-        var identityMatrix = _getCachedIdentityMatrix();
-        this._shaderManager.setMat4('uModel', identityMatrix);
-
-        // Set texture unit (atlas on unit 0).
-        gl.activeTexture(gl.TEXTURE0);
-
-        if (this._textureAtlas && this._textureAtlas.isReady()) {
-            // Bind the generated texture atlas.
-            this._textureAtlas.bind();
-        } else {
-            // Fall back to placeholder (checkerboard).
-            var placeholderTex = this._getPlaceholderTexture();
-            if (placeholderTex) {
-                gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
-            }
-        }
-        this._shaderManager.setSampler('uTexture', 0);
-
-        // Set fog uniforms and update fog color from lighting system.
-        if (this._fog) {
-            // Update fog color from lighting if available (time-of-day aware).
-            if (this._lighting) {
-                this._fog.updateFromSky(this._lighting.getSkyColor());
-            }
-            this._fog.applyToFogUniforms(this._shaderManager);
-        }
-
-        // Set dynamic lighting factor via Lighting.applyToShader() for consistency.
-        // This centralizes the sun intensity × ambient logic in one place.
-        if (this._lighting) {
-            this._lighting.applyToShader(this._shaderManager);
-        } else {
-            // Default: full brightness when no lighting system.
-            this._shaderManager.setFloat('uLightFactor', 1.0);
-        }
-
-        // NOTE: GPU back-face culling is intentionally DISABLED for terrain rendering.
-        // All visible-face culling is already done at build time in GeometryBuilder
-        // (only faces adjacent to transparent blocks are generated). Enabling
-        // gl.cullFace(gl.BACK) causes incorrect clipping of faces when the camera
-        // angle makes normally-wound triangles appear "back-facing" due to perspective
-        // projection quirks in WebGL 1. Disabling it ensures all generated faces render
-        // correctly; the performance cost is negligible since invisible faces are already
-        // culled during mesh build.
-        var cullWasEnabled = gl.isEnabled(gl.CULL_FACE);
-        gl.disable(gl.CULL_FACE);
+        var prevCullFace = false;
+        try { prevCullFace = gl.isEnabled(gl.CULL_FACE); } catch (e) { /* context may be lost */ }
 
         try {
-            // Draw each chunk, skipping those outside the frustum.
+            // ---- Enable depth testing for proper terrain rendering ----
+            if (!prevDepthTest) {
+                gl.enable(gl.DEPTH_TEST);
+            }
+            gl.depthFunc(gl.LEQUAL);
+
+            // Enable polygon offset to prevent z-fighting between adjacent block faces.
+            // When blocks share edges at identical world coordinates, floating-point
+            // depth precision causes triangles within quads to flicker. POLYGON_OFFSET_FILL
+            // adds a small depth bias to push each face slightly away from the camera.
+            if (!prevPolyOffsetFill) {
+                gl.enable(gl.POLYGON_OFFSET_FILL);
+            }
+            gl.polygonOffset(0.5, 0.5);
+
+            // ---- Activate terrain shader ----
+            if (!this._shaderManager.use('terrain')) {
+                Donkeycraft.Logger.error('TerrainRenderer', 'render: terrain shader program not available — skipping');
+                return;
+            }
+
+            // ---- Set camera matrices ----
+            var matrices = camera.getMatrices();
+            this._shaderManager.setMat4('uProjection', matrices.projection);
+            this._shaderManager.setMat4('uView', matrices.view);
+
+            // ---- Cache matrix data for frustum extraction ----
+            this._cachedProjData = matrices.projection.getData();
+            this._cachedViewData = matrices.view.getData();
+
+            // ---- Extract frustum planes only when matrices change ----
+            var cacheKey = this._getFrustumCacheKey();
+            if (cacheKey !== this._lastFrustumKey) {
+                var planes = this._extractFrustumPlanes();
+                if (!planes || planes.length === 0) {
+                    Donkeycraft.Logger.warn('TerrainRenderer',
+                        'render: frustum extraction failed — rendering all chunks (no culling)');
+                    this._frustumPlanes = null;
+                } else {
+                    this._frustumPlanes = planes;
+                }
+                this._lastFrustumKey = cacheKey;
+            }
+
+            // ---- Set model matrix (identity for world-space rendering) ----
+            var identityMatrix = _getCachedIdentityMatrix();
+            this._shaderManager.setMat4('uModel', identityMatrix);
+
+            // ---- Bind texture unit (atlas on unit 0) ----
+            gl.activeTexture(gl.TEXTURE0);
+
+            if (this._textureAtlas && this._textureAtlas.isReady()) {
+                this._textureAtlas.bind();
+            } else {
+                var placeholderTex = this._getPlaceholderTexture();
+                if (placeholderTex) {
+                    gl.bindTexture(gl.TEXTURE_2D, placeholderTex);
+                }
+            }
+            this._shaderManager.setSampler('uTexture', 0);
+
+            // ---- Set fog uniforms ----
+            if (this._fog) {
+                if (this._lighting) {
+                    this._fog.updateFromSky(this._lighting.getSkyColor());
+                }
+                this._fog.applyToFogUniforms(this._shaderManager);
+            }
+
+            // ---- Set dynamic lighting factor ----
+            if (this._lighting) {
+                this._lighting.applyToShader(this._shaderManager);
+            } else {
+                this._shaderManager.setFloat('uLightFactor', 1.0);
+            }
+
+            // ---- Disable GPU back-face culling ----
+            // All visible-face culling is done at build time in GeometryBuilder.
+            // Enabling gl.cullFace(gl.BACK) causes incorrect clipping of faces when the
+            // camera angle makes normally-wound triangles appear "back-facing" in WebGL 1.
+            if (prevCullFace) {
+                gl.disable(gl.CULL_FACE);
+            }
+
+            // ---- Draw each visible chunk, skipping those outside the frustum ----
             var cs = CHUNK_SIZE;
             for (var key in this._chunks) {
                 if (!this._chunks.hasOwnProperty(key)) continue;
@@ -848,12 +870,25 @@
                 this._drawChunk(chunkMesh);
             }
         } finally {
-            // Restore previous CULL_FACE state so subsequent renderers
-            // (sky dome, GUI, particles) are not affected.
-            if (cullWasEnabled) {
+            // CRITICAL: Always restore GL state before returning — even on error or early exit.
+            gl.depthFunc(prevDepthFunc);
+            gl.depthMask(prevDepthMask);
+
+            if (!prevPolyOffsetFill) {
+                gl.disable(gl.POLYGON_OFFSET_FILL);
+            } else {
+                gl.polygonOffset(prevPolyOffsetFactor, prevPolyOffsetUnits);
+            }
+
+            if (prevCullFace) {
                 gl.enable(gl.CULL_FACE);
             } else {
                 gl.disable(gl.CULL_FACE);
+            }
+
+            // Restore depth testing only if it was disabled before we entered render().
+            if (!prevDepthTest) {
+                gl.disable(gl.DEPTH_TEST);
             }
         }
     };
