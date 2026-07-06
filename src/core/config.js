@@ -35,9 +35,21 @@
             PLAYER_SPEED: 5.0,          // Walking speed (blocks/sec)
             PLAYER_SPRINT_SPEED: 7.8,   // Sprinting speed (blocks/sec)
             PLAYER_SNEAK_SPEED: 2.0,    // Sneak speed (blocks/sec) — 0.4x walk
-            PLAYER_FLY_SPEED: 5.0,      // Creative fly speed
-            PLAYER_FLY_SPEED_BOOST: 10.0, // Creative fly speed with sprint
-            PLAYER_TURBO_SPEED: 75.0,   // Creative turbo fly speed (15x run speed)
+
+            // Creative mode grounded turbo speed (slider position 3)
+            CREATIVE_TURBO_SPEED: 20.0, // Creative turbo on ground (4x walk speed)
+
+            // Flying speed modes — used by the speed indicator slider when flying
+            // [normal, fast, turbo, ultra]
+            PLAYER_FLY_SPEED_NORMAL: 5.0,   // Normal fly speed (1x walk speed)
+            PLAYER_FLY_SPEED_FAST: 10.0,    // Fast fly speed (2x walk speed)
+            PLAYER_FLY_SPEED_TURBO: 30.0,   // Turbo fly speed (6x walk speed)
+            PLAYER_FLY_SPEED_ULTRA: 60.0,   // Ultra fly speed (12x walk speed)
+
+            // Terrain-based slow effects (multipliers applied to base speed)
+            HONEY_BLOCK_SLOW: 0.5,          // Honey block surface — 50% speed
+            MUD_SLOW: 0.7,                  // Mud/packed mud — 70% speed
+            POWDER_SNOW_SLOW: 0.6,          // Powder snow — 60% speed
             PLAYER_JUMP_FORCE: 14.0,      // Jump velocity (blocks/s) — gives ~5.0 block jump height with GRAVITY=19.6
             PLAYER_REACH: 6.0,          // Block interaction reach distance
 

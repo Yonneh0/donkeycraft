@@ -1,5 +1,8 @@
 // Donkeycraft — Movement Physics
 // Movement physics: walking, sprinting, swimming, flying, speed modifiers.
+// Handles WASD input, gravity, collision resolution, swimming, and terrain-based speed effects.
+//
+// @module Movement
 (function () {
     'use strict';
 
@@ -40,20 +43,37 @@
         this._mouseLocked = true;
 
         /**
-         * Locked speed mode from UI indicator.
-         * When set, forces the given speed mode regardless of input keys.
-         * Null = input-driven (normal behavior).
-         * @type {string|null}
+         * Current slider index for speed selection.
+         * @type {number}
          * @private
          */
-        this._lockedSpeed = null;
+        this._sliderIndex = 1; // Default to walk/normal
 
         /**
-         * Callback for when a speed lock is cleared by code.
-         * @type {Function|null}
+         * Track which speed keys are currently held for cycling.
+         * Used to detect key press events (transition from up to down) for Ctrl/Shift.
+         * @type {Object}
          * @private
          */
-        this._onSpeedLockCleared = null;
+        this._speedKeyState = {
+            SNEAK: false,   // ControlLeft — decrease speed
+            SPRINT: false    // ShiftLeft — increase speed
+        };
+
+        /**
+         * Cooldown timer for speed key cycling (in game ticks).
+         * Prevents rapid cycling when holding Ctrl/Shift.
+         * @type {number}
+         * @private
+         */
+        this._speedKeyCooldown = 0;
+
+        /**
+         * Speed key cooldown interval (in ticks).
+         * @type {number}
+         * @private
+         */
+        this._SPEED_KEY_COOLDOWN = 5; // 5 ticks between speed changes when holding key
     };
 
     /**
@@ -82,100 +102,188 @@
     };
 
     /**
-     * Set the locked speed mode from UI indicator.
-     * @param {string|null} mode - 'sneak' | 'walk' | 'run' | 'turbo', or null to unlock.
+     * Set the slider index for speed selection.
+     * 
+     * Called by the SpeedIndicator slider when the user changes speed selection.
+     * The index corresponds to positions in the mode-specific speed arrays:
+     * - Survival: 0=sneak, 1=walk, 2=run
+     * - Creative: 0=sneak, 1=walk, 2=run, 3=turbo
+     * - Flying:   0=normal, 1=fast, 2=turbo, 3=ultra
+     * 
+     * @param {number} index - The slider index (0-based).
      */
-    Donkeycraft.Movement.prototype.setLockedSpeed = function (mode) {
-        var wasLocked = this._lockedSpeed !== null;
-        this._lockedSpeed = mode;
-
-        // Notify UI when lock is cleared by code (key press)
-        if (wasLocked && !this._lockedSpeed && this._onSpeedLockCleared) {
-            this._onSpeedLockCleared();
+    Donkeycraft.Movement.prototype.setSliderIndex = function (index) {
+        if (typeof index !== 'number' || index < 0) {
+            Donkeycraft.Logger.warn('Movement', 'Invalid slider index: ' + index);
+            return;
         }
+        this._sliderIndex = index;
     };
 
     /**
-     * Set the callback for when speed lock is cleared.
-     * @param {Function} callback - Function to call when lock is cleared.
+     * Get the current slider index.
+     * 
+     * @returns {number} Current slider index (0-based).
      */
-    Donkeycraft.Movement.prototype.setSpeedLockClearedCallback = function (callback) {
-        this._onSpeedLockCleared = callback;
+    Donkeycraft.Movement.prototype.getSliderIndex = function () {
+        return this._sliderIndex !== undefined ? this._sliderIndex : 1; // Default to walk/normal
     };
 
     /**
      * Get the current active speed mode string for UI display.
-     * @returns {string} 'sneak' | 'walk' | 'run' | 'turbo'
+     * 
+     * Returns the speed ID string corresponding to the current slider index,
+     * based on the current game mode and flying state.
+     * 
+     * @returns {string} Speed mode ID (e.g., 'sneak', 'walk', 'run', 'turbo', 'normal', 'fast', 'ultra').
      */
     Donkeycraft.Movement.prototype.getActiveSpeedMode = function () {
         var gameMode = this._player.getGameMode();
+        var isFlying = this._player.flyEnabled && gameMode === 'creative';
+        var index = this.getSliderIndex();
 
-        // Determine base mode based on locked state or input
-        var mode = this._getSpeedModeFromInput(gameMode);
-
-        // If locked, use locked mode (but validate it exists for current game mode)
-        if (this._lockedSpeed) {
-            // Turbo only valid in creative
-            if (this._lockedSpeed === 'turbo' && gameMode !== 'creative') {
-                return this._getSpeedModeFromInput(gameMode);
-            }
-            return this._lockedSpeed;
+        var speeds = this._getSpeedDefinitions(gameMode, isFlying);
+        if (!speeds || !speeds[index]) {
+            Donkeycraft.Logger.warn('Movement', 'Invalid slider index ' + index + ' for mode ' + gameMode + ', defaulting to walk');
+            return 'walk';
         }
 
-        return mode;
+        return speeds[index].id;
     };
 
     /**
-     * Determine the active speed mode string from current key input.
+     * Get the speed definitions array for the current game mode and state.
      * 
-     * Sneaking takes priority over sprinting. Sprinting is disabled in creative mode
-     * (creative players control speed via turbo button instead of shift key).
-     * The locked speed override (`_lockedSpeed`) is NOT checked here — that is handled
-     * by `getActiveSpeedMode()` which calls this method internally.
-     * 
+     * @private
      * @param {string} gameMode - Current game mode ('survival', 'creative', 'spectator').
-     * @returns {string} Speed mode: 'sneak', 'walk', or 'run'.
-     * @private
+     * @param {boolean} isFlying - Whether the player is currently flying.
+     * @returns {Array<Object>} Speed definitions array with id, emoji, label, speed properties.
      */
-    Donkeycraft.Movement.prototype._getSpeedModeFromInput = function (gameMode) {
-        var input = this._input;
-        if (!input) return 'walk';
+    Donkeycraft.Movement.prototype._getSpeedDefinitions = function (gameMode, isFlying) {
+        if (isFlying) {
+            return [
+                { id: 'normal', speed: Config.PLAYER_FLY_SPEED_NORMAL },
+                { id: 'fast', speed: Config.PLAYER_FLY_SPEED_FAST },
+                { id: 'turbo', speed: Config.PLAYER_FLY_SPEED_TURBO },
+                { id: 'ultra', speed: Config.PLAYER_FLY_SPEED_ULTRA }
+            ];
+        }
 
-        var isSneaking = input.isKeyDown(Config.KEYBINDS.SNEAK);
-        var isSprinting = input.isKeyDown(Config.KEYBINDS.SPRINT);
+        if (gameMode === 'creative') {
+            return [
+                { id: 'sneak', speed: Config.PLAYER_SNEAK_SPEED },
+                { id: 'walk', speed: Config.PLAYER_SPEED },
+                { id: 'run', speed: Config.PLAYER_SPRINT_SPEED },
+                { id: 'turbo', speed: Config.CREATIVE_TURBO_SPEED }
+            ];
+        }
 
-        // Sneak takes priority
-        if (isSneaking) return 'sneak';
-
-        // Sprint → run
-        if (isSprinting && gameMode !== 'creative') return 'run';
-
-        return 'walk';
+        // Survival (and creative grounded)
+        return [
+            { id: 'sneak', speed: Config.PLAYER_SNEAK_SPEED },
+            { id: 'walk', speed: Config.PLAYER_SPEED },
+            { id: 'run', speed: Config.PLAYER_SPRINT_SPEED }
+        ];
     };
 
     /**
-     * Get the horizontal speed in blocks per second for a given speed mode and game mode.
-     * 
-     * Speed modes:
-     * - `'sneak'`: `Config.PLAYER_SNEAK_SPEED` (2.0 blocks/s) — slow, consistent movement
-     * - `'walk'`: `Config.PLAYER_SPEED` (5.0 blocks/s) — normal walking speed
-     * - `'run'`: `Config.PLAYER_SPRINT_SPEED` (7.8 blocks/s) — ~60% faster, drains hunger
-     * - `'turbo'`: `Config.PLAYER_TURBO_SPEED` (75.0 blocks/s) — creative turbo fly speed
-     * 
-     * @param {string} mode - Speed mode string.
-     * @param {string} gameMode - Current game mode.
-     * @returns {number} Speed in blocks per second.
+     * Get the horizontal speed in blocks per second for the current slider index.
+     *
+     * Retrieves the base speed from the mode-specific speed definitions array,
+     * then applies terrain-based modifiers (honey block, mud, powder snow, etc.).
+     *
      * @private
+     * @param {number} index - The slider index (0-based).
+     * @param {string} gameMode - Current game mode.
+     * @param {Object} [terrainContext] - Terrain context with slow modifier.
+     * @returns {number} Speed in blocks per second.
      */
-    Donkeycraft.Movement.prototype._getSpeedForMode = function (mode, gameMode) {
-        switch (mode) {
-            case 'sneak': return Config.PLAYER_SNEAK_SPEED;
-            case 'run': return Config.PLAYER_SPRINT_SPEED;
-            case 'turbo': return Config.PLAYER_TURBO_SPEED;
-            default:
-                // walk — speed is the same regardless of game mode when grounded
-                return Config.PLAYER_SPEED;
+    Donkeycraft.Movement.prototype._getSpeedForIndex = function (index, gameMode, terrainContext) {
+        var speeds = this._getSpeedDefinitions(gameMode, false);
+        var speed = Config.PLAYER_SPEED; // Default
+
+        if (speeds && speeds[index]) {
+            speed = speeds[index].speed;
         }
+
+        // Apply terrain-based slow effects (grounded only)
+        if (terrainContext && terrainContext.slowModifier) {
+            speed *= terrainContext.slowModifier;
+        }
+
+        return speed;
+    };
+
+    /**
+     * Get the flying speed in blocks per second for the current slider index.
+     *
+     * @private
+     * @param {number} index - The slider index (0-based).
+     * @returns {number} Flying speed in blocks per second.
+     */
+    Donkeycraft.Movement.prototype._getFlySpeedForIndex = function (index) {
+        var speeds = [
+            Config.PLAYER_FLY_SPEED_NORMAL,
+            Config.PLAYER_FLY_SPEED_FAST,
+            Config.PLAYER_FLY_SPEED_TURBO,
+            Config.PLAYER_FLY_SPEED_ULTRA
+        ];
+
+        if (index >= 0 && index < speeds.length) {
+            return speeds[index];
+        }
+
+        return Config.PLAYER_FLY_SPEED_NORMAL; // Fallback to normal
+    };
+
+    /**
+     * Detect terrain effects beneath the player's feet.
+     *
+     * Checks the block(s) under the player's feet and returns a context object
+     * with any applicable speed modifiers (honey block, mud, powder snow).
+     *
+     * @private
+     * @param {number} x - Player X position.
+     * @param {number} y - Player Y position (feet level).
+     * @param {number} z - Player Z position.
+     * @returns {Object} Terrain context with slowModifier property.
+     */
+    Donkeycraft.Movement.prototype._detectTerrainEffects = function (x, y, z) {
+        var collision = this._collision;
+        if (!collision || !this._chunkManager) {
+            return { slowModifier: 1.0 }; // No modifier — default full speed
+        }
+
+        // Sample the block directly beneath the player's feet
+        var footBlockX = Math.floor(x);
+        var footBlockY = Math.floor(y);
+        var footBlockZ = Math.floor(z);
+
+        try {
+            // Use ChunkManager.getBlockId (which delegates to chunk.getBlock)
+            var footBlockId = this._chunkManager.getBlockId(footBlockX, footBlockY, footBlockZ);
+
+            // Honey block: slow movement (slimy surface)
+            if (footBlockId === 126) { // honey_block
+                return { slowModifier: Config.HONEY_BLOCK_SLOW, type: 'honey' };
+            }
+
+            // Mud variants: slow movement (muddy terrain)
+            if (footBlockId === 224 || footBlockId === 241) { // mud, packed_mud
+                return { slowModifier: Config.MUD_SLOW, type: 'mud' };
+            }
+
+            // Powder snow: slow movement (deep, soft snow)
+            if (footBlockId === 305) { // powder_snow (if it exists)
+                return { slowModifier: Config.POWDER_SNOW_SLOW, type: 'powder_snow' };
+            }
+
+        } catch (e) {
+            Donkeycraft.Logger.warn('Movement', 'Failed to detect terrain effects: ' + e.message);
+        }
+
+        // No terrain effects — full speed
+        return { slowModifier: 1.0, type: null };
     };
 
     /**
@@ -205,6 +313,9 @@
             return;
         }
 
+        // Process Ctrl/Shift key presses to cycle speed slider index
+        this._processSpeedKeyInput();
+
         var gameMode = player.getGameMode();
 
         // Spectator mode: clip through blocks, always fly
@@ -222,6 +333,83 @@
 
         // Survival mode: walking + gravity
         this._tickSurvival(deltaTime);
+    };
+
+    /**
+     * Process Ctrl/Shift key input to cycle through speed slider index.
+     *
+     * - ControlLeft (SNEAK/Ctrl): Decrease speed by one step
+     * - ShiftLeft (SPRINT/Shift): Increase speed by one step (only when grounded)
+     *
+     * Uses edge detection (key press event) with cooldown to prevent rapid cycling.
+     * Updates the slider index and notifies the UI via setSliderIndex().
+     *
+     * **Important:** ShiftLeft has different meanings depending on game state:
+     * - Survival / creative grounded: Sprint key → increase speed
+     * - Creative flying: Vertical descent control (handled in _tickCreativeFly)
+     * - Spectator: Vertical descent control (handled in _tickSpectator)
+     *
+     * @private
+     */
+    Donkeycraft.Movement.prototype._processSpeedKeyInput = function () {
+        var input = this._input;
+        if (!input) return;
+
+        // Decrement cooldown each tick
+        if (this._speedKeyCooldown > 0) {
+            this._speedKeyCooldown--;
+        }
+
+        // Only process speed key changes when cooldown is zero
+        if (this._speedKeyCooldown > 0) return;
+
+        var gameMode = this._player.getGameMode();
+
+        // Determine if player is actually flying (not just in creative mode)
+        var isFlying = false;
+        if (gameMode === 'creative' && this._player.flyEnabled) {
+            isFlying = true;
+        } else if (gameMode === 'spectator') {
+            // Spectators always fly — no speed cycling
+            return;
+        }
+
+        var speeds = this._getSpeedDefinitions(gameMode, isFlying);
+        if (!speeds) return;
+
+        var currentIdx = this.getSliderIndex();
+        var changed = false;
+
+        // --- ControlLeft (SNEAK/Ctrl): Decrease speed ---
+        var sneakDown = input.isKeyDown('ControlLeft');
+        if (sneakDown && !this._speedKeyState.SNEAK) {
+            // Key just pressed — decrease speed
+            if (currentIdx > 0) {
+                this.setSliderIndex(currentIdx - 1);
+                this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
+                changed = true;
+                Donkeycraft.Logger.info('Movement', 'Speed decreased to index ' + (currentIdx - 1) + ' via Ctrl');
+            }
+        }
+        this._speedKeyState.SNEAK = sneakDown;
+
+        // --- ShiftLeft (SPRINT/Shift): Increase speed (grounded only) ---
+        // ShiftLeft is vertical control when flying — only use as sprint when grounded.
+        var sprintDown = false;
+        if (!isFlying) {
+            sprintDown = input.isKeyDown('ShiftLeft');
+        }
+
+        if (sprintDown && !this._speedKeyState.SPRINT) {
+            // Key just pressed — increase speed
+            if (currentIdx < speeds.length - 1) {
+                this.setSliderIndex(currentIdx + 1);
+                this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
+                changed = true;
+                Donkeycraft.Logger.info('Movement', 'Speed increased to index ' + (currentIdx + 1) + ' via Shift');
+            }
+        }
+        this._speedKeyState.SPRINT = sprintDown;
     };
 
     /**
@@ -247,15 +435,31 @@
         var input = this._input;
         var collision = this._collision;
 
+        if (!player || !input || !collision) {
+            if (!player) Donkeycraft.Logger.error('Movement', 'Player reference is null in _tickSurvival()');
+            if (!input) Donkeycraft.Logger.error('Movement', 'Input reference is null in _tickSurvival()');
+            if (!collision) Donkeycraft.Logger.warn('Movement', 'Collision reference is null — movement will be unconstrained');
+            return;
+        }
+
         // Clamp deltaTime to prevent physics instability on frame drops
         deltaTime = Math.min(deltaTime, 0.1);
 
-        // Get the active speed mode and corresponding speed
+        // Get the slider index and corresponding speed
         var gameMode = player.getGameMode();
-        var activeMode = this.getActiveSpeedMode();
-        var speed = this._getSpeedForMode(activeMode, gameMode);
+        var sliderIndex = this.getSliderIndex();
 
-        // Track sprint/sneak state for hunger and UI lock clearing
+        // Detect terrain effects beneath the player's feet
+        var pos = player.getPosition();
+        var terrainContext = this._detectTerrainEffects(pos.x, pos.y, pos.z);
+
+        // Get base speed from slider index, apply terrain modifiers
+        var speed = this._getSpeedForIndex(sliderIndex, gameMode, terrainContext);
+
+        // Get the active speed mode string for UI/hunger tracking
+        var activeMode = this.getActiveSpeedMode();
+
+        // Track sprint/sneak state for hunger degradation
         var isSprinting = (activeMode === 'run');
         var isSneaking = (activeMode === 'sneak');
 
@@ -458,27 +662,9 @@
             this._distanceAccumulator = 0;
         }
 
-        // Clear speed lock only if the key press would result in a DIFFERENT mode than the locked one.
-        // This allows temporary override (e.g., locked to walk → press sprint to temporarily run),
-        // but prevents the lock from being cleared when pressing the same-mode key
-        // (e.g., locked to sneak → press sneak keeps the lock).
-        // Sneak takes priority: if both keys are pressed, only evaluate sneak to avoid
-        // the sprint check from incorrectly clearing the lock.
-        if (this._lockedSpeed && input) {
-            var sneakJustPressed = input.isKeyJustPressed(Config.KEYBINDS.SNEAK);
-            var sprintJustPressed = input.isKeyJustPressed(Config.KEYBINDS.SPRINT);
-
-            // Sneak takes priority — if sneak was just pressed, only evaluate sneak logic
-            if (sneakJustPressed) {
-                if (this._lockedSpeed !== 'sneak') {
-                    this.setLockedSpeed(null);
-                }
-            } else if (sprintJustPressed && this._player.getGameMode() !== 'creative') {
-                // Sprint only applies in survival; in creative, sprint key has no movement effect
-                if (this._lockedSpeed !== 'run' && this._lockedSpeed !== 'turbo') {
-                    this.setLockedSpeed(null);
-                }
-            }
+        // Log terrain effects for debugging
+        if (terrainContext.type && terrainContext.slowModifier < 1.0) {
+            Donkeycraft.Logger.info('Movement', 'Terrain slow effect: ' + terrainContext.type + ' (' + (terrainContext.slowModifier * 100) + '% speed)');
         }
     };
 
@@ -503,16 +689,19 @@
         var input = this._input;
         var collision = this._collision;
 
+        if (!player || !input || !collision) {
+            if (!player) Donkeycraft.Logger.error('Movement', 'Player reference is null in _tickCreativeFly()');
+            if (!input) Donkeycraft.Logger.error('Movement', 'Input reference is null in _tickCreativeFly()');
+            if (!collision) Donkeycraft.Logger.warn('Movement', 'Collision reference is null — movement will be unconstrained');
+            return;
+        }
+
         // Clamp deltaTime to prevent physics instability on frame drops
         deltaTime = Math.min(deltaTime, 0.1);
 
-        // Fly speed — check for creative sprint-flying (Space + forward = boosted speed).
-        // In vanilla Minecraft, creative mode sprint-flying uses double speed when
-        // moving forward while also pressing Space (ascend) or Shift (descend).
-        var speed = Config.PLAYER_FLY_SPEED;
-        if (input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) && input.isKeyDown(Config.KEYBINDS.JUMP)) {
-            speed = Config.PLAYER_FLY_SPEED_BOOST;
-        }
+        // Get fly speed from slider index — replaces hardcoded sprint-flying boost logic
+        var sliderIndex = this.getSliderIndex();
+        var speed = this._getFlySpeedForIndex(sliderIndex);
 
         // Compute horizontal movement direction from input
         var forward = input.isKeyDown(Config.KEYBINDS.MOVE_FORWARD) ? 1 : (input.isKeyDown(Config.KEYBINDS.MOVE_BACKWARD) ? -1 : 0);
@@ -663,6 +852,7 @@
 
     /**
      * Get the current horizontal movement speed based on game mode and sprint state.
+     *
      * @returns {number} Speed in blocks per second.
      */
     Donkeycraft.Movement.prototype.getHorizontalSpeed = function () {
@@ -683,7 +873,8 @@
 
     /**
      * Check if the player is currently swimming (in water).
-     * @returns {boolean}
+     *
+     * @returns {boolean} True if the player's mid-body position is in a liquid block.
      */
     Donkeycraft.Movement.prototype.isSwimming = function () {
         var pos = this._player.getPosition();
@@ -692,7 +883,8 @@
 
     /**
      * Check if the player's eyes are in water.
-     * @returns {boolean}
+     *
+     * @returns {boolean} True if the eye position is in a liquid block.
      */
     Donkeycraft.Movement.prototype.isInWater = function () {
         var eyePos = this._player.getEyePosition();
@@ -724,7 +916,8 @@
 
     /**
      * Get the player's current game mode.
-     * @returns {string}
+     *
+     * @returns {string} Game mode string ('survival', 'creative', 'spectator').
      */
     Donkeycraft.Movement.prototype.getGameMode = function () {
         return this._player.getGameMode();
@@ -732,7 +925,8 @@
 
     /**
      * Set the player's game mode.
-     * @param {string} mode - 'survival', 'creative', or 'spectator'.
+     *
+     * @param {string} mode - Game mode string ('survival', 'creative', 'spectator').
      */
     Donkeycraft.Movement.prototype.setGameMode = function (mode) {
         this._player.setGameMode(mode);
@@ -818,12 +1012,16 @@
 
     /**
      * Destroy the movement system and free resources.
+     *
+     * Clears all internal references to allow garbage collection.
      */
     Donkeycraft.Movement.prototype.destroy = function () {
         this._input = null;
         this._player = null;
         this._collision = null;
         this._chunkManager = null;
+        this._hungerSystem = null;
+        this._speedKeyState = {};
     };
 
 })();

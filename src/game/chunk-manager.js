@@ -139,6 +139,22 @@
     };
 
     /**
+     * Get a block ID at world coordinates by finding the correct chunk.
+     * Delegates to Chunk.getBlockId() for the actual lookup.
+     * @param {number} x - World X coordinate.
+     * @param {number} y - World Y coordinate.
+     * @param {number} z - World Z coordinate.
+     * @returns {number} Block ID at the given position, or 0 (air) if chunk not loaded.
+     */
+    Donkeycraft.ChunkManager.prototype.getBlockId = function (x, y, z) {
+        var chunkX = Math.floor(x / CHUNK_SIZE);
+        var chunkZ = Math.floor(z / CHUNK_SIZE);
+        var chunk = this._chunks.get(chunkKey(chunkX, chunkZ));
+        if (!chunk) return 0; // Chunk not loaded — treat as air
+        return chunk.getBlock(x, y, z);
+    };
+
+    /**
      * Unload a chunk at the given coordinates.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.

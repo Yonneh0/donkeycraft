@@ -1,92 +1,228 @@
 /* ============================================================
-   SPEED INDICATOR — Left side of shared container
+   SPEED INDICATOR — Horizontal slider with snap-to positions
+   ============================================================
+   
+   Design:
+   - Soft rounded background matching other UI elements
+   - Horizontal track/frame outline (not filled)
+   - Emoji icons + labels at each snap position
+   - Slider thumb highlights the currently selected speed
+   - Supports click-to-snaps and drag-to-slide interaction
+   
+   Speed modes:
+   - Survival:    sneak 🐌 | walk 🚶 | run 🏃
+   - Creative:    sneak 🐌 | walk 🚶 | run 🏃 | turbo 🚀
+   - Flying:      normal 🕊️ | fast ⚡ | turbo 🚀 | ultra 💫
+*/
+
+/* ============================================================
+   MAIN CONTAINER
    ============================================================ */
 
-/* Main speed indicator container — flex row with button bar */
 .dk-speed-indicator {
-    display: none;
-    /* Hidden by default — shown via JS for survival/creative */
+    display: none; /* Hidden by default — shown via JS for survival/creative */
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+    justify-content: center;
+    gap: 0;
+    padding: 8px 12px;
     background: rgba(0, 0, 0, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
+    border-radius: 16px;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     pointer-events: auto;
     user-select: none;
     transition: opacity 200ms ease, transform 200ms ease;
+    position: relative;
+    height: 48px;
+    width: 260px; /* Fixed width for proper stop spacing */
+    min-width: 260px;
+    max-width: 260px;
+    cursor: pointer;
+    box-sizing: border-box;
 }
 
-/* Individual speed button */
-.dk-speed-btn {
-    display: inline-flex;
+/* ============================================================
+   SLIDER TRACK (horizontal frame/outline)
+   ============================================================ */
+
+.dk-speed-track {
+    position: relative;
+    display: flex;
     align-items: center;
-    gap: 3px;
-    padding: 3px 6px;
-    background: rgba(60, 60, 60, 0.6);
-    border: 1px solid rgba(100, 100, 100, 0.4);
-    border-radius: 4px;
-    color: #ccc;
+    flex: 1;
+    height: 100%;
+    padding: 0 4px;
+    min-width: 0; /* Allow flex item to shrink if needed */
+}
+
+/* Track line — subtle outline frame */
+.dk-speed-track::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+/* ============================================================
+   SLIDER THUMB (highlights current selection)
+   ============================================================ */
+
+.dk-speed-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(46, 204, 113, 0.2);
+    border: 2px solid rgba(46, 204, 113, 0.6);
+    box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
+    pointer-events: none;
+    transition: left 150ms ease-out, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+    z-index: 2;
+}
+
+/* Thumb glow pulse animation */
+.dk-speed-thumb.dk-pulse {
+    animation: dk-speed-thumb-pulse 300ms ease-out;
+}
+
+@keyframes dk-speed-thumb-pulse {
+    0% {
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(46, 204, 113, 0.5), inset 0 0 8px rgba(46, 204, 113, 0.2);
+    }
+    100% {
+        box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
+    }
+}
+
+/* ============================================================
+   SPEED STOP POINTS (emoji + label at each snap position)
+   ============================================================ */
+
+.dk-speed-stop {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 6px;
+    min-width: 48px; /* Ensure enough space for icon + label */
+    pointer-events: none;
+    transition: opacity 150ms ease, transform 150ms ease;
+    z-index: 1;
+}
+
+/* Ensure stops are visible and not overlapping */
+.dk-speed-stop-icon {
+    font-size: 18px;
+    line-height: 1;
+    filter: grayscale(0.3);
+    transition: filter 150ms ease, transform 150ms ease;
+    display: block;
+}
+
+.dk-speed-stop-label {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 10px;
+    font-size: 8px;
     font-weight: bold;
     letter-spacing: 0.5px;
-    cursor: pointer;
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+    color: rgba(255, 255, 255, 0.45);
+    text-transform: uppercase;
     white-space: nowrap;
-    line-height: 1;
+    transition: color 150ms ease;
+    display: block;
 }
 
-.dk-speed-btn:hover {
-    background: rgba(80, 80, 80, 0.8);
-    border-color: rgba(150, 150, 150, 0.6);
-    color: #fff;
+/* Active stop point — when this speed is selected */
+.dk-speed-stop.dk-active .dk-speed-stop-icon {
+    filter: grayscale(0) drop-shadow(0 0 4px rgba(46, 204, 113, 0.5));
+    transform: scale(1.1);
 }
 
-.dk-speed-btn:active {
-    transform: scale(0.95);
+.dk-speed-stop.dk-active .dk-speed-stop-label {
+    color: rgba(46, 204, 113, 0.9);
 }
 
-/* Active state — current speed mode from input */
-.dk-speed-btn.active {
-    background: rgba(46, 204, 113, 0.3);
-    border-color: rgba(46, 204, 113, 0.6);
-    color: #2ecc71;
-    box-shadow: 0 0 6px rgba(46, 204, 113, 0.3);
+/* ============================================================
+   FLYING MODE SPECIFIC STYLES
+   ============================================================ */
+
+/* Flying mode thumb color — cyan/blue instead of green */
+.dk-speed-indicator.dk-flying .dk-speed-thumb {
+    background: rgba(52, 152, 219, 0.2);
+    border-color: rgba(52, 152, 219, 0.6);
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.3), inset 0 0 4px rgba(52, 152, 219, 0.1);
 }
 
-/* Locked state — UI-toggled lock (crouch-lock/run-lock) */
-.dk-speed-btn.locked {
-    background: rgba(52, 152, 219, 0.3);
-    border-color: rgba(52, 152, 219, 0.7);
-    color: #3498db;
-    box-shadow: 0 0 8px rgba(52, 152, 219, 0.4);
+.dk-speed-indicator.dk-flying .dk-speed-stop.dk-active .dk-speed-stop-icon {
+    filter: grayscale(0) drop-shadow(0 0 4px rgba(52, 152, 219, 0.5));
 }
 
-/* Locked + active — both locked and currently active from input */
-.dk-speed-btn.locked.active {
-    background: rgba(46, 204, 113, 0.4);
-    border-color: rgba(46, 204, 113, 0.8);
-    color: #27ae60;
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
+.dk-speed-indicator.dk-flying .dk-speed-stop.dk-active .dk-speed-stop-label {
+    color: rgba(52, 152, 219, 0.9);
 }
 
-/* Emoji icon in button */
-.dk-speed-emoji {
-    font-size: 14px;
-    line-height: 1;
+/* ============================================================
+   DRAGGING STATE
+   ============================================================ */
+
+.dk-speed-indicator.dk-dragging {
+    cursor: grabbing;
 }
 
-/* Label text in button */
-.dk-speed-label {
-    font-size: 9px;
-    line-height: 1;
-    opacity: 0.8;
+.dk-speed-indicator.dk-dragging .dk-speed-thumb {
+    transition: none; /* No animation during drag for responsiveness */
+    width: 40px;
+    height: 40px;
 }
 
-.dk-speed-btn.active .dk-speed-label,
-.dk-speed-btn.locked .dk-speed-label {
-    opacity: 1;
+/* ============================================================
+   HOVER STATE (on track area)
+   ============================================================ */
+
+.dk-speed-track:hover {
+    cursor: pointer;
+}
+
+/* ============================================================
+   RESPONSIVE — Hide labels on small screens if needed
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .dk-speed-indicator {
+        padding: 6px 8px;
+        height: 40px;
+    }
+    
+    .dk-speed-stop {
+        min-width: 32px;
+        padding: 2px 4px;
+    }
+    
+    .dk-speed-stop-icon {
+        font-size: 14px;
+    }
+    
+    .dk-speed-stop-label {
+        font-size: 7px;
+    }
+    
+    .dk-speed-thumb {
+        width: 30px;
+        height: 30px;
+    }
 }

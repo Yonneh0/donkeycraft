@@ -1,6 +1,9 @@
 // Donkeycraft — Flying System
 // Creative/spectator flying state management: enable/disable fly mode, speed queries.
 // Physics application is handled by Movement._tickCreativeFly() to avoid duplicate velocity writes.
+// Emits 'flying:stateChanged' events via global EventBus for UI synchronization.
+//
+// @module Flying
 (function () {
     'use strict';
 
@@ -61,15 +64,16 @@
 
     /**
      * Toggle flying mode on/off.
-     * 
-     * **Creative mode**: Toggles the internal `_flyEnabled` flag and `player.flyEnabled`.
+     *
+     * **Creative mode:** Toggles the internal `_flyEnabled` flag and `player.flyEnabled`.
      * If currently flying (`_flyEnabled === true`), disables flight. If not flying, enables it.
-     * 
-     * **Spectator mode**: Always sets the flag to `true` without toggling off.
+     * Emits a `flying:stateChanged` event via the global EventBus for UI synchronization.
+     *
+     * **Spectator mode:** Always sets the flag to `true` without toggling off.
      * Spectators cannot disable flight — this method always returns `true` and never disables.
-     * 
-     * **Survival mode**: Returns `false` — cannot enable flying in survival.
-     * 
+     *
+     * **Survival mode:** Returns `false` — cannot enable flying in survival.
+     *
      * @returns {boolean} True if the operation was applied (always true for creative/spectator, false for survival).
      */
     Donkeycraft.Flying.prototype.toggleFlyMode = function () {
@@ -86,6 +90,7 @@
             if (this._player) {
                 this._player.flyEnabled = true;
             }
+            Donkeycraft.EventBus.emitSafe('flying:stateChanged', { isFlying: true });
             return true;
         }
 
@@ -94,17 +99,21 @@
         if (this._player) {
             this._player.flyEnabled = this._flyEnabled;
         }
+
+        // Emit event for UI synchronization (speed indicator, etc.)
+        Donkeycraft.EventBus.emitSafe('flying:stateChanged', { isFlying: this._flyEnabled });
         return true;
     };
 
     /**
      * Enable flying mode (creative/spectator only).
-     * 
-     * **Creative mode**: Sets `_flyEnabled` to `true` and updates `player.flyEnabled`.
-     * **Spectator mode**: Also sets the flag to `true` for consistency, though spectators
+     *
+     * **Creative mode:** Sets `_flyEnabled` to `true` and updates `player.flyEnabled`.
+     * Emits a `flying:stateChanged` event via the global EventBus.
+     * **Spectator mode:** Also sets the flag to `true` for consistency, though spectators
      * always fly regardless of this flag.
-     * **Survival mode**: Returns `false` — cannot enable flying in survival.
-     * 
+     * **Survival mode:** Returns `false` — cannot enable flying in survival.
+     *
      * @returns {boolean} True if enabled successfully; false for survival mode.
      */
     Donkeycraft.Flying.prototype.enableFlyMode = function () {
@@ -119,16 +128,20 @@
         if (this._player) {
             this._player.flyEnabled = true;
         }
+
+        // Emit event for UI synchronization
+        Donkeycraft.EventBus.emitSafe('flying:stateChanged', { isFlying: true });
         return true;
     };
 
     /**
      * Disable flying mode (creative mode only).
-     * 
-     * **Creative mode**: Sets `_flyEnabled` to `false` and updates `player.flyEnabled`.
-     * **Spectator mode**: Returns `false` — spectators cannot disable flight.
-     * **Survival mode**: Returns `false` — not flying to begin with, nothing to disable.
-     * 
+     *
+     * **Creative mode:** Sets `_flyEnabled` to `false` and updates `player.flyEnabled`.
+     * Emits a `flying:stateChanged` event via the global EventBus.
+     * **Spectator mode:** Returns `false` — spectators cannot disable flight.
+     * **Survival mode:** Returns `false` — not flying to begin with, nothing to disable.
+     *
      * @returns {boolean} True if disabled successfully; false for spectator/survival modes.
      */
     Donkeycraft.Flying.prototype.disableFlyMode = function () {
@@ -143,6 +156,9 @@
         if (this._player) {
             this._player.flyEnabled = false;
         }
+
+        // Emit event for UI synchronization
+        Donkeycraft.EventBus.emitSafe('flying:stateChanged', { isFlying: false });
         return true;
     };
 

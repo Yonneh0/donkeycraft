@@ -54,6 +54,19 @@
     border-left: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* Mouse emoji in input status */
+.dk-keybindings-panel .dk-kb-mouse-emoji {
+    font-size: 12px;
+    margin-right: 3px;
+}
+
+/* Status text (locked/unlocked) */
+.dk-keybindings-panel .dk-kb-status-text {
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
 .dk-keybindings-panel .dk-kb-locked {
     color: #2ecc71;
 }

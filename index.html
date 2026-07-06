@@ -1276,7 +1276,7 @@ void main() {
                         Donkeycraft.Logger.error('Game', 'HungerBar error: ' + e.message);
                     }
 
-                    // --- Wire up Speed Indicator UI ---
+                    // --- Wire up Speed Indicator UI (slider-based speed selection) ---
                     try {
                         var speedIndicatorContainer = document.getElementById('dk-speed-indicator');
                         if (speedIndicatorContainer && Donkeycraft.SpeedIndicator && game2._movementSystem) {
@@ -1286,19 +1286,20 @@ void main() {
                             }
                             speedIndicator.setMovementSystem(game2._movementSystem);
 
-                            // Wire the speed lock cleared callback — when sprint/crouch key clears the lock,
-                            // also clear the UI lock so buttons return to normal state.
-                            if (game2._movementSystem.setSpeedLockClearedCallback) {
-                                game2._movementSystem.setSpeedLockClearedCallback(function () {
-                                    if (speedIndicator && speedIndicator.onKeybindPress) {
-                                        speedIndicator.onKeybindPress('sprint');
+                            // Wire the slider change callback — when the user changes the slider,
+                            // notify the movement system of the new index and speed ID.
+                            if (game2._movementSystem.setSliderIndex) {
+                                speedIndicator.setOnSliderChange(function (index, speedId) {
+                                    if (game2._movementSystem && game2._movementSystem.setSliderIndex) {
+                                        game2._movementSystem.setSliderIndex(index);
                                     }
+                                    Donkeycraft.Logger.info('SpeedIndicator', 'Speed changed to index ' + index + ' (' + speedId + ')');
                                 });
                             }
 
                             // Store reference on game for render loop updates
                             game2._speedIndicator = speedIndicator;
-                            Donkeycraft.Logger.info('Game', 'Speed Indicator initialized');
+                            Donkeycraft.Logger.info('Game', 'Speed Indicator initialized (slider mode)');
                         }
                     } catch (e) {
                         Donkeycraft.Logger.error('Game', 'SpeedIndicator error: ' + e.message);
