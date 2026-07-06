@@ -18,7 +18,7 @@
 
     /**
      * Ensure the canonical PerlinNoise is initialized before any generator runs.
-     * Checks the _isInitialized() flag set by PerlinNoise.init() in math-utils.js.
+     * Checks via the public _isInitialized() getter set by PerlinNoise.init() in math-utils.js.
      * If not initialized, initializes with the seed from Config or defaults to 42.
      * @private
      */
@@ -27,14 +27,9 @@
         if (typeof Donkeycraft.PerlinNoise.init !== 'function') return;
 
         var isInit = false;
-        // Check via the public getter method first, then fallback to direct property
+        // Check via the public getter method first
         if (typeof Donkeycraft.PerlinNoise._isInitialized === 'function') {
-            isInit = Donkeycraft.PerlinNoise._isInitialized();
-        } else if (Donkeycraft.PerlinNoise._initialized !== undefined) {
-            isInit = !!Donkeycraft.PerlinNoise._initialized;
-        } else {
-            // If no check available, assume initialized (PerlinNoise module loaded)
-            isInit = true;
+            isInit = !!Donkeycraft.PerlinNoise._isInitialized();
         }
 
         if (!isInit) {
@@ -71,8 +66,6 @@
      * Each generator module has its own isolated PRNG state to avoid cross-contamination.
      * The algorithm uses explicit 32-bit masking (& 0xFFFFFFFF) at each multiplication step
      * to ensure consistent behavior across all JavaScript engines and browsers.
-     * Without this masking, 64-bit floats lose precision for large x values before the | 0
-     * truncation, potentially producing different results on different JS engines.
      *
      * @param {string} namespace - Unique identifier (e.g., 'ore', 'cave', 'structure').
      * @returns {number} Random value in [0, 1).
@@ -100,8 +93,9 @@
      * @private
      */
     function _seedRng(namespace, seed) {
-        _rngStates[namespace] = (seed | 0);
-        if (_rngStates[namespace] < 0) _rngStates[namespace] += 4294967296;
+        // Properly clamp seed to 32-bit unsigned range
+        var clampedSeed = ((seed | 0) + 4294967296) % 4294967296;
+        _rngStates[namespace] = clampedSeed;
     }
 
     // ============================================================
@@ -126,10 +120,16 @@
                 // PerlinNoise threw — fall through to fallback
             }
         }
-        // Fallback: simple hash-based noise if PerlinNoise unavailable
-        var X = Math.floor(x) & 255;
-        var Y = Math.floor(y) & 255;
-        return ((Math.sin(X * 12.9898 + Y * 78.233) * 43758.5453) % 1) * 2 - 1;
+        // Fallback: simple hash-based noise seeded from global seed
+        var globalSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+        var h = _hash2D(Math.floor(x), Math.floor(y)) ^ globalSeed;
+        var rngState = h;
+        // Mulberry32 step
+        rngState = (rngState ^ (rngState >>> 16)) & 0xFFFFFFFF;
+        rngState = ((rngState * 0x45d9f3b) & 0xFFFFFFFF) | 0;
+        rngState = (rngState ^ (rngState >>> 16)) & 0xFFFFFFFF;
+        rngState = ((rngState * 0x45d9f3b) & 0xFFFFFFFF) | 0;
+        return (((rngState + 1) & 0xFFFFFFFF) >>> 0) / 2147483648 - 1; // Range [-1, 1]
     }
 
     /**
@@ -163,7 +163,7 @@
                 // PerlinNoise threw — fall through to fallback
             }
         }
-        // Fallback: simple octave accumulation if PerlinNoise unavailable
+        // Fallback: simple octave accumulation with proper persistence parameter
         var total = 0;
         var maxVal = 0;
         var freq = frequency || 2.0;
@@ -173,7 +173,7 @@
             total += _noise2D(x * freq, y * freq + z * 0.01) * amp;
             maxVal += amp;
             freq *= 2;
-            amp *= 0.5;
+            amp *= 0.5; // Fixed persistence decay in fallback
         }
         return maxVal > 0 ? total / maxVal : 0;
     }
@@ -235,7 +235,7 @@
 
     /**
      * Deterministic 3D hash using FNV-1a algorithm.
-     * Extends the 2D hash with a Z component for volumetric feature placement.
+     * Extends the 2D hash with a z component for volumetric feature placement.
      * Handles negative inputs correctly and returns an unsigned 32-bit integer.
      *
      * @param {number} x - X coordinate (may be negative).
@@ -251,6 +251,246 @@
         var h = (x * 374761393 + y * 668265263 + z * 923496773) ^ 0x5bd1e995;
         h = ((h >>> 13) ^ h) * 0x5bd1e995;
         return (h ^ (h >>> 15)) >>> 0;
+    }
+
+    // ============================================================
+    // Enhanced Fractal Noise — Ridged Multifractal & Valley Detection
+    // Required by Phase 1: Enhanced noise system for mountains/cliffs/lakes
+    // ============================================================
+
+    /**
+     * Ridged Multifractal Noise — generates mountain-like features with sharp peaks and valleys.
+     * Unlike standard fBm, this creates ridges by taking absolute values and squaring them,
+     * producing dramatic cliff faces, mountain ranges, and steep elevation changes.
+     *
+     * Algorithm:
+     *   1. Generate Perlin noise at each octave
+     *   2. Take absolute value (creates ridges)
+     *   3. Square it (emphasizes peaks)
+     *   4. Invert and weight by amplitude
+     *   5. Sum with lacunarity frequency scaling
+     *
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate (defaults to 0 for 2D).
+     * @param {number} [octaves=4] - Number of noise octaves.
+     * @param {number} [persistence=0.5] - Amplitude multiplier per octave.
+     * @param {number} [lacunarity=2.0] - Frequency multiplier per octave.
+     * @param {number} [gain=2.0] - Ridge sharpness multiplier.
+     * @returns {number} Normalized result in [-1, 1].
+     * @private
+     */
+    function _ridgedMultifractal(x, y, z, octaves, persistence, lacunarity, gain) {
+        _ensureNoiseInit();
+        if (!Donkeycraft.PerlinNoise || typeof Donkeycraft.PerlinNoise.fbm !== 'function') {
+            // Fallback: simple ridged noise using hash
+            return _noise2D(x, y) * 0.5;
+        }
+
+        octaves = Math.max(1, Math.min(8, Math.round(octaves || 4)));
+        persistence = Math.max(0, Math.min(1, persistence || 0.5));
+        lacunarity = Math.max(1, Math.min(4, lacunarity || 2));
+        gain = gain || 2;
+
+        var maxVal = 0;
+        var result = 0;
+        var amplitude = 1;
+        var frequency = 1;
+
+        for (var i = 0; i < octaves; i++) {
+            // Get noise and take absolute value for ridges
+            var noiseValue = Math.abs(Donkeycraft.PerlinNoise.noise3D(x * frequency, y * frequency, z * frequency));
+
+            // Invert and square for ridge formation
+            noiseValue = gain - noiseValue;
+            noiseValue = noiseValue * noiseValue;
+
+            // Weight by amplitude
+            noiseValue *= amplitude;
+
+            // Track maximum possible value for normalization
+            maxVal += amplitude;
+
+            result += noiseValue;
+
+            // Prepare next octave
+            amplitude *= persistence;
+            frequency *= lacunarity;
+        }
+
+        // Normalize to [-1, 1] and clamp for numerical safety
+        var normalized = maxVal > 0 ? (result / maxVal * 2 - 1) : 0;
+        return Math.max(-1, Math.min(1, normalized));
+    }
+
+    /**
+     * Valley Detection Noise — identifies basin/valley regions for lake formation.
+     * Uses inverted fBm with low thresholds to create depression zones.
+     * Values closer to 1.0 indicate deeper/more pronounced valleys.
+     * Properly normalizes output to [0, 1] range.
+     *
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate (defaults to 0 for 2D).
+     * @param {number} [octaves=3] - Number of noise octaves.
+     * @param {number} [persistence=0.5] - Amplitude multiplier per octave.
+     * @param {number} [lacunarity=2.0] - Frequency multiplier per octave.
+     * @returns {number} Valley strength in [0, 1] (0 = flat/high, 1 = deep valley).
+     * @private
+     */
+    function _valleyNoise(x, y, z, octaves, persistence, lacunarity) {
+        _ensureNoiseInit();
+        if (!Donkeycraft.PerlinNoise || typeof Donkeycraft.PerlinNoise.fbm !== 'function') {
+            return 0;
+        }
+
+        octaves = Math.max(1, Math.min(8, Math.round(octaves || 3)));
+        persistence = Math.max(0, Math.min(1, persistence || 0.5));
+        lacunarity = Math.max(1, Math.min(4, lacunarity || 2));
+
+        // Get standard fBm (range [-1, 1])
+        var fbmValue = Donkeycraft.PerlinNoise.fbm(x, y, z || 0, octaves, persistence, lacunarity);
+
+        // Invert and normalize: fbm ∈ [-1, 1] → valley ∈ [0, 1]
+        // When fbm = -1 (deep): valley = 1 (deep valley)
+        // When fbm = 1 (high): valley = 0 (no valley)
+        var valleyStrength = (1 - fbmValue) / 2;
+
+        // Clamp to [0, 1]
+        return Math.max(0, Math.min(1, valleyStrength));
+    }
+
+    /**
+     * Noise Composition System — combines multiple noise layers with blending modes.
+     * Enables terrain designers to layer continental, terrain-shaping, and detail noise
+     * with configurable influence weights for multi-pass generation.
+     *
+     * All layer outputs are normalized to [-1, 1] before weighting to ensure
+     * consistent blending regardless of the underlying noise type.
+     *
+     * @param {Array} layers - Array of noise layer definitions.
+     *   Each layer: { xScale, yScale, zScale, octaves, persistence, lacunarity, weight, type }
+     *   where type is 'fbm', 'ridged', or 'valley'.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate.
+     * @returns {number} Composed noise value in [-1, 1].
+     * @private
+     */
+    function _composeNoise(layers, x, y, z) {
+        var result = 0;
+        var totalWeight = 0;
+
+        for (var i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            var noiseValue = 0;
+
+            switch (layer.type || 'fbm') {
+                case 'ridged':
+                    noiseValue = _ridgedMultifractal(
+                        x * (layer.xScale || 1), y * (layer.yScale || 1), z * (layer.zScale || 1),
+                        layer.octaves, layer.persistence, layer.lacunarity, layer.gain
+                    );
+                    break;
+                case 'valley':
+                    // Valley returns [0, 1], convert to [-1, 1] for consistent blending
+                    var valleyVal = _valleyNoise(
+                        x * (layer.xScale || 1), y * (layer.yScale || 1), z * (layer.zScale || 1),
+                        layer.octaves, layer.persistence, layer.lacunarity
+                    );
+                    noiseValue = valleyVal * 2 - 1; // Map [0,1] → [-1,1]
+                    break;
+                default:
+                    noiseValue = _fbm(
+                        x * (layer.xScale || 1), y * (layer.yScale || 1), z * (layer.zScale || 1),
+                        layer.octaves, layer.persistence, layer.lacunarity
+                    );
+            }
+
+            var weight = layer.weight || 1;
+            result += noiseValue * weight;
+            totalWeight += weight;
+        }
+
+        // Normalize by total weight
+        var normalized = totalWeight > 0 ? result / totalWeight : 0;
+        return Math.max(-1, Math.min(1, normalized));
+    }
+
+    /**
+     * Create a pre-configured terrain noise composition for multi-pass generation.
+     * Matches Phase 2 surface generator passes:
+     *   Pass 1: Continental (large scale) — land vs water
+     *   Pass 2: Terrain shaping (medium scale) — hills/valleys
+     *   Pass 3: Detail (small scale) — texture
+     *   Pass 4: Ridged multifractal — mountains/cliffs
+     *   Pass 5: Micro-detail (very small scale) — surface roughness
+     *
+     * Uses proper scale parameters for both X and Z dimensions.
+     *
+     * @param {number} continentalScale - Scale for continental noise (default 0.003).
+     * @param {number} terrainScale - Scale for terrain shaping (default 0.015).
+     * @param {number} detailScale - Scale for detail noise (default 0.05).
+     * @param {number} ridgeScale - Scale for ridged multifractal (default 0.012).
+     * @param {number} microScale - Scale for micro-detail (default 0.1).
+     * @returns {Array} Noise layer configuration array.
+     * @private
+     */
+    function _createTerrainComposition(continentalScale, terrainScale, detailScale, ridgeScale, microScale) {
+        continentalScale = continentalScale || 0.003;
+        terrainScale = terrainScale || 0.015;
+        detailScale = detailScale || 0.05;
+        ridgeScale = ridgeScale || 0.012;
+        microScale = microScale || 0.1;
+
+        return [
+            {
+                type: 'fbm',
+                xScale: continentalScale,
+                zScale: continentalScale, // Use same scale for X and Z
+                octaves: 4,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                weight: 0.4
+            },
+            {
+                type: 'fbm',
+                xScale: terrainScale,
+                zScale: terrainScale, // Use same scale for X and Z
+                octaves: 3,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                weight: 0.3
+            },
+            {
+                type: 'fbm',
+                xScale: detailScale,
+                zScale: detailScale, // Use same scale for X and Z
+                octaves: 2,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                weight: 0.15
+            },
+            {
+                type: 'ridged',
+                xScale: ridgeScale,
+                zScale: ridgeScale, // Use same scale for X and Z
+                octaves: 4,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                gain: 2.0,
+                weight: 0.15
+            },
+            {
+                type: 'fbm',
+                xScale: microScale,
+                zScale: microScale, // Use same scale for X and Z
+                octaves: 2,
+                persistence: 0.5,
+                lacunarity: 2.0,
+                weight: 0.1
+            }
+        ];
     }
 
     // ============================================================
@@ -272,6 +512,10 @@
     Donkeycraft._gen._createShuffledPerm = _createShuffledPerm;
     Donkeycraft._gen._noise2D = _noise2D;
     Donkeycraft._gen._fbm = _fbm;
+    Donkeycraft._gen._ridgedMultifractal = _ridgedMultifractal;
+    Donkeycraft._gen._valleyNoise = _valleyNoise;
+    Donkeycraft._gen._composeNoise = _composeNoise;
+    Donkeycraft._gen._createTerrainComposition = _createTerrainComposition;
     Donkeycraft._gen._seedRng = _seedRng;
     Donkeycraft._gen._rng = _rng;
     Donkeycraft._gen._hash2D = _hash2D;

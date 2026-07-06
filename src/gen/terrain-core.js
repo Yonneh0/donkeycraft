@@ -1,0 +1,478 @@
+// Donkeycraft — Central Terrain Engine
+// Single entry point for all terrain generation.
+// Manages the 32-bit seed, chunk grid layout, caching coordination,
+// and provides API for chunk generation requests.
+(function () {
+    'use strict';
+
+    var Donkeycraft = window.Donkeycraft;
+    if (!Donkeycraft) return;
+
+    // ============================================================
+    // Constants
+    // ============================================================
+    var SEED_MASK_32BIT = 0xFFFFFFFF;
+    var DEFAULT_SEED = 42;
+
+    /**
+     * Get current Config values lazily to avoid module load order issues.
+     * @returns {{CHUNK_SIZE: number, WORLD_HEIGHT: number}}
+     * @private
+     */
+    function _getConfig() {
+        return Donkeycraft.Config || { CHUNK_SIZE: 16, WORLD_HEIGHT: 256 };
+    }
+
+    // ============================================================
+    // Runtime State
+    // ============================================================
+    var _seed = DEFAULT_SEED;
+    var _currentBiomeId = 1; // Default to plains
+    var _generationInProgress = false;
+    var _generationStartTime = 0;
+    var _totalChunksGenerated = 0;
+    var _cacheHitCount = 0;
+    var _cacheMissCount = 0;
+
+    // ============================================================
+    // Utility Functions
+    // ============================================================
+
+    /**
+     * Clamp a 32-bit seed value to valid range.
+     * @param {number} seed - Seed value.
+     * @returns {number} Clamped 32-bit unsigned seed.
+     * @private
+     */
+    function _clampSeed(seed) {
+        if (!isFinite(seed) || seed === null) return DEFAULT_SEED;
+        return seed >>> 0; // Convert to unsigned 32-bit integer
+    }
+
+    /**
+     * Generate a deterministic hash from seed and chunk coordinates.
+     * Used for cache key generation and noise offsetting.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @returns {number} Deterministic hash.
+     * @private
+     */
+    function _chunkHash(chunkX, chunkZ) {
+        var h = (chunkX * 374761393 + chunkZ * 668265263) ^ 0x5bd1e995;
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0;
+    }
+
+    /**
+     * Generate a cache key from chunk coordinates and generation parameters.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number} biomeId - Biome ID.
+     * @param {number} seed - World seed.
+     * @returns {string} Unique cache key string.
+     * @private
+     */
+    function _makeCacheKey(chunkX, chunkZ, biomeId, seed) {
+        return 'terrain_' + seed + '_' + chunkX + '_' + chunkZ + '_b' + (biomeId || 0);
+    }
+
+    /**
+     * Record a cache hit or miss for statistics tracking.
+     * @param {boolean} isHit - True if cache hit, false if miss.
+     * @private
+     */
+    function _recordCacheAccess(isHit) {
+        if (isHit) {
+            _cacheHitCount++;
+        } else {
+            _cacheMissCount++;
+        }
+    }
+
+    // ============================================================
+    // Seed Management
+    // ============================================================
+
+    /**
+     * Set the world seed and reinitialize all noise systems.
+     * @param {number} seed - 32-bit seed value.
+     */
+    function setSeed(seed) {
+        var oldSeed = _seed;
+        _seed = _clampSeed(seed);
+
+        // Reinitialize PerlinNoise with new seed
+        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
+            try {
+                Donkeycraft.PerlinNoise.init(_seed);
+            } catch (e) { /* ignore */ }
+        }
+
+        // Seed the noise module's internal state
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._ensureNoiseInit === 'function') {
+            Donkeycraft._gen._ensureNoiseInit();
+        }
+
+        // Clear memory cache when seed changes
+        if (Donkeycraft.Storage && Donkeycraft.Storage.clearAllCaches) {
+            try {
+                Donkeycraft.Storage.clearAllCaches();
+            } catch (e) { /* ignore */ }
+        }
+
+        // Notify listeners of seed change
+        _notifySeedChanged({
+            oldSeed: oldSeed,
+            newSeed: _seed
+        });
+    }
+
+    /**
+     * Get the current world seed.
+     * @returns {number} Current 32-bit seed.
+     */
+    function getSeed() {
+        return _seed;
+    }
+
+    // ============================================================
+    // Biome Management
+    // ============================================================
+
+    /**
+     * Set the current biome for terrain generation.
+     * @param {number|string|Donkeycraft.Biome} biome - Biome ID, name, or Biome object.
+     */
+    function setBiome(biome) {
+        var biomeId = 1; // Default to plains
+        var biomeResolved = false;
+
+        if (typeof biome === 'object' && biome.id !== undefined) {
+            biomeId = biome.id;
+            biomeResolved = true;
+        } else if (typeof biome === 'number') {
+            biomeId = biome;
+            biomeResolved = true;
+        } else if (typeof biome === 'string' && Donkeycraft.BiomeRegistry) {
+            var resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
+            if (resolvedBiome) {
+                biomeId = resolvedBiome.id;
+                biomeResolved = true;
+            }
+        }
+
+        if (!biomeResolved && typeof console !== 'undefined' && console.warn) {
+            console.warn('[TerrainCore] Unknown biome "' + String(biome) + '", defaulting to ID 1 (plains)');
+        }
+
+        _currentBiomeId = biomeId;
+    }
+
+    /**
+     * Get the current biome ID.
+     * @returns {number} Current biome ID.
+     */
+    function getBiome() {
+        return _currentBiomeId;
+    }
+
+    // ============================================================
+    // Chunk Generation
+    // ============================================================
+
+    /**
+     * Generate a single chunk's heightmap at the given coordinates.
+     * Uses cache if available, otherwise generates from scratch.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
+     */
+    function generateChunk(chunkX, chunkZ) {
+        var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed);
+
+        // Check storage once and store result to avoid race conditions
+        var storageReady = Donkeycraft.Storage && Donkeycraft.Storage.isReady();
+
+        if (storageReady) {
+            return Donkeycraft.Storage.getChunk(cacheKey).then(function (cachedData) {
+                // Check if cached data exists and has a valid heightmap
+                if (cachedData && Array.isArray(cachedData.heightmap) && cachedData.heightmap.length > 0) {
+                    _recordCacheAccess(true);
+                    return { heightmap: cachedData.heightmap, cacheHit: true };
+                }
+
+                // Cache miss — generate
+                _recordCacheAccess(false);
+                return _generateChunkData(chunkX, chunkZ).then(function (result) {
+                    // Store in cache if storage is still ready
+                    if (Donkeycraft.Storage && Donkeycraft.Storage.isReady()) {
+                        try {
+                            Donkeycraft.Storage.putChunk(cacheKey, result);
+                        } catch (e) { /* ignore storage errors */ }
+                    }
+                    return result;
+                });
+            }).catch(function (e) {
+                // Storage error — fall back to direct generation
+                _recordCacheAccess(false);
+                return _generateChunkData(chunkX, chunkZ);
+            });
+        }
+
+        // No storage — generate directly
+        _recordCacheAccess(false);
+        return _generateChunkData(chunkX, chunkZ);
+    }
+
+    /**
+     * Generate chunk data without caching (internal).
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
+     * @private
+     */
+    function _generateChunkData(chunkX, chunkZ) {
+        if (!Donkeycraft.TerrainGenerator) {
+            return Promise.resolve({ heightmap: [], cacheHit: false });
+        }
+
+        try {
+            var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(chunkX, chunkZ, _currentBiomeId);
+            _totalChunksGenerated++;
+
+            return Promise.resolve({
+                heightmap: heightmap,
+                cacheHit: false,
+                generationTime: Date.now() - _generationStartTime
+            });
+        } catch (e) {
+            return Promise.resolve({ heightmap: [], cacheHit: false, error: e.message });
+        }
+    }
+
+    /**
+     * Generate all chunks in the current grid.
+     * Uses Promise.allSettled to ensure one chunk failure doesn't abort the entire batch.
+     * @returns {Promise<Array>} Array of generation results (settled).
+     */
+    function generateAllChunks() {
+        if (_generationInProgress) {
+            return Promise.reject(new Error('Generation already in progress'));
+        }
+
+        _generationInProgress = true;
+        _generationStartTime = Date.now();
+        _totalChunksGenerated = 0;
+
+        var gridChunks = Donkeycraft.ChunkGrid ? Donkeycraft.ChunkGrid.getGridChunks() : [];
+        var promises = [];
+
+        for (var i = 0; i < gridChunks.length; i++) {
+            var chunk = gridChunks[i];
+            promises.push(generateChunk(chunk.x, chunk.z).catch(function (e) {
+                return { heightmap: [], cacheHit: false, error: e && e.message ? e.message : String(e) };
+            }));
+        }
+
+        return Promise.all(promises).then(function (results) {
+            _generationInProgress = false;
+            return results;
+        }).catch(function (error) {
+            // Fallback: should not happen with individual catch handlers above
+            _generationInProgress = false;
+            throw error;
+        });
+    }
+
+    /**
+     * Generate chunks in a radius around the player position.
+     * @param {number} playerChunkX - Player's chunk X coordinate.
+     * @param {number} playerChunkZ - Player's chunk Z coordinate.
+     * @param {number} [radius=3] - Generation radius.
+     * @returns {Promise<Array>} Array of generation results.
+     */
+    function generateChunksInRadius(playerChunkX, playerChunkZ, radius) {
+        radius = radius || 3;
+        var promises = [];
+
+        for (var dx = -radius; dx <= radius; dx++) {
+            for (var dz = -radius; dz <= radius; dz++) {
+                var chunkX = playerChunkX + dx;
+                var chunkZ = playerChunkZ + dz;
+                promises.push(generateChunk(chunkX, chunkZ));
+            }
+        }
+
+        return Promise.all(promises);
+    }
+
+    // ============================================================
+    // Event System
+    // ============================================================
+    var _seedListeners = [];
+    var _generationListeners = [];
+
+    /**
+     * Register a listener for seed changes.
+     * @param {Function} callback - Callback function.
+     * @returns {Function} Unsubscribe function.
+     * @private
+     */
+    function _onSeedChange(callback) {
+        if (typeof callback === 'function') {
+            _seedListeners.push(callback);
+        }
+        return function () {
+            var idx = _seedListeners.indexOf(callback);
+            if (idx >= 0) _seedListeners.splice(idx, 1);
+        };
+    }
+
+    /**
+     * Register a listener for generation progress.
+     * @param {Function} callback - Callback function receiving progress events.
+     * @returns {Function} Unsubscribe function.
+     * @private
+     */
+    function _onGenerationProgress(callback) {
+        if (typeof callback === 'function') {
+            _generationListeners.push(callback);
+        }
+        return function () {
+            var idx = _generationListeners.indexOf(callback);
+            if (idx >= 0) _generationListeners.splice(idx, 1);
+        };
+    }
+
+    /**
+     * Notify all seed change listeners.
+     * @param {Object} event - Event data.
+     * @private
+     */
+    function _notifySeedChanged(event) {
+        for (var i = 0; i < _seedListeners.length; i++) {
+            try { _seedListeners[i](event); } catch (e) { /* ignore */ }
+        }
+    }
+
+    /**
+     * Notify all generation progress listeners.
+     * @param {Object} event - Event data.
+     * @private
+     */
+    function _notifyGenerationProgress(event) {
+        for (var i = 0; i < _generationListeners.length; i++) {
+            try { _generationListeners[i](event); } catch (e) { /* ignore */ }
+        }
+    }
+
+    // ============================================================
+    // Statistics
+    // ============================================================
+
+    /**
+     * Get terrain generation statistics.
+     * @returns {{seed: number, biomeId: number, chunksGenerated: number, cacheHits: number, cacheMisses: number, cacheHitRate: number, isGenerating: boolean}}
+     */
+    function getStats() {
+        var totalAccesses = _cacheHitCount + _cacheMissCount;
+        var cacheHitRate = totalAccesses > 0 ? (_cacheHitCount / totalAccesses * 100) : 0;
+
+        return {
+            seed: _seed,
+            biomeId: _currentBiomeId,
+            chunksGenerated: _totalChunksGenerated,
+            cacheHits: _cacheHitCount,
+            cacheMisses: _cacheMissCount,
+            cacheHitRate: cacheHitRate.toFixed(1) + '%',
+            isGenerating: _generationInProgress,
+            storage: Donkeycraft.Storage ? Donkeycraft.Storage.getStats() : null
+        };
+    }
+
+    /**
+     * Reset generation statistics.
+     */
+    function resetStats() {
+        _totalChunksGenerated = 0;
+        _cacheHitCount = 0;
+        _cacheMissCount = 0;
+    }
+
+    // ============================================================
+    // Initialization & Lifecycle
+    // ============================================================
+
+    /**
+     * Initialize the terrain core system.
+     * @returns {Promise<boolean>} True if initialization successful.
+     */
+    function init() {
+        // Initialize storage if available
+        if (Donkeycraft.Storage && typeof Donkeycraft.Storage.init === 'function') {
+            return Donkeycraft.Storage.init().then(function (ready) {
+                // Initialize noise with default seed
+                setSeed(_seed);
+                return true;
+            }).catch(function (e) {
+                // Storage init failed — continue without it
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[TerrainCore] Storage initialization failed:', e && e.message ? e.message : String(e));
+                }
+                setSeed(_seed);
+                return false;
+            });
+        }
+
+        // No storage — just initialize noise
+        setSeed(_seed);
+        return Promise.resolve(true);
+    }
+
+    /**
+     * Destroy the terrain core system and free resources.
+     */
+    function destroy() {
+        if (Donkeycraft.Storage && typeof Donkeycraft.Storage.destroy === 'function') {
+            Donkeycraft.Storage.destroy();
+        }
+        _seedListeners = [];
+        _generationListeners = [];
+    }
+
+    // ============================================================
+    // Public API
+    // ============================================================
+
+    /**
+     * Donkeycraft.TerrainCore — Central terrain engine.
+     * @namespace
+     */
+    Donkeycraft.TerrainCore = {
+        // Seed management
+        setSeed: setSeed,
+        getSeed: getSeed,
+
+        // Biome management
+        setBiome: setBiome,
+        getBiome: getBiome,
+
+        // Chunk generation
+        generateChunk: generateChunk,
+        generateAllChunks: generateAllChunks,
+        generateChunksInRadius: generateChunksInRadius,
+
+        // Statistics
+        getStats: getStats,
+        resetStats: resetStats,
+
+        // Lifecycle
+        init: init,
+        destroy: destroy,
+
+        // Internal access (for other modules)
+        _makeCacheKey: _makeCacheKey,
+        _chunkHash: _chunkHash
+    };
+
+})();
