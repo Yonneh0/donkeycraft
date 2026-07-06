@@ -1,7 +1,7 @@
 // Donkeycraft — Keybindings Panel
 // Display-only top-center panel showing all keybindings and input lock status.
 // Transparent, non-interactive — all clicks pass through to the rendered area below.
-// Dynamically updates key display based on current game mode.
+// Dynamically updates key display based on current game mode and player state.
 (function () {
     'use strict';
 
@@ -16,6 +16,7 @@
         this._element = null;
         this._unsubscribeRender = null;
         this._gameMode = 'survival';
+        this._isFlying = false;
         this._htmlBuilt = false;
         this._initDOM();
     };
@@ -37,8 +38,8 @@
     Donkeycraft.KeybindingsPanel.prototype._getKeyLabel = function (keyCode) {
         var keyMap = {
             'KeyW': '[W]', 'KeyA': '[A]', 'KeyS': '[S]', 'KeyD': '[D]',
-            'Space': '[SPACE]', 'ShiftLeft': '[SHIFT]', 'ControlLeft': '[CTRL]',
-            'KeyE': '[E]', 'KeyQ': '[Q]', 'KeyF': '[F]', 'KeyT': '[T]',
+            'Space': '[SPACE]', 'ShiftLeft': '[SHIFT]',
+            'KeyE': '[E]', 'KeyQ': '[Q]', 'KeyZ': '[Z]', 'KeyP': '[P]', 'KeyF': '[F]', 'KeyT': '[T]',
             'Digit1': '[1]', 'Digit2': '[2]', 'Digit3': '[3]', 'Digit4': '[4]',
             'Digit5': '[5]', 'Digit6': '[6]', 'Digit7': '[7]', 'Digit8': '[8]', 'Digit9': '[9]',
             'F3': '[F3]', 'F5': '[F5]'
@@ -48,7 +49,7 @@
 
     /**
      * _buildHTML — constructs the panel HTML string from Config.KEYBINDS, dynamically
-     * including/excluding mode-specific keys based on current game mode.
+     * including/excluding mode-specific keys based on current game mode and flying state.
      * @private
      * @returns {string} HTML for the keybindings display.
      */
@@ -57,6 +58,7 @@
         if (!kb) return '';
 
         var isCreative = (this._gameMode === 'creative');
+        var isFlying = this._isFlying;
         var groups = [];
 
         // Movement group
@@ -75,17 +77,42 @@
             '</span>'
         );
 
-        // Sprint / Sneak
+        // Speed controls — context-dependent labels
+        if (isFlying) {
+            // Flying: Z = down, Q = up
+            groups.push(
+                '<span class="dk-kb-group">' +
+                '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPEED_DOWN) + '</span>' +
+                '<span class="dk-kb-label">down</span>' +
+                '</span>'
+            );
+            groups.push(
+                '<span class="dk-kb-group">' +
+                '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPEED_UP) + '</span>' +
+                '<span class="dk-kb-label">up</span>' +
+                '</span>'
+            );
+        } else {
+            // Grounded: Z = slow, Q = fast
+            groups.push(
+                '<span class="dk-kb-group">' +
+                '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPEED_DOWN) + '</span>' +
+                '<span class="dk-kb-label">slow</span>' +
+                '</span>'
+            );
+            groups.push(
+                '<span class="dk-kb-group">' +
+                '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPEED_UP) + '</span>' +
+                '<span class="dk-kb-label">fast</span>' +
+                '</span>'
+            );
+        }
+
+        // Speed cycle (Shift) — always shown
         groups.push(
             '<span class="dk-kb-group">' +
-            '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPRINT) + '</span>' +
-            '<span class="dk-kb-label">sprint</span>' +
-            '</span>'
-        );
-        groups.push(
-            '<span class="dk-kb-group">' +
-            '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SNEAK) + '</span>' +
-            '<span class="dk-kb-label">sneak</span>' +
+            '<span class="dk-kb-keys">' + this._getKeyLabel(kb.SPEED_CYCLE) + '</span>' +
+            '<span class="dk-kb-label">cycle spd</span>' +
             '</span>'
         );
 
@@ -121,6 +148,14 @@
             );
         }
 
+        // Drop item (P) — always shown
+        groups.push(
+            '<span class="dk-kb-group">' +
+            '<span class="dk-kb-keys">' + this._getKeyLabel(kb.DROP_ITEM) + '</span>' +
+            '<span class="dk-kb-label">drop</span>' +
+            '</span>'
+        );
+
         // Hotbar keys 1-9
         var hotkeyLabels = [];
         for (var i = 1; i <= 9; i++) {
@@ -152,17 +187,18 @@
     /**
      * update — refreshes the panel content (keybindings HTML + input lock status).
      * Called every render frame to keep the lock status indicator current.
-     * Rebuilds HTML when game mode changes.
+     * Rebuilds HTML when game mode or flying state changes.
      * @param {Donkeycraft.Input} [input] - Input instance (unused, lock status uses document.pointerLockElement).
      */
     Donkeycraft.KeybindingsPanel.prototype.update = function (input) {
         if (!this._element) return;
 
-        // Rebuild HTML when game mode changes
-        if (!this._htmlBuilt || this._gameModeDirty) {
+        // Rebuild HTML when game mode or flying state changes
+        if (!this._htmlBuilt || this._gameModeDirty || this._flyingDirty) {
             this._element.innerHTML = this._buildHTML();
             this._htmlBuilt = true;
             this._gameModeDirty = false;
+            this._flyingDirty = false;
         }
 
         // Update input lock status indicator
@@ -185,6 +221,16 @@
         if (!mode || mode === this._gameMode) return;
         this._gameMode = mode;
         this._gameModeDirty = true;
+    };
+
+    /**
+     * setFlyingState — update the flying state and rebuild the panel if changed.
+     * @param {boolean} flying - True if player is currently flying.
+     */
+    Donkeycraft.KeybindingsPanel.prototype.setFlyingState = function (flying) {
+        if (flying === this._isFlying) return;
+        this._isFlying = !!flying;
+        this._flyingDirty = true;
     };
 
     /**

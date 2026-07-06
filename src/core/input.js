@@ -357,8 +357,8 @@
 
         // Prevent default for game-relevant keys to avoid blocking browser shortcuts.
         var gameKeys = [
-            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ControlLeft',
-            'KeyE', 'KeyQ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
+            'KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft',
+            'KeyE', 'KeyQ', 'KeyZ', 'KeyP', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
             'Digit6', 'Digit7', 'Digit8', 'Digit9',
             'F3', 'F5', 'KeyG'
         ];

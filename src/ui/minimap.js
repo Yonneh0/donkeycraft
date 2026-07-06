@@ -109,7 +109,7 @@
         var surfaceMap = chunk._mapSurfaceMap;
         if (surfaceMap && surfaceMap[localX] && surfaceMap[localX][localZ] !== undefined) {
             var cached = surfaceMap[localX][localZ];
-            return cached !== null ? cached : 1;
+            return cached !== null ? cached.blockId : 1;
         }
 
         // Surface map not built yet — scan from top to bottom and build it
@@ -123,12 +123,14 @@
             }
         }
 
+        var surfaceY = -1;
         var surfaceBlockId = 1; // Default: stone
         try {
             var worldHeight = Config && Config.WORLD_HEIGHT ? Config.WORLD_HEIGHT : 256;
             for (var y = worldHeight - 1; y >= 0; y--) {
                 var blockId = chunk.getBlock(localX, y, localZ);
                 if (blockId === 0) continue; // Skip air
+                surfaceY = y;
                 surfaceBlockId = blockId;
                 break;
             }
@@ -136,8 +138,8 @@
             Donkeycraft.Logger.warn('MinimapUI', 'Failed to read block at [' + localX + ',' + localZ + ']: ' + e.message);
         }
 
-        // Cache result in surface map
-        chunk._mapSurfaceMap[localX][localZ] = surfaceBlockId;
+        // Cache result in surface map (consistent format with chunk-manager: {y, blockId})
+        chunk._mapSurfaceMap[localX][localZ] = surfaceY >= 0 ? { y: surfaceY, blockId: surfaceBlockId } : null;
         return surfaceBlockId;
     };
 

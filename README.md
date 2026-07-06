@@ -108,10 +108,13 @@ No server, no installation, no dependencies.
 | Key | Action |
 |-----|--------|
 | W/A/S/D | Move (forward/left/back/right) |
-| Space | Jump / Swim upward |
-| Shift | Sprint (Survival) / Descend (Creative) |
+| Space | Jump / Swim upward / Fly upward |
+| Shift | Toggle speed up one step (cycles back to start at max) |
+| Z | Speed down (grounded) / Go down (swimming/flying) |
+| Q | Speed up (grounded) / Go up (swimming/flying) |
 | Left Click | Break block |
 | Right Click | Place block / Interact |
+| P | Drop item |
 | 1-9 | Select hotbar slot |
 | E | Open creative inventory |
 | F3 | Debug screen |

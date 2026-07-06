@@ -196,6 +196,98 @@
         colors[145] = '#7a5a3a';          // furnace_off
         colors[146] = '#8a6a4a';          // furnace_on
 
+        // Liquids and special blocks (IDs 212-213)
+        colors[212] = '#3060c0';          // water
+        colors[213] = '#b43200';          // lava
+
+        // Ores and resources (IDs 214-232)
+        colors[214] = '#2a2a2a';          // coal
+        colors[215] = '#c0a080';          // raw_iron
+        colors[216] = '#d0b090';          // raw_gold
+        colors[217] = '#a0d0e0';          // raw_diamond
+        colors[218] = '#40e0d0';          // diamond
+        colors[219] = '#50c0a0';          // emerald
+        colors[220] = '#3050a0';          // lapis_lazuli
+        colors[221] = '#d0b090';          // iron_ingot
+        colors[222] = '#ffd700';          // gold_ingot
+        colors[223] = '#6a5040';          // netherite_ingot
+        colors[224] = '#5a4535';          // netherite_block
+        colors[225] = '#ffd700';          // gold_block
+        colors[226] = '#d0b090';          // iron_block
+        colors[227] = '#40e0d0';          // diamond_block
+        colors[228] = '#50c0a0';          // emerald_block
+        colors[229] = '#aa4444';          // redstone_dust
+        colors[230] = '#aa4444';          // redstone_block
+        colors[231] = '#3050a0';          // lapis_block
+        colors[232] = '#2a2a2a';          // coal_block
+
+        // Quartz blocks (IDs 234-238)
+        colors[234] = '#e8e0d0';          // quartz_block
+        colors[235] = '#e8e0d0';          // chiseled_quartz_block
+        colors[236] = '#e0d8c8';          // quartz_pillar
+        colors[237] = '#d8d0c0';          // quartz_bricks
+        colors[238] = '#6a6a8a';          // nether_quartz_ore
+
+        // Hay bale and cocoa (IDs 239-240)
+        colors[239] = '#d4c478';          // hay_block
+        colors[240] = '#4a6a2a';          // cocoa
+
+        // Stained glass (IDs 241-256)
+        colors[241] = '#e8e8e8';          // white_stained_glass
+        colors[242] = '#d0a060';          // orange_stained_glass
+        colors[243] = '#c080c0';          // magenta_stained_glass
+        colors[244] = '#80c0e0';          // light_blue_stained_glass
+        colors[245] = '#e0d060';          // yellow_stained_glass
+        colors[246] = '#80d080';          // lime_stained_glass
+        colors[247] = '#e0a0c0';          // pink_stained_glass
+        colors[248] = '#808080';          // gray_stained_glass
+        colors[249] = '#c0c0c0';          // light_gray_stained_glass
+        colors[250] = '#60c0c0';          // cyan_stained_glass
+        colors[251] = '#a080d0';          // purple_stained_glass
+        colors[252] = '#6080d0';          // blue_stained_glass
+        colors[253] = '#a08060';          // brown_stained_glass
+        colors[254] = '#60a060';          // green_stained_glass
+        colors[255] = '#d04040';          // red_stained_glass
+        colors[256] = '#2a2a2a';          // black_stained_glass
+
+        // Nether blocks (IDs 257-274)
+        colors[257] = '#8a3a3a';          // netherrack
+        colors[258] = '#5a4a3a';          // soul_sand
+        colors[259] = '#6a5a4a';          // soul_soil
+        colors[260] = '#a08060';          // gilded_blackstone
+        colors[261] = '#5a5a5a';          // polished_blackstone
+        colors[262] = '#4a4a4a';          // polished_blackstone_bricks
+        colors[263] = '#4a6a2a';          // nether_wart_block
+        colors[264] = '#e0d0b0';          // warped_stem
+        colors[265] = '#d0c0a0';          // warped_hyphae
+        colors[266] = '#7a2a2a';          // crimson_planks (warped_planks was 81, using crimson)
+        colors[267] = '#6a8a4a';          // warped_nylium
+        colors[268] = '#c04040';          // crimson_stem
+        colors[269] = '#b03030';          // crimson_hyphae
+        colors[270] = '#8a2a2a';          // crimson_planks
+        colors[271] = '#8a4a4a';          // crimson_nylium
+        colors[272] = '#c0a040';          // nether_gold_ore
+        colors[273] = '#5a6a4a';          // ancient_debris
+        colors[274] = '#8a5a2a';          // magma
+
+        // Respawn anchor and portals (IDs 275-277)
+        colors[275] = '#6a3a8a';          // respawn_anchor
+        colors[276] = '#6a3a8a';          // nether_portal
+        colors[277] = '#1a1a2a';          // end_portal
+
+        // End blocks (IDs 287-294)
+        colors[287] = '#5a3a5a';          // chorus_plant
+        colors[288] = '#a060a0';          // chorus_flower
+        colors[289] = '#d0b0d0';          // purpur_block
+        colors[290] = '#c0a0c0';          // purpur_pillar
+        colors[291] = '#c8b8a0';          // end_stone_brick_wall
+        colors[292] = '#d0b0d0';          // end_stone_bricks_stairs
+        colors[293] = '#f06040';          // shroomlight
+        colors[294] = '#4a8a2a';          // pitcher_pod
+
+        // Additional common blocks not yet covered
+        colors[1000] = '#1a1a1a';         // bedrock
+
         _blockColors = colors;
         return _blockColors;
     }

@@ -51,13 +51,14 @@
 
         /**
          * Track which speed keys are currently held for cycling.
-         * Used to detect key press events (transition from up to down) for Ctrl/Shift.
+         * Used to detect key press events (transition from up to down).
          * @type {Object}
          * @private
          */
         this._speedKeyState = {
-            SNEAK: false,   // ControlLeft — decrease speed
-            SPRINT: false    // ShiftLeft — increase speed
+            SPEED_CYCLE: false,  // ShiftLeft — toggle speed up (cycles)
+            SPEED_DOWN: false,   // KeyZ — decrease speed / go down
+            SPEED_UP: false      // KeyQ — increase speed / go up
         };
 
         /**
@@ -237,6 +238,84 @@
     };
 
     /**
+     * Process ShiftLeft key to cycle speed slider index up (toggle).
+     * When at the highest setting, cycles back to the first setting.
+     *
+     * @private
+     */
+    Donkeycraft.Movement.prototype._processSpeedCycleKey = function () {
+        var input = this._input;
+        if (!input) return;
+
+        // Decrement cooldown each tick
+        if (this._speedKeyCooldown > 0) {
+            this._speedKeyCooldown--;
+        }
+
+        // Only process speed key changes when cooldown is zero
+        if (this._speedKeyCooldown > 0) return;
+
+        var gameMode = this._player.getGameMode();
+        var isFlying = false;
+        if (gameMode === 'creative' && this._player.flyEnabled) {
+            isFlying = true;
+        } else if (gameMode === 'spectator') {
+            isFlying = true;
+        }
+
+        var speeds = this._getSpeedDefinitions(gameMode, isFlying);
+        if (!speeds) return;
+
+        var currentIdx = this.getSliderIndex();
+        var cycleDown = input.isKeyDown('KeyZ');
+        var cycleUp = input.isKeyDown('KeyQ');
+
+        // ShiftLeft: toggle speed up (cycles back to first at max)
+        var cycleDownPressed = input.isKeyDown(Config.KEYBINDS.SPEED_CYCLE);
+        if (cycleDownPressed && !this._speedKeyState.SPEED_CYCLE) {
+            // Key just pressed — increase speed, cycle to first at max
+            if (currentIdx < speeds.length - 1) {
+                this.setSliderIndex(currentIdx + 1);
+                Donkeycraft.Logger.info('Movement', 'Speed increased to index ' + (currentIdx + 1) + ' via Shift');
+            } else {
+                // Cycle back to first setting
+                this.setSliderIndex(0);
+                Donkeycraft.Logger.info('Movement', 'Speed cycled to index 0 (wrap-around) via Shift');
+            }
+            this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
+        }
+        this._speedKeyState.SPEED_CYCLE = cycleDownPressed;
+
+        // Z key: decrease speed (grounded) / go down (swimming/flying)
+        if (cycleDown && !this._speedKeyState.SPEED_DOWN) {
+            if (!isFlying) {
+                // Grounded: decrease speed
+                if (currentIdx > 0) {
+                    this.setSliderIndex(currentIdx - 1);
+                    Donkeycraft.Logger.info('Movement', 'Speed decreased to index ' + (currentIdx - 1) + ' via Z');
+                }
+            }
+            // Cooldown for key press detection
+            this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
+        }
+        this._speedKeyState.SPEED_DOWN = cycleDown;
+
+        // Q key: increase speed (grounded) / go up (swimming/flying)
+        if (cycleUp && !this._speedKeyState.SPEED_UP) {
+            if (!isFlying) {
+                // Grounded: increase speed
+                if (currentIdx < speeds.length - 1) {
+                    this.setSliderIndex(currentIdx + 1);
+                    Donkeycraft.Logger.info('Movement', 'Speed increased to index ' + (currentIdx + 1) + ' via Q');
+                }
+            }
+            // Cooldown for key press detection
+            this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
+        }
+        this._speedKeyState.SPEED_UP = cycleUp;
+    };
+
+    /**
      * Detect terrain effects beneath the player's feet.
      *
      * Checks the block(s) under the player's feet and returns a context object
@@ -313,8 +392,8 @@
             return;
         }
 
-        // Process Ctrl/Shift key presses to cycle speed slider index
-        this._processSpeedKeyInput();
+        // Process speed keys (Shift=cycle up, Z=down/slow, Q=up/fast)
+        this._processSpeedCycleKey();
 
         var gameMode = player.getGameMode();
 
@@ -335,82 +414,6 @@
         this._tickSurvival(deltaTime);
     };
 
-    /**
-     * Process Ctrl/Shift key input to cycle through speed slider index.
-     *
-     * - ControlLeft (SNEAK/Ctrl): Decrease speed by one step
-     * - ShiftLeft (SPRINT/Shift): Increase speed by one step (only when grounded)
-     *
-     * Uses edge detection (key press event) with cooldown to prevent rapid cycling.
-     * Updates the slider index and notifies the UI via setSliderIndex().
-     *
-     * **Important:** ShiftLeft has different meanings depending on game state:
-     * - Survival / creative grounded: Sprint key → increase speed
-     * - Creative flying: Vertical descent control (handled in _tickCreativeFly)
-     * - Spectator: Vertical descent control (handled in _tickSpectator)
-     *
-     * @private
-     */
-    Donkeycraft.Movement.prototype._processSpeedKeyInput = function () {
-        var input = this._input;
-        if (!input) return;
-
-        // Decrement cooldown each tick
-        if (this._speedKeyCooldown > 0) {
-            this._speedKeyCooldown--;
-        }
-
-        // Only process speed key changes when cooldown is zero
-        if (this._speedKeyCooldown > 0) return;
-
-        var gameMode = this._player.getGameMode();
-
-        // Determine if player is actually flying (not just in creative mode)
-        var isFlying = false;
-        if (gameMode === 'creative' && this._player.flyEnabled) {
-            isFlying = true;
-        } else if (gameMode === 'spectator') {
-            // Spectators always fly — no speed cycling
-            return;
-        }
-
-        var speeds = this._getSpeedDefinitions(gameMode, isFlying);
-        if (!speeds) return;
-
-        var currentIdx = this.getSliderIndex();
-        var changed = false;
-
-        // --- ControlLeft (SNEAK/Ctrl): Decrease speed ---
-        var sneakDown = input.isKeyDown('ControlLeft');
-        if (sneakDown && !this._speedKeyState.SNEAK) {
-            // Key just pressed — decrease speed
-            if (currentIdx > 0) {
-                this.setSliderIndex(currentIdx - 1);
-                this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
-                changed = true;
-                Donkeycraft.Logger.info('Movement', 'Speed decreased to index ' + (currentIdx - 1) + ' via Ctrl');
-            }
-        }
-        this._speedKeyState.SNEAK = sneakDown;
-
-        // --- ShiftLeft (SPRINT/Shift): Increase speed (grounded only) ---
-        // ShiftLeft is vertical control when flying — only use as sprint when grounded.
-        var sprintDown = false;
-        if (!isFlying) {
-            sprintDown = input.isKeyDown('ShiftLeft');
-        }
-
-        if (sprintDown && !this._speedKeyState.SPRINT) {
-            // Key just pressed — increase speed
-            if (currentIdx < speeds.length - 1) {
-                this.setSliderIndex(currentIdx + 1);
-                this._speedKeyCooldown = this._SPEED_KEY_COOLDOWN;
-                changed = true;
-                Donkeycraft.Logger.info('Movement', 'Speed increased to index ' + (currentIdx + 1) + ' via Shift');
-            }
-        }
-        this._speedKeyState.SPRINT = sprintDown;
-    };
 
     /**
      * Survival mode movement tick — handles walking, gravity, and swimming physics.
@@ -531,9 +534,9 @@
                 player.getVelocity().z * 0.85
             );
 
-            // Fly-like vertical controls: Space = swim up, Shift = swim down
-            var swimUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-            var swimDown = input.isKeyDown('ShiftLeft') ? 1 : 0;
+            // Fly-like vertical controls: Space/Q = swim up, Z = swim down
+            var swimUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : (input.isKeyDown(Config.KEYBINDS.SPEED_UP) ? 1 : 0);
+            var swimDown = input.isKeyDown(Config.KEYBINDS.SPEED_DOWN) ? 1 : 0;
 
             var swimVy = player.getVelocity().y;
             if (swimUp !== 0) {
@@ -731,11 +734,9 @@
             moveZ = 0;
         }
 
-        // Vertical movement: Space = up, ShiftLeft = down.
-        // In creative fly mode, ShiftLeft controls vertical descent — no conflict with
-        // survival sprint (which also uses ShiftLeft) because this code only runs in creative mode.
-        var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-        var moveDown = input.isKeyDown('ShiftLeft') ? 1 : 0;
+        // Vertical movement: Space/Q = up, Z = down.
+        var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : (input.isKeyDown(Config.KEYBINDS.SPEED_UP) ? 1 : 0);
+        var moveDown = input.isKeyDown(Config.KEYBINDS.SPEED_DOWN) ? 1 : 0;
 
         var flyVy = 0;
         if (moveUp !== 0) {
@@ -822,11 +823,9 @@
             moveZ = 0;
         }
 
-        // Vertical movement: Space = up, ShiftLeft = down.
-        // In spectator mode, ShiftLeft controls vertical descent — no conflict with
-        // survival sprint because this code only runs in spectator mode.
-        var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : 0;
-        var moveDown = input.isKeyDown('ShiftLeft') ? 1 : 0;
+        // Vertical movement: Space/Q = up, Z = down.
+        var moveUp = input.isKeyDown(Config.KEYBINDS.JUMP) ? 1 : (input.isKeyDown(Config.KEYBINDS.SPEED_UP) ? 1 : 0);
+        var moveDown = input.isKeyDown(Config.KEYBINDS.SPEED_DOWN) ? 1 : 0;
 
         var flyVy = 0;
         if (moveUp !== 0) {
@@ -851,7 +850,7 @@
     };
 
     /**
-     * Get the current horizontal movement speed based on game mode and sprint state.
+     * Get the current horizontal movement speed based on game mode and slider index.
      *
      * @returns {number} Speed in blocks per second.
      */
@@ -866,9 +865,8 @@
             return Config.PLAYER_FLY_SPEED;
         }
 
-        // Survival or creative walking
-        var isSprinting = this._input.isKeyDown(Config.KEYBINDS.SPRINT);
-        return isSprinting ? Config.PLAYER_SPRINT_SPEED : Config.PLAYER_SPEED;
+        // Survival or creative walking — use slider index
+        return this._getSpeedForIndex(this.getSliderIndex(), gameMode, { slowModifier: 1.0 });
     };
 
     /**

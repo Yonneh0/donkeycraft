@@ -89,11 +89,10 @@
                 MOVE_LEFT: 'KeyA',
                 MOVE_RIGHT: 'KeyD',
                 JUMP: 'Space',
-                SPRINT: 'ShiftLeft',
-                SNEAK: 'ControlLeft',
+                SPEED_CYCLE: 'ShiftLeft',   // Toggle speed up one step (cycles back to first at max)
                 INVENTORY: 'KeyE',
                 DEBUG_SCREEN: 'F3',
-                FLY_TOGGLE: 'KeyF',        // Creative mode only — toggles flying
+                FLY_TOGGLE: 'KeyF',         // Creative mode only — toggles flying
                 TURBO_TOGGLE: 'KeyT',       // Creative mode only — toggles turbo speed while flying
                 PICK_ITEM_1: 'Digit1',
                 PICK_ITEM_2: 'Digit2',
@@ -104,7 +103,9 @@
                 PICK_ITEM_7: 'Digit7',
                 PICK_ITEM_8: 'Digit8',
                 PICK_ITEM_9: 'Digit9',
-                DROP_ITEM: 'KeyQ'
+                DROP_ITEM: 'KeyP',          // Drop item (moved from Q)
+                SPEED_DOWN: 'KeyZ',         // Grounded: decrease speed / Swimming/Flying: go down
+                SPEED_UP: 'KeyQ'            // Grounded: increase speed / Swimming/Flying: go up
             },
 
             // Chunk persistence (used by Game._saveDirtyChunks for auto-save batching)
