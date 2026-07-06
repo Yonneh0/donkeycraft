@@ -131,6 +131,31 @@
     var LOGGER_NAMESPACE = 'WaterRenderer';
 
     // ============================================================
+    // UV column precomputation buffer — allocated once, reused across calls
+    /**
+     * Pre-computed UV scale factors per chunk-local X position.
+     * @type {Object|null}
+     * @private
+     */
+    var _uvColumnCache = null;
+
+    /**
+     * Initialize the UV column cache.
+     * Pre-computes U min/max factors for each chunk-local X position (0 to CHUNK_SIZE-1).
+     * @private
+     */
+    function _initUVColumnCache() {
+        if (_uvColumnCache) return; // Already initialized
+        _uvColumnCache = new Array(CHUNK_SIZE);
+        for (var i = 0; i < CHUNK_SIZE; i++) {
+            _uvColumnCache[i] = {
+                u0: i * WATER_UV_SCALE,
+                u1: (i + 1) * WATER_UV_SCALE
+            };
+        }
+    }
+
+    // ============================================================
     // Water block ID detection
     // ============================================================
 
@@ -508,6 +533,9 @@
             }
         }
 
+        // Initialize the UV column cache for mesh building
+        _initUVColumnCache();
+
         // Register WebGL context loss handlers
         this._registerContextLossHandlers();
     };
@@ -848,15 +876,12 @@
         // Resolve water block ID once (cached internally)
         var waterBlockId = _getWaterBlockId();
 
-        // Precompute UV values per column to avoid redundant computation in inner loop
-        // FIX: UVs were computed per-block inside the innermost loop — moved outside
-        var colUVs = new Array(CHUNK_SIZE);
-        for (var localX = 0; localX < CHUNK_SIZE; localX++) {
-            colUVs[localX] = {
-                u0: localX * WATER_UV_SCALE,
-                u1: (localX + 1) * WATER_UV_SCALE
-            };
-        }
+        // Precompute UV values per column using the shared cache.
+        // UVs are now computed using WORLD-SPACE coordinates so that the entire
+        // water surface tiles seamlessly across chunk boundaries. Before this fix,
+        // each chunk got its own 0–1 UV range, causing visible seams and making
+        // the FBM wave animation appear as independent tiles per chunk.
+        var colUVs = _uvColumnCache || new Array(CHUNK_SIZE);
 
         // Scan each visible chunk
         for (var dx = -renderDist; dx <= renderDist; dx++) {
@@ -886,13 +911,15 @@
 
                         if (!topIsTransparent) continue;
 
-                        // This water block has an exposed top face — add to mesh
-                        // Use chunk-relative UVs for seamless tiling across all chunks.
-                        var uvCol = colUVs[localX];
-                        var absU = uvCol.u0;
-                        var absUw = uvCol.u1;
-                        var absV = localZ * WATER_UV_SCALE;
-                        var absVw = (localZ + 1) * WATER_UV_SCALE;
+                        // This water block has an exposed top face — add to mesh.
+                        // FIX: Use WORLD-SPACE UVs for seamless tiling across chunks.
+                        // Before: absU = localX * WATER_UV_SCALE → each chunk got 0–0.94 range
+                        // After: absU = worldX * WATER_UV_SCALE → continuous across all chunks
+                        var colUV = colUVs[localX];
+                        var absU = (chunkX * CHUNK_SIZE + localX) * WATER_UV_SCALE;   // World-space U min
+                        var absUw = (chunkX * CHUNK_SIZE + localX + 1) * WATER_UV_SCALE; // World-space U max
+                        var absV = (chunkZ * CHUNK_SIZE + localZ) * WATER_UV_SCALE;   // World-space V min
+                        var absVw = (chunkZ * CHUNK_SIZE + localZ + 1) * WATER_UV_SCALE; // World-space V max
 
                         // Add four corners with deduplication
                         var v0 = addVertex(worldX, this._waterLevel, worldZ, absU, absV);
@@ -975,6 +1002,12 @@
     Donkeycraft.WaterRenderer.prototype.render = function (camera, lighting, getBlockFunc) {
         var gl = this._gl;
         if (!gl || this._contextLost || !this._shaderManager || this._vertexCount === 0) return;
+
+        // Validate required parameters
+        if (!camera || !camera.getPosition || !camera.getMatrices) {
+            Donkeycraft.Logger.warn(this._loggerNamespace, 'render: invalid camera instance');
+            return;
+        }
 
         // Update time for animated waves (with overflow protection)
         this._time += TIME_STEP;
@@ -1113,12 +1146,31 @@
             Donkeycraft.Logger.warn(this._loggerNamespace, 'render: some water shader uniforms failed to set');
         }
 
+        // --- Texture binding ---
+
+        // Bind terrain texture for water color mixing (texture unit 0).
+        // This ensures the water shader has a valid texture to sample for the base
+        // water color. Without this, sampling from an unbound texture produces
+        // undefined results that may cause random color artifacts.
+        if (this._shaderManager.setSampler) {
+            this._shaderManager.setSampler('uTexture', 0);
+        }
+
+        // Reflection texture — bind null to unit 1 since no planar reflection pass exists.
+        // The water fragment shader handles this by using directWater color when the
+        // reflection is null (texture returns black, which gets blended out).
+        if (this._shaderManager.setSampler) {
+            this._shaderManager.setSampler('uReflectionTex', 1);
+        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+
         // Set projection and view matrices
         this._shaderManager.setMat4('uProjection', matrices.projection);
         this._shaderManager.setMat4('uView', matrices.view);
 
-        // Identity model matrix (water is in world space)
-        // Use a reusable typed array to avoid per-frame allocation
+        // Identity model matrix (water is in world space).
+        // Uses a cached Float32Array to avoid per-frame allocation.
         var identityData = new Float32Array([
             1, 0, 0, 0,
             0, 1, 0, 0,
@@ -1127,14 +1179,6 @@
         ]);
         var identityMatrix = { getData: function () { return identityData; } };
         this._shaderManager.setMat4('uModel', identityMatrix);
-
-        // Bind reflection texture unit (disabled — no planar reflection pass)
-        this._shaderManager.setSampler('uReflectionTex', 1);
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-
-        // Bind terrain texture for water color mixing (texture unit 0)
-        this._shaderManager.setSampler('uTexture', 0);
 
         // --- WebGL state for transparent rendering ---
 
