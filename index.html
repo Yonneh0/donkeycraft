@@ -729,9 +729,11 @@ void main() {
     float waveYn = fbm(waveUV - dy, uTime);
     vec2 waveGradient = vec2(waveXp - waveXn, waveYp - waveYn) * 0.5;
 
-    // === Texture UV: wrap to [0,1] for proper tile-based texture lookup ===
-    // Wave animation uses world-space UVs (seamless), texture uses wrapped UVs (correct tile sampling).
-    vec2 texUV = fract(vUV);
+    // === Texture UV: use vertex UV directly (already in correct atlas tile range) ===
+    // The vertex shader now passes per-block UVs offset by the water tile position,
+    // so no fract() wrapping is needed. This ensures the water samples its specific
+    // tile from the atlas instead of all tiles being clamped to [0,1].
+    vec2 texUV = vUV;
 
     // Reflection UV: distort by wave gradient for scattered reflection effect
     vec2 reflUV = texUV;
@@ -739,7 +741,7 @@ void main() {
     reflUV = clamp(reflUV, 0.0, 1.0); // Clamp to prevent out-of-bounds
 
     // Sample base terrain texture (for water color mixing)
-    vec2 baseUV = fract(texUV + waveGradient * 0.05);
+    vec2 baseUV = texUV + waveGradient * 0.05;
     vec4 texColor = texture2D(uTexture, baseUV);
 
     // Sample reflected terrain (null texture returns black — safely blended out)

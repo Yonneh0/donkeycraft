@@ -100,6 +100,7 @@
         // Renderer visibility toggles (debug menu)
         this._renderSky = true;
         this._renderTerrain = true;
+        this._renderWater = true;
         this._renderParticles = true;
         this._renderHand = true;
         this._renderWeather = true;
@@ -669,7 +670,7 @@
      */
     Donkeycraft.Game.prototype._getRendererMap = function () {
         return {
-            'sky': '_renderSky', 'terrain': '_renderTerrain',
+            'sky': '_renderSky', 'terrain': '_renderTerrain', 'water': '_renderWater',
             'particles': '_renderParticles', 'hand': '_renderHand',
             'weather': '_renderWeather', 'gui': '_renderGUI',
             'entity': '_renderEntity'
@@ -2175,7 +2176,7 @@
         }
 
         // Update and render water surface (unified semi-transparent mesh with reflection)
-        if (this._waterRenderer && this._camera && this._terrainRenderer) {
+        if (this._renderWater && this._waterRenderer && this._camera && this._terrainRenderer) {
             try {
                 // Get player position for water mesh update
                 var waterPos = this._player.getPosition();

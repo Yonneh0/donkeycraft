@@ -978,6 +978,49 @@
         // Resolve water block ID once (cached internally)
         var waterBlockId = _getWaterBlockId();
 
+        /**
+         * Compute the UV tile offset for the water texture in the atlas grid.
+         * For a 256x256 atlas with 16x16 pixel tiles (16x16 grid):
+         *   col = blockId % 16, row = floor(blockId / 16)
+         *   tileU = col / 256.0, tileV = row / 256.0
+         *   tileSize = 16 / 256.0 = 0.0625 (= WATER_UV_SCALE)
+         * This offset defines the bottom-left corner of the water tile in the atlas.
+         * Per-block UVs (0-1 range) are then scaled by tileSize and added to get
+         * the final UV that samples the correct water texture.
+         * @type {Object|null}
+         */
+        var _waterTileUV = null;
+
+        /**
+         * Get or compute the water tile UV offset from the atlas grid.
+         * @returns {Object|null} {u: number, v: number} or null if water block ID unknown.
+         */
+        var _getWaterTileUV = function () {
+            if (_waterTileUV) return _waterTileUV;
+            if (waterBlockId === null || waterBlockId === undefined || waterBlockId < 0) {
+                Donkeycraft.Logger.warn(LOGGER_NAMESPACE, 'water block ID not resolved — using default tile offset');
+                _waterTileUV = { u: 0, v: 0 }; // fallback to top-left tile
+                return _waterTileUV;
+            }
+            // Atlas is 256x256 with 16x16 grid of 16x16 pixel tiles.
+            // tileU = col / ATLAS_SIZE, tileSize = TEX_SIZE / ATLAS_SIZE
+            var col = waterBlockId % 16;
+            var row = Math.floor(waterBlockId / 16);
+            _waterTileUV = {
+                u: col / 256.0,
+                v: row / 256.0
+            };
+            Donkeycraft.Logger.debug(LOGGER_NAMESPACE,
+                'Water tile UV offset: blockId=' + waterBlockId + ', col=' + col + ', row=' + row +
+                ', tileUV=(' + _waterTileUV.u.toFixed(6) + ', ' + _waterTileUV.v.toFixed(6) + ')');
+            return _waterTileUV;
+        };
+
+        var waterTileUV = _getWaterTileUV();
+        if (!waterTileUV) {
+            waterTileUV = { u: 0, v: 0 };
+        }
+
         // Precompute UV values per column using the shared cache.
         // UVs are now computed using WORLD-SPACE coordinates so that the entire
         // water surface tiles seamlessly across chunk boundaries. Before this fix,
@@ -1014,14 +1057,14 @@
                         if (!topIsTransparent) continue;
 
                         // This water block has an exposed top face — add to mesh.
-                        // FIX: Use WORLD-SPACE UVs for seamless tiling across chunks.
-                        // Before: absU = localX * WATER_UV_SCALE → each chunk got 0–0.94 range
-                        // After: absU = worldX * WATER_UV_SCALE → continuous across all chunks
-                        var colUV = colUVs[localX];
-                        var absU = (chunkX * CHUNK_SIZE + localX) * WATER_UV_SCALE;   // World-space U min
-                        var absUw = (chunkX * CHUNK_SIZE + localX + 1) * WATER_UV_SCALE; // World-space U max
-                        var absV = (chunkZ * CHUNK_SIZE + localZ) * WATER_UV_SCALE;   // World-space V min
-                        var absVw = (chunkZ * CHUNK_SIZE + localZ + 1) * WATER_UV_SCALE; // World-space V max
+                        // Use per-block UVs (0-1 range) scaled by tileSize, offset by the
+                        // water tile position in the atlas grid. This ensures each block's
+                        // face samples exactly one tile from the atlas, and tiling is seamless
+                        // across chunk boundaries because all blocks use the same 0-1 UV range.
+                        var absU = waterTileUV.u;   // Water tile base U in atlas
+                        var absUw = waterTileUV.u + WATER_UV_SCALE; // Water tile U + one tile width
+                        var absV = waterTileUV.v;   // Water tile base V in atlas
+                        var absVw = waterTileUV.v + WATER_UV_SCALE; // Water tile V + one tile height
 
                         // Add four corners with deduplication
                         var v0 = addVertex(worldX, this._waterLevel, worldZ, absU, absV);
