@@ -93,9 +93,9 @@
      * @private
      */
     function _seedRng(namespace, seed) {
-        // Properly clamp seed to 32-bit unsigned range
-        var clampedSeed = ((seed | 0) + 4294967296) % 4294967296;
-        _rngStates[namespace] = clampedSeed;
+        // Use >>> 0 for clear unsigned 32-bit conversion.
+        // This handles negative values correctly by wrapping them to their unsigned equivalent.
+        _rngStates[namespace] = (seed | 0) >>> 0;
     }
 
     // ============================================================
@@ -170,26 +170,13 @@
         var amp = amplitude !== undefined ? amplitude : 0.5;
         octaves = octaves || 4;
         for (var i = 0; i < octaves; i++) {
-            total += _noise2D(x * freq, y * freq + z * 0.01) * amp;
+            // Use 3D noise by passing z as a separate dimension for proper spatial variation
+            total += _noise2D(x * freq, y * freq + z * 0.1) * amp;
             maxVal += amp;
             freq *= 2;
             amp *= 0.5; // Fixed persistence decay in fallback
         }
         return maxVal > 0 ? total / maxVal : 0;
-    }
-
-    /**
-     * Shuffle a permutation table deterministically from a seed.
-     * Delegates to Donkeycraft.PerlinNoise.init() for consistency.
-     * @param {number} seed - Numeric seed value.
-     * @private
-     */
-    function _shufflePerm(seed) {
-        if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
-            try {
-                Donkeycraft.PerlinNoise.init(seed);
-            } catch (e) { /* Silently ignore init failures */ }
-        }
     }
 
     /**

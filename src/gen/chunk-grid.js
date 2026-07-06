@@ -78,6 +78,14 @@
      * @param {number} z - New center chunk Z.
      */
     function setCenter(x, z) {
+        // Validate inputs are finite numbers
+        if (!isFinite(x) || !isFinite(z)) {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[ChunkGrid] setCenter: non-finite coordinates ignored');
+            }
+            return;
+        }
+
         var oldX = _centerChunkX;
         var oldZ = _centerChunkZ;
         _centerChunkX = Math.round(x);
@@ -107,6 +115,12 @@
      * @returns {boolean} True if expanded successfully.
      */
     function expand(direction) {
+        // Validate direction parameter
+        if (typeof direction !== 'string' || !direction.match(/^[nsew]$/i)) {
+            return false;
+        }
+        direction = direction.toLowerCase();
+
         var oldTotal = _totalChunks();
 
         switch (direction) {
@@ -146,6 +160,12 @@
      * @returns {boolean} True if contracted successfully.
      */
     function contract(direction) {
+        // Validate direction parameter
+        if (typeof direction !== 'string' || !direction.match(/^[nsew]$/i)) {
+            return false;
+        }
+        direction = direction.toLowerCase();
+
         var oldTotal = _totalChunks();
         var oldBounds = getBounds(); // Capture bounds before contraction
 
@@ -174,31 +194,45 @@
         var removedChunks = [];
         var newBounds = getBounds();
 
+        // Direction mapping: each direction affects a specific edge
+        // 'n' (North): _radiusN decreases → minZ increases (chunks at lower Z are removed)
+        // 's' (South): _radiusS decreases → maxZ decreases (chunks at higher Z are removed)
+        // 'w' (West): _radiusW decreases → minX increases (chunks at lower X are removed)
+        // 'e' (East): _radiusE decreases → maxX decreases (chunks at higher X are removed)
+
         if (direction === 'n') {
-            // Removed rows are at the north edge (higher Z values)
+            // Removed rows are at the south edge of the NEW bounds (lower Z range)
+            // old minZ = center - old_radiusN, new minZ = center - new_radiusN (higher value)
+            // Removed: chunks with Z in [newBounds.minZ, oldBounds.minZ)
             for (var rx = oldBounds.minX; rx <= oldBounds.maxX; rx++) {
-                for (var rz = oldBounds.maxZ; rz > newBounds.maxZ; rz--) {
+                for (var rz = newBounds.minZ; rz < oldBounds.minZ; rz++) {
                     removedChunks.push({ x: rx, z: rz });
                 }
             }
         } else if (direction === 's') {
-            // Removed rows are at the south edge (lower Z values)
+            // Removed rows are at the north edge of the NEW bounds (higher Z range)
+            // old maxZ = center + old_radiusS, new maxZ = center + new_radiusS (lower value)
+            // Removed: chunks with Z in (newBounds.maxZ, oldBounds.maxZ]
             for (var rx2 = oldBounds.minX; rx2 <= oldBounds.maxX; rx2++) {
-                for (var rz2 = oldBounds.minZ; rz2 < newBounds.minZ; rz2++) {
+                for (var rz2 = newBounds.maxZ + 1; rz2 <= oldBounds.maxZ; rz2++) {
                     removedChunks.push({ x: rx2, z: rz2 });
                 }
             }
         } else if (direction === 'e') {
-            // Removed columns are at the east edge (higher X values)
+            // Removed columns are at the west edge of the NEW bounds (higher X range)
+            // old maxX = center + old_radiusE, new maxX = center + new_radiusE (lower value)
+            // Removed: chunks with X in (newBounds.maxX, oldBounds.maxX]
             for (var rz3 = oldBounds.minZ; rz3 <= oldBounds.maxZ; rz3++) {
-                for (var rx3 = oldBounds.maxX; rx3 > newBounds.maxX; rx3--) {
+                for (var rx3 = newBounds.maxX + 1; rx3 <= oldBounds.maxX; rx3++) {
                     removedChunks.push({ x: rx3, z: rz3 });
                 }
             }
         } else if (direction === 'w') {
-            // Removed columns are at the west edge (lower X values)
+            // Removed columns are at the east edge of the NEW bounds (lower X range)
+            // old minX = center - old_radiusW, new minX = center - new_radiusW (higher value)
+            // Removed: chunks with X in [newBounds.minX, oldBounds.minX)
             for (var rz4 = oldBounds.minZ; rz4 <= oldBounds.maxZ; rz4++) {
-                for (var rx4 = oldBounds.minX; rx4 < newBounds.minX; rx4++) {
+                for (var rx4 = newBounds.minX; rx4 < oldBounds.minX; rx4++) {
                     removedChunks.push({ x: rx4, z: rz4 });
                 }
             }
@@ -238,19 +272,6 @@
             radii: getRadii(),
             total: _totalChunks()
         });
-    }
-
-    /**
-     * Recalculate radii to maintain consistent grid dimension after center change.
-     * Ensures the grid maintains DEFAULT_GRID_DIMENSION × DEFAULT_GRID_DIMENSION chunks.
-     * @private
-     */
-    function _recalculateRadii() {
-        var halfSize = Math.floor(DEFAULT_GRID_DIMENSION / 2);
-        _radiusN = halfSize;
-        _radiusS = DEFAULT_GRID_DIMENSION - halfSize - 1;
-        _radiusE = halfSize;
-        _radiusW = DEFAULT_GRID_DIMENSION - halfSize - 1;
     }
 
     /**
@@ -377,10 +398,12 @@
             var state = JSON.parse(raw);
             if (!state || !state.center || !state.radii) return false;
 
-            // Validate loaded coordinates
-            var cx = Math.round(state.center.x);
-            var cz = Math.round(state.center.z);
-            if (!isFinite(cx) || !isFinite(cz)) return false;
+            // Validate loaded coordinates (validate raw values before rounding)
+            var rawX = state.center.x;
+            var rawZ = state.center.z;
+            if (!isFinite(rawX) || !isFinite(rawZ)) return false;
+            var cx = Math.round(rawX);
+            var cz = Math.round(rawZ);
 
             setCenter(cx, cz);
 

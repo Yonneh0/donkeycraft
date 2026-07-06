@@ -52,19 +52,27 @@
     /**
      * Generate a deterministic hash from seed and chunk coordinates.
      * Used for cache key generation and noise offsetting.
-     * @param {number} chunkX - Chunk X coordinate.
-     * @param {number} chunkZ - Chunk Z coordinate.
-     * @returns {number} Deterministic hash.
+     * Uses 32-bit masking at each arithmetic step to ensure consistent
+     * behavior across all JavaScript engines and browsers, including
+     * for negative chunk coordinates.
+     * @param {number} chunkX - Chunk X coordinate (may be negative).
+     * @param {number} chunkZ - Chunk Z coordinate (may be negative).
+     * @returns {number} Deterministic unsigned 32-bit hash.
      * @private
      */
     function _chunkHash(chunkX, chunkZ) {
-        var h = (chunkX * 374761393 + chunkZ * 668265263) ^ 0x5bd1e995;
-        h = ((h >>> 13) ^ h) * 0x5bd1e995;
-        return (h ^ (h >>> 15)) >>> 0;
+        // Mask to 32-bit signed integers first
+        var x = chunkX | 0;
+        var z = chunkZ | 0;
+        // FNV-1a inspired hash with 32-bit masking at each step
+        var h = ((x * 374761393 + z * 668265263) ^ 0x5bd1e995) & 0xFFFFFFFF;
+        h = (((h >>> 13) ^ h) * 0x5bd1e995) & 0xFFFFFFFF;
+        return ((h ^ (h >>> 15)) & 0xFFFFFFFF) >>> 0;
     }
 
     /**
      * Generate a cache key from chunk coordinates and generation parameters.
+     * Validates all inputs are finite numbers before constructing the key.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {number} biomeId - Biome ID.
@@ -73,7 +81,11 @@
      * @private
      */
     function _makeCacheKey(chunkX, chunkZ, biomeId, seed) {
-        return 'terrain_' + seed + '_' + chunkX + '_' + chunkZ + '_b' + (biomeId || 0);
+        // Validate inputs are finite numbers
+        if (!isFinite(chunkX) || !isFinite(chunkZ) || !isFinite(biomeId) || !isFinite(seed)) {
+            return 'terrain_invalid_' + Date.now();
+        }
+        return 'terrain_' + Math.floor(seed) + '_' + Math.floor(chunkX) + '_' + Math.floor(chunkZ) + '_b' + Math.floor(biomeId || 0);
     }
 
     /**
@@ -148,11 +160,17 @@
         var biomeResolved = false;
 
         if (typeof biome === 'object' && biome.id !== undefined) {
-            biomeId = biome.id;
+            biomeId = Math.max(0, Math.floor(biome.id));
             biomeResolved = true;
         } else if (typeof biome === 'number') {
-            biomeId = biome;
-            biomeResolved = true;
+            if (!isFinite(biome)) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[TerrainCore] setBiome: non-finite biome ID, using default ID 1');
+                }
+            } else {
+                biomeId = Math.max(0, Math.floor(biome));
+                biomeResolved = true;
+            }
         } else if (typeof biome === 'string' && Donkeycraft.BiomeRegistry) {
             var resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
             if (resolvedBiome) {
@@ -162,7 +180,7 @@
         }
 
         if (!biomeResolved && typeof console !== 'undefined' && console.warn) {
-            console.warn('[TerrainCore] Unknown biome "' + String(biome) + '", defaulting to ID 1 (plains)');
+            console.warn('[TerrainCore] setBiome: unknown biome "' + String(biome) + '", defaulting to ID 1');
         }
 
         _currentBiomeId = biomeId;
@@ -188,6 +206,11 @@
      * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
      */
     function generateChunk(chunkX, chunkZ) {
+        // Validate inputs
+        if (!isFinite(chunkX) || !isFinite(chunkZ)) {
+            return Promise.resolve({ heightmap: [], cacheHit: false, error: 'Invalid chunk coordinates' });
+        }
+
         var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed);
 
         // Check storage once and store result to avoid race conditions
@@ -214,6 +237,9 @@
                 });
             }).catch(function (e) {
                 // Storage error — fall back to direct generation
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[TerrainCore] Storage error for chunk (' + chunkX + ',' + chunkZ + '):', e && e.message ? e.message : String(e));
+                }
                 _recordCacheAccess(false);
                 return _generateChunkData(chunkX, chunkZ);
             });
@@ -268,10 +294,14 @@
         var promises = [];
 
         for (var i = 0; i < gridChunks.length; i++) {
-            var chunk = gridChunks[i];
-            promises.push(generateChunk(chunk.x, chunk.z).catch(function (e) {
-                return { heightmap: [], cacheHit: false, error: e && e.message ? e.message : String(e) };
-            }));
+            (function(chunkX, chunkZ) {
+                promises.push(generateChunk(chunkX, chunkZ).catch(function (e) {
+                    if (typeof console !== 'undefined' && console.warn) {
+                        console.warn('[TerrainCore] Failed to generate chunk (' + chunkX + ',' + chunkZ + '):', e && e.message ? e.message : String(e));
+                    }
+                    return { heightmap: [], cacheHit: false, error: e && e.message ? e.message : String(e) };
+                }));
+            }(gridChunks[i].x, gridChunks[i].z));
         }
 
         return Promise.all(promises).then(function (results) {
@@ -280,6 +310,9 @@
         }).catch(function (error) {
             // Fallback: should not happen with individual catch handlers above
             _generationInProgress = false;
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('[TerrainCore] generateAllChunks failed:', error && error.message ? error.message : String(error));
+            }
             throw error;
         });
     }

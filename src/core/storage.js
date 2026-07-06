@@ -308,7 +308,16 @@
                     // Check for quota exceeded error
                     if (tx.error && tx.error.name === 'QuotaExceededError') {
                         _warn('IndexedDB quota exceeded — clearing old cache entries');
-                        clearAllCaches();
+                        // Clear only the chunk store, not metadata, to avoid transaction conflicts
+                        try {
+                            var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                            clearTx.objectStore(CHUNK_STORE_NAME).clear();
+                            clearTx.oncomplete = function () {
+                                _memoryCache.clear();
+                                _lruOrder = [];
+                            };
+                            clearTx.onerror = function() { /* ignore */ };
+                        } catch (e) { /* ignore */ }
                     }
                     _pendingWrites = [];
                     _flushPromise = null;
@@ -518,23 +527,32 @@
             return _flushPromise;
         }
 
-        // Trigger a new flush
+        // Trigger a new flush and return its promise directly
         _flushPendingWrites();
 
-        // Return the promise (it resolves when the IndexedDB transaction completes)
+        // Return a promise that resolves when the IndexedDB transaction completes
+        // or times out after 2 seconds (whichever comes first)
         return new Promise(function (resolve) {
-            function checkFlush() {
-                if (!_flushPromise && _pendingWrites.length === 0) {
+            var completed = false;
+
+            // If _flushPromise exists, wait for it
+            if (_flushPromise) {
+                _flushPromise.then(function () {
+                    completed = true;
                     resolve();
-                } else if (_flushPromise) {
-                    _flushPromise.then(checkFlush);
-                } else {
-                    // Timeout after 1 second
-                    setTimeout(resolve, 100);
-                }
+                }).catch(function () {
+                    completed = true;
+                    resolve();
+                });
             }
-            // Give the flush a brief window to complete
-            setTimeout(checkFlush, 50);
+
+            // Timeout fallback: resolve after 2 seconds to avoid hanging forever
+            setTimeout(function () {
+                if (!completed) {
+                    completed = true;
+                    resolve();
+                }
+            }, 2000);
         });
     }
 
