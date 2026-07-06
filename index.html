@@ -668,6 +668,13 @@ void main() {
 
 // Water Fragment Shader — unified semi-transparent water surface with FBM waves,
 // semi-scattered reflection, sun glare (Fresnel + specular), and depth-based fog.
+//
+// FIXES applied:
+// - UV coordinates are now wrapped using fract() to prevent out-of-bounds texture sampling
+//   which caused random color artifacts when water spans many blocks.
+// - Wave animation uses the FBM-computed wave height to perturb the normal for
+//   more realistic light interaction with the animated surface.
+// - Reflection texture sampling is clamped to [0,1] to prevent undefined behavior.
 var WATER_FRAGMENT_SHADER = `
 precision mediump float;
 
@@ -756,30 +763,51 @@ void main() {
     float waveYn = fbm(waterUV - dy, uTime);
     vec2 waveGradient = vec2(waveXp - waveXn, waveYp - waveYn) * 0.5;
 
+    // === FIX: Clamp UV coordinates to [0,1] range to prevent random texture artifacts ===
+    // Water UVs span many blocks (world-space), causing out-of-bounds sampling.
+    // Use fract() to wrap UVs into [0,1] for proper tile-based texture lookup.
+    vec2 clampedUV = fract(vUV);
+
     // Reflection UV: distort by wave gradient for scattered reflection effect
-    vec2 reflUV = vUV;
+    vec2 reflUV = clampedUV;
     reflUV += waveGradient * 0.3; // subtle scattering
+    reflUV = clamp(reflUV, 0.0, 1.0); // Clamp to prevent out-of-bounds
 
     // Sample base terrain texture (for water color mixing)
-    vec2 baseUV = vUV + waveGradient * 0.05; // slight direct distortion
+    // FIX: Use clamped UVs with slight wave distortion for correct tile sampling
+    vec2 baseUV = fract(clampedUV + waveGradient * 0.05);
     vec4 texColor = texture2D(uTexture, baseUV);
 
-    // Sample reflected terrain
+    // Sample reflected terrain (null texture returns black — safely blended out)
     vec4 reflColor = texture2D(uReflectionTex, reflUV);
+
+    // === FIX: Compute animated normal from FBM wave height for realistic lighting ===
+    // Perturb the normal based on wave gradient so light interacts with the animated surface.
+    vec3 waveNormal = vec3(waveGradient * 2.0, 1.0 - length(waveGradient) * 0.5);
+    waveNormal = normalize(waveNormal);
+    vec3 litNormal = mix(vNormal, waveNormal, 0.3); // Blend 30% with animated normal
 
     // === Fresnel effect: steeper angles = more reflection ===
     vec3 viewDir = normalize(uCameraPos - vWorldPos);
-    float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 4.0);
+    float fresnel = pow(1.0 - abs(dot(viewDir, litNormal)), 4.0);
 
     // Reflection blend: mix between direct water (bottom angle) and reflection (grazing)
     float reflectionBlend = mix(0.2, 1.0, fresnel) * uReflectionStrength;
-    vec3 directWater = texColor.rgb * vec3(0.15, 0.35, 0.6); // blue-green water color
-    vec3 waterColor = mix(directWater, reflColor.rgb, reflectionBlend);
+
+    // FIX: Use a solid base water color instead of relying on texture sampling
+    // which can produce garbage when the atlas doesn't have the expected tiles.
+    vec3 directWater = vec3(0.12, 0.32, 0.58); // Deep blue-green water color
+
+    // Blend with texture color for subtle variation (reduce texture dependency)
+    float texInfluence = 0.3; // Only 30% texture influence, 70% solid color
+    directWater = mix(directWater, texColor.rgb * vec3(0.15, 0.35, 0.6), texInfluence);
+
+    vec3 waterColor = mix(directWater, reflColor.rgb * vec3(0.5), reflectionBlend);
 
     // === Sun glare (specular highlight) ===
     // Blinn-Phong specular: highlight when half-angle aligns with normal
     vec3 halfDir = normalize(uSunDir + viewDir);
-    float spec = pow(max(dot(vNormal, halfDir), 0.0), 64.0);
+    float spec = pow(max(dot(litNormal, halfDir), 0.0), 64.0);
     // Add wave perturbation to specular for realistic shimmer
     spec *= (0.5 + 0.5 * (0.5 + waveHeight)); // shimmer: brightens/darkens with waves
     vec3 sunGlare = vec3(1.0, 0.95, 0.8) * spec * 0.6; // warm white glare

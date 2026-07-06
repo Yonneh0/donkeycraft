@@ -1,13 +1,14 @@
-// Donkeycraft — WaterRenderer
+// Donkeycraft — WaterRenderer (Release Build)
 // Unified semi-transparent water surface rendering across all visible chunks.
 //
 // Features:
 // - Single mesh across all visible chunks (no borders at chunk boundaries)
 // - Animated FBM wave displacement in fragment shader
-// - Fresnel-based reflection blending
-// - Sun glare specular highlight (Blinn-Phong)
+// - Fresnel-based reflection blending (grazing angles more reflective)
+// - Sun glare specular highlight (Blinn-Phong with wave shimmer)
 // - Depth-based distance fog with lighting factor
 // - Dithering to prevent alpha banding
+// - Robust error handling and JSDoc documentation
 //
 // Rendering pipeline:
 // 1. Terrain pass — opaque blocks only (water blocks skipped by terrain renderer)
@@ -25,8 +26,9 @@
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    var Config = Donkeycraft.Config || {};
+    var CHUNK_SIZE = Config.CHUNK_SIZE || 16;
+    var WORLD_HEIGHT = Config.WORLD_HEIGHT || 256;
 
     // ============================================================
     // Named constants — extracted from magic numbers for clarity
@@ -41,8 +43,9 @@
 
     /**
      * FBM wave UV scale multiplier for animated water surface.
-     * 8.0 creates 8 tile-sized repeats across the water surface.
-     * Must match the value in WATER_FRAGMENT_SHADER's fbm() function.
+     * 8.0 creates 8 tile-sized repeats across the water surface, producing
+     * organic rolling wave patterns visible across the entire water body.
+     * Must match the value passed as uWaveScale uniform in the shader.
      * @constant {number}
      */
     var FBM_WAVE_SCALE = 8.0;
@@ -132,6 +135,8 @@
 
     // ============================================================
     // UV column precomputation buffer — allocated once, reused across calls
+    // ============================================================
+
     /**
      * Pre-computed UV scale factors per chunk-local X position.
      * @type {Object|null}
@@ -316,7 +321,7 @@
          * Render distance in chunks (synchronized from Game).
          * @type {number}
          */
-        this._renderDistance = Donkeycraft.Config.RENDER_DISTANCE || 8;
+        this._renderDistance = Config.RENDER_DISTANCE || 8;
 
         // ============================================================
         // Sun direction for specular highlight
@@ -1148,7 +1153,7 @@
 
         // --- Texture binding ---
 
-        // Bind terrain texture for water color mixing (texture unit 0).
+        // FIX: Bind terrain texture for water color mixing (texture unit 0).
         // This ensures the water shader has a valid texture to sample for the base
         // water color. Without this, sampling from an unbound texture produces
         // undefined results that may cause random color artifacts.
@@ -1156,7 +1161,7 @@
             this._shaderManager.setSampler('uTexture', 0);
         }
 
-        // Reflection texture — bind null to unit 1 since no planar reflection pass exists.
+        // FIX: Reflection texture — bind null to unit 1 since no planar reflection pass exists.
         // The water fragment shader handles this by using directWater color when the
         // reflection is null (texture returns black, which gets blended out).
         if (this._shaderManager.setSampler) {
