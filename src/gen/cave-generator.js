@@ -1,330 +1,654 @@
-// Donkeycraft — Cave Generator
-// Cave system: 3D noise-based cave generation, lava caves, mushroom caves.
+// Donkeycraft — Multi-Pass Cave Generator
+// 5-pass cave system: main network, small branches, entrance carving, lava caves, decoration caves.
+// Uses fractal noise for natural tunnel shapes with spherical carving and adaptive Y stepping.
+//
+// @module cave-generator
+// @description 5-pass cave generation system for realistic underground networks
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    if (!Donkeycraft) return;
+
+    var CHUNK_SIZE = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
+    var WORLD_HEIGHT = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256;
 
     // ============================================================
-    // CaveGenerator
+    // Constants
     // ============================================================
 
     /**
-     * CaveGenerator — generates cave systems using 3D noise.
+     * Air block ID.
+     * @type {number}
      */
-    Donkeycraft.CaveGenerator = (function () {
-        // ============================================================
-        // Configuration constants — extracted from magic numbers
-        // ============================================================
+    var AIR_ID = 0;
 
-        /** Default cave density threshold. fbm returns [-1,1]; lower = fewer caves. */
-        var _DEFAULT_CAVE_DENSITY = -0.8;
-        /** Base cave tunnel radius in blocks. */
-        var _DEFAULT_CAVE_RADIUS = 2.0;
-        /** Y level threshold below which lava caves are generated. */
-        var _DEFAULT_LAVA_Y_LEVEL = 10;
-        /** Maximum Y iterations per column to prevent infinite loops in cave generation. */
-        var _MAX_CAVE_ITERATIONS = 500;
+    /**
+     * Default cave threshold for main network carving.
+     * Lower values = fewer caves (more solid terrain).
+     * @type {number}
+     */
+    var CAVE_THRESHOLD_MAIN = -0.1;
 
-        // Ocean biome density modifier — more negative = fewer caves (water fills them)
-        var _OCEAN_DENSITY_MODIFIER = -0.95;
-        var _OCEAN_RADIUS_MODIFIER = 0.5;
+    /**
+     * Default cave threshold for small cave branches.
+     * Higher threshold = more sparse small caves.
+     * @type {number}
+     */
+    var CAVE_THRESHOLD_SMALL = 0.05;
 
-        // Desert biome density modifier — slightly fewer caves
-        var _DESERT_DENSITY_MODIFIER = -0.9;
+    /**
+     * Default Y level for lava caves.
+     * Lava appears below this level.
+     * @type {number}
+     */
+    var LAVA_CAVE_Y_LEVEL = 10;
 
-        // Noise scale factors for cave generation
-        var _CAVE_NOISE_SCALE_XZ = 0.02;
-        var _CAVE_NOISE_SCALE_Y = 0.02;
-        var _CAVE_NOISE_OCTAVES = 3;
-        var _CAVE_NOISE_PERSISTENCE = 0.5;
-        var _CAVE_NOISE_LUNNARITY = 2.0;
+    /**
+     * Maximum radius of cave tunnels (in blocks).
+     * @type {number}
+     */
+    var MAX_CAVE_RADIUS = 4;
 
-        // Adaptive Y stepping
-        var _SHALLOW_DEPTH_THRESHOLD = 20; // Blocks above minY where caves are continuous
-        var _MAX_Y_STEP = 4;
-        var _MIN_Y_STEP = 1;
+    /**
+     * Minimum radius of small cave tunnels.
+     * @type {number}
+     */
+    var MIN_CAVE_RADIUS = 1.5;
 
-        /**
-         * Current configuration — defaults to standard overworld values.
-         * @type {{minY: number, maxY: number, lavaYLevel: number}}
-         * @private
-         */
-        var _defaultConfig = { minY: 1, maxY: WORLD_HEIGHT - 1, lavaYLevel: _DEFAULT_LAVA_Y_LEVEL };
+    // ============================================================
+    // Cave Generator State
+    // ============================================================
 
-        // Runtime state — these are mutable via setters.
-        var _caveDensity = _DEFAULT_CAVE_DENSITY;
-        var _caveRadius = _DEFAULT_CAVE_RADIUS;
-        var _lavaYLevel = _DEFAULT_LAVA_Y_LEVEL;
-        /** Maximum Y iterations per column to prevent infinite loops in cave generation. */
-        var _maxCaveIterations = _MAX_CAVE_ITERATIONS;
+    /**
+     * Resolve the air block ID from BlockRegistry.
+     * @returns {number} Air block ID (always 0).
+     * @private
+     */
+    function _getAirId() {
+        return AIR_ID;
+    }
 
-        /**
-         * Check if a block ID is replaceable (air, flowers, grass, tall grass, etc.).
-         * Uses safe method existence checks to avoid errors if BlockRegistry methods are missing.
-         * Centralized helper — also available via Donkeycraft._gen._isReplaceable when needed.
-         * NOTE: Does NOT include transparent blocks (glass, stained glass) or liquids — caves
-         * should only carve through truly replaceable surface decorations and air.
-         * @param {number} blockId - Block ID to check.
-         * @returns {boolean} True if the block can be carved through.
-         * @private
-         */
-        function _isReplaceable(blockId) {
-            if (blockId === 0) return true;
-            if (Donkeycraft.BlockRegistry) {
-                try {
-                    if (typeof Donkeycraft.BlockRegistry.isReplaceable === 'function' && Donkeycraft.BlockRegistry.isReplaceable(blockId)) return true;
-                } catch (e) { /* BlockRegistry method threw — skip */ }
-            }
-            return false;
-        }
+    // ============================================================
+    // Pass 1: Main Cave Network
+    // ============================================================
 
-        /**
-         * Generate caves in a chunk using 3D noise.
-         * Creates main cave layers and deep lava caves based on biome type.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
-         * @param {number} biomeId - Biome ID for this chunk.
-         * @param {Object} [dimConfig] - Optional dimension configuration.
-         * @param {number} [dimConfig.minY] - Minimum Y level for cave generation. Defaults to 1.
-         * @param {number} [dimConfig.maxY] - Maximum Y level for cave generation. Defaults to WORLD_HEIGHT - 1.
-         * @param {number} [dimConfig.lavaYLevel] - Y level threshold for lava caves. Defaults to 10.
-         */
-        function generateCaves(chunk, biomeId, dimConfig) {
-            // Input validation
-            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
-            if (typeof biomeId !== 'number' || biomeId < 0) return;
+    /**
+     * Generate the main cave network using fBm noise at a low threshold.
+     * Creates large tunnels and caverns that form the primary underground structure.
+     * Cave generation occurs in the deep underground layer (Y=5 to Y=WORLD_HEIGHT/2)
+     * for realistic geology.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
+     * @param {number} chunkX - Chunk X coordinate (for noise seeding).
+     * @param {number} chunkZ - Chunk Z coordinate (for noise seeding).
+     * @param {Object} [options] - Generation options.
+     * @param {number} [options.threshold] - Noise threshold for cave carving [-1, 1].
+     * @param {number} [options.radius] - Base cave tunnel radius.
+     * @param {number} [options.noiseScale] - Noise scale factor.
+     * @returns {Object} Generation stats: {mainCavesCarved, blocksModified}.
+     */
+    function pass1MainNetwork(chunk, chunkX, chunkZ, options) {
+        var result = { mainCavesCarved: 0, blocksModified: 0 };
 
-            // Resolve dimension configuration
-            var config = dimConfig || _defaultConfig;
-            var minY = config.minY !== undefined ? config.minY : 0;
-            var maxY = config.maxY !== undefined ? config.maxY : WORLD_HEIGHT;
-            var lavaYLevel = config.lavaYLevel !== undefined ? config.lavaYLevel : _lavaYLevel;
+        if (!chunk || typeof chunk.setBlock !== 'function') return result;
 
-            // Ocean biomes: fewer caves (water fills them)
-            var density = _caveDensity;
-            var radius = _caveRadius;
+        var threshold = (options && options.threshold !== undefined) ? options.threshold : CAVE_THRESHOLD_MAIN;
+        var baseRadius = (options && options.radius) ? options.radius : 3;
+        var noiseScale = (options && options.noiseScale) ? options.noiseScale : 0.02;
 
-            if (biomeId === Donkeycraft.BiomeID.OCEAN) {
-                density = _OCEAN_DENSITY_MODIFIER;
-                radius = _caveRadius * _OCEAN_RADIUS_MODIFIER;
-            } else if (biomeId === Donkeycraft.BiomeID.DESERT || biomeId === Donkeycraft.BiomeID.DESERT_M) {
-                density = _DESERT_DENSITY_MODIFIER;
-            }
+        var airId = _getAirId();
 
-            // Generate main cave layer with continuous Y iteration
-            _generateCaveLayer(chunk, density, radius, minY, maxY, 'main');
+        // Step through Y with adaptive spacing for connected networks
+        var yStep = 2;
+        // Generate caves in deep underground layer: from middle of world down to minimum Y
+        var startY = Math.floor(WORLD_HEIGHT * 0.4);
+        var endY = 2;
 
-            // Generate lava caves near bedrock floor (60% radius, higher density)
-            _generateCaveLayer(chunk, _OCEAN_DENSITY_MODIFIER, radius * 0.6, minY, lavaYLevel + 4, 'lava');
-        }
-
-        /**
-         * Generate a single cave layer within Y bounds using continuous Y iteration
-         * for connected cave systems. Uses 3D fbm noise to carve smooth tunnel shapes.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} density - Cave density threshold.
-         * @param {number} radius - Base tunnel radius.
-         * @param {number} minY - Minimum Y level.
-         * @param {number} maxY - Maximum Y level.
-         * @param {string} layerType - Layer type ('main', 'lava').
-         * @private
-         */
-        function _generateCaveLayer(chunk, density, radius, minY, maxY, layerType) {
-            // Clamp to valid range
-            if (minY < 0) minY = 0;
-            if (maxY > WORLD_HEIGHT) maxY = WORLD_HEIGHT;
-
+        for (var y = startY; y >= endY; y -= yStep) {
             for (var x = 0; x < CHUNK_SIZE; x++) {
                 for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var worldX = chunk.chunkX * CHUNK_SIZE + x;
-                    var worldZ = chunk.chunkZ * CHUNK_SIZE + z;
+                    // Global coordinates for seamless chunk boundaries
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Adjust threshold based on local X/Z noise for tunnel shape variation.
-                    var threshold = density + Donkeycraft._gen._noise2D(
-                        x * 0.3, z * 0.3
-                    ) * 0.05;
+                    // Get fBm noise value at this position
+                    var noiseValue = _fbmNoise(worldX * noiseScale, y * noiseScale * 0.8, worldZ * noiseScale, 3);
 
-                    // Continuous Y iteration for connected cave networks with max iteration guard.
-                    var y = minY;
-                    var iterations = 0;
-                    while (y < maxY && iterations < _maxCaveIterations) {
-                        iterations++;
+                    // Check if below threshold (cave space)
+                    if (noiseValue < threshold) {
+                        // Calculate variable radius based on noise
+                        var radius = baseRadius + _fbmNoise(worldX * 0.1, y * 0.1, worldZ * 0.1, 2) * 1.5;
 
-                        // Primary cave noise — fbm via _gen wrapper for proper initialization
-                        var noiseVal = Donkeycraft._gen._fbm(
-                            worldX * _CAVE_NOISE_SCALE_XZ,
-                            y * _CAVE_NOISE_SCALE_Y,
-                            worldZ * _CAVE_NOISE_SCALE_XZ,
-                            _CAVE_NOISE_OCTAVES, _CAVE_NOISE_PERSISTENCE, _CAVE_NOISE_LUNNARITY
-                        );
-
-                        // Carve when noise falls below the threshold (fbm returns [-1, 1])
-                        if (noiseVal < threshold) {
-                            // Carve a tunnel at this position with slight Y spread
-                            var tunnelRadius = radius + Donkeycraft._gen._noise2D(
-                                y * 0.1 + x, z * 0.1 + worldZ * 0.05
-                            ) * radius * 0.5;
-
-                            _carveTunnel(chunk, x, y, z, tunnelRadius);
-                        }
-
-                        // Adaptive Y step: near shallow depth = continuous caves; deeper = spaced steps
-                        var yNoise = Donkeycraft._gen._noise2D(worldX * 0.1, worldZ * 0.1);
-                        var yStep = (y < minY + _SHALLOW_DEPTH_THRESHOLD) ? _MIN_Y_STEP : ((yNoise > 0) ? 3 : 2);
-
-                        // Clamp step to avoid skipping too far
-                        if (yStep < _MIN_Y_STEP) yStep = _MIN_Y_STEP;
-                        if (yStep > _MAX_Y_STEP) yStep = _MAX_Y_STEP;
-
-                        y += yStep;
+                        // Carve spherical cave at this position
+                        result.blocksModified += _carveCave(chunk, x, y, z, radius, airId);
                     }
                 }
             }
         }
 
-        /**
-         * Carve a tunnel at the given position with the given radius.
-         * Uses spherical shape with smooth falloff for natural-looking caves.
-         * Carves through air, liquids, and replaceable blocks (flowers, grass, tall grass, etc.).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} cx - Center X.
-         * @param {number} cy - Center Y.
-         * @param {number} cz - Center Z.
-         * @param {number} radius - Tunnel radius.
-         * @private
-         */
-        function _carveTunnel(chunk, cx, cy, cz, radius) {
-            var r = Math.ceil(radius);
+        // Count distinct cave regions (approximate by counting transition points)
+        result.mainCavesCarved = Math.floor(result.blocksModified / (Math.PI * baseRadius * baseRadius * 4));
 
-            var radiusSq = radius * radius;
-            for (var dx = -r; dx <= r; dx++) {
-                var dx2 = dx * dx;
-                for (var dy = -r; dy <= r; dy++) {
-                    var dy2 = dy * dy;
-                    for (var dz = -r; dz <= r; dz++) {
-                        var distSq = dx2 + dy2 + (dz * dz);
-                        if (distSq <= radiusSq) {
-                            var bx = cx + dx;
-                            var by = cy + dy;
-                            var bz = cz + dz;
+        return result;
+    }
 
-                            // Check bounds
-                            if (bx >= 0 && bx < CHUNK_SIZE &&
-                                by >= 0 && by < WORLD_HEIGHT &&
-                                bz >= 0 && bz < CHUNK_SIZE) {
-                                var currentBlock = chunk.getBlock(bx, by, bz);
-                                // Carve air, liquids, and replaceable blocks.
-                                if (currentBlock === 0 ||
-                                    _isReplaceable(currentBlock)) {
-                                    chunk.setBlock(bx, by, bz, 0); // Air
-                                }
-                            }
+    // ============================================================
+    // Pass 2: Small Cave Branches
+    // ============================================================
+
+    /**
+     * Generate small cave branches using finer-scale noise.
+     * Creates secondary passages and connects main caves to form realistic networks.
+     * Cave generation occurs in the underground layer (Y=5 to Y=WORLD_HEIGHT/2).
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} [options] - Generation options.
+     * @returns {Object} Generation stats: {smallCavesCarved, blocksModified}.
+     */
+    function pass2SmallBranches(chunk, chunkX, chunkZ, options) {
+        var result = { smallCavesCarved: 0, blocksModified: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return result;
+
+        var threshold = (options && options.threshold !== undefined) ? options.threshold : CAVE_THRESHOLD_SMALL;
+        var baseRadius = (options && options.radius) ? options.radius : MIN_CAVE_RADIUS;
+        var noiseScale = (options && options.noiseScale) ? options.noiseScale : 0.05;
+
+        var airId = _getAirId();
+
+        // Higher Y step for smaller caves (less thorough coverage)
+        var yStep = 3;
+        // Generate in upper underground layer: from mid-world down to minimum cave depth
+        var startY = Math.floor(WORLD_HEIGHT * 0.5);
+        var endY = 4;
+
+        for (var y = startY; y >= endY; y -= yStep) {
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                    // Use different noise offset to avoid correlation with main caves
+                    var noiseValue = _fbmNoise(worldX * noiseScale + 1000, y * noiseScale * 0.7 + 500, worldZ * noiseScale + 1000, 4);
+
+                    if (noiseValue < threshold) {
+                        var radius = baseRadius + _fbmNoise(worldX * 0.15, y * 0.15, worldZ * 0.15, 2) * 0.8;
+
+                        result.blocksModified += _carveCave(chunk, x, y, z, Math.max(1, radius), airId);
+                    }
+                }
+            }
+        }
+
+        result.smallCavesCarved = Math.floor(result.blocksModified / (Math.PI * baseRadius * baseRadius * 4));
+
+        return result;
+    }
+
+    // ============================================================
+    // Pass 3: Cave Entrance Carving
+    // ============================================================
+
+    /**
+     * Detect surface-adjacent caves and carve natural entrances.
+     * Connects underground networks to the surface for realistic appearance.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate entrances in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number[]} heightmap - Heightmap array for surface detection.
+     * @param {Object} [options] - Generation options.
+     * @returns {Object} Generation stats: {entrancesCarved, blocksModified}.
+     */
+    function pass3EntranceCarving(chunk, chunkX, chunkZ, heightmap, options) {
+        var result = { entrancesCarved: 0, blocksModified: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return result;
+        if (!heightmap || !Array.isArray(heightmap)) return result;
+
+        var airId = _getAirId();
+        var entranceChance = (options && options.entranceChance) ? options.entranceChance : 0.3;
+
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var surfaceY = heightmap[x + z * CHUNK_SIZE];
+                if (surfaceY < 2 || surfaceY >= WORLD_HEIGHT - 2) continue;
+
+                var worldX = chunkX * CHUNK_SIZE + x;
+                var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                // Check for cave blocks near the surface (within 8 blocks below)
+                var hasNearSurfaceCave = false;
+                for (var dy = 1; dy <= 8 && surfaceY - dy >= 0; dy++) {
+                    if (chunk.getBlock(x, surfaceY - dy, z) === airId) {
+                        hasNearSurfaceCave = true;
+                        break;
+                    }
+                }
+
+                if (!hasNearSurfaceCave) continue;
+
+                // Random chance to create an entrance at this location
+                var hash = _hash3D(worldX, surfaceY, worldZ);
+                if ((hash % 100) / 100 > entranceChance) continue;
+
+                // Carve a natural entrance shaft from surface down to the cave
+                var entranceRadius = 1.5 + (hash % 3) * 0.5;
+                var shaftDepth = 3 + (hash % 4);
+
+                for (var sy = surfaceY; sy >= surfaceY - shaftDepth && sy >= 0; sy--) {
+                    // Taper the entrance radius as we go deeper
+                    var taperFactor = 1 - (surfaceY - sy) / (shaftDepth + 1);
+                    var currentRadius = entranceRadius * taperFactor;
+
+                    result.blocksModified += _carveCave(chunk, x, Math.floor(sy), z, Math.max(1, currentRadius), airId);
+                }
+
+                result.entrancesCarved++;
+            }
+        }
+
+        return result;
+    }
+
+    // ============================================================
+    // Pass 4: Lava Caves
+    // ============================================================
+
+    /**
+     * Generate deep caves below a threshold Y level with lava filling.
+     * Creates dramatic underground lava lakes and glowing caverns.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate lava caves in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} [options] - Generation options.
+     * @returns {Object} Generation stats: {lavaCavesCarved, lavaBlocksPlaced}.
+     */
+    function pass4LavaCaves(chunk, chunkX, chunkZ, options) {
+        var result = { lavaCavesCarved: 0, lavaBlocksPlaced: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return result;
+
+        var lavaThreshold = (options && options.threshold !== undefined) ? options.threshold : -0.2;
+        var lavaNoiseScale = (options && options.noiseScale) ? options.noiseScale : 0.03;
+        var lavaYLevel = (options && options.yLevel !== undefined) ? options.yLevel : LAVA_CAVE_Y_LEVEL;
+
+        var lavaBlockId = _getLavaBlockId();
+        if (!lavaBlockId) return result;
+
+        // Only generate in the lower portion of the world
+        var startY = WORLD_HEIGHT - 5;
+        var endY = Math.max(1, lavaYLevel - 10);
+
+        for (var y = startY; y >= endY; y--) {
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                    // Get lava-specific noise (different seed offset)
+                    var noiseValue = _fbmNoise(worldX * lavaNoiseScale + 5000, y * lavaNoiseScale * 0.6 + 3000, worldZ * lavaNoiseScale + 5000, 3);
+
+                    // Carve cave space where noise is below threshold
+                    if (noiseValue < lavaThreshold) {
+                        var radius = 2 + _fbmNoise(worldX * 0.12, y * 0.12, worldZ * 0.12, 2) * 1;
+
+                        // First carve air
+                        _carveCave(chunk, x, y, z, Math.max(1, radius), _getAirId());
+
+                        // Then fill with lava at or below the water table
+                        if (y <= lavaYLevel + 2) {
+                            result.lavaBlocksPlaced += _fillCaveWithLava(chunk, x, y, z, Math.max(1, radius), lavaBlockId);
                         }
                     }
                 }
             }
         }
 
-        /**
-         * Get the current cave density threshold.
-         * @returns {number} Cave density threshold (typically -0.95 to -0.7).
-         */
-        function getDensity() {
-            return _caveDensity;
-        }
+        result.lavaCavesCarved = Math.floor(result.lavaBlocksPlaced / 8);
 
-        /**
-         * Set the cave density threshold.
-         * @param {number} value - New density value (recommended range: -1.0 to 0.0).
-         */
-        function setDensity(value) {
-            _caveDensity = value;
-        }
+        return result;
+    }
 
-        /**
-         * Get the base cave tunnel radius in blocks.
-         * @returns {number} Base tunnel radius.
-         */
-        function getRadius() {
-            return _caveRadius;
-        }
+    // ============================================================
+    // Pass 5: Decoration Caves
+    // ============================================================
 
-        /**
-         * Set the base cave tunnel radius in blocks.
-         * @param {number} value - New radius value (positive number).
-         */
-        function setRadius(value) {
-            if (typeof value === 'number' && value > 0) {
-                _caveRadius = value;
+    /**
+     * Generate special caves with glowstone/crystal formations.
+     * Creates small, visually striking caverns with embedded light sources.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate decoration caves in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} [options] - Generation options.
+     * @returns {Object} Generation stats: {decoCaves, glowstonePlaced}.
+     */
+    function pass5DecorationCaves(chunk, chunkX, chunkZ, options) {
+        var result = { decoCaves: 0, glowstonePlaced: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return result;
+
+        var decoNoiseScale = (options && options.noiseScale) ? options.noiseScale : 0.04;
+        var decoThreshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
+        var glowstoneId = _getBlockId('glowstone');
+
+        // Decoration caves are sparse, large caverns
+        var yStep = 5;
+        var startY = WORLD_HEIGHT - 30;
+        var endY = 15;
+
+        for (var y = startY; y >= endY; y -= yStep) {
+            for (var x = 0; x < CHUNK_SIZE; x++) {
+                for (var z = 0; z < CHUNK_SIZE; z++) {
+                    var worldX = chunkX * CHUNK_SIZE + x;
+                    var worldZ = chunkZ * CHUNK_SIZE + z;
+
+                    var noiseValue = _fbmNoise(worldX * decoNoiseScale + 9000, y * decoNoiseScale * 0.5 + 7000, worldZ * decoNoiseScale + 9000, 3);
+
+                    if (noiseValue < decoThreshold) {
+                        var radius = 2 + (Math.abs(_hash3D(worldX, y, worldZ)) % 4);
+
+                        // Carve small decorative cave
+                        _carveCave(chunk, x, y, z, radius, _getAirId());
+
+                        // Place glowstone crystals at cave edges
+                        if (glowstoneId) {
+                            var crystalCount = 1 + (Math.abs(_hash3D(worldX + 1, y + 1, worldZ + 1)) % 3);
+                            result.glowstonePlaced += _placeCrystals(chunk, x, y, z, radius, glowstoneId, crystalCount);
+                        }
+
+                        result.decoCaves++;
+                    }
+                }
             }
         }
 
-        /**
-         * Get the Y level below which lava caves are generated.
-         * @returns {number} Lava cave Y level threshold.
-         */
-        function getLavaYLevel() {
-            return _lavaYLevel;
-        }
+        return result;
+    }
 
-        /**
-         * Set the Y level below which lava caves are generated.
-         * @param {number} value - New lava Y level (must be > 0 and < WORLD_HEIGHT).
-         */
-        function setLavaYLevel(value) {
-            if (typeof value === 'number' && value > 0 && value < WORLD_HEIGHT) {
-                _lavaYLevel = Math.floor(value);
+    // ============================================================
+    // Core Cave Carving Utilities
+    // ============================================================
+
+    /**
+     * Carve a spherical cave at the given position.
+     * Uses sphere distance algorithm for efficient voxel placement.
+     * Allows multi-pass expansion by carving through existing air blocks,
+     * enabling subsequent passes to connect and expand caves carved by earlier passes.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to carve in.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y.
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Cave radius (must be >= 1).
+     * @param {number} blockId - Block ID to place (usually 0 for air).
+     * @returns {number} Number of blocks modified.
+     * @private
+     */
+    function _carveCave(chunk, cx, cy, cz, radius, blockId) {
+        // Validate parameters: radius must be >= 1, blockId can be 0 (air) or any valid block ID
+        if (radius < 1 || blockId === null || blockId === undefined) return 0;
+
+        var rSquared = radius * radius;
+        var count = 0;
+        var rInt = Math.ceil(radius);
+
+        for (var dx = -rInt; dx <= rInt; dx++) {
+            for (var dy = -rInt; dy <= rInt; dy++) {
+                for (var dz = -rInt; dz <= rInt; dz++) {
+                    var distSquared = dx * dx + dy * dy + dz * dz;
+
+                    if (distSquared > rSquared) continue;
+
+                    var bx = cx + dx;
+                    var by = cy + dy;
+                    var bz = cz + dz;
+
+                    // Check chunk bounds
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                    // Carve: replace any non-air block with the target block (usually air).
+                    // This allows multi-pass caves to expand through previously carved areas,
+                    // creating connected tunnel networks instead of isolated pockets.
+                    var currentBlock = chunk.getBlock(bx, by, bz);
+                    if (currentBlock !== blockId) {
+                        chunk.setBlock(bx, by, bz, blockId);
+                        count++;
+                    }
+                }
             }
         }
 
-        /**
-         * Get the maximum Y iterations per column.
-         * @returns {number} Max cave iterations.
-         */
-        function getMaxCaveIterations() {
-            return _maxCaveIterations;
-        }
+        return count;
+    }
 
-        /**
-         * Set the maximum Y iterations per column.
-         * @param {number} value - New max iterations (positive integer).
-         */
-        function setMaxCaveIterations(value) {
-            if (typeof value === 'number' && value > 0) {
-                _maxCaveIterations = Math.floor(value);
+    /**
+     * Fill a cave area with lava up to a certain level.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y (lava level).
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Cave radius.
+     * @param {number} lavaBlockId - Lava block ID.
+     * @returns {number} Number of lava blocks placed.
+     * @private
+     */
+    function _fillCaveWithLava(chunk, cx, cy, cz, radius, lavaBlockId) {
+        if (!lavaBlockId) return 0;
+
+        var rSquared = radius * radius;
+        var count = 0;
+        var rInt = Math.ceil(radius);
+
+        for (var dx = -rInt; dx <= rInt; dx++) {
+            for (var dy = -rInt; dy <= 0; dy++) { // Only below center Y
+                for (var dz = -rInt; dz <= rInt; dz++) {
+                    var distSquared = dx * dx + dy * dy + dz * dz;
+
+                    if (distSquared > rSquared) continue;
+
+                    var bx = cx + dx;
+                    var by = cy + dy;
+                    var bz = cz + dz;
+
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    if (by < 0) continue;
+
+                    var currentBlock = chunk.getBlock(bx, by, bz);
+                    if (currentBlock === 0) { // Only fill air
+                        chunk.setBlock(bx, by, bz, lavaBlockId);
+                        count++;
+                    }
+                }
             }
         }
 
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The CaveGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.CaveGenerator;
+        return count;
+    }
+
+    /**
+     * Place crystal formations on cave walls/ceilings.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y.
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Cave radius.
+     * @param {number} crystalBlockId - Crystal block ID (glowstone).
+     * @param {number} count - Number of crystals to place.
+     * @returns {number} Number of crystals placed.
+     * @private
+     */
+    function _placeCrystals(chunk, cx, cy, cz, radius, crystalBlockId, count) {
+        if (!crystalBlockId) return 0;
+
+        var placed = 0;
+
+        for (var i = 0; i < count; i++) {
+            // Random position on cave surface
+            var angle = (i / count) * Math.PI * 2;
+            var crystalX = cx + Math.cos(angle) * Math.floor(radius * 0.7);
+            var crystalZ = cz + Math.sin(angle) * Math.floor(radius * 0.7);
+            var crystalY = cy + Math.floor(radius * 0.5);
+
+            // Check bounds
+            if (crystalX < 0 || crystalX >= CHUNK_SIZE || crystalZ < 0 || crystalZ >= CHUNK_SIZE) continue;
+            if (crystalY < 0 || crystalY >= WORLD_HEIGHT) continue;
+
+            // Only place if current block is air (inside cave)
+            if (chunk.getBlock(crystalX, crystalY, crystalZ) === 0) {
+                chunk.setBlock(crystalX, crystalY, crystalZ, crystalBlockId);
+                placed++;
+            }
         }
 
-        /**
-         * Destroy and free resources. Cleans up internal state.
-         */
-        function destroy() {
-            // No dynamic resources to free — all state is in closure variables
-        }
+        return placed;
+    }
 
-        return {
-            getInstance: getInstance,
-            generateCaves: generateCaves,
-            getDensity: getDensity,
-            setDensity: setDensity,
-            getRadius: getRadius,
-            setRadius: setRadius,
-            getLavaYLevel: getLavaYLevel,
-            setLavaYLevel: setLavaYLevel,
-            getMaxCaveIterations: getMaxCaveIterations,
-            setMaxCaveIterations: setMaxCaveIterations,
-            destroy: destroy
+    // ============================================================
+    // Block ID Resolution
+    // ============================================================
+
+    /**
+     * Resolve a block ID by name from BlockRegistry.
+     * @param {string} name - Block name.
+     * @returns {number} Block ID, or 0 if not found.
+     * @private
+     */
+    function _getBlockId(name) {
+        if (!Donkeycraft.BlockRegistry) return 0;
+        var block = Donkeycraft.BlockRegistry.getBlockByName(name);
+        return block ? block.id : 0;
+    }
+
+    /**
+     * Resolve the lava block ID from BlockRegistry.
+     * @returns {number} Lava block ID, or 0 if not found.
+     * @private
+     */
+    function _getLavaBlockId() {
+        return _getBlockId('lava') || _getBlockId('lava_still') || 0;
+    }
+
+    // ============================================================
+    // Noise Functions (delegating to noise.js)
+    // ============================================================
+
+    /**
+     * Fractal Brownian Motion for cave generation.
+     * Delegates to Donkeycraft._gen._fbm when available.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate.
+     * @param {number} octaves - Number of octaves.
+     * @returns {number} Normalized noise value [-1, 1].
+     * @private
+     */
+    function _fbmNoise(x, y, z, octaves) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._fbm === 'function') {
+            try {
+                return Donkeycraft._gen._fbm(x, y, z, octaves || 3, 0.5, 2.0);
+            } catch (e) { /* fallback below */ }
+        }
+        // Simple fallback: single octave noise
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._noise2D === 'function') {
+            return Donkeycraft._gen._noise2D(x, z);
+        }
+        return 0;
+    }
+
+    /**
+     * 3D hash for deterministic random values.
+     * Delegates to Donkeycraft._gen._hash3D when available.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate.
+     * @returns {number} Positive 32-bit integer.
+     * @private
+     */
+    function _hash3D(x, y, z) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._hash3D === 'function') {
+            return Donkeycraft._gen._hash3D(Math.floor(x), Math.floor(y), Math.floor(z));
+        }
+        // Simple fallback hash
+        var h = (x * 374761393 + y * 668265263 + z * 923496773) ^ 0x5bd1e995;
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0;
+    }
+
+    // ============================================================
+    // Main Entry Point
+    // ============================================================
+
+    /**
+     * Generate all cave passes for a chunk.
+     * Runs all 5 passes in sequence and returns combined stats.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate caves in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number[]} [heightmap] - Optional heightmap for entrance carving (Pass 3).
+     * @param {Object} [options] - Global generation options.
+     * @returns {{pass1: Object, pass2: Object, pass3: Object, pass4: Object, pass5: Object, totalBlocksModified: number}}
+     */
+    function generateCaves(chunk, chunkX, chunkZ, heightmap, options) {
+        var stats = {
+            pass1: null,
+            pass2: null,
+            pass3: null,
+            pass4: null,
+            pass5: null,
+            totalBlocksModified: 0
         };
-    })();
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return stats;
+
+        // Pass 1: Main cave network
+        stats.pass1 = pass1MainNetwork(chunk, chunkX, chunkZ, options);
+        stats.totalBlocksModified += stats.pass1.blocksModified;
+
+        // Pass 2: Small cave branches
+        stats.pass2 = pass2SmallBranches(chunk, chunkX, chunkZ, options);
+        stats.totalBlocksModified += stats.pass2.blocksModified;
+
+        // Pass 3: Cave entrance carving (needs heightmap)
+        stats.pass3 = pass3EntranceCarving(chunk, chunkX, chunkZ, heightmap, options);
+        stats.totalBlocksModified += stats.pass3.blocksModified;
+
+        // Pass 4: Lava caves
+        stats.pass4 = pass4LavaCaves(chunk, chunkX, chunkZ, options);
+        stats.totalBlocksModified += stats.pass4.lavaBlocksPlaced;
+
+        // Pass 5: Decoration caves
+        stats.pass5 = pass5DecorationCaves(chunk, chunkX, chunkZ, options);
+        stats.totalBlocksModified += stats.pass5.glowstonePlaced;
+
+        return stats;
+    }
+
+    // ============================================================
+    // Public API
+    // ============================================================
+
+    /**
+     * Donkeycraft.CaveGenerator — Multi-pass cave generation system.
+     * @namespace
+     */
+    Donkeycraft.CaveGenerator = {
+        // Main entry point
+        generateCaves: generateCaves,
+
+        // Individual passes (for debugging/selection)
+        pass1MainNetwork: pass1MainNetwork,
+        pass2SmallBranches: pass2SmallBranches,
+        pass3EntranceCarving: pass3EntranceCarving,
+        pass4LavaCaves: pass4LavaCaves,
+        pass5DecorationCaves: pass5DecorationCaves,
+
+        // Configuration constants
+        CAVE_THRESHOLD_MAIN: CAVE_THRESHOLD_MAIN,
+        CAVE_THRESHOLD_SMALL: CAVE_THRESHOLD_SMALL,
+        LAVA_CAVE_Y_LEVEL: LAVA_CAVE_Y_LEVEL,
+        MAX_CAVE_RADIUS: MAX_CAVE_RADIUS,
+        MIN_CAVE_RADIUS: MIN_CAVE_RADIUS
+    };
 
 })();

@@ -1,391 +1,728 @@
-// Donkeycraft — Water Generator
-// Water source placement: lakes, ocean floors, surface water per biome.
+// Donkeycraft — Realistic Water Generator
+// Water features: oceans, rivers, lakes, underground aquifers, and flooded caves.
+// Biome-specific behavior: grass (standard), arctic (frozen), desert (no surface water), forest (higher water table).
+//
+// @module water-generator
+// @description Realistic water placement system with rivers, lakes, and biome-specific behavior
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    if (!Donkeycraft) return;
+
+    var CHUNK_SIZE = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
+    var WORLD_HEIGHT = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256;
 
     // ============================================================
-    // WaterGenerator
+    // Constants
     // ============================================================
 
     /**
-     * WaterGenerator — places water sources in chunks.
+     * Default sea level for standard biomes.
+     * @type {number}
      */
-    Donkeycraft.WaterGenerator = (function () {
-        var _waterLevel = 63; // Default sea level
-        var _waterBlockId = null; // Cached water block ID from BlockRegistry
-        var _liquidBlocks = {}; // Cache of liquid block IDs for quick lookup
+    var DEFAULT_WATER_LEVEL = 63;
 
-        /**
-         * Resolve the water block ID from BlockRegistry.
-         * Tries multiple names since water may be registered as 'water', 'water_still', or 'water_flow'.
-         * @private
-         */
-        function _resolveWaterBlockId() {
-            if (_waterBlockId !== null) return; // Already resolved
-            if (!Donkeycraft.BlockRegistry) {
-                _waterBlockId = 212; // Fallback: water block ID per block.js registry
-                return;
+    /**
+     * River formation threshold — noise value below which water flows.
+     * @type {number}
+     */
+    var RIVER_THRESHOLD = -0.15;
+
+    /**
+     * River depth — how many blocks deep river beds are.
+     * @type {number}
+     */
+    var RIVER_DEPTH = 2;
+
+    /**
+     * Lake frequency per chunk (base count).
+     * @type {number}
+     */
+    var LAKE_FREQUENCY = 2;
+
+    /**
+     * Maximum number of water blocks to place per chunk (safety cap).
+     * @type {number}
+     */
+    var MAX_WATER_BLOCKS_PER_CHUNK = 32768;
+
+    // ============================================================
+    // Biome Water Configuration
+    // ============================================================
+
+    /**
+     * Water configuration for each of the 4 simplified biomes.
+     * @type {Object.<string, {waterLevel: number, hasSurfaceWater: boolean, hasRivers: boolean, hasAquifers: boolean, iceBlockId: number}>}
+     */
+    var BIOME_WATER_CONFIG = {
+        grass: {
+            waterLevel: 63,
+            hasSurfaceWater: true,
+            hasRivers: true,
+            hasAquifers: true,
+            iceBlockId: 0 // No ice
+        },
+        arctic: {
+            waterLevel: 58,
+            hasSurfaceWater: true,
+            hasRivers: true,
+            hasAquifers: false,
+            iceBlockId: 325 // Ice block (if registered)
+        },
+        desert: {
+            waterLevel: 60,
+            hasSurfaceWater: false,
+            hasRivers: false,
+            hasAquifers: true,
+            iceBlockId: 0
+        },
+        forest: {
+            waterLevel: 63,
+            hasSurfaceWater: true,
+            hasRivers: true,
+            hasAquifers: true,
+            iceBlockId: 0
+        }
+    };
+
+    // ============================================================
+    // Water Generator State
+    // ============================================================
+
+    var _waterBlockId = null;
+    var _lavaBlockId = null;
+    var _iceBlockId = null;
+    var _liquidBlocks = {};
+
+    /**
+     * Resolve water-related block IDs from BlockRegistry.
+     */
+    function init() {
+        _resolveWaterBlocks();
+    }
+
+    /**
+     * Resolve water-related block IDs from BlockRegistry.
+     * @private
+     */
+    function _resolveWaterBlocks() {
+        if (!Donkeycraft.BlockRegistry) return;
+
+        // Water blocks
+        var waterNames = ['water', 'water_still', 'flowing_water'];
+        for (var i = 0; i < waterNames.length; i++) {
+            var block = Donkeycraft.BlockRegistry.getBlockByName(waterNames[i]);
+            if (block) {
+                _waterBlockId = block.id;
+                _registerLiquidBlock(block.id);
+                break;
             }
+        }
+        if (!_waterBlockId) _waterBlockId = 212; // Fallback
 
-            var waterNames = ['water', 'water_still', 'water_flow', 'flowing_water'];
-            for (var i = 0; i < waterNames.length; i++) {
-                var w = Donkeycraft.BlockRegistry.getBlockByName(waterNames[i]);
-                if (w) {
-                    _waterBlockId = w.id;
-                    return;
+        // Lava blocks
+        var lavaNames = ['lava', 'lava_still', 'flowing_lava'];
+        for (var j = 0; j < lavaNames.length; j++) {
+            var lavaBlock = Donkeycraft.BlockRegistry.getBlockByName(lavaNames[j]);
+            if (lavaBlock) {
+                _lavaBlockId = lavaBlock.id;
+                _registerLiquidBlock(lavaBlock.id);
+                break;
+            }
+        }
+
+        // Ice blocks
+        var iceNames = ['ice', 'packed_ice', 'blue_ice'];
+        for (var k = 0; k < iceNames.length; k++) {
+            var iceBlock = Donkeycraft.BlockRegistry.getBlockByName(iceNames[k]);
+            if (iceBlock) {
+                _iceBlockId = iceBlock.id;
+                break;
+            }
+        }
+    }
+
+    /**
+     * Register a block ID as a liquid block.
+     * @param {number} blockId - Block ID to register.
+     * @private
+     */
+    function _registerLiquidBlock(blockId) {
+        _liquidBlocks[blockId] = true;
+    }
+
+    /**
+     * Check if a block ID is a liquid.
+     * @param {number} blockId - Block ID.
+     * @returns {boolean} True if the block is a liquid.
+     */
+    function isLiquidBlock(blockId) {
+        return _liquidBlocks[blockId] === true;
+    }
+
+    /**
+     * Get the resolved water block ID.
+     * @returns {number} Water block ID, or 0 if not resolved.
+     */
+    function getWaterBlockId() {
+        return _waterBlockId || 0;
+    }
+
+    // ============================================================
+     // Main Water Placement Entry Point
+    // ============================================================
+
+    /**
+     * Place all water features for a chunk.
+     * Runs ocean/surface water, rivers, lakes, and underground aquifers based on biome config.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to place water in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number} biomeId - Biome ID for this chunk.
+     * @param {number[]} heightmap - Heightmap array.
+     * @param {Object} [options] - Generation options.
+     * @returns {{waterBlocksPlaced: number, riversCreated: number, lakesCreated: number}} Generation stats.
+     */
+    function placeWater(chunk, chunkX, chunkZ, biomeId, heightmap, options) {
+        var stats = { waterBlocksPlaced: 0, riversCreated: 0, lakesCreated: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return stats;
+        if (!_waterBlockId || _waterBlockId === 0) return stats;
+
+        // Resolve biome name from ID
+        var biomeName = _resolveBiomeName(biomeId);
+        var config = BIOME_WATER_CONFIG[biomeName] || BIOME_WATER_CONFIG.grass;
+
+        // Ocean biomes: fill to water level across entire chunk
+        if (options && options.isOcean) {
+            stats.waterBlocksPlaced += _placeOceanWater(chunk, config, heightmap);
+        } else {
+            // Overworld biomes: surface water in low areas
+            stats.waterBlocksPlaced += _placeSurfaceWater(chunk, config, heightmap);
+        }
+
+        // Rivers (biome-dependent)
+        if (config.hasRivers) {
+            var riverStats = _placeRivers(chunk, chunkX, chunkZ, config, heightmap);
+            stats.waterBlocksPlaced += riverStats.waterBlocksPlaced;
+            stats.riversCreated += riverStats.riversCreated;
+        }
+
+        // Lakes (biome-dependent)
+        if (config.hasSurfaceWater) {
+            var lakeStats = _placeLakes(chunk, chunkX, chunkZ, config, heightmap);
+            stats.waterBlocksPlaced += lakeStats.waterBlocksPlaced;
+            stats.lakesCreated += lakeStats.lakesCreated;
+        }
+
+        // Underground aquifers (biome-dependent)
+        if (config.hasAquifers) {
+            var aquiferStats = _placeAquifers(chunk, chunkX, chunkZ, config);
+            stats.waterBlocksPlaced += aquiferStats.waterBlocksPlaced;
+        }
+
+        // Ice layer for arctic biomes
+        if (config.iceBlockId && _iceBlockId) {
+            stats.waterBlocksPlaced += _placeIceLayer(chunk, config, heightmap);
+        }
+
+        return stats;
+    }
+
+    // ============================================================
+    // Ocean Water Placement
+    // ============================================================
+
+    /**
+     * Place ocean water across the chunk — fills from surface+1 to water level.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {Object} config - Biome water configuration.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of water blocks placed.
+     * @private
+     */
+    function _placeOceanWater(chunk, config, heightmap) {
+        var placed = 0;
+        var waterLevel = config.waterLevel;
+
+        if (!heightmap) return placed;
+
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var surfaceY = heightmap[x + z * CHUNK_SIZE] || waterLevel;
+
+                // Fill from surface+1 to water level, only replacing air blocks
+                for (var y = surfaceY + 1; y <= waterLevel && y < WORLD_HEIGHT; y++) {
+                    if (chunk.getBlock(x, y, z) === 0) {
+                        chunk.setBlock(x, y, z, _waterBlockId);
+                        placed++;
+                    }
                 }
             }
-
-            // Final fallback: water is ID 212 in block.js
-            _waterBlockId = 212;
         }
 
-        /**
-         * Get the water block ID.
-         * @returns {number} Water block ID, or 0 if not found.
-         * @private
-         */
-        function _getWaterBlockId() {
-            _resolveWaterBlockId();
-            return _waterBlockId || 0;
-        }
+        return placed;
+    }
 
-        /**
-         * Resolve the water block ID and liquid cache from BlockRegistry.
-         * Populates _liquidBlocks cache for fast lookup during generation.
-         * @private
-         */
-        function _resolveLiquidBlocks() {
-            if (!Donkeycraft.BlockRegistry) return;
+    // ============================================================
+    // Surface Water Placement
+    // ============================================================
 
-            var liquidNames = ['water', 'water_still', 'flowing_water', 'lava', 'lava_still', 'flowing_lava'];
-            for (var i = 0; i < liquidNames.length; i++) {
-                var block = Donkeycraft.BlockRegistry.getBlockByName(liquidNames[i]);
-                if (block) {
-                    _registerLiquidBlock(block.id);
-                }
-            }
-        }
+    /**
+     * Place surface water in low-lying areas where terrain is below sea level.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {Object} config - Biome water configuration.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of water blocks placed.
+     * @private
+     */
+    function _placeSurfaceWater(chunk, config, heightmap) {
+        var placed = 0;
+        var waterLevel = config.waterLevel;
 
-        /**
-         * Place water sources in a chunk.
-         * Only replaces air blocks — never overwrites existing terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to place water in.
-         * @param {number} biomeId - Biome ID for this chunk.
-         * @param {number[]} heightmap - Heightmap array.
-         */
-        function placeWater(chunk, biomeId, heightmap) {
-            // Input validation
-            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
+        if (!heightmap) return placed;
 
-            var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
-            if (!biome) return;
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var surfaceY = heightmap[x + z * CHUNK_SIZE] || waterLevel;
 
-            // Resolve water block ID and liquid cache
-            _resolveLiquidBlocks();
-            _resolveWaterBlockId();
-            if (!_waterBlockId || _waterBlockId === 0) return;
-
-            // Ocean biomes: fill to water level
-            if (biome.isOcean) {
-                _placeOceanWater(chunk, heightmap);
-            } else {
-                // Overworld biomes: surface water in low areas
-                _placeSurfaceWater(chunk, heightmap);
-            }
-
-            // Random underground lakes (pass heightmap for terrain clamping)
-            _placeUndergroundLakes(chunk, heightmap);
-        }
-
-        /**
-         * Place ocean water across the chunk.
-         * Fills from surface+1 to water level with water, only replacing air blocks.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _placeOceanWater(chunk, heightmap) {
-            if (!heightmap) return;
-
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE] || 20;
-
-                    // Fill from surface+1 to water level with water, only replacing air blocks.
-                    // This prevents overwriting terrain that was placed above the heightmap.
-                    for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
-                        if (chunk.getBlock(x, y, z) === 0) { // Only replace air
+                // Place water where terrain is below water level
+                if (surfaceY < waterLevel) {
+                    for (var y = surfaceY + 1; y <= waterLevel && y < WORLD_HEIGHT; y++) {
+                        if (chunk.getBlock(x, y, z) === 0) {
                             chunk.setBlock(x, y, z, _waterBlockId);
+                            placed++;
                         }
                     }
                 }
             }
         }
 
-        /**
-         * Place surface water in low-lying areas of overworld biomes.
-         * Fills below water level with water where terrain is below sea level.
-         * Only replaces air blocks to avoid overwriting placed terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _placeSurfaceWater(chunk, heightmap) {
-            if (!heightmap) return;
+        return placed;
+    }
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE] || 63;
+    // ============================================================
+    // River Placement
+    // ============================================================
 
-                    // Place water where terrain is below water level.
-                    // Only fill air blocks — never overwrite existing terrain.
-                    if (surfaceY < _waterLevel) {
-                        for (var y = surfaceY + 1; y <= _waterLevel && y < WORLD_HEIGHT; y++) {
-                            if (chunk.getBlock(x, y, z) === 0) { // Only replace air
-                                chunk.setBlock(x, y, z, _waterBlockId);
-                            }
+    /**
+     * Place rivers using noise-based channel carving.
+     * Rivers flow from higher to lower terrain, following natural drainage paths.
+     * Uses world coordinates for seamless chunk boundary traversal.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} config - Biome water configuration.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {{waterBlocksPlaced: number, riversCreated: number}} Generation stats.
+     * @private
+     */
+    function _placeRivers(chunk, chunkX, chunkZ, config, heightmap) {
+        var stats = { waterBlocksPlaced: 0, riversCreated: 0 };
+
+        if (!heightmap) return stats;
+
+        var riverNoiseScale = 0.01;
+        var startX = ((chunkX * 7 + chunkZ * 13) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
+        var startZ = ((chunkX * 11 + chunkZ * 3) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
+
+        // Start from a random edge position (local chunk coordinates)
+        var localX = startX;
+        var localZ = startZ;
+        // World coordinates for seamless noise sampling across chunks
+        var worldX = chunkX * CHUNK_SIZE + startX;
+        var worldZ = chunkZ * CHUNK_SIZE + startZ;
+        var currentY = heightmap[startX + startZ * CHUNK_SIZE] || config.waterLevel;
+
+        // Trace river path using gradient descent on terrain noise
+        var riverLength = 10 + Math.abs(_hash2D(chunkX, chunkZ)) % 30;
+        var riverWidth = 1 + (Math.abs(_hash2D(chunkX + 1, chunkZ)) % 2);
+
+        for (var step = 0; step < riverLength; step++) {
+            // Check local bounds — allow stepping off to enable cross-chunk flow
+            if (localX < -riverWidth || localX >= CHUNK_SIZE + riverWidth || localZ < -riverWidth || localZ >= CHUNK_SIZE + riverWidth) break;
+
+            // Get terrain height at current position using world coordinates for seamless chunk boundaries
+            var sampleLocalX = ((worldX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+            var sampleLocalZ = ((worldZ % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+            var sampleWorldX = chunkX * CHUNK_SIZE + sampleLocalX;
+            var sampleWorldZ = chunkZ * CHUNK_SIZE + sampleLocalZ;
+
+            // Clamp to valid heightmap range
+            if (sampleLocalX < 0 || sampleLocalX >= CHUNK_SIZE || sampleLocalZ < 0 || sampleLocalZ >= CHUNK_SIZE) break;
+
+            currentY = heightmap[sampleLocalX + sampleLocalZ * CHUNK_SIZE] || config.waterLevel;
+            if (currentY < 2 || currentY >= WORLD_HEIGHT - 2) break;
+
+            // Carve river bed
+            for (var dy = 0; dy <= RIVER_DEPTH && currentY - dy >= 0; dy++) {
+                var ry = currentY - dy;
+                for (var wx = -riverWidth; wx <= riverWidth; wx++) {
+                    for (var wz = -riverWidth; wz <= riverWidth; wz++) {
+                        var rx = sampleLocalX + wx;
+                        var rz = sampleLocalZ + wz;
+
+                        if (rx < 0 || rx >= CHUNK_SIZE || rz < 0 || rz >= CHUNK_SIZE) continue;
+
+                        // Elliptical cross-section
+                        var normalizedDist = (wx * wx + wz * wz) / ((riverWidth + 1) * (riverWidth + 1));
+                        if (normalizedDist > 1) continue;
+
+                        var currentBlock = chunk.getBlock(rx, ry, rz);
+                        if (currentBlock !== 0 && currentBlock !== _waterBlockId) {
+                            chunk.setBlock(rx, ry, rz, 0); // Carve air
+                            stats.carvedBlocks = (stats.carvedBlocks || 0) + 1;
                         }
                     }
                 }
             }
-        }
 
-        /**
-         * Place underground lakes using noise-based detection.
-         * Uses world seed for deterministic lake placement across all chunks.
-         * Lake Y levels are clamped to terrain surface via heightmap to prevent floating water.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} [heightmap] - Optional heightmap for terrain clamping.
-         * @private
-         */
-        function _placeUndergroundLakes(chunk, heightmap) {
-            if (!_waterBlockId || _waterBlockId === 0) return;
-
-            // Use centralized _gen._hash2D with world seed for deterministic placement.
-            var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
-            var chunkSeed = Donkeycraft._gen._hash2D(chunk.chunkX, chunk.chunkZ);
-            var lakeCount = 1 + ((chunkSeed >> 8) % 3);
-
-            for (var i = 0; i < lakeCount; i++) {
-                var hash = Donkeycraft._gen._hash2D(chunkSeed + i * 73, i * 97);
-                var lx = hash % CHUNK_SIZE;
-                if (lx < 0) lx += CHUNK_SIZE;
-                var lz = ((hash >> 8) % CHUNK_SIZE);
-                if (lz < 0) lz += CHUNK_SIZE;
-
-                // Determine terrain surface Y at this position for clamping
-                var surfaceY = WORLD_HEIGHT;
-                if (heightmap) {
-                    surfaceY = heightmap[lx + lz * CHUNK_SIZE] || WORLD_HEIGHT;
+            // Place water in river bed
+            for (var wy = currentY - RIVER_DEPTH; wy <= currentY && wy < WORLD_HEIGHT; wy++) {
+                if (chunk.getBlock(sampleLocalX, wy, sampleLocalZ) === 0) {
+                    chunk.setBlock(sampleLocalX, wy, sampleLocalZ, _waterBlockId);
+                    stats.waterBlocksPlaced++;
                 }
+            }
 
-                // Clamp lake Y to be underground: between Y=5 and surfaceY-4
-                // This ensures lakes are always below terrain surface
-                var maxLakeY = Math.min(surfaceY - 4, 60); // Cap at Y=60 for "underground" feel
-                var minLakeY = 5;
+            // Determine next position using noise-based flow direction
+            var flowNoise = _fbmNoise(
+                worldX * riverNoiseScale,
+                0,
+                worldZ * riverNoiseScale,
+                2
+            );
 
-                if (minLakeY >= maxLakeY) continue; // No valid range
+            // Move in direction of steepest descent using world coordinates
+            var dx = Math.floor(_hash2D(sampleLocalX + step, sampleLocalZ) % 3) - 1;
+            var dz = Math.floor(_hash2D(sampleLocalX, sampleLocalZ + step) % 3) - 1;
 
-                // Random Y level within clamped range
-                var lakeY = minLakeY + ((hash >> 16) % (maxLakeY - minLakeY));
-
-                if (lakeY >= WORLD_HEIGHT - 5) continue;
-
-                // Lake radius
-                var radius = 2 + ((hash >> 24) % 3); // Slightly reduced: 2-4 instead of 2-5
-
-                _placeLake(chunk, lx, lakeY, lz, radius);
+            // Bias movement toward lower terrain
+            if (flowNoise < RIVER_THRESHOLD) {
+                worldX += dx;
+                worldZ += dz;
+                localX = ((worldX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+                localZ = ((worldZ % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+            } else {
+                // River dissipates
+                break;
             }
         }
 
-        /**
-         * Place a small underground lake (sphere of water).
-         * Only replaces air blocks to avoid overwriting terrain.
-         * Validates that the lake sits on solid terrain by checking a vertical column below
-         * the center position with limited depth to prevent false positives in deep caves.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} cx - Center X.
-         * @param {number} cy - Center Y.
-         * @param {number} cz - Center Z.
-         * @param {number} radius - Lake radius.
-         * @private
-         */
-        function _placeLake(chunk, cx, cy, cz, radius) {
-            if (!_waterBlockId || _waterBlockId === 0) return;
+        // Count distinct rivers (approximate)
+        stats.riversCreated = stats.waterBlocksPlaced > 0 ? 1 : 0;
 
-            // Validate: the lake center must have solid support within a limited depth below it.
-            // Maximum scan depth is 5 blocks to prevent false validation in deep cave systems
-            // where distant solid terrain below a lake could cause incorrect placement.
-            var MAX_SUPPORT_SCAN_DEPTH = 5;
-            var hasSupport = false;
+        return stats;
+    }
 
-            // Check multiple X/Z positions around the center for more robust support detection
-            var checkPositions = [
-                { dx: 0, dz: 0 },
-                { dx: 1, dz: 0 },
-                { dx: -1, dz: 0 },
-                { dx: 0, dz: 1 },
-                { dx: 0, dz: -1 }
-            ];
+    // ============================================================
+    // Lake Placement
+    // ============================================================
 
-            for (var p = 0; p < checkPositions.length; p++) {
-                var px = cx + checkPositions[p].dx;
-                var pz = cz + checkPositions[p].dz;
+    /**
+     * Place underground/lake water using noise-based basin detection.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} config - Biome water configuration.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {{waterBlocksPlaced: number, lakesCreated: number}} Generation stats.
+     * @private
+     */
+    function _placeLakes(chunk, chunkX, chunkZ, config, heightmap) {
+        var stats = { waterBlocksPlaced: 0, lakesCreated: 0 };
 
-                // Clamp to chunk bounds
-                if (px < 0 || px >= CHUNK_SIZE || pz < 0 || pz >= CHUNK_SIZE) continue;
+        var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
+        var chunkSeed = _hash2D(chunkX, chunkZ);
+        var lakeCount = LAKE_FREQUENCY + ((chunkSeed >> 8) % 2);
 
-                var blockAtCheck = chunk.getBlock(px, cy, pz);
-                // The check position itself must be air or water (lake area)
-                if (blockAtCheck !== 0 && blockAtCheck !== _waterBlockId) continue;
+        for (var i = 0; i < lakeCount; i++) {
+            var hash = _hash2D(chunkSeed + i * 73, i * 97);
+            var lx = hash % CHUNK_SIZE;
+            if (lx < 0) lx += CHUNK_SIZE;
+            var lz = ((hash >> 8) % CHUNK_SIZE);
+            if (lz < 0) lz += CHUNK_SIZE;
 
-                // Scan downward from the lake center with limited depth for solid support
-                for (var scanDepth = 1; scanDepth <= MAX_SUPPORT_SCAN_DEPTH; scanDepth++) {
-                    var checkY = cy - scanDepth;
-                    if (checkY < 0) break;
+            // Determine terrain surface Y for lake clamping
+            var surfaceY = heightmap[lx + lz * CHUNK_SIZE] || WORLD_HEIGHT;
+            if (surfaceY < 2 || surfaceY >= WORLD_HEIGHT - 4) continue;
 
-                    var blockBelow = chunk.getBlock(px, checkY, pz);
-                    if (blockBelow !== 0 && blockBelow !== _waterBlockId) {
-                        hasSupport = true;
+            // Clamp lake Y to be below surface
+            var lakeY = Math.min(surfaceY - 3, config.waterLevel - 2);
+            if (lakeY < 5) continue;
+
+            // Lake radius
+            var radius = 2 + ((hash >> 16) % 3);
+
+            // Check if this is a basin area (terrain below water level)
+            var isBasin = false;
+            for (var bx = lx - radius; bx <= lx + radius; bx++) {
+                for (var bz = lz - radius; bz <= lz + radius; bz++) {
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    var h = heightmap[bx + bz * CHUNK_SIZE];
+                    if (h < config.waterLevel) {
+                        isBasin = true;
                         break;
                     }
                 }
-
-                if (hasSupport) break;
+                if (isBasin) break;
             }
 
-            if (!hasSupport) return;
+            if (!isBasin) continue;
 
-            var r = Math.ceil(radius);
+            // Place lake water
+            stats.lakesCreated += _placeUndergroundLake(chunk, lx, lakeY, lz, radius);
+        }
 
-            for (var dx = -r; dx <= r; dx++) {
-                for (var dy = -r; dy <= r; dy++) {
-                    for (var dz = -r; dz <= r; dz++) {
-                        var distSq = dx * dx + dy * dy + dz * dz;
-                        if (distSq > radius * radius) continue;
+        return stats;
+    }
 
-                        var bx = cx + dx;
-                        var by = cy + dy;
-                        var bz = cz + dz;
+    /**
+     * Place an underground lake (sphere of water).
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y.
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Lake radius.
+     * @returns {number} Number of water blocks placed.
+     * @private
+     */
+    function _placeUndergroundLake(chunk, cx, cy, cz, radius) {
+        var placed = 0;
+        var rSquared = radius * radius;
+        var rInt = Math.ceil(radius);
 
-                        // Check bounds
-                        if (bx >= 0 && bx < CHUNK_SIZE &&
-                            by >= 0 && by < WORLD_HEIGHT &&
-                            bz >= 0 && bz < CHUNK_SIZE) {
-                            // Only replace air and water blocks — never overwrite existing terrain.
-                            var currentBlock = chunk.getBlock(bx, by, bz);
-                            if (currentBlock === 0 || currentBlock === _waterBlockId) {
-                                chunk.setBlock(bx, by, bz, _waterBlockId);
-                            }
-                        }
+        for (var dx = -rInt; dx <= rInt; dx++) {
+            for (var dy = -rInt; dy <= rInt; dy++) {
+                for (var dz = -rInt; dz <= rInt; dz++) {
+                    var distSquared = dx * dx + dy * dy + dz * dz;
+
+                    if (distSquared > rSquared) continue;
+
+                    var bx = cx + dx;
+                    var by = cy + dy;
+                    var bz = cz + dz;
+
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                    var currentBlock = chunk.getBlock(bx, by, bz);
+                    if (currentBlock === 0 || currentBlock === _waterBlockId) {
+                        chunk.setBlock(bx, by, bz, _waterBlockId);
+                        placed++;
                     }
                 }
             }
         }
 
-        /**
-         * Get the default water level (sea level).
-         * @returns {number} Water level Y coordinate.
-         */
-        function getWaterLevel() {
-            return _waterLevel;
-        }
+        return placed;
+    }
 
-        /**
-         * Set the default water level (sea level).
-         * @param {number} value - New water level (must be > 0 and < WORLD_HEIGHT).
-         */
-        function setWaterLevel(value) {
-            if (typeof value === 'number' && value > 0 && value < WORLD_HEIGHT) {
-                _waterLevel = Math.floor(value);
-            }
-        }
+    // ============================================================
+    // Underground Aquifer Placement
+    // ============================================================
 
-        /**
-         * Register a block ID as a liquid block.
-         * @param {number} blockId - Block ID to register.
-         * @private
-         */
-        function _registerLiquidBlock(blockId) {
-            _liquidBlocks[blockId] = true;
-        }
+    /**
+     * Place underground aquifers — water-filled pockets deep below the terrain.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Object} config - Biome water configuration.
+     * @returns {{waterBlocksPlaced: number}} Generation stats.
+     * @private
+     */
+    function _placeAquifers(chunk, chunkX, chunkZ, config) {
+        var placed = 0;
 
-        /**
-         * Check if a block ID is a liquid.
-         * @param {number} blockId - Block ID.
-         * @returns {boolean} True if the block is a liquid.
-         */
-        function isLiquidBlock(blockId) {
-            return _liquidBlocks[blockId] === true;
-        }
+        var aquiferY = Math.max(5, config.waterLevel - 15);
+        var rngState = _hash2D(chunkX, chunkZ);
 
-        /**
-         * Get all known liquid block IDs.
-         * @returns {number[]} Array of liquid block IDs.
-         */
-        function getLiquidBlockIds() {
-            var result = [];
-            for (var id in _liquidBlocks) {
-                if (_liquidBlocks.hasOwnProperty(id)) {
-                    result.push(parseInt(id, 10));
+        // Place 1-3 aquifer pockets per chunk
+        var pocketCount = 1 + (rngState % 3);
+
+        for (var p = 0; p < pocketCount; p++) {
+            var px = (rngState >> (p * 8)) % CHUNK_SIZE;
+            if (px < 0) px += CHUNK_SIZE;
+            var pz = ((rngState >> (p * 8 + 4)) % CHUNK_SIZE);
+            if (pz < 0) pz += CHUNK_SIZE;
+
+            var aquiferRadius = 1 + ((rngState >> (p * 8 + 8)) % 2);
+
+            // Place water at aquifer Y level
+            for (var ax = -aquiferRadius; ax <= aquiferRadius; ax++) {
+                for (var az = -aquiferRadius; az <= aquiferRadius; az++) {
+                    var dist = Math.abs(ax) + Math.abs(az);
+                    if (dist > aquiferRadius) continue;
+
+                    var bx = px + ax;
+                    var bz = pz + az;
+
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+
+                    if (chunk.getBlock(bx, aquiferY, bz) === 0) {
+                        chunk.setBlock(bx, aquiferY, bz, _waterBlockId);
+                        placed++;
+                    }
                 }
             }
-            return result;
         }
 
-        /**
-         * Initialize the water generator — resolves water block ID and liquid cache from BlockRegistry.
-         * Should be called once during game initialization.
-         * @private
-         */
-        function _init() {
-            _resolveLiquidBlocks();
-            _resolveWaterBlockId();
+        return { waterBlocksPlaced: placed };
+    }
+
+    // ============================================================
+    // Ice Layer Placement (Arctic)
+    // ============================================================
+
+    /**
+     * Place ice layer on surface water for arctic biomes.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {Object} config - Biome water configuration.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of ice blocks placed.
+     * @private
+     */
+    function _placeIceLayer(chunk, config, heightmap) {
+        if (!_iceBlockId || !heightmap) return 0;
+
+        var placed = 0;
+        var waterLevel = config.waterLevel;
+
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var surfaceY = heightmap[x + z * CHUNK_SIZE] || waterLevel;
+
+                // Place ice at water level if surface is air
+                if (surfaceY < waterLevel && surfaceY + 1 < WORLD_HEIGHT) {
+                    if (chunk.getBlock(x, surfaceY + 1, z) === 0) {
+                        chunk.setBlock(x, surfaceY + 1, z, _iceBlockId);
+                        placed++;
+                    }
+                }
+            }
         }
 
-        /**
-         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
-         * @param {number} x - First hash coordinate.
-         * @param {number} y - Second hash coordinate.
-         * @returns {number} Positive 32-bit integer.
-         * @private
-         */
-        function _hash2D(x, y) {
-            return Donkeycraft._gen._hash2D(x, y);
-        }
+        return placed;
+    }
 
-        /**
-         * Destroy the water generator and free resources.
-         * Clears cached block IDs and liquid cache.
-         */
-        function destroy() {
-            _waterBlockId = null;
-            _liquidBlocks = {};
-        }
+    // ============================================================
+    // Utility Functions
+    // ============================================================
 
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The WaterGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.WaterGenerator;
+    /**
+     * Resolve biome name from ID.
+     * @param {number} biomeId - Biome ID.
+     * @returns {string} Biome name.
+     * @private
+     */
+    function _resolveBiomeName(biomeId) {
+        switch (biomeId) {
+            case 0: return 'grass';
+            case 1: return 'arctic';
+            case 2: return 'desert';
+            case 3: return 'forest';
+            default: return 'grass';
         }
+    }
 
-        return {
-            getInstance: getInstance,
-            init: _init,
-            placeWater: placeWater,
-            getWaterLevel: getWaterLevel,
-            setWaterLevel: setWaterLevel,
-            isLiquidBlock: isLiquidBlock,
-            getLiquidBlockIds: getLiquidBlockIds,
-            destroy: destroy
-        };
-    })();
+    /**
+     * Deterministic 2D hash using FNV-1a inspired algorithm.
+     * Handles negative coordinates by masking to signed 32-bit before hashing.
+     * @param {number} x - X coordinate (may be negative).
+     * @param {number} y - Y coordinate (may be negative).
+     * @returns {number} Positive 32-bit integer.
+     */
+    function _hash2D(x, y) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._hash2D === 'function') {
+            return Donkeycraft._gen._hash2D(Math.floor(x), Math.floor(y));
+        }
+        // Mask to signed 32-bit integers to handle negative coordinates consistently
+        var xi = Math.floor(x) | 0;
+        var yi = Math.floor(y) | 0;
+        var h = (xi * 374761393 + yi * 668265263) ^ 0x5bd1e995;
+        // Use unsigned right shift for consistent 32-bit behavior across all JS engines
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0;
+    }
+
+    /**
+     * Fractal Brownian Motion for river flow detection.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate.
+     * @param {number} octaves - Number of octaves.
+     * @returns {number} Normalized noise value [-1, 1].
+     */
+    function _fbmNoise(x, y, z, octaves) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._fbm === 'function') {
+            try {
+                return Donkeycraft._gen._fbm(x, y, z, octaves || 2, 0.5, 2.0);
+            } catch (e) { /* fallback below */ }
+        }
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._noise2D === 'function') {
+            return Donkeycraft._gen._noise2D(x, z);
+        }
+        return 0;
+    }
+
+    /**
+     * Get the default water level (sea level).
+     * @returns {number} Water level Y coordinate.
+     */
+    function getWaterLevel() {
+        return DEFAULT_WATER_LEVEL;
+    }
+
+    /**
+     * Get the biome-specific water configuration.
+     * @param {string} biomeName - Biome name.
+     * @returns {Object|null} Biome water config, or null if not found.
+     */
+    function getBiomeWaterConfig(biomeName) {
+        return BIOME_WATER_CONFIG[biomeName] || null;
+    }
+
+    /**
+     * Destroy the water generator and free resources.
+     */
+    function destroy() {
+        _waterBlockId = null;
+        _lavaBlockId = null;
+        _iceBlockId = null;
+        _liquidBlocks = {};
+    }
+
+    // ============================================================
+    // Public API
+    // ============================================================
+
+    /**
+     * Donkeycraft.WaterGenerator — Realistic water placement system.
+     * @namespace
+     */
+    Donkeycraft.WaterGenerator = {
+        // Main entry point
+        placeWater: placeWater,
+
+        // Initialization
+        init: init,
+        destroy: destroy,
+
+        // Block ID resolution
+        isLiquidBlock: isLiquidBlock,
+        getWaterBlockId: getWaterBlockId,
+
+        // Configuration
+        getWaterLevel: getWaterLevel,
+        getBiomeWaterConfig: getBiomeWaterConfig,
+
+        // Constants
+        DEFAULT_WATER_LEVEL: DEFAULT_WATER_LEVEL,
+        RIVER_THRESHOLD: RIVER_THRESHOLD,
+        RIVER_DEPTH: RIVER_DEPTH,
+        LAKE_FREQUENCY: LAKE_FREQUENCY,
+        BIOME_WATER_CONFIG: BIOME_WATER_CONFIG
+    };
 
 })();

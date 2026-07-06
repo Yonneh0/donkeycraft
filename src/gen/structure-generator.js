@@ -1,458 +1,656 @@
-// Donkeycraft — Structure Generator
-// Structure placement: ore veins, underground caves (noise-based), surface decoration.
+// Donkeycraft — Biome-Specific Decoration Generator
+// Places trees, flowers, grass, cacti, and other surface decorations per biome.
+// Grass: oak trees, flowers, tall grass
+// Arctic: snow layers, ice formations, sparse dead trees
+// Desert: cacti, dead bushes, no trees
+// Forest: dense trees (oak + birch), underbrush, mushrooms
+//
+// @module structure-generator
+// @description Biome-specific surface decoration placement system
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    if (!Donkeycraft) return;
+
+    var CHUNK_SIZE = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
+    var WORLD_HEIGHT = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256;
 
     // ============================================================
-    // StructureGenerator
+    // Decoration Definitions
     // ============================================================
 
     /**
-     * StructureGenerator — orchestrates the full chunk generation pipeline:
-     * terrain → surface layer → ores → caves → water → decoration.
-     * All generators use a single shared PerlinNoise instance (from math-utils.js)
-     * to ensure spatial coherence across features.
+     * Decorator — defines a surface decoration type.
+     * @param {string} name - Decorator name.
+     * @param {number} blockId - Block ID for the decoration.
+     * @param {string[]} biomeNames - Biomes where this decoration appears.
+     * @param {number} frequency - Average count per chunk.
+     * @param {Object} [options] - Placement options (height, width, etc.).
      */
-    Donkeycraft.StructureGenerator = (function () {
-        // Cached block references
-        var _blocks = {};
+    function Decorator(name, blockId, biomeNames, frequency, options) {
+        this.name = name;
+        this.blockId = blockId;
+        this.biomeNames = biomeNames;
+        this.frequency = frequency;
+        this.options = options || {};
+    }
 
-        /**
-         * Resolve all surface block IDs from BlockRegistry and cache them.
-         * @private
-         */
-        function _resolveBlocks() {
-            if (_blocks.resolved) return;
-            if (!Donkeycraft.BlockRegistry) return;
+    // ============================================================
+    // Decoration Registry
+    // ============================================================
 
-            var names = [
-                'bedrock', 'stone', 'dirt', 'grass_block', 'snow_block',
-                'oak_log', 'oak_leaves', 'poppy', 'tall_grass',
-                'cactus', 'snow_layer', 'sand'
-            ];
-            for (var i = 0; i < names.length; i++) {
-                var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
-                if (block) {
-                    _blocks[names[i]] = block.id;
-                }
+    var _decorators = {}; // Map: biomeName → Array<Decorator>
+    var _resolvedBlocks = {};
+
+    /**
+     * Initialize the decoration registry — resolve block IDs.
+     */
+    function init() {
+        _resolveDecorationBlocks();
+        _buildDecorationConfigurations();
+    }
+
+    /**
+     * Resolve decoration-related block IDs from BlockRegistry.
+     * @private
+     */
+    function _resolveDecorationBlocks() {
+        if (!Donkeycraft.BlockRegistry) return;
+
+        var blockNames = [
+            'oak_log', 'oak_leaves', 'birch_log', 'birch_leaves',
+            'dead_tree_log', 'dead_leaves', 'snow_layer',
+            'ice_formation', 'cactus_block', 'dead_bush',
+            'flower_yellow', 'flower_red', 'tall_grass',
+            'mushroom_brown', 'mushroom_red', 'pumpkin',
+            'melon_block'
+        ];
+
+        for (var i = 0; i < blockNames.length; i++) {
+            var block = Donkeycraft.BlockRegistry.getBlockByName(blockNames[i]);
+            if (block) {
+                _resolvedBlocks[blockNames[i]] = block.id;
             }
-            _blocks.resolved = true;
+        }
+    }
+
+    /**
+     * Build decoration configurations for each biome.
+     * @private
+     */
+    function _buildDecorationConfigurations() {
+        // Grass biome — oak trees, flowers, tall grass
+        _decorators['grass'] = [
+            new Decorator('oak_tree', null, ['grass'], 3, {
+                logBlock: _resolvedBlocks['oak_log'],
+                leafBlock: _resolvedBlocks['oak_leaves'],
+                heightMin: 4,
+                heightMax: 6,
+                trunkRadius: 1,
+                leafRadius: 2
+            }),
+            new Decorator('flower', _resolvedBlocks['flower_yellow'] || 0, ['grass'], 5, {}),
+            new Decorator('tall_grass', _resolvedBlocks['tall_grass'] || 0, ['grass'], 8, {})
+        ];
+
+        // Arctic biome — snow layers, ice formations, sparse dead trees
+        _decorators['arctic'] = [
+            new Decorator('dead_tree', null, ['arctic'], 1, {
+                logBlock: _resolvedBlocks['dead_tree_log'],
+                leafBlock: _resolvedBlocks['dead_leaves'],
+                heightMin: 3,
+                heightMax: 4,
+                trunkRadius: 1,
+                leafRadius: 1
+            }),
+            new Decorator('snow_layer', _resolvedBlocks['snow_layer'] || _resolvedBlocks['snow_block'] || 0, ['arctic'], 1, {
+                layerThickness: 2
+            }),
+            new Decorator('ice_formation', _resolvedBlocks['ice_formation'] || _resolvedBlocks['ice'] || 0, ['arctic'], 2, {})
+        ];
+
+        // Desert biome — cacti, dead bushes, no trees
+        _decorators['desert'] = [
+            new Decorator('cactus', _resolvedBlocks['cactus_block'] || 0, ['desert'], 4, {
+                heightMin: 2,
+                heightMax: 4
+            }),
+            new Decorator('dead_bush', _resolvedBlocks['dead_bush'] || 0, ['desert'], 6, {})
+        ];
+
+        // Forest biome — dense trees (oak + birch), underbrush, mushrooms
+        _decorators['forest'] = [
+            new Decorator('oak_tree', null, ['forest'], 5, {
+                logBlock: _resolvedBlocks['oak_log'],
+                leafBlock: _resolvedBlocks['oak_leaves'],
+                heightMin: 5,
+                heightMax: 8,
+                trunkRadius: 1,
+                leafRadius: 3
+            }),
+            new Decorator('birch_tree', null, ['forest'], 3, {
+                logBlock: _resolvedBlocks['birch_log'],
+                leafBlock: _resolvedBlocks['birch_leaves'],
+                heightMin: 4,
+                heightMax: 6,
+                trunkRadius: 1,
+                leafRadius: 2
+            }),
+            new Decorator('flower', _resolvedBlocks['flower_red'] || 0, ['forest'], 3, {}),
+            new Decorator('mushroom', null, ['forest'], 2, {
+                brownBlock: _resolvedBlocks['mushroom_brown'],
+                redBlock: _resolvedBlocks['mushroom_red']
+            })
+        ];
+    }
+
+    /**
+     * Get decorations for a biome.
+     * @param {string} biomeName - Biome name.
+     * @returns {Decorator[]} Array of decorators, or null if not found.
+     */
+    function getDecorations(biomeName) {
+        return _decorators[biomeName] || null;
+    }
+
+    /**
+     * Get all biomes with decorations.
+     * @returns {string[]} Array of biome names.
+     */
+    function getBiomesWithDecorations() {
+        var names = [];
+        for (var key in _decorators) {
+            if (_decorators.hasOwnProperty(key)) {
+                names.push(key);
+            }
+        }
+        return names;
+    }
+
+    // ============================================================
+    // Decoration Placement
+    // ============================================================
+
+    /**
+     * Place all decorations for a chunk.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to decorate.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {string} biomeName - Biome name for this chunk.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {{decorationsPlaced: number}} Generation stats.
+     */
+    function placeDecorations(chunk, chunkX, chunkZ, biomeName, heightmap) {
+        var stats = { decorationsPlaced: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return stats;
+        if (!heightmap || !Array.isArray(heightmap)) return stats;
+
+        var decorations = _decorators[biomeName];
+        if (!decorations) {
+            // Default to grass biome decorations
+            decorations = _decorators['grass'];
+            if (!decorations) return stats;
         }
 
-        /**
-         * Get a cached block ID by name.
-         * @param {string} name - Block name.
-         * @returns {number} Block ID, or 0 if not found.
-         * @private
-         */
-        function _getBlockId(name) {
-            _resolveBlocks();
-            return _blocks[name] || 0;
+        for (var i = 0; i < decorations.length; i++) {
+            var dec = decorations[i];
+
+            switch (dec.name) {
+                case 'oak_tree':
+                case 'birch_tree':
+                case 'dead_tree':
+                    stats.decorationsPlaced += _placeTree(chunk, chunkX, chunkZ, dec, heightmap);
+                    break;
+                case 'cactus':
+                    stats.decorationsPlaced += _placeCactus(chunk, chunkX, chunkZ, dec, heightmap);
+                    break;
+                case 'mushroom':
+                    stats.decorationsPlaced += _placeMushroom(chunk, chunkX, chunkZ, dec, heightmap);
+                    break;
+                default:
+                    stats.decorationsPlaced += _placeSimpleDecoration(chunk, chunkX, chunkZ, dec, heightmap);
+            }
         }
 
-        /**
-         * Generate a complete chunk using the full terrain generation pipeline.
-         * Pipeline order: air fill → terrain → surface layer → ores → caves → water → decoration.
-         * Validates all inputs and gracefully skips optional steps if generators are unavailable.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to generate. Must have getBlock, setBlock, fill, and generated properties.
-         * @param {number} biomeId - Biome ID for this chunk (must be a non-negative integer).
-         * @throws {Error} If chunk object is invalid or missing required methods.
-         */
-        function generateChunkFull(chunk, biomeId) {
-            // Step 1: Fill with air
-            chunk.fill(0);
+        return stats;
+    }
 
-            // Step 2: Generate heightmap and place terrain blocks (stone/dirt below surface)
-            var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
-            var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(
-                chunk.chunkX, chunk.chunkZ,
-                biome
-            );
-            _placeTerrain(chunk, heightmap, biomeId);
+    /**
+     * Place a tree decoration.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Decorator} dec - Tree decorator definition.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of blocks placed.
+     * @private
+     */
+    function _placeTree(chunk, chunkX, chunkZ, dec, heightmap) {
+        var placed = 0;
 
-            // Step 3: Apply surface layer (grass/dirt/stone per biome) — replaces top blocks
-            Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, biomeId, heightmap);
+        var logBlock = dec.options.logBlock;
+        var leafBlock = dec.options.leafBlock;
+        if (!logBlock || !leafBlock) return 0;
 
-            // Step 4: Place ores in stone layers (pass heightmap for terrain clamping)
-            if (Donkeycraft.OreGenerator) Donkeycraft.OreGenerator.placeOres(chunk, biomeId, heightmap);
+        var treeCount = dec.frequency;
+        var rngSeed = _hash2D(chunkX, chunkZ);
 
-            // Step 5: Generate caves
-            if (Donkeycraft.CaveGenerator) Donkeycraft.CaveGenerator.generateCaves(chunk, biomeId);
+        for (var t = 0; t < treeCount; t++) {
+            // Random position within chunk
+            var tx = (rngSeed + t * 7) % CHUNK_SIZE;
+            if (tx < 0) tx += CHUNK_SIZE;
+            var tz = ((rngSeed >> 8) + t * 13) % CHUNK_SIZE;
+            if (tz < 0) tz += CHUNK_SIZE;
 
-            // Step 6: Place water in air blocks only
-            if (Donkeycraft.WaterGenerator) Donkeycraft.WaterGenerator.placeWater(chunk, biomeId, heightmap);
+            // Get surface height
+            var surfaceY = heightmap[tx + tz * CHUNK_SIZE];
+            if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 10) continue;
 
-            // Step 7: Surface decoration (trees, flowers, grass on top of surface layer)
-            _placeSurfaceDecoration(chunk, biomeId, heightmap);
+            // Check there's air (or water) above the surface for tree placement
+            var aboveBlock = chunk.getBlock(tx, surfaceY + 1, tz);
+            if (aboveBlock !== 0 && aboveBlock !== _getWaterBlockId()) continue;
 
-            // Mark as generated
-            chunk.generated = true;
-        }
+            // Place trunk
+            var trunkHeight = dec.options.heightMin + ((rngSeed >> (t * 4 + 2)) % (dec.options.heightMax - dec.options.heightMin + 1));
+            var trunkRadius = dec.options.trunkRadius || 1;
 
-        /**
-         * Place terrain blocks (stone/bedrock below heightmap).
-         * Does NOT place surface blocks — those are handled by applySurfaceLayer()
-         * to avoid redundant work. Surface Y is excluded from this loop.
-         * For snow biomes, also places a thin layer of snow blocks near the surface.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @param {number} biomeId - Biome ID (unused but kept for API consistency).
-         * @private
-         */
-        function _placeTerrain(chunk, heightmap, biomeId) {
-            var bedrockId = _getBlockId('bedrock');
-            var stoneId = _getBlockId('stone');
-            var dirtId = _getBlockId('dirt');
+            for (var ty = 0; ty < trunkHeight; ty++) {
+                var by = surfaceY + 1 + ty;
+                if (by < 0 || by >= WORLD_HEIGHT) continue;
+                chunk.setBlock(tx, by, tz, logBlock);
+                placed++;
+            }
 
-            if (!bedrockId || !stoneId || !dirtId) return;
+            // Place foliage (sphere at top of trunk)
+            var leafRadius = dec.options.leafRadius || 2;
+            var topY = surfaceY + trunkHeight;
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var height = heightmap[x + z * CHUNK_SIZE] || 64;
+            for (var lx = -leafRadius; lx <= leafRadius; lx++) {
+                for (var ly = -leafRadius; ly <= leafRadius; ly++) {
+                    for (var lz = -leafRadius; lz <= leafRadius; lz++) {
+                        var dist = lx * lx + ly * ly + lz * lz;
+                        if (dist > leafRadius * leafRadius + 1) continue;
 
-                    // Place blocks from Y=0 up to surface-1.
-                    // Surface block (Y == height) is handled by applySurfaceLayer().
-                    for (var y = 0; y < height && y < WORLD_HEIGHT; y++) {
-                        if (y === 0) {
-                            // Bedrock layer at bottom of world (single layer)
-                            chunk.setBlock(x, y, z, bedrockId);
-                        } else if (y < height - 3) {
-                            // Stone below terrain
-                            chunk.setBlock(x, y, z, stoneId);
-                        } else {
-                            // Dirt layer near surface (last 3 blocks before surface)
-                            chunk.setBlock(x, y, z, dirtId);
+                        var bx = tx + lx;
+                        var bz = tz + lz;
+                        var by = topY + ly;
+
+                        if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                        if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                        // Only place leaf in air or water
+                        var currentBlock = chunk.getBlock(bx, by, bz);
+                        if (currentBlock === 0 || currentBlock === _getWaterBlockId()) {
+                            chunk.setBlock(bx, by, bz, leafBlock);
+                            placed++;
                         }
                     }
                 }
             }
         }
 
-        /**
-         * Place surface decoration (trees, flowers, grass, cacti).
-         * Uses biome constants from Donkeycraft.BiomeID for consistent checks.
-         * Delegates to biome-specific decoration placers based on the biome's decoration config.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @private
-         */
-        function _placeSurfaceDecoration(chunk, biomeId, heightmap) {
-            var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
-            if (!biome) return;
+        return placed;
+    }
 
-            var decor = biome.decoration;
-            var seed = chunk.chunkX * 7919 + chunk.chunkZ * 104729;
+    /**
+     * Place a cactus decoration.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Decorator} dec - Cactus decorator definition.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of blocks placed.
+     * @private
+     */
+    function _placeCactus(chunk, chunkX, chunkZ, dec, heightmap) {
+        var placed = 0;
 
-            // Place trees
-            if (decor.trees > 0) {
-                _placeTrees(chunk, biomeId, heightmap, seed, decor.trees);
-            }
+        var cactusBlock = dec.blockId;
+        if (!cactusBlock) return 0;
 
-            // Place flowers
-            if (decor.flowers > 0) {
-                _placeFlowers(chunk, biomeId, heightmap, seed, decor.flowers);
-            }
+        var count = dec.frequency;
+        var rngSeed = _hash2D(chunkX + 100, chunkZ);
 
-            // Place grass
-            if (decor.grass > 0) {
-                _placeGrass(chunk, biomeId, heightmap, seed, decor.grass);
-            }
+        for (var i = 0; i < count; i++) {
+            var cx = (rngSeed + i * 11) % CHUNK_SIZE;
+            if (cx < 0) cx += CHUNK_SIZE;
+            var cz = ((rngSeed >> 6) + i * 17) % CHUNK_SIZE;
+            if (cz < 0) cz += CHUNK_SIZE;
 
-            // Place cacti (desert only) — using biome constants instead of magic numbers
-            var BIOME_DESERT = Donkeycraft.BiomeID ? [Donkeycraft.BiomeID.DESERT, Donkeycraft.BiomeID.DESERT_M] : [];
-            var isDesert = false;
-            for (var d = 0; d < BIOME_DESERT.length; d++) {
-                if (biomeId === BIOME_DESERT[d]) { isDesert = true; break; }
-            }
-            if (decor.cacti > 0 && isDesert) {
-                _placeCacti(chunk, heightmap, seed, decor.cacti);
-            }
-        }
+            var surfaceY = heightmap[cx + cz * CHUNK_SIZE];
+            if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 5) continue;
 
-        /**
-         * Place trees in a chunk using deterministic hash-based positioning.
-         * Uses biome constants from Donkeycraft.BiomeID for consistent checks.
-         * Taiga biomes get taller spruce-style trees; forest variants get medium-height trees;
-         * all other biomes get standard oak-height trees (4 blocks).
-         * Validates trunk space is clear before placing each tree to avoid clipping into terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID.
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @param {number} seed - Random seed derived from chunk coordinates.
-         * @param {number} count - Number of tree placement attempts per chunk.
-         * @private
-         */
-        function _placeTrees(chunk, biomeId, heightmap, seed, count) {
-            var logId = _getBlockId('oak_log');
-            var leavesId = _getBlockId('oak_leaves');
-            var grassBlockId = _getBlockId('grass_block');
-            var snowBlockId = _getBlockId('snow_block');
-            var dirtId = _getBlockId('dirt');
+            // Check there's air (or water) above the surface for cactus placement
+            var aboveBlockC = chunk.getBlock(cx, surfaceY + 1, cz);
+            if (aboveBlockC !== 0 && aboveBlockC !== _getWaterBlockId()) continue;
 
-            if (!logId || !leavesId) return;
+            // Place cactus
+            var height = dec.options.heightMin + ((rngSeed >> (i * 3)) % (dec.options.heightMax - dec.options.heightMin + 1));
 
-            // Biome constants for tree type selection
-            var BIOME_TAIGA = Donkeycraft.BiomeID ? [Donkeycraft.BiomeID.TAIGA, Donkeycraft.BiomeID.TAIGA_HILL] : [];
-            var BIOME_FOREST = Donkeycraft.BiomeID ? [Donkeycraft.BiomeID.FOREST, Donkeycraft.BiomeID.FLOWER_FOREST, Donkeycraft.BiomeID.FOREST_HILL] : [];
-
-            for (var i = 0; i < count; i++) {
-                var hash = _hash2D(seed + i * 37, i * 71);
-                var tx = hash % CHUNK_SIZE;
-                var tz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
-
-                // Find surface Y
-                var surfaceY = heightmap[tx + tz * CHUNK_SIZE];
-                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 10) continue;
-
-                // Check if there's a valid surface block for trees.
-                // Only place on grass_block, dirt, or snow_block surfaces to prevent
-                // trees from growing on exposed logs/leaves (which would be visually jarring).
-                var surfaceBlock = chunk.getBlock(tx, surfaceY, tz);
-                var isValidSurface = surfaceBlock === (grassBlockId || 0) ||
-                    surfaceBlock === (dirtId || 0) ||
-                    surfaceBlock === (snowBlockId || 0);
-
-                if (!isValidSurface) {
-                    continue;
-                }
-
-                // Determine tree type based on biome using constants
-                var treeHeight = 4; // Default oak
-                for (var t = 0; t < BIOME_TAIGA.length; t++) {
-                    if (biomeId === BIOME_TAIGA[t]) { // Taiga — spruce (taller)
-                        treeHeight = 6 + ((hash >> 16) % 3);
-                        break;
-                    }
-                }
-                for (var f = 0; f < BIOME_FOREST.length; f++) {
-                    if (biomeId === BIOME_FOREST[f]) { // Forest variants
-                        treeHeight = 5 + ((hash >> 16) % 2);
-                        break;
-                    }
-                }
-
-                _placeOakTree(chunk, tx, surfaceY, tz, treeHeight, logId, leavesId);
+            for (var cy = 0; cy < height; cy++) {
+                var by = surfaceY + 1 + cy;
+                if (by < 0 || by >= WORLD_HEIGHT) continue;
+                chunk.setBlock(cx, by, cz, cactusBlock);
+                placed++;
             }
         }
 
-        /**
-         * Place an oak-style tree at the given position with a 3×3×3 rounded leaf canopy.
-         * Validates that trunk space is clear (air or replaceable blocks) before placing.
-         * Leaf canopy is a 3×3×3 box centered above the trunk top, with corners clipped for a rounded look.
-         * Only replaces air blocks in the leaf area — never overwrites solid terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} x - X coordinate (within chunk bounds).
-         * @param {number} y - Y coordinate for trunk base (within world bounds).
-         * @param {number} z - Z coordinate (within chunk bounds).
-         * @param {number} height - Trunk height in blocks (4+ recommended).
-         * @param {number} logId - Log block ID for the trunk.
-         * @param {number} leavesId - Leaves block ID for the canopy.
-         * @returns {boolean} True if the tree was placed successfully, false if blocked.
-         * @private
-         */
-        function _placeOakTree(chunk, x, y, z, height, logId, leavesId) {
-            // Validate trunk space is clear (all air or replaceable blocks)
-            for (var ty = 0; ty < height; ty++) {
-                if (y + ty >= WORLD_HEIGHT) return false;
-                var trunkBlock = chunk.getBlock(x, y + ty, z);
-                if (trunkBlock !== 0 && !isReplaceable(trunkBlock)) return false;
-            }
+        return placed;
+    }
 
-            // Place trunk: logs from y to y+height-1
-            for (var ty2 = 0; ty2 < height; ty2++) {
-                chunk.setBlock(x, y + ty2, z, logId);
-            }
+    /**
+     * Place a mushroom decoration — alternates between brown and red types.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Decorator} dec - Mushroom decorator definition.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of mushrooms placed.
+     * @private
+     */
+    function _placeMushroom(chunk, chunkX, chunkZ, dec, heightmap) {
+        var placed = 0;
 
-            // Leaves: 3×3×3 box on top, minus corners for rounded look
-            var leafStartY = y + height - 2;
-            var leafEndY = y + height + 1;
+        var brownBlock = dec.options.brownBlock || 0;
+        var redBlock = dec.options.redBlock || 0;
+        if (!brownBlock && !redBlock) return 0;
 
-            for (var ly = leafStartY; ly <= leafEndY && ly < WORLD_HEIGHT; ly++) {
-                for (var lx = -1; lx <= 1; lx++) {
-                    for (var lz = -1; lz <= 1; lz++) {
-                        // Skip corners for rounded look
-                        if (Math.abs(lx) === 1 && Math.abs(lz) === 1 && ly >= leafEndY) continue;
+        var count = dec.frequency;
+        var rngSeed = _hash2D(chunkX + (dec.name.charCodeAt(0) << 4), chunkZ);
 
-                        var bx = x + lx;
-                        var bz = z + lz;
+        for (var i = 0; i < count; i++) {
+            var dx = (rngSeed + i * 7) % CHUNK_SIZE;
+            if (dx < 0) dx += CHUNK_SIZE;
+            var dz = ((rngSeed >> 6) + i * 13) % CHUNK_SIZE;
+            if (dz < 0) dz += CHUNK_SIZE;
 
-                        if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE && ly >= 0) {
-                            if (chunk.getBlock(bx, ly, bz) === 0) { // Only replace air
-                                chunk.setBlock(bx, ly, bz, leavesId);
-                            }
-                        }
-                    }
-                }
-            }
+            var surfaceY = heightmap[dx + dz * CHUNK_SIZE];
+            if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 1) continue;
 
-            return true;
+            // Check there's air (or water) above the surface and solid ground below
+            var aboveBlockM = chunk.getBlock(dx, surfaceY + 1, dz);
+            if (aboveBlockM !== 0 && aboveBlockM !== _getWaterBlockId()) continue;
+
+            // Alternate between brown and red mushrooms
+            var mushroomBlock = (i % 2 === 0) ? brownBlock : redBlock;
+            if (!mushroomBlock) mushroomBlock = brownBlock;
+
+            chunk.setBlock(dx, surfaceY + 1, dz, mushroomBlock);
+            placed++;
         }
 
-        /**
-         * Check if a block ID is replaceable (air or transparent decorative).
-         * Delegates to BlockRegistry when available, with safe fallback.
-         * @param {number} blockId - Block ID to check.
-         * @returns {boolean} True if the block can be overwritten.
-         * @private
-         */
-        function isReplaceable(blockId) {
-            if (blockId === 0) return true;
-            if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.isReplaceable === 'function') {
-                try {
-                    return Donkeycraft.BlockRegistry.isReplaceable(blockId);
-                } catch (e) { /* ignore */ }
-            }
-            return false;
+        return placed;
+    }
+
+    /**
+     * Place a simple (single-block) decoration.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Decorator} dec - Decoration definition.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Number of decorations placed.
+     * @private
+     */
+    function _placeSimpleDecoration(chunk, chunkX, chunkZ, dec, heightmap) {
+        var placed = 0;
+
+        var blockId = dec.blockId;
+        if (!blockId) return 0;
+
+        var count = dec.frequency;
+        var rngSeed = _hash2D(chunkX + (dec.name.charCodeAt(0) << 4), chunkZ);
+
+        for (var i = 0; i < count; i++) {
+            var dx = (rngSeed + i * 7) % CHUNK_SIZE;
+            if (dx < 0) dx += CHUNK_SIZE;
+            var dz = ((rngSeed >> 6) + i * 13) % CHUNK_SIZE;
+            if (dz < 0) dz += CHUNK_SIZE;
+
+            var surfaceY = heightmap[dx + dz * CHUNK_SIZE];
+            if (surfaceY < 0 || surfaceY >= WORLD_HEIGHT - 1) continue;
+
+            // Check there's air (or water) above the surface for simple decoration placement
+            var aboveBlockS = chunk.getBlock(dx, surfaceY + 1, dz);
+            if (aboveBlockS !== 0 && aboveBlockS !== _getWaterBlockId()) continue;
+
+            chunk.setBlock(dx, surfaceY + 1, dz, blockId);
+            placed++;
         }
 
-        /**
-         * Place flowers on grass blocks in a chunk using deterministic hash-based positioning.
-         * Only places flowers on grass_block type surfaces to respect biome-specific terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID (unused but kept for API consistency).
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @param {number} seed - Random seed derived from chunk coordinates.
-         * @param {number} count - Number of flower placement attempts per chunk.
-         * @private
-         */
-        function _placeFlowers(chunk, biomeId, heightmap, seed, count) {
-            var poppyId = _getBlockId('poppy');
-            var grassBlockId = _getBlockId('grass_block');
-            if (!poppyId || !grassBlockId) return;
+        return placed;
+    }
 
-            for (var i = 0; i < count; i++) {
-                var hash = _hash2D(seed + i * 53 + 100, i * 97 + 200);
-                var fx = hash % CHUNK_SIZE;
-                var fz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
+    // ============================================================
+    // Utility Functions
+    // ============================================================
 
-                var surfaceY = heightmap[fx + fz * CHUNK_SIZE];
-                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
-
-                // Place on grass block top
-                if (chunk.getBlock(fx, surfaceY, fz) === grassBlockId) {
-                    if (surfaceY + 1 < WORLD_HEIGHT) {
-                        chunk.setBlock(fx, surfaceY + 1, fz, poppyId);
-                    }
-                }
-            }
+    /**
+     * Get the water block ID from WaterGenerator or resolve from BlockRegistry.
+     * Returns 0 if no water block is resolved — leaf placement checks for this
+     * to skip liquid block replacement when water is unavailable.
+     * @returns {number} Water block ID, or 0 if not resolved.
+     */
+    function _getWaterBlockId() {
+        if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.getWaterBlockId === 'function') {
+            var waterId = Donkeycraft.WaterGenerator.getWaterBlockId();
+            if (waterId > 0) return waterId;
         }
-
-        /**
-         * Place tall grass on grass blocks in a chunk using deterministic hash-based positioning.
-         * Only places grass on grass_block type surfaces to respect biome-specific terrain.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} biomeId - Biome ID (unused but kept for API consistency).
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @param {number} seed - Random seed derived from chunk coordinates.
-         * @param {number} count - Number of tall grass placement attempts per chunk.
-         * @private
-         */
-        function _placeGrass(chunk, biomeId, heightmap, seed, count) {
-            var tallGrassId = _getBlockId('tall_grass');
-            var grassBlockId = _getBlockId('grass_block');
-            if (!tallGrassId || !grassBlockId) return;
-
-            for (var i = 0; i < count; i++) {
-                var hash = _hash2D(seed + i * 61 + 300, i * 89 + 400);
-                var gx = hash % CHUNK_SIZE;
-                var gz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
-
-                var surfaceY = heightmap[gx + gz * CHUNK_SIZE];
-                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
-
-                if (chunk.getBlock(gx, surfaceY, gz) === grassBlockId) {
-                    if (surfaceY + 1 < WORLD_HEIGHT) {
-                        chunk.setBlock(gx, surfaceY + 1, gz, tallGrassId);
-                    }
-                }
+        // Resolve from BlockRegistry as fallback
+        if (Donkeycraft.BlockRegistry) {
+            var waterNames = ['water', 'water_still', 'flowing_water'];
+            for (var i = 0; i < waterNames.length; i++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(waterNames[i]);
+                if (block && block.id > 0) return block.id;
             }
         }
+        return 0; // No water block available — leaf placement will skip liquid replacement
+    }
 
-        /**
-         * Place cacti on sand blocks in a desert chunk using deterministic hash-based positioning.
-         * Each cactus is 1-3 blocks tall, placed vertically above the sand surface.
-         * Only places cacti when the biome is identified as a desert type via Donkeycraft.BiomeID constants.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number[]} heightmap - Heightmap array with height values per column.
-         * @param {number} seed - Random seed derived from chunk coordinates.
-         * @param {number} count - Number of cactus placement attempts per chunk.
-         * @private
-         */
-        function _placeCacti(chunk, heightmap, seed, count) {
-            var cactusId = _getBlockId('cactus');
-            var sandId = _getBlockId('sand');
-            if (!cactusId || !sandId) return;
+    /**
+     * Deterministic 2D hash using FNV-1a algorithm.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Positive 32-bit integer.
+     */
+    function _hash2D(x, y) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._hash2D === 'function') {
+            return Donkeycraft._gen._hash2D(Math.floor(x), Math.floor(y));
+        }
+        x = x | 0;
+        y = y | 0;
+        var h = (x * 374761393 + y * 668265263) ^ 0x5bd1e995;
+        h = ((h >>> 13) ^ h) * 0x5bd1e995;
+        return (h ^ (h >>> 15)) >>> 0;
+    }
 
-            for (var i = 0; i < count; i++) {
-                var hash = _hash2D(seed + i * 47 + 500, i * 73 + 600);
-                var cx = hash % CHUNK_SIZE;
-                var cz = ((hash >> 8) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
+    /**
+     * Resolve a block ID by name from BlockRegistry.
+     * @param {string} name - Block name.
+     * @returns {number} Block ID, or 0 if not found.
+     */
+    function getBlockId(name) {
+        return _resolvedBlocks[name] || 0;
+    }
 
-                var surfaceY = heightmap[cx + cz * CHUNK_SIZE];
-                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+    /**
+     * Destroy the decoration registry and free resources.
+     */
+    function destroy() {
+        _decorators = {};
+        _resolvedBlocks = {};
+    }
 
-                // Check for sand surface
-                if (chunk.getBlock(cx, surfaceY, cz) !== sandId) {
-                    continue;
-                }
+    // ============================================================
+    // Full Chunk Generation Pipeline
+    // ============================================================
 
-                // Place cactus (1-3 blocks tall)
-                var cactusHeight = 1 + ((hash >> 16) % 3);
-                for (var cy = 0; cy < cactusHeight && surfaceY + 1 + cy < WORLD_HEIGHT; cy++) {
-                    chunk.setBlock(cx, surfaceY + 1 + cy, cz, cactusId);
-                }
-            }
+    /**
+     * Generate a complete chunk with all features: heightmap, surface layers, ores, caves, water, and decorations.
+     * This is the main entry point for terrain generation from terrain.html.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to populate.
+     * @param {number|string|Donkeycraft.Biome} biome - Biome ID (number), name (string), or Biome object.
+     * @param {Object} [options] - Generation options.
+     * @param {boolean} [options.caves=true] - Whether to generate caves.
+     * @param {boolean} [options.ores=true] - Whether to generate ores.
+     * @param {boolean} [options.water=true] - Whether to generate water features.
+     * @param {boolean} [options.surface=true] - Whether to apply surface layers.
+     * @param {boolean} [options.decorations=true] - Whether to place decorations.
+     * @returns {{heightmap: number[], stats: Object}} Generation results with heightmap and per-pass stats.
+     */
+    function generateChunkFull(chunk, biome, options) {
+        // Initialize modules if needed
+        if (!Donkeycraft.SurfaceGenerator || !Donkeycraft.TerrainSurface ||
+            !Donkeycraft.OreGenerator || !Donkeycraft.CaveGenerator ||
+            !Donkeycraft.WaterGenerator) {
+            return { heightmap: [], stats: {}, error: 'Required modules not loaded' };
         }
 
-        /**
-         * Deterministic 2D hash — delegates to centralized _gen._hash2D for consistent
-         * pseudo-random values across all decoration placement operations.
-         * @param {number} x - First hash coordinate (typically a variation index).
-         * @param {number} y - Second hash coordinate (typically derived from seed).
-         * @returns {number} Positive 32-bit integer in range [0, 2^32-1].
-         * @private
-         */
-        function _hash2D(x, y) {
-            return Donkeycraft._gen._hash2D(x, y);
+        // Resolve biome to ID and name
+        var biomeId = 0; // Default to grass
+        var biomeName = 'grass';
+
+        if (typeof biome === 'number') {
+            biomeId = Math.max(0, Math.floor(biome));
+            biomeName = _biomeIdToName(biomeId);
+        } else if (typeof biome === 'string') {
+            biomeName = biome.toLowerCase();
+            biomeId = _biomeNameToId(biomeName);
+        } else if (biome && typeof biome === 'object' && biome.id !== undefined) {
+            biomeId = Math.max(0, Math.floor(biome.id));
+            biomeName = (biome.name || 'grass').toLowerCase();
         }
 
-        /**
-         * Invalidate cached block IDs and re-resolve from BlockRegistry.
-         * Call this after dynamically adding new blocks to the registry to ensure
-         * the generator picks up newly registered block references.
-         */
-        function invalidateBlockIdCache() {
-            _blocks = {};
-            _resolveBlocks();
-        }
+        // Default options
+        var opts = options || {};
+        if (opts.caves === undefined) opts.caves = true;
+        if (opts.ores === undefined) opts.ores = true;
+        if (opts.water === undefined) opts.water = true;
+        if (opts.surface === undefined) opts.surface = true;
+        if (opts.decorations === undefined) opts.decorations = true;
 
-        /**
-         * Destroy the structure generator and free resources.
-         * Clears all cached block IDs and resets resolution state.
-         */
-        function destroy() {
-            _blocks = {};
-        }
+        var chunkX = chunk.chunkX || 0;
+        var chunkZ = chunk.chunkZ || 0;
 
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The StructureGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.StructureGenerator;
-        }
-
-        return {
-            getInstance: getInstance,
-            generateChunkFull: generateChunkFull,
-            invalidateBlockIdCache: invalidateBlockIdCache,
-            destroy: destroy
+        var stats = {
+            heightmapGenerated: false,
+            surfaceApplied: false,
+            oresPlaced: 0,
+            veinsCreated: 0,
+            cavesCarved: 0,
+            blocksModified: 0,
+            waterBlocksPlaced: 0,
+            decorationsPlaced: 0
         };
-    })();
+
+        // Pass 1: Generate heightmap via SurfaceGenerator
+        var heightmap = Donkeycraft.SurfaceGenerator.generateHeightmap(chunkX, chunkZ, biomeName);
+        stats.heightmapGenerated = Array.isArray(heightmap) && heightmap.length > 0;
+
+        if (!stats.heightmapGenerated) {
+            return { heightmap: [], stats: stats, error: 'Heightmap generation failed' };
+        }
+
+        // Pass 2: Apply surface layers via TerrainSurface
+        if (opts.surface && typeof Donkeycraft.TerrainSurface.applySurfaceLayers === 'function') {
+            var surfaceStats = Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap);
+            stats.surfaceApplied = true;
+            stats.blocksModified += surfaceStats.blocksModified || 0;
+        }
+
+        // Pass 3: Place ores via OreGenerator
+        if (opts.ores && typeof Donkeycraft.OreGenerator.generateOres === 'function') {
+            var oreStats = Donkeycraft.OreGenerator.generateOres(chunk, chunkX, chunkZ, biomeId);
+            stats.oresPlaced += oreStats.oresPlaced || 0;
+            stats.veinsCreated += oreStats.veinsCreated || 0;
+        }
+
+        // Pass 4: Generate caves via CaveGenerator
+        if (opts.caves && typeof Donkeycraft.CaveGenerator.generateCaves === 'function') {
+            var caveStats = Donkeycraft.CaveGenerator.generateCaves(chunk, chunkX, chunkZ, heightmap);
+            stats.cavesCarved += (caveStats.pass1 ? caveStats.pass1.mainCavesCarved : 0) +
+                                  (caveStats.pass2 ? caveStats.pass2.smallCavesCarved : 0) +
+                                  (caveStats.pass3 ? caveStats.pass3.entrancesCarved : 0) +
+                                  (caveStats.pass4 ? caveStats.pass4.lavaCavesCarved : 0) +
+                                  (caveStats.pass5 ? caveStats.pass5.decoCaves : 0);
+            stats.blocksModified += caveStats.totalBlocksModified || 0;
+        }
+
+        // Pass 5: Place water via WaterGenerator
+        if (opts.water && typeof Donkeycraft.WaterGenerator.placeWater === 'function') {
+            var waterStats = Donkeycraft.WaterGenerator.placeWater(chunk, chunkX, chunkZ, biomeId, heightmap, opts);
+            stats.waterBlocksPlaced += waterStats.waterBlocksPlaced || 0;
+        }
+
+        // Pass 6: Place decorations via placeDecorations
+        if (opts.decorations && typeof placeDecorations === 'function') {
+            var decoStats = placeDecorations(chunk, chunkX, chunkZ, biomeName, heightmap);
+            stats.decorationsPlaced += decoStats.decorationsPlaced || 0;
+        }
+
+        return { heightmap: heightmap, stats: stats };
+    }
+
+    /**
+     * Map a biome ID to its name string.
+     * @param {number} biomeId - Biome ID.
+     * @returns {string} Biome name.
+     * @private
+     */
+    function _biomeIdToName(biomeId) {
+        switch (biomeId) {
+            case 0: return 'grass';
+            case 1: return 'arctic';
+            case 2: return 'desert';
+            case 3: return 'forest';
+            default: return 'grass';
+        }
+    }
+
+    /**
+     * Map a biome name string to its ID value.
+     * @param {string} name - Biome name.
+     * @returns {number} Biome ID.
+     * @private
+     */
+    function _biomeNameToId(name) {
+        switch (name) {
+            case 'grass': return 0;
+            case 'arctic': return 1;
+            case 'desert': return 2;
+            case 'forest': return 3;
+            default: return 0;
+        }
+    }
+
+    // ============================================================
+    // Public API
+    // ============================================================
+
+    /**
+     * Donkeycraft.StructureGenerator — Biome-specific surface decoration placement and full chunk generation pipeline.
+     * @namespace
+     */
+    Donkeycraft.StructureGenerator = {
+        // Full chunk generation pipeline (main entry point from terrain.html)
+        generateChunkFull: generateChunkFull,
+
+        // Decoration placement
+        placeDecorations: placeDecorations,
+
+        // Initialization
+        init: init,
+        destroy: destroy,
+
+        // Configuration access
+        getDecorations: getDecorations,
+        getBiomesWithDecorations: getBiomesWithDecorations,
+        getBlockId: getBlockId,
+
+        // Constants
+        Decorator: Decorator
+    };
 
 })();

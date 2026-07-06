@@ -355,9 +355,13 @@
     <script src="src/game/biome.js"></script>
 
     <!-- Generation Modules -->
+    <script src="src/gen/noise.js"></script>
+    <script src="src/core/storage.js"></script>
+    <script src="src/gen/terrain-core.js"></script>
+    <script src="src/gen/chunk-grid.js"></script>
+    <script src="src/gen/surface-generator.js"></script>
     <script src="src/gen/terrain-generator.js"></script>
     <script src="src/game/terrain-surface.js"></script>
-    <script src="src/gen/noise.js"></script>
     <script src="src/gen/ore-generator.js"></script>
     <script src="src/gen/cave-generator.js"></script>
     <script src="src/gen/structure-generator.js"></script>
@@ -833,7 +837,7 @@
             var skyPosBuf = null, skyColBuf = null;
 
             // ============================================================
-            // Initialization
+            // Initialization — integrates TerrainCore, ChunkGrid, and Storage
             // ============================================================
             function init() {
                 canvas = document.getElementById('dk-terrain-canvas');
@@ -869,7 +873,35 @@
                 skyLocs.uModel = gl.getUniformLocation(skyProgram, 'uModel');
 
                 setupUI();
-                if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
+
+                // Initialize TerrainCore (which initializes Storage and Noise internally)
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.init === 'function') {
+                    Donkeycraft.TerrainCore.init().then(function () {
+                        // Set seed and biome via TerrainCore
+                        Donkeycraft.TerrainCore.setSeed(worldSeed);
+                        Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
+
+                        // Initialize ChunkGrid with center at current position
+                        if (Donkeycraft.ChunkGrid) {
+                            Donkeycraft.ChunkGrid.setCenter(currentChunkX, currentChunkZ);
+                            Donkeycraft.ChunkGrid.setRadii({ n: chunkRadiusN, s: chunkRadiusS, e: chunkRadiusE, w: chunkRadiusW });
+                        }
+
+                        regenerateTerrain();
+                    }).catch(function (e) {
+                        // TerrainCore init failed — fall back to legacy noise
+                        if (typeof console !== 'undefined' && console.warn) {
+                            console.warn('[Terrain] TerrainCore init failed, using legacy noise:', e && e.message ? e.message : String(e));
+                        }
+                        if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
+                        regenerateTerrain();
+                    });
+                } else {
+                    // No TerrainCore — fall back to legacy noise system
+                    if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
+                    regenerateTerrain();
+                }
+
                 requestAnimationFrame(renderLoop);
             }
 
@@ -965,10 +997,51 @@
                 var seedInput = document.getElementById('ui-seed');
                 seedInput.addEventListener('change', function () {
                     worldSeed = parseInt(this.value) || 42;
-                    if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) Donkeycraft._gen._shufflePerm(worldSeed);
+                    // Use TerrainCore.setSeed if available, otherwise fall back to legacy
+                    if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.setSeed === 'function') {
+                        Donkeycraft.TerrainCore.setSeed(worldSeed);
+                    } else if (Donkeycraft._gen && Donkeycraft._gen._shufflePerm) {
+                        Donkeycraft._gen._shufflePerm(worldSeed);
+                    }
                     regenerateTerrain();
                     saveState();
                 });
+
+                // Wire up ChunkGrid event listener for automatic UI updates
+                if (Donkeycraft.ChunkGrid && typeof Donkeycraft.ChunkGrid.onGridChange === 'function') {
+                    Donkeycraft.ChunkGrid.onGridChange(function (event) {
+                        // Sync internal radii with ChunkGrid state after any grid change
+                        var radii = Donkeycraft.ChunkGrid.getRadii();
+                        chunkRadiusN = radii.n;
+                        chunkRadiusS = radii.s;
+                        chunkRadiusE = radii.e;
+                        chunkRadiusW = radii.w;
+
+                        // Re-render the chunk grid display to reflect new bounds/center
+                        renderChunkGrid();
+
+                        // If chunks were removed, clear them from the map
+                        if (event.type === 'gridContracted' && event.removedChunks) {
+                            for (var ri = 0; ri < event.removedChunks.length; ri++) {
+                                var rc = event.removedChunks[ri];
+                                var rkey = rc.x + ',' + rc.z;
+                                chunks.delete(rkey);
+                                if (meshBuffers[rkey]) {
+                                    // Free WebGL buffers
+                                    if (meshBuffers[rkey].posBuf) gl.deleteBuffer(meshBuffers[rkey].posBuf);
+                                    if (meshBuffers[rkey].colorBuf) gl.deleteBuffer(meshBuffers[rkey].colorBuf);
+                                    if (meshBuffers[rkey].alphaBuf) gl.deleteBuffer(meshBuffers[rkey].alphaBuf);
+                                    if (meshBuffers[rkey].normBuf) gl.deleteBuffer(meshBuffers[rkey].normBuf);
+                                    delete meshBuffers[rkey];
+                                }
+                                dirtyChunks.delete(rkey);
+                            }
+                        }
+
+                        // Update stats display
+                        _updateStatsDisplay();
+                    });
+                }
 
                 // Load saved state from localStorage
                 var hasState = loadState();
@@ -1033,17 +1106,58 @@
                     });
                 });
 
-                // Chunk grid expand/contract button handlers
+                // Chunk grid expand/contract button handlers — use ChunkGrid API when available
                 var chunkBtnActions = {
-                    'btn-expand-n': function () { if (chunkRadiusN < MAX_CHUNK_RADIUS) { chunkRadiusN++; regenerateTerrain(); saveState(); } },
-                    'btn-contract-n': function () { if (chunkRadiusN > 0) { chunkRadiusN--; regenerateTerrain(); saveState(); } },
-                    'btn-expand-s': function () { if (chunkRadiusS < MAX_CHUNK_RADIUS) { chunkRadiusS++; regenerateTerrain(); saveState(); } },
-                    'btn-contract-s': function () { if (chunkRadiusS > 0) { chunkRadiusS--; regenerateTerrain(); saveState(); } },
-                    'btn-expand-e': function () { if (chunkRadiusE < MAX_CHUNK_RADIUS) { chunkRadiusE++; regenerateTerrain(); saveState(); } },
-                    'btn-contract-e': function () { if (chunkRadiusE > 0) { chunkRadiusE--; regenerateTerrain(); saveState(); } },
-                    'btn-expand-w': function () { if (chunkRadiusW < MAX_CHUNK_RADIUS) { chunkRadiusW++; regenerateTerrain(); saveState(); } },
-                    'btn-contract-w': function () { if (chunkRadiusW > 0) { chunkRadiusW--; regenerateTerrain(); saveState(); } }
+                    'btn-expand-n': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.expand('n')) {
+                            if (chunkRadiusN < MAX_CHUNK_RADIUS) chunkRadiusN++;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-contract-n': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.contract('n')) {
+                            if (chunkRadiusN > 0) chunkRadiusN--;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-expand-s': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.expand('s')) {
+                            if (chunkRadiusS < MAX_CHUNK_RADIUS) chunkRadiusS++;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-contract-s': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.contract('s')) {
+                            if (chunkRadiusS > 0) chunkRadiusS--;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-expand-e': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.expand('e')) {
+                            if (chunkRadiusE < MAX_CHUNK_RADIUS) chunkRadiusE++;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-contract-e': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.contract('e')) {
+                            if (chunkRadiusE > 0) chunkRadiusE--;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-expand-w': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.expand('w')) {
+                            if (chunkRadiusW < MAX_CHUNK_RADIUS) chunkRadiusW++;
+                        }
+                        regenerateTerrain(); saveState();
+                    },
+                    'btn-contract-w': function () {
+                        if (!Donkeycraft.ChunkGrid || !Donkeycraft.ChunkGrid.contract('w')) {
+                            if (chunkRadiusW > 0) chunkRadiusW--;
+                        }
+                        regenerateTerrain(); saveState();
+                    }
                 };
+
                 var btnIds = Object.keys(chunkBtnActions);
                 for (var bi = 0; bi < btnIds.length; bi++) {
                     (function (id, action) {
@@ -1074,6 +1188,17 @@
                 resizeCanvas();
             }
 
+            /**
+             * Update the stats display with terrain generation statistics.
+             */
+            function _updateStatsDisplay() {
+                document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
+                    var stats = Donkeycraft.TerrainCore.getStats();
+                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+                }
+            }
+
             function resizeCanvas() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
@@ -1081,7 +1206,7 @@
             }
 
             // ============================================================
-            // Terrain regeneration — uses StructureGenerator pipeline with asymmetric radii
+            // Terrain regeneration — uses TerrainCore pipeline with ChunkGrid integration
             // ============================================================
             function regenerateTerrain() {
                 chunks.clear();
@@ -1090,38 +1215,97 @@
 
                 var allBiomes = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getAllBiomes() : [];
 
-                for (var cx = currentChunkX - chunkRadiusW; cx <= currentChunkX + chunkRadiusE; cx++) {
-                    for (var cz = currentChunkZ - chunkRadiusN; cz <= currentChunkZ + chunkRadiusS; cz++) {
+                // Determine the grid bounds from ChunkGrid or legacy radii
+                var bounds, radii;
+                if (Donkeycraft.ChunkGrid) {
+                    bounds = Donkeycraft.ChunkGrid.getBounds();
+                    radii = Donkeycraft.ChunkGrid.getRadii();
+                    // Sync internal radii with ChunkGrid state
+                    chunkRadiusN = radii.n;
+                    chunkRadiusS = radii.s;
+                    chunkRadiusE = radii.e;
+                    chunkRadiusW = radii.w;
+                    currentChunkX = bounds.minX + chunkRadiusW;
+                    currentChunkZ = bounds.minZ + chunkRadiusN;
+                } else {
+                    // Legacy: use internal radii directly
+                    bounds = {
+                        minX: currentChunkX - chunkRadiusW,
+                        maxX: currentChunkX + chunkRadiusE,
+                        minZ: currentChunkZ - chunkRadiusN,
+                        maxZ: currentChunkZ + chunkRadiusS
+                    };
+                }
+
+                var generationStartTime = Date.now();
+                var totalChunks = 0;
+
+                for (var cx = bounds.minX; cx <= bounds.maxX; cx++) {
+                    for (var cz = bounds.minZ; cz <= bounds.maxZ; cz++) {
                         var key = cx + ',' + cz;
                         var chunk = new Donkeycraft.Chunk(cx, cz);
                         chunk.fill(0);
                         var biomeId = selectedBiomeId;
 
-                        // Biome variation based on world position
-                        if (allBiomes.length > 1) {
-                            var bn = Donkeycraft._gen ? Donkeycraft._gen._noise2D(cx * 0.05, cz * 0.05) : 0;
-                            var bi = Math.floor((bn + 1) / 2 * (allBiomes.length - 1));
-                            biomeId = allBiomes[Math.min(bi, allBiomes.length - 1)].id;
-                        }
-                        chunk.biomeId = biomeId;
+                        // Use TerrainCore to generate heightmap with proper global coordinates
+                        if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.generateChunk === 'function') {
+                            Donkeycraft.TerrainCore.setSeed(worldSeed);
+                            Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
 
-                        // Use StructureGenerator for full pipeline: terrain → surface → ores → caves → water → decoration
-                        if (Donkeycraft.StructureGenerator) {
-                            Donkeycraft.StructureGenerator.generateChunkFull(chunk, biomeId);
+                            Donkeycraft.TerrainCore.generateChunk(cx, cz).then(function (result) {
+                                // Heightmap generated — apply full pipeline
+                                _applyGenerationPipeline(chunk, cx, cz, result.heightmap, biomeId);
+                            }).catch(function (e) {
+                                // Generation failed — use fallback
+                                if (typeof console !== 'undefined' && console.warn) {
+                                    console.warn('[Terrain] Generation failed for chunk (' + cx + ',' + cz + '):', e && e.message ? e.message : String(e));
+                                }
+                                _applyGenerationPipeline(chunk, cx, cz, null, biomeId);
+                            });
                         } else {
-                            // Fallback: manual generation if StructureGenerator unavailable
-                            _generateChunkFallback(chunk, biomeId);
+                            // Fallback: legacy generation (synchronous)
+                            _generateChunkFallback(chunk, cx, cz, biomeId);
+                            chunks.set(key, chunk);
+                            dirtyChunks.add(key);
+                            totalChunks++;
+                            continue;
                         }
 
                         chunks.set(key, chunk);
                         dirtyChunks.add(key);
+                        totalChunks++;
                     }
                 }
+
                 document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
                 document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
 
                 // Refresh chunk grid visual to reflect new bounds/center
                 renderChunkGrid();
+
+                // Update stats after generation
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
+                    var stats = Donkeycraft.TerrainCore.getStats();
+                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+                }
+            }
+
+            /**
+             * Apply the full generation pipeline to a chunk.
+             * @param {Donkeycraft.Chunk} chunk - The chunk to populate.
+             * @param {number} cx - Chunk X coordinate.
+             * @param {number} cz - Chunk Z coordinate.
+             * @param {number[]} heightmap - Generated heightmap (or null for fallback).
+             * @param {number} biomeId - Biome ID.
+             * @private
+             */
+            function _applyGenerationPipeline(chunk, cx, cz, heightmap, biomeId) {
+                // Use StructureGenerator for full pipeline: terrain → surface → ores → caves → water → decoration
+                if (Donkeycraft.StructureGenerator) {
+                    Donkeycraft.StructureGenerator.generateChunkFull(chunk, biomeId);
+                } else {
+                    _generateChunkFallback(chunk, cx, cz, biomeId);
+                }
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)
@@ -1149,9 +1333,9 @@
                 return ids;
             }
 
-            function _generateChunkFallback(chunk, biomeId) {
+            function _generateChunkFallback(chunk, cx, cz, biomeId) {
                 var biome = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getBiomeById(biomeId) : null;
-                var heightmap = Donkeycraft.TerrainGenerator ? Donkeycraft.TerrainGenerator.generateHeightmap(chunk.chunkX, chunk.chunkZ, biome) : null;
+                var heightmap = Donkeycraft.TerrainGenerator ? Donkeycraft.TerrainGenerator.generateHeightmap(cx !== undefined ? cx : chunk.chunkX, cz !== undefined ? cz : chunk.chunkZ, biome) : null;
                 var ws = Donkeycraft.Config.WORLD_HEIGHT, cs = Donkeycraft.Config.CHUNK_SIZE;
 
                 // Resolve block IDs from registry instead of hardcoding

@@ -1,369 +1,551 @@
-// Donkeycraft — Ore Generator
-// Ore distribution: vein placement per biome, rarity, Y-level ranges for all ores.
+// Donkeycraft — Realistic Ore Generator
+// Geological ore placement with vein-based distribution, biome awareness, and Y-level ranges.
+// Supports spheres (magmatic), layers (sedimentary), and pipes (hydrothermal) vein types.
+//
+// @module ore-generator
+// @description Realistic ore vein placement system with geological distribution
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    if (!Donkeycraft) return;
+
+    var CHUNK_SIZE = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
+    var WORLD_HEIGHT = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256;
 
     // ============================================================
     // Ore Definitions
     // ============================================================
 
     /**
-     * Ore definitions with Y-level ranges, vein size, rarity, and biome restrictions.
-     * Block IDs resolved at runtime via BlockRegistry using block names.
-     * Y-levels are absolute, but actual placement is clamped to terrain surface during generation.
-     * @type {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>}
+     * OreDefinition — defines an ore type's placement characteristics.
+     * @param {string} name - Ore name.
+     * @param {number} blockId - Block ID for this ore.
+     * @param {number} minY - Minimum Y level for placement.
+     * @param {number} maxY - Maximum Y level for placement.
+     * @param {number} frequency - Number of veins per chunk.
+     * @param {number} veinSize - Average size of each vein (radius).
+     * @param {string} veinType - Vein type: 'sphere', 'layer', or 'pipe'.
+     * @param {number} [weight] - Relative weight for occurrence frequency.
+     * @param {number[]} [biomeIds] - Biome IDs where this ore appears (undefined = all).
      */
-    var ORE_DEFS = [
-        { blockName: 'coal_ore', name: 'coal_ore', minY: 0, maxY: 60, veinSize: 5, rarity: 200, biomes: null },
-        { blockName: 'iron_ore', name: 'iron_ore', minY: 0, maxY: 50, veinSize: 4, rarity: 160, biomes: null },
-        { blockName: 'gold_ore', name: 'gold_ore', minY: 0, maxY: 32, veinSize: 3, rarity: 240, biomes: null },
-        { blockName: 'diamond_ore', name: 'diamond_ore', minY: 0, maxY: 20, veinSize: 3, rarity: 320, biomes: null },
-        { blockName: 'redstone_ore', name: 'redstone_ore', minY: 0, maxY: 28, veinSize: 3, rarity: 200, biomes: null },
-        { blockName: 'lapis_ore', name: 'lapis_ore', minY: 0, maxY: 24, veinSize: 2, rarity: 280, biomes: null },
-        { blockName: 'emerald_ore', name: 'emerald_ore', minY: 0, maxY: 20, veinSize: 1, rarity: 400, biomes: [Donkeycraft.BiomeID.EXTREME_HILLS] }
-    ];
+    function OreDefinition(name, blockId, minY, maxY, frequency, veinSize, veinType, weight, biomeIds) {
+        this.name = name;
+        this.blockId = blockId;
+        this.minY = minY;
+        this.maxY = maxY;
+        this.frequency = frequency;
+        this.veinSize = veinSize;
+        this.veinType = veinType;
+        this.weight = weight || 1;
+        this.biomeIds = biomeIds || null; // null = appears in all biomes
+    }
 
-    // Cache for resolved block IDs to avoid repeated lookups.
-    var _blockCache = null;
+    // ============================================================
+    // Ore Registry
+    // ============================================================
 
     /**
-     * Resolve all ore block IDs from BlockRegistry and cache them.
-     * Uses exact block names from definitions for reliable lookup.
+     * Create the default ore registry with all standard ores.
+     * @returns {OreDefinition[]} Array of ore definitions.
+     */
+    /**
+     * Create the default ore registry with all standard ores.
+     * Ore names match BlockRegistry entries (typically *_ore suffix).
+     * @returns {OreDefinition[]} Array of ore definitions.
+     */
+    function getDefaultOres() {
+        return [
+            // Coal — sedimentary layers, broad distribution
+            new OreDefinition('coal_ore', null, 0, 160, 8, 3, 'layer'),
+
+            // Iron — magmatic spheres, concentrated in mid-depths
+            new OreDefinition('iron_ore', null, 0, 120, 6, 2, 'sphere'),
+
+            // Gold — hydrothermal pipes, deep concentration
+            new OreDefinition('gold_ore', null, 0, 40, 4, 2, 'pipe'),
+
+            // Diamond — magmatic spheres, very deep only
+            new OreDefinition('diamond_ore', null, 0, 30, 2, 1.5, 'sphere'),
+
+            // Redstone — concentrated near lava levels, deep
+            new OreDefinition('redstone_ore', null, 0, 35, 5, 1.5, 'sphere'),
+
+            // Lapis — mid-depth concentration, moderate frequency
+            new OreDefinition('lapis_ore', null, 10, 60, 3, 2, 'sphere'),
+
+            // Emerald — mountain/biome-specific, shallow but rare
+            new OreDefinition('emerald_ore', null, 20, 80, 1, 2, 'sphere', 1, [1]), // Arctic only
+
+            // Copper — magmatic spheres, mid-range depth
+            new OreDefinition('copper_ore', null, 0, 100, 5, 2, 'sphere'),
+
+            // Tin — hydrothermal pipes, deep concentration
+            new OreDefinition('tin_ore', null, 0, 50, 3, 2, 'pipe')
+        ];
+    }
+
+    // ============================================================
+    // Ore Generator State
+    // ============================================================
+
+    var _ores = [];
+    var _resolvedBlocks = {};
+
+    /**
+     * Initialize the ore generator — resolve block IDs from BlockRegistry.
+     */
+    function init() {
+        _ores = getDefaultOres();
+        _resolveOreBlocks();
+    }
+
+    /**
+     * Resolve ore block IDs from BlockRegistry.
      * @private
      */
-    function _resolveBlockIds() {
-        _blockCache = {};
+    /**
+     * Resolve ore block IDs from BlockRegistry.
+     * Tries multiple naming variants (e.g., 'coal_ore', 'coal_block') for cross-compatibility.
+     * @private
+     */
+    function _resolveOreBlocks() {
         if (!Donkeycraft.BlockRegistry) return;
 
-        for (var i = 0; i < ORE_DEFS.length; i++) {
-            var def = ORE_DEFS[i];
-            // Try exact block name first
-            var block = Donkeycraft.BlockRegistry.getBlockByName(def.blockName);
-            if (!block) {
-                // Fallback: try common naming variations
-                var parts = def.blockName.split('_');
-                if (parts.length > 1) {
-                    // Try without last part (e.g., "coal_ore" → "coal")
-                    block = Donkeycraft.BlockRegistry.getBlockByName(parts[0]);
+        // Define primary names and fallback variants for each ore type
+        var oreVariants = [
+            { key: 'coal_ore', variants: ['coal_ore', 'coal'] },
+            { key: 'iron_ore', variants: ['iron_ore', 'iron'] },
+            { key: 'gold_ore', variants: ['gold_ore', 'gold'] },
+            { key: 'diamond_ore', variants: ['diamond_ore', 'diamond'] },
+            { key: 'redstone_ore', variants: ['redstone_ore', 'redstone'] },
+            { key: 'lapis_ore', variants: ['lapis_ore', 'lapis'] },
+            { key: 'emerald_ore', variants: ['emerald_ore', 'emerald'] },
+            { key: 'copper_ore', variants: ['copper_ore', 'copper'] },
+            { key: 'tin_ore', variants: ['tin_ore', 'tin'] }
+        ];
+
+        for (var i = 0; i < oreVariants.length; i++) {
+            var entry = oreVariants[i];
+            for (var j = 0; j < entry.variants.length; j++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(entry.variants[j]);
+                if (block && block.id) {
+                    _resolvedBlocks[entry.key] = block.id;
+                    break;
                 }
             }
-            if (block) {
-                _blockCache[def.name] = block.id;
-            } else {
-                // Log warning for missing blocks (only once per name)
-                if (!_blockCache._warned) _blockCache._warned = {};
-                if (!_blockCache._warned[def.blockName]) {
-                    _blockCache._warned[def.blockName] = true;
-                    if (Donkeycraft.Logger) {
-                        Donkeycraft.Logger.warn('OreGenerator: block "' + def.blockName + '" not found in BlockRegistry');
-                    }
-                }
+        }
+
+        // Update ore definitions with resolved IDs
+        for (var k = 0; k < _ores.length; k++) {
+            var ore = _ores[k];
+            if (_resolvedBlocks[ore.name]) {
+                ore.blockId = _resolvedBlocks[ore.name];
             }
         }
     }
 
     /**
-     * Get a resolved block ID by ore name.
-     * @param {string} oreName - Ore definition name.
-     * @returns {number|null} Block ID or null if not found.
+     * Get the block ID for an ore by name.
+     * @param {string} oreName - Ore name.
+     * @returns {number} Block ID, or 0 if not found.
+     */
+    function getOreBlockId(oreName) {
+        return _resolvedBlocks[oreName] || 0;
+    }
+
+    // ============================================================
+    // Vein Placement Algorithms
+    // ============================================================
+
+    /**
+     * Generate ore veins for a chunk.
+     * Places all applicable ores based on biome, Y-level, and frequency.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to generate ores in.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {number} biomeId - Biome ID for this chunk.
+     * @returns {{oresPlaced: number, veinsCreated: number}} Generation stats.
+     */
+    function generateOres(chunk, chunkX, chunkZ, biomeId) {
+        var stats = { oresPlaced: 0, veinsCreated: 0 };
+
+        if (!chunk || typeof chunk.setBlock !== 'function') return stats;
+
+        // Resolve stone block ID for validation
+        var stoneId = _getBlockId('stone');
+
+        for (var i = 0; i < _ores.length; i++) {
+            var ore = _ores[i];
+
+            // Skip if block ID not resolved
+            if (!ore.blockId) continue;
+
+            // Skip if biome-restricted and this chunk's biome doesn't match
+            if (ore.biomeIds && ore.biomeIds.length > 0) {
+                var biomeMatch = false;
+                for (var b = 0; b < ore.biomeIds.length; b++) {
+                    if (ore.biomeIds[b] === biomeId) {
+                        biomeMatch = true;
+                        break;
+                    }
+                }
+                if (!biomeMatch) continue;
+            }
+
+            // Place veins for this ore
+            var oreStats = _placeOreVeins(chunk, chunkX, chunkZ, ore, stoneId);
+            stats.oresPlaced += oreStats.oresPlaced;
+            stats.veinsCreated += oreStats.veinsCreated;
+        }
+
+        return stats;
+    }
+
+    /**
+     * Place veins for a single ore type in a chunk.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {OreDefinition} ore - Ore definition.
+     * @param {number} stoneId - Stone block ID for validation.
+     * @returns {{oresPlaced: number, veinsCreated: number}}
      * @private
      */
-    function _getBlockId(oreName) {
-        if (!_blockCache && Donkeycraft.BlockRegistry) {
-            _resolveBlockIds();
+    function _placeOreVeins(chunk, chunkX, chunkZ, ore, stoneId) {
+        var stats = { oresPlaced: 0, veinsCreated: 0 };
+
+        var rngState = _getRngState(chunkX, chunkZ, ore.name);
+
+        for (var v = 0; v < ore.frequency; v++) {
+            // Random position within chunk
+            var ox = _nextRange(rngState, 0, CHUNK_SIZE - 1);
+            var oz = _nextRange(rngState, 0, CHUNK_SIZE - 1);
+
+            // Random Y level within ore's range
+            var minY = Math.max(0, ore.minY);
+            var maxY = Math.min(WORLD_HEIGHT - 1, ore.maxY);
+            var oy = _nextRange(rngState, minY, maxY);
+
+            // Place vein based on type
+            switch (ore.veinType) {
+                case 'sphere':
+                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    break;
+                case 'layer':
+                    stats.oresPlaced += _placeLayerVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    break;
+                case 'pipe':
+                    stats.oresPlaced += _placePipeVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    break;
+                default:
+                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+            }
+
+            stats.veinsCreated++;
         }
-        return _blockCache ? _blockCache[oreName] : null;
+
+        return stats;
+    }
+
+    /**
+     * Place a spherical (magmatic) ore vein.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y.
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Vein radius.
+     * @param {number} oreBlockId - Ore block ID.
+     * @param {number} stoneId - Stone block ID for validation.
+     * @param {number} rngState - PRNG state.
+     * @returns {number} Number of ore blocks placed.
+     * @private
+     */
+    function _placeSphereVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+        if (!oreBlockId) return 0;
+
+        var rSquared = radius * radius;
+        var rInt = Math.ceil(radius);
+        var placed = 0;
+
+        for (var dx = -rInt; dx <= rInt; dx++) {
+            for (var dy = -rInt; dy <= rInt; dy++) {
+                for (var dz = -rInt; dz <= rInt; dz++) {
+                    var distSquared = dx * dx + dy * dy + dz * dz;
+
+                    if (distSquared > rSquared) continue;
+
+                    // Noise-based density falloff for natural edges
+                    var noiseVal = _fbmNoise(
+                        (cx + dx) * 0.15,
+                        (cy + dy) * 0.15,
+                        (cz + dz) * 0.15,
+                        2
+                    );
+                    if (noiseVal < -0.2) continue; // Sparse edges
+
+                    var bx = cx + dx;
+                    var by = cy + dy;
+                    var bz = cz + dz;
+
+                    // Check chunk bounds
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                    // Validate: ore must be placed inside solid rock
+                    var currentBlock = chunk.getBlock(bx, by, bz);
+                    if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, by, bz, oreBlockId);
+                        placed++;
+                    }
+                }
+            }
+        }
+
+        return placed;
+    }
+
+    /**
+     * Place a layered (sedimentary) ore vein.
+     * Creates flat, horizontal deposits typical of sedimentary ores like coal.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y.
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Vein radius.
+     * @param {number} oreBlockId - Ore block ID.
+     * @param {number} stoneId - Stone block ID for validation.
+     * @param {number} rngState - PRNG state.
+     * @returns {number} Number of ore blocks placed.
+     * @private
+     */
+    function _placeLayerVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+        if (!oreBlockId) return 0;
+
+        var layerHeight = Math.max(1, Math.floor(radius / 2));
+        var placed = 0;
+
+        for (var dy = -layerHeight; dy <= layerHeight; dy++) {
+            for (var dx = -radius; dx <= radius; dx++) {
+                for (var dz = -radius; dz <= radius; dz++) {
+                    // Elliptical shape: wider in XZ, thinner in Y
+                    var normalizedDist = (dx * dx + dz * dz) / (radius * radius) + (dy * dy) / (layerHeight * layerHeight);
+
+                    if (normalizedDist > 1) continue;
+
+                    // Noise-based density falloff
+                    var noiseVal = _fbmNoise(
+                        (cx + dx) * 0.12,
+                        (cy + dy) * 0.3,
+                        (cz + dz) * 0.12,
+                        2
+                    );
+                    if (noiseVal < -0.1) continue;
+
+                    var bx = cx + dx;
+                    var by = cy + dy;
+                    var bz = cz + dz;
+
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+                    if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+                    var currentBlock = chunk.getBlock(bx, by, bz);
+                    if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, by, bz, oreBlockId);
+                        placed++;
+                    }
+                }
+            }
+        }
+
+        return placed;
+    }
+
+    /**
+     * Place a vertical pipe (hydrothermal) ore vein.
+     * Creates tube-like deposits typical of hydrothermal vents, e.g., gold veins.
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} cx - Center X.
+     * @param {number} cy - Center Y (bottom of pipe).
+     * @param {number} cz - Center Z.
+     * @param {number} radius - Pipe radius.
+     * @param {number} oreBlockId - Ore block ID.
+     * @param {number} stoneId - Stone block ID for validation.
+     * @param {number} rngState - PRNG state.
+     * @returns {number} Number of ore blocks placed.
+     * @private
+     */
+    function _placePipeVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+        if (!oreBlockId) return 0;
+
+        var pipeHeight = radius * 4; // Tall vertical structure
+        var placed = 0;
+
+        for (var y = 0; y < pipeHeight; y++) {
+            var currentY = cy + y;
+            if (currentY < 0 || currentY >= WORLD_HEIGHT) continue;
+
+            // Taper radius at top and bottom
+            var taperFactor = 1 - Math.abs(y - pipeHeight / 2) / (pipeHeight / 2);
+            var currentRadius = radius * (0.5 + taperFactor * 0.5);
+
+            var rInt = Math.ceil(currentRadius);
+
+            for (var dx = -rInt; dx <= rInt; dx++) {
+                for (var dz = -rInt; dz <= rInt; dz++) {
+                    var distSquared = dx * dx + dz * dz;
+
+                    if (distSquared > currentRadius * currentRadius) continue;
+
+                    var bx = cx + dx;
+                    var bz = cz + dz;
+
+                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
+
+                    var currentBlock = chunk.getBlock(bx, currentY, bz);
+                    if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, currentY, bz, oreBlockId);
+                        placed++;
+                    }
+                }
+            }
+        }
+
+        return placed;
     }
 
     // ============================================================
-    // OreGenerator
+    // PRNG Utilities (Mulberry32 with namespace isolation)
     // ============================================================
 
     /**
-     * OreGenerator — places ore veins in chunks.
+     * PRNG state container for ore placement — uses a mutable object
+     * so that each call to `_nextRange` properly advances the state.
+     * @typedef {Object} OreRngState
+     * @property {number} val - Current Mulberry32 state value (unsigned 32-bit).
      */
-    Donkeycraft.OreGenerator = (function () {
-        /**
-         * Initialize the ore generator by resolving all ore block IDs from BlockRegistry.
-         * Resolves blocks by name, falling back to common aliases for robustness.
-         */
-        function init() {
-            _resolveBlockIds();
+
+    /**
+     * Get a deterministic RNG state for ore placement.
+     * Combines chunk coordinates and ore name for unique seeding.
+     * Returns a mutable state object so successive _nextRange calls produce different values.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {string} oreName - Ore name.
+     * @returns {OreRngState} Mutable PRNG state object.
+     */
+    function _getRngState(chunkX, chunkZ, oreName) {
+        var hash = 0;
+        for (var i = 0; i < oreName.length; i++) {
+            hash = ((hash << 5) - hash) + oreName.charCodeAt(i);
+            hash |= 0;
         }
+        hash += chunkX * 374761393 + chunkZ * 668265263;
+        hash |= 0;
+        return { val: hash >>> 0 };
+    }
 
-        /**
-         * Place ores in a chunk based on biome restrictions and ore definitions.
-         * Resolves block IDs from BlockRegistry at runtime for correctness.
-         * Auto-initializes the ore generator (resolves all block IDs) on first call.
-         * Ore Y levels are clamped to terrain surface via heightmap to prevent spawning above ground.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to place ores in.
-         * @param {number} biomeId - Biome ID for this chunk.
-         * @param {number[]} [heightmap] - Optional heightmap array for terrain clamping.
-         */
-        function placeOres(chunk, biomeId, heightmap) {
-            // Ensure noise is initialized before any generation.
-            if (Donkeycraft._gen && typeof Donkeycraft._gen._ensureNoiseInit === 'function') {
-                Donkeycraft._gen._ensureNoiseInit();
-            }
+    /**
+     * Generate next pseudo-random integer in range [min, max].
+     * Uses Mulberry32 algorithm and mutates the state object so each call advances.
+     * @param {OreRngState} rng - Mutable PRNG state object with a `val` property.
+     * @param {number} min - Minimum value.
+     * @param {number} max - Maximum value.
+     * @returns {number} Random integer in [min, max].
+     */
+    function _nextRange(rng, min, max) {
+        var x = rng.val | 0;
+        x = (x ^ (x >>> 16)) & 0xFFFFFFFF;
+        x = ((x * 0x45d9f3b) & 0xFFFFFFFF) | 0;
+        x = (x ^ (x >>> 16)) & 0xFFFFFFFF;
+        x = ((x * 0x45d9f3b) & 0xFFFFFFFF) | 0;
+        x = (x + 1) & 0xFFFFFFFF;
+        rng.val = x >>> 0;
 
-            if (!chunk || !chunk.getBlock || !chunk.setBlock) return;
+        return min + (rng.val % (max - min + 1));
+    }
 
-            // Auto-initialize: resolve all block IDs from BlockRegistry on first call
-            if (!_blockCache && Donkeycraft.BlockRegistry) {
-                _resolveBlockIds();
-            }
+    // ============================================================
+    // Noise Functions (delegating to noise.js)
+    // ============================================================
 
-            for (var i = 0; i < ORE_DEFS.length; i++) {
-                var oreDef = ORE_DEFS[i];
-                var blockId = _getBlockId(oreDef.name);
-
-                // Skip if block not found in registry
-                if (blockId === null || blockId === 0) continue;
-
-                // Check biome restriction
-                if (oreDef.biomes && oreDef.biomes.length > 0) {
-                    var found = false;
-                    for (var j = 0; j < oreDef.biomes.length; j++) {
-                        if (oreDef.biomes[j] === biomeId) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if (!found) continue; // Skip this ore for this biome
-                }
-
-                // Place veins for this ore type
-                _placeOreVeins(chunk, oreDef, blockId, heightmap);
-            }
+    /**
+     * Fractal Brownian Motion for ore density falloff.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate.
+     * @param {number} octaves - Number of octaves.
+     * @returns {number} Normalized noise value [-1, 1].
+     */
+    function _fbmNoise(x, y, z, octaves) {
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._fbm === 'function') {
+            try {
+                return Donkeycraft._gen._fbm(x, y, z, octaves || 2, 0.5, 2.0);
+            } catch (e) { /* fallback below */ }
         }
-
-        /**
-         * Place veins for a single ore type in a chunk.
-         * Y levels are clamped to terrain surface when heightmap is provided.
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {object} oreDef - Ore definition.
-         * @param {number} blockId - Resolved block ID.
-         * @param {number[]} [heightmap] - Optional heightmap for terrain clamping.
-         * @private
-         */
-        function _placeOreVeins(chunk, oreDef, blockId, heightmap) {
-            // Determine how many vein placement attempts based on rarity
-            var attempts = Math.floor((CHUNK_SIZE * CHUNK_SIZE) / oreDef.rarity);
-
-            for (var v = 0; v < attempts; v++) {
-                // Random position in the chunk using deterministic hash
-                var seedX = _hash2D(v, 0x7F3A + oreDef.minY);
-                var seedZ = _hash2D(v, 0xB4C1 + oreDef.maxY);
-
-                var vx = seedX % CHUNK_SIZE;
-                if (vx < 0) vx += CHUNK_SIZE; // Handle negative modulo
-                var vz = seedZ % CHUNK_SIZE;
-                if (vz < 0) vz += CHUNK_SIZE;
-
-                // Determine terrain surface Y at this position for clamping
-                var surfaceY = WORLD_HEIGHT; // Default: use max if no heightmap
-                if (heightmap) {
-                    surfaceY = heightmap[vx + vz * CHUNK_SIZE] || WORLD_HEIGHT;
-                }
-
-                // Calculate max Y: ore must be below terrain surface
-                // Subtract offset based on ore depth tier to create proper underground distribution
-                var depthOffset;
-                if (oreDef.name === 'coal_ore' || oreDef.name === 'iron_ore') {
-                    depthOffset = 6; // Common ores: a bit deeper
-                } else if (oreDef.name === 'gold_ore' || oreDef.name === 'redstone_ore') {
-                    depthOffset = 12; // Rarer ores: deeper
-                } else {
-                    depthOffset = 10; // Default
-                }
-
-                var maxYForOre = Math.min(oreDef.maxY, surfaceY - depthOffset);
-
-                // Skip this vein if no valid Y range exists (terrain too low)
-                if (oreDef.minY >= maxYForOre) continue;
-
-                // Random Y level within ore's clamped range
-                var vy = _randomInRange(v, oreDef.minY, maxYForOre);
-
-                // Place the vein (simple sphere shape)
-                _placeVein(chunk, vx, vy, vz, blockId, oreDef.veinSize, v);
-            }
+        if (Donkeycraft._gen && typeof Donkeycraft._gen._noise2D === 'function') {
+            return Donkeycraft._gen._noise2D(x, z);
         }
+        return 0;
+    }
 
-        /**
-         * Place a single ore vein as a rough sphere with natural variation.
-         * Uses fbm noise for organic shape instead of hard sphere edges.
-         * Validates that the ore is placed inside solid terrain (block below must not be air).
-         * @param {Donkeycraft.Chunk} chunk - The chunk.
-         * @param {number} cx - Center X.
-         * @param {number} cy - Center Y.
-         * @param {number} cz - Center Z.
-         * @param {number} blockId - Ore block ID.
-         * @param {number} radius - Vein radius.
-         * @param {number} veinIndex - Index of this vein for variation.
-         * @private
-         */
-        function _placeVein(chunk, cx, cy, cz, blockId, radius, veinIndex) {
-            var halfRadius = Math.ceil(radius);
-            var seedX = cx + veinIndex * 1000;
-            var seedZ = cz + veinIndex * 2000;
+    // ============================================================
+    // Block ID Resolution
+    // ============================================================
 
-            for (var dx = -halfRadius; dx <= halfRadius; dx++) {
-                for (var dy = -halfRadius; dy <= halfRadius; dy++) {
-                    for (var dz = -halfRadius; dz <= halfRadius; dz++) {
-                        var distSq = dx * dx + dy * dy + dz * dz;
-                        if (distSq > radius * radius) continue;
+    /**
+     * Resolve a block ID by name from BlockRegistry.
+     * @param {string} name - Block name.
+     * @returns {number} Block ID, or 0 if not found.
+     */
+    function _getBlockId(name) {
+        if (!Donkeycraft.BlockRegistry) return 0;
+        var block = Donkeycraft.BlockRegistry.getBlockByName(name);
+        return block ? block.id : 0;
+    }
 
-                        var bx = cx + dx;
-                        var by = cy + dy;
-                        var bz = cz + dz;
+    // ============================================================
+    // Backward Compatibility Aliases
+    // ============================================================
 
-                        // Check bounds
-                        if (bx < 0 || bx >= CHUNK_SIZE || by < 0 || by >= WORLD_HEIGHT || bz < 0 || bz >= CHUNK_SIZE) {
-                            continue;
-                        }
+    /**
+     * Alias for generateOres — provides backward compatibility with legacy code that calls placeOres.
+     * Legacy signature: placeOres(chunk, biomeId) — resolves chunk coordinates from chunk.chunkX/chunk.chunkZ
+     * @param {Donkeycraft.Chunk} chunk - The chunk.
+     * @param {number} biomeId - Biome ID.
+     * @returns {{oresPlaced: number, veinsCreated: number}}
+     */
+    function placeOres(chunk, biomeId) {
+        return generateOres(chunk, chunk.chunkX || 0, chunk.chunkZ || 0, biomeId);
+    }
 
-                        // Validate: block below must be solid (not air) to ensure ore is underground
-                        if (by > 0) {
-                            var blockBelow = chunk.getBlock(bx, by - 1, bz);
-                            if (blockBelow === 0) continue; // Skip — no solid block beneath
-                        } else {
-                            continue; // Y=0 has nothing below, skip
-                        }
+    // ============================================================
+    // Public API
+    // ============================================================
 
-                        // Use noise for organic shape variation — blocks near the edge
-                        // have a probability of inclusion based on their distance from center.
-                        var dist = Math.sqrt(distSq);
-                        var noiseVal = Donkeycraft._gen ? Donkeycraft._gen._noise2D(
-                            (bx + veinIndex * 100) * 0.3, (bz + veinIndex * 200) * 0.3
-                        ) : 0;
+    /**
+     * Donkeycraft.OreGenerator — Realistic ore vein placement system.
+     * @namespace
+     */
+    Donkeycraft.OreGenerator = {
+        // Main entry point
+        generateOres: generateOres,
 
-                        // Smooth falloff: center blocks always placed, edge blocks probabilistic
-                        var threshold = radius - 0.5 + noiseVal * 0.8;
-                        if (dist < threshold) {
-                            chunk.setBlock(bx, by, bz, blockId);
-                        }
-                    }
-                }
-            }
-        }
+        // Backward compatibility alias
+        placeOres: placeOres,
 
-        /**
-         * Get the minimum Y level for an ore type by name.
-         * @param {string} oreName - Ore definition name (e.g., 'diamond_ore').
-         * @returns {number} Minimum Y level, or -1 if not found.
-         */
-        function getMinY(oreName) {
-            for (var i = 0; i < ORE_DEFS.length; i++) {
-                if (ORE_DEFS[i].name === oreName) {
-                    return ORE_DEFS[i].minY;
-                }
-            }
-            return -1;
-        }
+        // Initialization
+        init: init,
 
-        /**
-         * Get the maximum Y level for an ore type by name.
-         * @param {string} oreName - Ore definition name (e.g., 'diamond_ore').
-         * @returns {number} Maximum Y level, or -1 if not found.
-         */
-        function getMaxY(oreName) {
-            for (var i = 0; i < ORE_DEFS.length; i++) {
-                if (ORE_DEFS[i].name === oreName) {
-                    return ORE_DEFS[i].maxY;
-                }
-            }
-            return -1;
-        }
+        // Block ID resolution
+        getOreBlockId: getOreBlockId,
 
-        /**
-         * Get all ore definitions.
-         * @returns {Array<{blockName: string, name: string, minY: number, maxY: number, veinSize: number, rarity: number, biomes: number[]}>} Array of ore definition objects.
-         */
-        function getOreDefinitions() {
-            return ORE_DEFS.slice();
-        }
+        // Configuration access
+        getOres: function () { return _ores; },
+        setOres: function (newOres) { _ores = newOres; _resolveOreBlocks(); },
 
-        /**
-         * Get the number of ore types defined.
-         * @returns {number} Number of ore definitions.
-         */
-        function getOreCount() {
-            return ORE_DEFS.length;
-        }
-
-        /**
-         * Deterministic 2D hash — delegates to centralized _gen._hash2D.
-         * @param {number} x
-         * @param {number} y
-         * @returns {number} Positive 32-bit integer.
-         * @private
-         */
-        function _hash2D(x, y) {
-            return Donkeycraft._gen._hash2D(x, y);
-        }
-
-        /**
-         * Generate a pseudo-random number in a range using deterministic hashing.
-         * Uses high bits of hash to minimize modulo bias for non-power-of-two ranges.
-         * @param {number} index - Variation index for this vein placement attempt.
-         * @param {number} min - Minimum Y value (inclusive).
-         * @param {number} max - Maximum Y value (inclusive).
-         * @returns {number} Integer in [min, max].
-         * @private
-         */
-        function _randomInRange(index, min, max) {
-            var hash = _hash2D(index, ((min + max) | 0));
-            var range = max - min + 1;
-            if (range <= 1) return min;
-            // Use high bits of hash to minimize bias for small ranges
-            if (range <= 256) {
-                return min + ((hash >>> 16) % range);
-            }
-            return min + (hash % range);
-        }
-
-        /**
-         * Validate that required parameters are of correct type and range.
-         * @param {Object} params - Parameters to validate.
-         * @returns {boolean} True if all validations pass.
-         * @private
-         */
-        function _validateParams(params) {
-            if (!params.chunk || typeof params.chunk.getBlock !== 'function') return false;
-            if (typeof params.biomeId !== 'number' || params.biomeId < 0) return false;
-            return true;
-        }
-
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The OreGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.OreGenerator;
-        }
-
-        /**
-         * Destroy and free resources.
-         */
-        function destroy() {
-            _blockCache = null;
-        }
-
-        return {
-            getInstance: getInstance,
-            init: init,
-            placeOres: placeOres,
-            getMinY: getMinY,
-            getMaxY: getMaxY,
-            getOreDefinitions: getOreDefinitions,
-            getOreCount: getOreCount,
-            destroy: destroy
-        };
-    })();
+        // Constants
+        getDefaultOres: getDefaultOres
+    };
 
 })();

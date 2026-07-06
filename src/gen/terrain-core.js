@@ -27,7 +27,8 @@
     // Runtime State
     // ============================================================
     var _seed = DEFAULT_SEED;
-    var _currentBiomeId = 1; // Default to plains
+    var _currentBiomeId = 0; // Default to grass (BiomeID.GRASS = 0)
+    var _currentBiomeName = null; // Track biome name for direct resolution
     var _generationInProgress = false;
     var _generationStartTime = 0;
     var _totalChunksGenerated = 0;
@@ -156,34 +157,66 @@
      * @param {number|string|Donkeycraft.Biome} biome - Biome ID, name, or Biome object.
      */
     function setBiome(biome) {
-        var biomeId = 1; // Default to plains
+        var biomeId = 0; // Default to grass (BiomeID.GRASS = 0)
+        var biomeName = null;
         var biomeResolved = false;
 
         if (typeof biome === 'object' && biome.id !== undefined) {
             biomeId = Math.max(0, Math.floor(biome.id));
+            biomeName = biome.name || null;
             biomeResolved = true;
         } else if (typeof biome === 'number') {
             if (!isFinite(biome)) {
                 if (typeof console !== 'undefined' && console.warn) {
-                    console.warn('[TerrainCore] setBiome: non-finite biome ID, using default ID 1');
+                    console.warn('[TerrainCore] setBiome: non-finite biome ID, using default ID 0 (grass)');
                 }
             } else {
                 biomeId = Math.max(0, Math.floor(biome));
                 biomeResolved = true;
             }
-        } else if (typeof biome === 'string' && Donkeycraft.BiomeRegistry) {
-            var resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
-            if (resolvedBiome) {
-                biomeId = resolvedBiome.id;
-                biomeResolved = true;
+        } else if (typeof biome === 'string') {
+            // Try resolving as biome name first
+            if (Donkeycraft.BiomeRegistry) {
+                var resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
+                if (resolvedBiome) {
+                    biomeId = resolvedBiome.id;
+                    biomeName = resolvedBiome.name;
+                    biomeResolved = true;
+                }
+            }
+            // If BiomeRegistry not available, try direct name mapping
+            if (!biomeResolved && Donkeycraft.SurfaceGenerator) {
+                var availableBiomes = Donkeycraft.SurfaceGenerator.getAvailableBiomes();
+                if (availableBiomes.indexOf(biome) >= 0) {
+                    biomeName = biome;
+                    biomeId = _biomeNameToId(biome);
+                    biomeResolved = true;
+                }
             }
         }
 
         if (!biomeResolved && typeof console !== 'undefined' && console.warn) {
-            console.warn('[TerrainCore] setBiome: unknown biome "' + String(biome) + '", defaulting to ID 1');
+            console.warn('[TerrainCore] setBiome: unknown biome "' + String(biome) + '", defaulting to ID 0 (grass)');
         }
 
         _currentBiomeId = biomeId;
+        _currentBiomeName = biomeName;
+    }
+
+    /**
+     * Map a biome name string to its ID value.
+     * @param {string} name - Biome name.
+     * @returns {number} Biome ID.
+     * @private
+     */
+    function _biomeNameToId(name) {
+        switch (name) {
+            case 'grass': return 0;
+            case 'arctic': return 1;
+            case 'desert': return 2;
+            case 'forest': return 3;
+            default: return 0;
+        }
     }
 
     /**
@@ -252,18 +285,22 @@
 
     /**
      * Generate chunk data without caching (internal).
+     * Uses SurfaceGenerator for fractal terrain heightmaps.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
      * @private
      */
     function _generateChunkData(chunkX, chunkZ) {
-        if (!Donkeycraft.TerrainGenerator) {
+        if (!Donkeycraft.SurfaceGenerator) {
             return Promise.resolve({ heightmap: [], cacheHit: false });
         }
 
         try {
-            var heightmap = Donkeycraft.TerrainGenerator.generateHeightmap(chunkX, chunkZ, _currentBiomeId);
+            // Resolve biome name from ID for SurfaceGenerator
+            var biomeName = _resolveBiomeName(_currentBiomeId);
+
+            var heightmap = Donkeycraft.SurfaceGenerator.generateHeightmap(chunkX, chunkZ, biomeName);
             _totalChunksGenerated++;
 
             return Promise.resolve({
@@ -272,8 +309,44 @@
                 generationTime: Date.now() - _generationStartTime
             });
         } catch (e) {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[TerrainCore] Generation error for chunk (' + chunkX + ',' + chunkZ + '):', e && e.message ? e.message : String(e));
+            }
             return Promise.resolve({ heightmap: [], cacheHit: false, error: e.message });
         }
+    }
+
+    /**
+     * Resolve a biome ID to its name string for SurfaceGenerator.
+     * @param {number} biomeId - Biome ID.
+     * @returns {string} Biome name ('grass', 'arctic', 'desert', 'forest').
+     * @private
+     */
+    function _resolveBiomeName(biomeId) {
+        // First check if we have a tracked biome name from setBiome
+        if (_currentBiomeName) {
+            return _currentBiomeName;
+        }
+
+        // Map biome IDs to names based on BiomeID constants
+        if (Donkeycraft.BiomeID) {
+            switch (biomeId) {
+                case Donkeycraft.BiomeID.GRASS: return 'grass';
+                case Donkeycraft.BiomeID.ARCTIC: return 'arctic';
+                case Donkeycraft.BiomeID.DESERT: return 'desert';
+                case Donkeycraft.BiomeID.FOREST: return 'forest';
+            }
+        }
+
+        // Direct ID-to-name mapping as fallback
+        switch (biomeId) {
+            case 0: return 'grass';
+            case 1: return 'arctic';
+            case 2: return 'desert';
+            case 3: return 'forest';
+        }
+
+        return 'grass'; // Default
     }
 
     /**

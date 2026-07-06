@@ -495,7 +495,7 @@
      */
     Donkeycraft._gen = Donkeycraft._gen || {};
     Donkeycraft._gen._ensureNoiseInit = _ensureNoiseInit;
-    Donkeycraft._gen._shufflePerm = _shufflePerm;
+    // _shufflePerm removed — _createShuffledPerm handles permutation shuffling internally
     Donkeycraft._gen._createShuffledPerm = _createShuffledPerm;
     Donkeycraft._gen._noise2D = _noise2D;
     Donkeycraft._gen._fbm = _fbm;

@@ -1,323 +1,268 @@
-// Donkeycraft — Terrain Surface
-// Surface layer per biome: grass, dirt, sand, snow, stone, clay placement.
+// Donkeycraft — Biome-Appropriate Surface Layers
+// Applies biome-specific top blocks and sub-surface layers to generated terrain.
+// Grass: grass block top, dirt sub-surface, stone deep
+// Arctic: snow block top, ice in shallow water, packed ice at depth
+// Desert: sand top, sandstone layers below, desert rock at depth
+// Forest: grass block top, rich dirt (2 layers), stone deep
+//
+// @module terrain-surface
+// @description Biome-appropriate surface layer application system
 (function () {
     'use strict';
 
     var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+    if (!Donkeycraft) return;
+
+    var CHUNK_SIZE = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
+    var WORLD_HEIGHT = Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256;
 
     // ============================================================
-    // TerrainSurface
+    // Surface Block Definitions
     // ============================================================
 
     /**
-     * TerrainSurface — applies biome-specific surface layers (grass, sand, snow, stone, clay)
-     * to chunks by replacing top blocks based on the chunk's biome ID and heightmap.
+     * SurfaceLayer — defines a surface layer's block type and depth range.
+     * @param {string} name - Layer name.
+     * @param {number} blockId - Block ID for this layer.
+     * @param {number} minDepth - Minimum depth from surface (0 = top block).
+     * @param {number} maxDepth - Maximum depth from surface.
+     * @param {string[]} biomeNames - Biome names that use this layer (null = all).
      */
-    Donkeycraft.TerrainSurface = (function () {
-        // Cached block references
-        var _blocks = {};
+    function SurfaceLayer(name, blockId, minDepth, maxDepth, biomeNames) {
+        this.name = name;
+        this.blockId = blockId;
+        this.minDepth = minDepth;
+        this.maxDepth = maxDepth;
+        this.biomeNames = biomeNames || null; // null = applies to all biomes
+    }
 
-        /**
-         * Resolve all surface block IDs from BlockRegistry and cache them.
-         * @private
-         */
-        function _resolveBlocks() {
-            if (_blocks.resolved) return;
-            if (!Donkeycraft.BlockRegistry) return;
+    // ============================================================
+    // Surface Registry
+    // ============================================================
 
-            var names = ['grass_block', 'stone', 'dirt', 'sand', 'snow_block', 'snow_layer', 'clay'];
-            for (var i = 0; i < names.length; i++) {
-                var block = Donkeycraft.BlockRegistry.getBlockByName(names[i]);
-                if (block) {
-                    _blocks[names[i]] = block.id;
-                }
-            }
-            _blocks.resolved = true;
-        }
+    /**
+     * Surface registry — maps biome names to their surface layer sequences.
+     * @type {Object.<string, SurfaceLayer[]>}
+     */
+    var _surfaceLayers = {};
+    var _resolvedBlocks = {};
 
-        /**
-         * Get a cached block ID by name.
-         * @param {string} name - Block name.
-         * @returns {number} Block ID, or 0 if not found.
-         * @private
-         */
-        function _getBlockId(name) {
-            _resolveBlocks();
-            return _blocks[name] || 0;
-        }
+    /**
+     * Initialize the surface registry — resolve block IDs from BlockRegistry.
+     */
+    function init() {
+        _resolveSurfaceBlocks();
+        _buildSurfaceConfigurations();
+    }
 
-        /**
-         * Apply the surface layer to a chunk based on biome.
-         * Replaces top terrain blocks with appropriate surface blocks (grass, sand, snow, stone, clay).
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number} biomeId - Biome ID for this chunk.
-         * @param {number[]} heightmap - Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
-         */
-        function applySurfaceLayer(chunk, biomeId, heightmap) {
-            // Input validation
-            if (!chunk || typeof chunk.getBlock !== 'function' || typeof chunk.setBlock !== 'function') return;
-            if (typeof biomeId !== 'number' || biomeId < 0) return;
-            if (!heightmap || !Array.isArray(heightmap)) return;
+    /**
+     * Resolve surface-related block IDs from BlockRegistry.
+     * Tries multiple naming conventions (snake_case, camelCase, no prefix) for cross-compatibility.
+     * @private
+     */
+    function _resolveSurfaceBlocks() {
+        if (!Donkeycraft.BlockRegistry) return;
 
-            switch (biomeId) {
-                // Plains & forest variants — grass block surface with dirt layer
-                case Donkeycraft.BiomeID.PLAINS:
-                case Donkeycraft.BiomeID.FOREST:
-                case Donkeycraft.BiomeID.FLOWER_FOREST:
-                case Donkeycraft.BiomeID.FOREST_HILL:
-                case Donkeycraft.BiomeID.OCEAN:
-                case Donkeycraft.BiomeID.SUNFLOWER_PLAINS:
-                    _applyGrassSurface(chunk, heightmap);
+        // Define primary names and fallback variants for each surface block type
+        var blockVariants = [
+            { key: 'grass_block', variants: ['grass_block', 'grass', 'grassblock'] },
+            { key: 'dirt', variants: ['dirt'] },
+            { key: 'stone', variants: ['stone'] },
+            { key: 'sand', variants: ['sand'] },
+            { key: 'snow_block', variants: ['snow_block', 'snow'] },
+            { key: 'ice', variants: ['ice'] },
+            { key: 'packed_ice', variants: ['packed_ice', 'packedice'] },
+            { key: 'sandstone', variants: ['sandstone'] },
+            { key: 'desert_stone', variants: ['desert_stone', 'desert_stone_block', 'desertstone'] },
+            { key: 'rich_dirt', variants: ['rich_dirt', 'richdirt'] },
+            { key: 'topsoil', variants: ['topsoil', 'rich_dirt'] } // topsoil falls back to rich_dirt
+        ];
+
+        for (var i = 0; i < blockVariants.length; i++) {
+            var entry = blockVariants[i];
+            for (var j = 0; j < entry.variants.length; j++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(entry.variants[j]);
+                if (block && block.id) {
+                    _resolvedBlocks[entry.key] = block.id;
+                    // Also map the exact variant name for direct lookup
+                    _resolvedBlocks[entry.variants[j]] = block.id;
                     break;
-
-                // Desert — sand surface with 1-3 layers of sand below
-                case Donkeycraft.BiomeID.DESERT:
-                case Donkeycraft.BiomeID.DESERT_M:
-                    _applySandSurface(chunk, heightmap);
-                    break;
-
-                // Taiga variants — grass block base with snow layer on top
-                case Donkeycraft.BiomeID.TAIGA:
-                case Donkeycraft.BiomeID.TAIGA_HILL:
-                    _applySnowSurface(chunk, heightmap);
-                    break;
-
-                // Ice plains & snowy tundra — stone/snow surface (no grass)
-                case Donkeycraft.BiomeID.ICE_PLAINS:
-                case Donkeycraft.BiomeID.SNOWY_TUNDRA:
-                    _applyIceSurface(chunk, heightmap);
-                    break;
-
-                // Extreme hills — exposed stone surface
-                case Donkeycraft.BiomeID.EXTREME_HILLS:
-                    _applyStoneSurface(chunk, heightmap);
-                    break;
-
-                // Swamp — dirt on top with clay layer below
-                case Donkeycraft.BiomeID.SWAMP:
-                    _applySwampSurface(chunk, heightmap);
-                    break;
-
-                default:
-                    _applyGrassSurface(chunk, heightmap);
-                    break;
-            }
-        }
-
-        /**
-         * Apply grass surface: grass block on top, 1-2 layers of dirt below stone.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applyGrassSurface(chunk, heightmap) {
-            var grassBlockId = _getBlockId('grass_block');
-            var dirtId = _getBlockId('dirt');
-            var stoneId = _getBlockId('stone');
-
-            // Validate at least grass block is available
-            if (!grassBlockId) return;
-            if (!dirtId) dirtId = grassBlockId; // Fallback to grass block
-
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
-
-                    // Replace top block with grass
-                    chunk.setBlock(x, surfaceY, z, grassBlockId);
-
-                    // Add 1-2 layers of dirt below
-                    for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
-                        if (stoneId && chunk.getBlock(x, surfaceY - dy, z) === stoneId) {
-                            chunk.setBlock(x, surfaceY - dy, z, dirtId);
-                        }
-                    }
                 }
             }
         }
+    }
 
-        /**
-         * Apply sand surface: replaces top 1-3 blocks with sand where terrain is below water level.
-         * Replaces stone and dirt beneath the surface with sand.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applySandSurface(chunk, heightmap) {
-            var sandId = _getBlockId('sand');
-            var dirtId = _getBlockId('dirt');
-            var stoneId = _getBlockId('stone');
+    /**
+     * Build surface configurations for each biome.
+     * @private
+     */
+    function _buildSurfaceConfigurations() {
+        // Grass biome — grass top, dirt sub-surface, stone deep
+        _surfaceLayers['grass'] = [
+            new SurfaceLayer('grass_top', _resolvedBlocks['grass_block'] || 0, 0, 0, ['grass', 'forest']),
+            new SurfaceLayer('dirt_sub', _resolvedBlocks['dirt'] || 0, 1, 3, ['grass', 'forest']),
+            new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 0, 4, WORLD_HEIGHT, ['grass', 'forest'])
+        ];
 
-            // Validate sand block is available
-            if (!sandId) return;
+        // Arctic biome — snow top, ice in shallow water, packed ice at depth
+        _surfaceLayers['arctic'] = [
+            new SurfaceLayer('snow_top', _resolvedBlocks['snow_block'] || 0, 0, 0, ['arctic']),
+            new SurfaceLayer('ice_sub', _resolvedBlocks['packed_ice'] || _resolvedBlocks['ice'] || 0, 1, 2, ['arctic']),
+            new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 0, 3, WORLD_HEIGHT, ['arctic'])
+        ];
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+        // Desert biome — sand top, sandstone layers below, desert rock at depth
+        _surfaceLayers['desert'] = [
+            new SurfaceLayer('sand_top', _resolvedBlocks['sand'] || 0, 0, 2, ['desert']),
+            new SurfaceLayer('sandstone_sub', _resolvedBlocks['sandstone'] || 0, 3, 10, ['desert']),
+            new SurfaceLayer('desert_stone_deep', _resolvedBlocks['desert_stone'] || _resolvedBlocks['stone'] || 0, 11, WORLD_HEIGHT, ['desert'])
+        ];
 
-                    // Replace top block with sand
-                    chunk.setBlock(x, surfaceY, z, sandId);
+        // Forest biome — grass top, rich dirt (2 layers), stone deep
+        _surfaceLayers['forest'] = [
+            new SurfaceLayer('forest_grass_top', _resolvedBlocks['grass_block'] || 0, 0, 0, ['forest']),
+            new SurfaceLayer('rich_dirt_1', _resolvedBlocks['rich_dirt'] || _resolvedBlocks['dirt'] || 0, 1, 2, ['forest']),
+            new SurfaceLayer('rich_dirt_2', _resolvedBlocks['topsoil'] || _resolvedBlocks['dirt'] || 0, 3, 4, ['forest']),
+            new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 0, 5, WORLD_HEIGHT, ['forest'])
+        ];
+    }
 
-                    // Add 1-3 layers of sand below
-                    for (var dy = 1; dy <= 3 && surfaceY - dy >= 0; dy++) {
-                        var blockBelow = chunk.getBlock(x, surfaceY - dy, z);
-                        if ((stoneId && blockBelow === stoneId) || (dirtId && blockBelow === dirtId)) {
-                            chunk.setBlock(x, surfaceY - dy, z, sandId);
-                        } else {
-                            break;
-                        }
-                    }
-                }
+    /**
+     * Get surface layers for a biome.
+     * @param {string} biomeName - Biome name.
+     * @returns {SurfaceLayer[]} Array of surface layers, or null if biome not found.
+     */
+    function getSurfaceLayers(biomeName) {
+        return _surfaceLayers[biomeName] || null;
+    }
+
+    /**
+     * Get all configured biome names.
+     * @returns {string[]} Array of biome names with surface configurations.
+     */
+    function getBiomesWithSurfaces() {
+        var names = [];
+        for (var key in _surfaceLayers) {
+            if (_surfaceLayers.hasOwnProperty(key)) {
+                names.push(key);
             }
         }
+        return names;
+    }
 
-        /**
-         * Apply snow surface: grass block as base, dirt layer below, thin snow layer on top.
-         * Used for taiga biomes — has actual vegetation with grass blocks and snow decoration.
-         * Uses snow_layer (transparent) for the top decorative snow, not snow_block.
-         * The snow layer sits ABOVE the grass_block surface.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applySnowSurface(chunk, heightmap) {
-            var snowLayerId = _getBlockId('snow_layer');
-            var snowBlockId = _getBlockId('snow_block');
-            var dirtId = _getBlockId('dirt');
-            var stoneId = _getBlockId('stone');
-            var grassBlockId = _getBlockId('grass_block');
+    // ============================================================
+    // Surface Application
+    // ============================================================
 
-            // Validate at least one snow type is available
-            if (!snowLayerId && !snowBlockId) return;
+    /**
+     * Apply surface layers to a chunk's terrain.
+     * Walks down from the surface and replaces blocks according to biome configuration.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to apply surfaces to.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {string} biomeName - Biome name for this chunk.
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {{blocksModified: number}} Generation stats.
+     */
+    function applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap) {
+        var stats = { blocksModified: 0 };
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+        if (!chunk || typeof chunk.setBlock !== 'function') return stats;
+        if (!heightmap || !Array.isArray(heightmap)) return stats;
 
-                    // Place grass block as the base surface layer
-                    if (grassBlockId) {
-                        chunk.setBlock(x, surfaceY, z, grassBlockId);
-                    } else if (dirtId) {
-                        chunk.setBlock(x, surfaceY, z, dirtId);
-                    }
+        var layers = _surfaceLayers[biomeName];
+        if (!layers) {
+            // Default to grass biome surface
+            layers = _surfaceLayers['grass'];
+            if (!layers) return stats;
+        }
 
-                    // Dirt layer below — only replace stone, don't overwrite existing dirt
-                    for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
-                        if (stoneId && chunk.getBlock(x, surfaceY - dy, z) === stoneId) {
-                            chunk.setBlock(x, surfaceY - dy, z, dirtId);
-                        } else {
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var surfaceY = heightmap[x + z * CHUNK_SIZE];
+                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+
+                // Walk down from surface, applying layers
+                var depth = 0;
+                for (var y = surfaceY; y >= 0 && depth < 20; y--) {
+                    var currentBlock = chunk.getBlock(x, y, z);
+
+                    // Find matching layer for this depth
+                    var applied = false;
+                    for (var i = 0; i < layers.length; i++) {
+                        var layer = layers[i];
+                        if (depth >= layer.minDepth && depth <= layer.maxDepth) {
+                            if (layer.blockId && currentBlock !== layer.blockId) {
+                                chunk.setBlock(x, y, z, layer.blockId);
+                                stats.blocksModified++;
+                            }
+                            applied = true;
                             break;
                         }
                     }
 
-                    // Snow layer on top of the surface block (if space is empty)
-                    if (surfaceY + 1 < WORLD_HEIGHT && chunk.getBlock(x, surfaceY + 1, z) === 0) {
-                        if (snowLayerId) {
-                            chunk.setBlock(x, surfaceY + 1, z, snowLayerId);
-                        } else if (snowBlockId) {
-                            chunk.setBlock(x, surfaceY + 1, z, snowBlockId);
-                        }
-                    }
+                    depth++;
                 }
             }
         }
 
-        /**
-         * Apply ice/snow surface: snow_block as the top block (no grass).
-         * Used for ice plains and snowy tundra — fully frozen surfaces without vegetation.
-         * Places a thin layer of snow_layer on top if space is available.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applyIceSurface(chunk, heightmap) {
-            var snowBlockId = _getBlockId('snow_block');
-            var stoneId = _getBlockId('stone');
+        return stats;
+    }
 
-            // Fallback: if no snow block, use stone
-            if (!snowBlockId && !stoneId) return;
-
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
-
-                    // Use snow_block as the primary surface, fall back to stone
-                    if (snowBlockId) {
-                        chunk.setBlock(x, surfaceY, z, snowBlockId);
-                    } else if (stoneId) {
-                        chunk.setBlock(x, surfaceY, z, stoneId);
-                    }
-                }
-            }
+    /**
+     * Get the top block ID for a biome.
+     * @param {string} biomeName - Biome name.
+     * @returns {number} Top block ID, or 0 if not found.
+     */
+    function getTopBlockId(biomeName) {
+        var layers = _surfaceLayers[biomeName];
+        if (layers && layers.length > 0) {
+            return layers[0].blockId;
         }
+        return 0;
+    }
 
-        /**
-         * Apply stone surface: keeps stone as the top block (no grass/sand/snow).
-         * Used for extreme hills and mountain biomes.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applyStoneSurface(chunk, heightmap) {
-            var stoneId = _getBlockId('stone');
-            // Stone is a core block — if missing, skip silently
-            if (!stoneId) return;
+    /**
+     * Resolve a block ID by name from BlockRegistry.
+     * @param {string} name - Block name.
+     * @returns {number} Block ID, or 0 if not found.
+     */
+    function getBlockId(name) {
+        return _resolvedBlocks[name] || 0;
+    }
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+    /**
+     * Destroy the surface registry and free resources.
+     */
+    function destroy() {
+        _surfaceLayers = {};
+        _resolvedBlocks = {};
+    }
 
-                    // Keep stone as surface
-                    chunk.setBlock(x, surfaceY, z, stoneId);
-                }
-            }
-        }
+    // ============================================================
+    // Public API
+    // ============================================================
 
-        /**
-         * Apply swamp surface: dirt on top, clay layer below stone.
-         * Swamps use dirt instead of grass blocks and have clay underneath.
-         * @param {Donkeycraft.Chunk} chunk - The chunk to modify.
-         * @param {number[]} heightmap - Heightmap array.
-         * @private
-         */
-        function _applySwampSurface(chunk, heightmap) {
-            var dirtId = _getBlockId('dirt');
-            var clayId = _getBlockId('clay');
-            var stoneId = _getBlockId('stone');
+    /**
+     * Donkeycraft.TerrainSurface — Biome-appropriate surface layer system.
+     * @namespace
+     */
+    Donkeycraft.TerrainSurface = {
+        // Main entry point
+        applySurfaceLayers: applySurfaceLayers,
 
-            // Validate dirt block is available (core swamp surface block)
-            if (!dirtId) return;
+        // Initialization
+        init: init,
+        destroy: destroy,
 
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+        // Configuration access
+        getSurfaceLayers: getSurfaceLayers,
+        getBiomesWithSurfaces: getBiomesWithSurfaces,
+        getTopBlockId: getTopBlockId,
+        getBlockId: getBlockId,
 
-                    // Replace top block with dirt (swamp has dirt, not grass)
-                    chunk.setBlock(x, surfaceY, z, dirtId);
-
-                    // Add 1-2 layers of clay below stone
-                    for (var dy = 1; dy <= 2 && surfaceY - dy >= 0; dy++) {
-                        if (stoneId && chunk.getBlock(x, surfaceY - dy, z) === stoneId) {
-                            chunk.setBlock(x, surfaceY - dy, z, clayId || dirtId);
-                        } else {
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        return {
-            applySurfaceLayer: applySurfaceLayer
-        };
-    })();
+        // Constants
+        SurfaceLayer: SurfaceLayer
+    };
 
 })();
