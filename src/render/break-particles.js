@@ -293,12 +293,12 @@
         } finally {
             // Always restore depth writes, even on error.
             gl.depthMask(true);
-        }
 
-        // Disable attribute pointers (after try/finally to ensure state cleanup).
-        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
-        if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
-        if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+            // Disable attribute pointers inside finally to ensure cleanup even if drawArrays throws.
+            if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+            if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
+            if (colorLoc >= 0) gl.disableVertexAttribArray(colorLoc);
+        }
     };
 
     /**

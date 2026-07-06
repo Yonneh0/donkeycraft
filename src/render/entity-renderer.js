@@ -897,8 +897,8 @@
             var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
             var pivot = boneDef.pivot || null;
 
-            // Entity yaw is needed for both root and child bones — declare at top of scope.
-            var yaw = rot ? rot.yaw : 0;
+            // Entity yaw is needed for both root and child bones — declared at function scope (line 959).
+            var yaw = self._yaw;
 
             if (!parentWorld) {
                 // Root bone: transform is entity position + bone offset
@@ -956,7 +956,8 @@
             };
         }
 
-        var yaw = rot ? rot.yaw : 0;
+        // Entity yaw: hoisted to function scope to avoid shadowing in computeBoneWorld.
+        this._yaw = rot ? rot.yaw : 0;
 
         // Process root bones first
         for (var k = 0; k < rootBones.length; k++) {
@@ -1053,12 +1054,16 @@
     };
 
     /**
-     * _colorCache — Cache for parsed hex colors to avoid redundant string parsing.
-     * Key: normalized hex string (e.g., '#8B4513'), Value: {r, g, b} in [0, 1].
-     * @type {Object.<string, {r: number, g: number, b: number}>}
+     * _colorCache — LRU cache for parsed hex colors to avoid redundant string parsing.
+     * Key: normalized hex string (e.g., '#8B4513'), Value: {r, g, b, _accessOrder}.
+     * Maximum size is capped at MAX_COLOR_CACHE_ENTRIES to prevent unbounded memory growth.
+     * When the cache exceeds the limit, the oldest entry (lowest access order) is evicted.
+     * @type {Object.<string, {r: number, g: number, b: number, _accessOrder: number}>}
      * @private
      */
     var _colorCache = {};
+    var _colorCacheOrder = 0;
+    var MAX_COLOR_CACHE_ENTRIES = 256;
 
     /**
      * _parseHexColor — Parse a hex color string (#RGB or #RRGGBB) to normalized RGB values.
@@ -1124,13 +1129,29 @@
         }
 
         // Cache the result (use normalized key for shorthand colors).
-        _colorCache[cacheKey] = result;
+        // Evict oldest entry if cache is full.
+        var cacheKeys = Object.keys(_colorCache);
+        if (cacheKeys.length >= MAX_COLOR_CACHE_ENTRIES) {
+            // Find the oldest entry (lowest _accessOrder).
+            var oldestKey = null;
+            var oldestOrder = Infinity;
+            for (var i = 0; i < cacheKeys.length; i++) {
+                if (_colorCache[cacheKeys[i]]._accessOrder < oldestOrder) {
+                    oldestOrder = _colorCache[cacheKeys[i]]._accessOrder;
+                    oldestKey = cacheKeys[i];
+                }
+            }
+            if (oldestKey) delete _colorCache[oldestKey];
+        }
+
+        _colorCache[cacheKey] = { r: result.r, g: result.g, b: result.b, _accessOrder: ++_colorCacheOrder };
         return result;
     };
 
     /**
      * _bindMeshAttributes — Bind vertex attributes for a mesh using the shader manager.
-     * Sets up position (aPosition), normal (aNormal), and UV (aUV) attribute pointers.
+     * Sets up position (aPosition) and normal (aNormal) attribute pointers.
+     * Note: Entity shader does not use UV attributes (flat color rendering).
      * @private
      * @param {Object} meshCache - Cached mesh data with VBO and vertexByteStride.
      * @param {Object} shaderManager - ShaderManager instance for getting attribute locations.
@@ -1154,11 +1175,7 @@
             gl.vertexAttribPointer(normLoc, 3, gl.FLOAT, false, meshCache.vertexByteStride, 3 * BYTES_PER_FLOAT);
         }
 
-        var uvLoc = shaderManager.getAttribute('aUV');
-        if (uvLoc >= 0) {
-            gl.enableVertexAttribArray(uvLoc);
-            gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, meshCache.vertexByteStride, 6 * BYTES_PER_FLOAT);
-        }
+        // Note: Entity shader uses flat color rendering — no UV attributes needed.
 
         return true;
     };
@@ -1860,7 +1877,7 @@
      * Required by _bindMeshAttributes:
      * - aPosition: Vertex position attribute (3 floats)
      * - aNormal: Vertex normal attribute (3 floats)
-     * - aUV: Vertex UV attribute (2 floats)
+     * Note: Entity shader uses flat color rendering — no UV attributes required.
      *
      * Required by _drawMesh:
      * - uModel: Model matrix uniform (mat4)
@@ -1888,14 +1905,34 @@
             return result;
         }
 
-        var requiredAttrs = ['aPosition', 'aNormal', 'aUV'];
-        for (var i = 0; i < requiredAttrs.length; i++) {
-            var attrName = requiredAttrs[i];
-            var loc = this._shaderManager.getAttribute(attrName);
-            if (loc == null || loc < 0) {
-                result.valid = false;
-                result.missingAttrs.push(attrName);
-                result.errors.push('Missing vertex attribute "' + attrName + '" — meshes cannot be rendered.');
+        // CRITICAL: Activate the entity shader program before querying attribute locations.
+        // getAttribute() queries the currently active program, so we must ensure the entity
+        // shader is active to get correct attribute locations. Without this, getAttribute()
+        // returns -1 (not found) when no program is active, causing false positive errors.
+        var entityProg = this._shaderManager.getProgram('entity');
+        var wasActiveProgram = this._shaderManager._getActiveProgram();
+        if (entityProg) {
+            this._shaderManager.useProgram(entityProg);
+        }
+
+        try {
+            // Entity shader only requires aPosition and aNormal (flat color, no UV).
+            var requiredAttrs = ['aPosition', 'aNormal'];
+            for (var i = 0; i < requiredAttrs.length; i++) {
+                var attrName = requiredAttrs[i];
+                var loc = this._shaderManager.getAttribute(attrName);
+                if (loc == null || loc < 0) {
+                    result.valid = false;
+                    result.missingAttrs.push(attrName);
+                    result.errors.push('Missing vertex attribute "' + attrName + '" — meshes cannot be rendered.');
+                }
+            }
+        } finally {
+            // Restore the previously active program (or deactivate if none was active).
+            if (wasActiveProgram) {
+                this._shaderManager.useProgram(wasActiveProgram);
+            } else if (entityProg) {
+                this._shaderManager.useProgram(null);
             }
         }
 

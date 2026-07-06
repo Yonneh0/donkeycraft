@@ -521,6 +521,12 @@
                 return;
             }
 
+            // CRITICAL: Reset color overlay flag at the start to prevent state leakage.
+            // If sun/moon rendering is skipped (e.g., sunIntensity < 0.1), the flag may
+            // retain a previous value from an earlier frame, causing stars to render
+            // with incorrect color overlay behavior.
+            this._shaderManager.setInt('uHasColorOverlay', 0);
+
             var matrices = camera.getMatrices();
             this._shaderManager.setMat4('uProjection', matrices.projection);
 

@@ -543,6 +543,23 @@
             try {
                 this._entityRenderer.setGL(this._gl);
                 this._entityRenderer.setShaderManager(this._shaderManager);
+
+                // Validate shader compatibility AFTER shader manager is wired (catch configuration errors early).
+                if (typeof this._entityRenderer.validateShaderCompatibility === 'function') {
+                    try {
+                        var validation = this._entityRenderer.validateShaderCompatibility();
+                        if (!validation.valid) {
+                            Donkeycraft.Logger.warn('Game', 'Entity renderer shader compatibility check failed:');
+                            for (var i = 0; i < validation.errors.length; i++) {
+                                Donkeycraft.Logger.warn('Game', '  - ' + validation.errors[i]);
+                            }
+                        } else {
+                            Donkeycraft.Logger.debug('Game', 'Entity renderer shader compatibility validated successfully.');
+                        }
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('Game', 'Entity renderer shader validation threw exception: ' + e.message);
+                    }
+                }
             } catch (e) {
                 Donkeycraft.Logger.warn('Game', 'Failed to wire WebGL to entity renderer: ' + e.message);
             }
@@ -1343,6 +1360,7 @@
         _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
         _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
         _compileShaderPair('water', 'WATER_VERTEX_SHADER', 'WATER_FRAGMENT_SHADER');
+        _compileShaderPair('entity', 'ENTITY_VERTEX_SHADER', 'ENTITY_FRAGMENT_SHADER');
 
     };
 

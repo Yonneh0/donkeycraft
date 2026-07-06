@@ -388,60 +388,22 @@ void main() {
 }
 `;
 
-// Entity Vertex Shader
+// Entity Vertex Shader — flat color rendering (no UV needed)
 var ENTITY_VERTEX_SHADER = `
 attribute vec3 aPosition;
-attribute vec2 aUV;
 attribute vec3 aNormal;
 
 uniform mat4 uProjection;
 uniform mat4 uView;
 uniform mat4 uModel;
 
-varying vec2 vUV;
 varying vec3 vNormal;
-varying vec4 vColor;
 varying float vDepth;
 
 void main() {
     gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
-    vUV = aUV;
     vNormal = aNormal;
-    vColor = vec4(1.0); // Will be overridden by uColor uniform
     vDepth = -(uView * uModel * vec4(aPosition, 1.0)).z;
-}
-`;
-
-// Entity Fragment Shader
-var ENTITY_FRAGMENT_SHADER = `
-precision mediump float;
-
-varying vec2 vUV;
-varying vec3 vNormal;
-varying vec4 vColor;
-varying float vDepth;
-
-uniform sampler2D uTexture;
-uniform vec3 uColor;
-uniform vec3 uFogColor;
-uniform float uFogDensity;
-uniform int uUseTexture;
-
-void main() {
-    // Apply flat color
-    vec3 finalColor = uColor;
-
-    // Optional simple lighting based on normal
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-    float diff = max(dot(normalize(vNormal), lightDir), 0.3);
-    finalColor *= diff;
-
-    // Exponential distance fog
-    float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
-    fogFactor = clamp(fogFactor, 0.0, 1.0);
-    finalColor = mix(finalColor, uFogColor, fogFactor);
-
-    gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
 
@@ -543,18 +505,18 @@ void main() {
     vec3 finalColor;
     if (uCameraWaterDepth > 0.5) {
         float depthFactor = uCameraWaterDepth * 0.01; // 1% UV shift per meter
-        // Animated distortion using world position and time
+        // Animated distortion using vUV (not vWorldPos) to prevent seams at chunk boundaries
         vec2 noiseUV = vUV + vec2(
-            sin(vWorldPos.x * 0.3) * depthFactor,
-            cos(vWorldPos.z * 0.3) * depthFactor
+            sin(vUV.x * 3.14159 * 2.0) * depthFactor,
+            cos(vUV.y * 3.14159 * 2.0) * depthFactor
         );
 
         // Additional distortion for deeper water (> 3m)
         if (uCameraWaterDepth > 3.0) {
             float extraDistort = (uCameraWaterDepth - 3.0) * 0.005;
             noiseUV += vec2(
-                sin(vWorldPos.y * 0.5) * extraDistort,
-                cos(vWorldPos.x * 0.5) * extraDistort
+                sin(vUV.y * 3.14159 * 2.0) * extraDistort,
+                cos(vUV.x * 3.14159 * 2.0) * extraDistort
             );
         }
 
@@ -583,10 +545,10 @@ void main() {
 // Fog Fragment Shader
 var FOG_FRAGMENT_SHADER = `
 precision mediump float;
-uniform vec4 uFogColor;
+uniform vec3 uFogColor;
 
 void main() {
-    gl_FragColor = uFogColor;
+    gl_FragColor = vec4(uFogColor, 1.0);
 }
 `;
 
@@ -753,34 +715,31 @@ float fbm(vec2 p, float time) {
 
 void main() {
     // === Animated FBM wave displacement ===
-    // Scale UV for seamless large surface — water is much larger than 1x1
-    // FIX: Use uniform uWaveScale instead of hardcoded 8.0 for consistency with JS
-    vec2 waterUV = vUV * uWaveScale;
-    float waveHeight = fbm(waterUV, uTime);
+    // Wave UV uses world-space coordinates for seamless large-surface animation.
+    vec2 waveUV = vUV * uWaveScale;
+    float waveHeight = fbm(waveUV, uTime);
 
     // Distort UV based on wave gradient for semi-scattered reflection
     float eps = 0.01;
     vec2 dx = vec2(eps, 0.0);
     vec2 dy = vec2(0.0, eps);
-    float waveXp = fbm(waterUV + dx, uTime);
-    float waveXn = fbm(waterUV - dx, uTime);
-    float waveYp = fbm(waterUV + dy, uTime);
-    float waveYn = fbm(waterUV - dy, uTime);
+    float waveXp = fbm(waveUV + dx, uTime);
+    float waveXn = fbm(waveUV - dx, uTime);
+    float waveYp = fbm(waveUV + dy, uTime);
+    float waveYn = fbm(waveUV - dy, uTime);
     vec2 waveGradient = vec2(waveXp - waveXn, waveYp - waveYn) * 0.5;
 
-    // === FIX: Clamp UV coordinates to [0,1] range to prevent random texture artifacts ===
-    // Water UVs span many blocks (world-space), causing out-of-bounds sampling.
-    // Use fract() to wrap UVs into [0,1] for proper tile-based texture lookup.
-    vec2 clampedUV = fract(vUV);
+    // === Texture UV: wrap to [0,1] for proper tile-based texture lookup ===
+    // Wave animation uses world-space UVs (seamless), texture uses wrapped UVs (correct tile sampling).
+    vec2 texUV = fract(vUV);
 
     // Reflection UV: distort by wave gradient for scattered reflection effect
-    vec2 reflUV = clampedUV;
+    vec2 reflUV = texUV;
     reflUV += waveGradient * 0.3; // subtle scattering
     reflUV = clamp(reflUV, 0.0, 1.0); // Clamp to prevent out-of-bounds
 
     // Sample base terrain texture (for water color mixing)
-    // FIX: Use clamped UVs with slight wave distortion for correct tile sampling
-    vec2 baseUV = fract(clampedUV + waveGradient * 0.05);
+    vec2 baseUV = fract(texUV + waveGradient * 0.05);
     vec4 texColor = texture2D(uTexture, baseUV);
 
     // Sample reflected terrain (null texture returns black — safely blended out)
@@ -846,11 +805,42 @@ void main() {
     }
     alpha *= (1.0 - reflectionBlend * 0.2); // slightly reduce alpha where reflection is strong
 
-    // Dithering: subtle per-pixel variation to prevent banding
-    float dither = (fract(sin(dot(vWorldPos.xz, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.02;
+    // Dithering: subtle per-pixel variation to prevent banding.
+    // Uses a UV-based pseudo-random pattern instead of world position to avoid
+    // visible repeating patterns across large bodies of water.
+    float dither = (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * 0.02;
     alpha += dither;
 
     gl_FragColor = vec4(waterColor, clamp(alpha, 0.3, 0.9));
+}
+`;
+
+// Entity Fragment Shader — flat color rendering with fog
+var ENTITY_FRAGMENT_SHADER = `
+precision mediump float;
+
+varying vec3 vNormal;
+varying float vDepth;
+
+uniform vec3 uColor;
+uniform vec3 uFogColor;
+uniform float uFogDensity;
+
+void main() {
+    // Apply flat color from uniform
+    vec3 finalColor = uColor;
+
+    // Simple directional lighting
+    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    float diff = max(dot(normalize(vNormal), lightDir), 0.25);
+    finalColor *= diff;
+
+    // Exponential distance fog
+    float fogFactor = 1.0 - exp(-vDepth * uFogDensity);
+    fogFactor = clamp(fogFactor, 0.0, 1.0);
+    finalColor = mix(finalColor, uFogColor, fogFactor);
+
+    gl_FragColor = vec4(finalColor, 1.0);
 }
 `;
 

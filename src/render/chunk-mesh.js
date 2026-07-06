@@ -94,7 +94,7 @@
         // Track whether this mesh uses Uint32 indices
         this._geometryUsesUint32 = false;
 
-        // Cached attribute locations (populated on first draw call).
+        // Cached attribute locations (populated on first draw call per shader program).
         // null indicates uninitialised. After first lookup, stores the actual location
         // (-1 if not found in shader, or >= 0 if found). Using null instead of -1
         // prevents conflating "not yet initialized" with "attribute not found at location 0".
@@ -102,6 +102,13 @@
         this._attrLight = null;
         this._attrUV = null;
         this._attrNormal = null;
+
+        // Track which shader program the cached locations belong to, so we can invalidate
+        // them when the active program changes. WebGL programs maintain stable attribute
+        // layouts, but if the shader program is re-linked with a different program,
+        // cached locations become stale. We use a simple program reference check.
+        this._cachedProgram = null;
+
 
         // Listen for context loss/restore on the source canvas
         if (gl && gl.canvas) {
@@ -217,11 +224,18 @@
 
         // Cache attribute locations on first draw call to avoid repeated shader manager lookups.
         // Uses null check — after first lookup, stores the actual result (-1 or >= 0).
+        // Invalidates cache when the shader program changes (tracked via _cachedProgram reference).
         if (this._attrPosition === null && this._shaderManager) {
-            this._attrPosition = this._shaderManager.getAttribute('aPosition');
-            this._attrLight = this._shaderManager.getAttribute('aLight');
-            this._attrUV = this._shaderManager.getAttribute('aUV');
-            this._attrNormal = this._shaderManager.getAttribute('aNormal');
+            var currentProgram = this._shaderManager._getActiveProgram();
+
+            // Invalidate cache if the shader program has changed since last draw.
+            if (currentProgram !== this._cachedProgram) {
+                this._attrPosition = this._shaderManager.getAttribute('aPosition');
+                this._attrLight = this._shaderManager.getAttribute('aLight');
+                this._attrUV = this._shaderManager.getAttribute('aUV');
+                this._attrNormal = this._shaderManager.getAttribute('aNormal');
+                this._cachedProgram = currentProgram;
+            }
         }
 
         // Bind vertex buffer and set up attribute pointers.
@@ -347,6 +361,7 @@
         this._attrLight = null;
         this._attrUV = null;
         this._attrNormal = null;
+        this._cachedProgram = null;
     };
 
 })();

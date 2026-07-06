@@ -731,7 +731,9 @@
             Donkeycraft.Logger.error('TerrainRenderer', 'render skipped: WebGL context is null');
             return;
         }
-        if (gl.isContextLost) {
+        // FIX: Call gl.isContextLost() as a method (with parentheses) to check if context was actually lost.
+        // Without parentheses, this checks if the property exists (always truthy), causing early return every frame.
+        if (gl.isContextLost()) {
             Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: WebGL context is lost');
             return;
         }
@@ -745,6 +747,14 @@
         }
         if (!camera) {
             Donkeycraft.Logger.warn('TerrainRenderer', 'render skipped: camera is null');
+            return;
+        }
+
+        // ---- FIX Issue #5: Validate shader BEFORE modifying GL state ----
+        // If shader activation fails, we return before any GL state changes,
+        // so nothing needs to be restored. This prevents state corruption.
+        if (!this._shaderManager.use('terrain')) {
+            Donkeycraft.Logger.error('TerrainRenderer', 'render: terrain shader program not available — skipping');
             return;
         }
 
@@ -780,11 +790,7 @@
             }
             gl.polygonOffset(0.5, 0.5);
 
-            // ---- Activate terrain shader ----
-            if (!this._shaderManager.use('terrain')) {
-                Donkeycraft.Logger.error('TerrainRenderer', 'render: terrain shader program not available — skipping');
-                return;
-            }
+            // Shader already activated above — before any GL state changes.
 
             // ---- Set camera matrices ----
             var matrices = camera.getMatrices();
