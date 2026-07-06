@@ -218,7 +218,7 @@ src/                # Sauce
     gui-renderer.js       # HUD overlay (crosshair, hotbar)
     hand-renderer.js      # First-person held item
     lighting.js           # Sun/ambient light
-    map-renderer.js       # 2D overhead map, rotating minimap, time-of-day dial, surface cache
+     map-renderer.js       # Lightweight 2D map rendering core: block color lookup, surface block queries, terrain rendering to offscreen canvas
     mesh-optimizer.js     # Face culling and index buffers
     shader-manager.js     # Shader compilation and caching
     sky.js                # Sky dome rendering
@@ -260,10 +260,16 @@ src/                # Sauce
     keybindings-panel.js  # Keybind configuration UI
     loading-screen.css    # Loading screen styles
     loading-screen.js     # Loading screen UI
-    speed-indicator.css   # Speed indicator styles
-    speed-indicator.js    # Speed indicator/control (sneak/walk/run/turbo buttons)
-    xp-bar.css            # XP bar styles
-    xp-bar.js             # XP level bar
+     minimap.css           # Minimap styles: circular border, compass ring positioning
+     minimap.js            # Minimap UI module: DOM management, rotating terrain rendering with player-centered rotation, compass ring display
+     map.css               # Full map view styles: panel layout, toggle button, close button, overlay background
+     map.js                # Full map panel UI module: DOM creation, drag-to-pan interaction, mousewheel zoom targeting, auto-zoom calculation, chunk grid and block border rendering
+     tod.css               # Time-of-day dial styles: circular dial background, daylight arc pointer, slider popup, freeze button states
+     tod.js                # Time-of-day dial UI module: DOM creation, time display updates, sun/moon emoji pointer, creative mode time slider with freeze/unfreeze controls
+     speed-indicator.css   # Speed indicator styles
+     speed-indicator.js    # Speed indicator/control (sneak/walk/run/turbo buttons)
+     xp-bar.css            # XP bar styles
+     xp-bar.js             # XP level bar
 
 ```
 

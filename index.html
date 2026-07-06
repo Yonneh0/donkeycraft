@@ -32,6 +32,11 @@
     <link rel="stylesheet" href="src/ui/debug-overlay.css"> <!-- debug-overlay (Engine/UI Testing Interface) -->
     <link rel="stylesheet" href="src/ui/nametags.css"> <!-- nametags (Entity Nametag CSS Overlay) -->
 
+    <!-- Map View UI (minimap, full map panel, time-of-day dial) -->
+    <link rel="stylesheet" href="src/ui/minimap.css"> <!-- minimap (Circular rotating minimap with compass ring) -->
+    <link rel="stylesheet" href="src/ui/map.css"> <!-- map (Full-screen panning/zooming map view) -->
+    <link rel="stylesheet" href="src/ui/tod.css"> <!-- tod (Time-of-day dial + time slider popup) -->
+
     <style>
         /* Inline styles for dynamically-created elements */
         #dk-canvas-container {
@@ -861,6 +866,12 @@ void main() {
     <script src="src/render/hand-renderer.js"></script>
     <script src="src/render/break-particles.js"></script>
     <script src="src/render/gui-renderer.js"></script>
+
+    <!-- Map View UI (minimap, full map panel, time-of-day dial) -->
+    <script src="src/ui/tod.js"></script>
+    <script src="src/ui/minimap.js"></script>
+    <script src="src/ui/map.js"></script>
+
     <script src="src/render/map-renderer.js"></script>
     <!-- Main Entry Point & Game Loop -->
     <script src="src/game.js"></script>

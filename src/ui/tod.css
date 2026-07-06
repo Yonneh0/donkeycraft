@@ -1,0 +1,291 @@
+/* Donkeycraft — Time of Day Dial UI Styles */
+/* Circular time dial widget, daylight arc, pointer, hour display, slider popup */
+
+/* ============================================================
+   TIME DIAL — Time-of-Day Indicator Widget
+   ============================================================ */
+
+#dk-time-dial {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 360;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, rgba(30, 35, 55, 0.92), rgba(15, 18, 30, 0.95));
+    border: 1px solid rgba(80, 100, 140, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    overflow: visible;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#dk-time-dial:hover {
+    border-color: rgba(120, 150, 200, 0.6);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.08);
+}
+
+#dk-time-dial .dk-dial-ring {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    position: relative;
+    margin-bottom: 2px;
+}
+
+#dk-time-dial .dk-dial-ring {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+#dk-time-dial .dk-dial-daylight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from 180deg, rgba(200, 220, 255, 0.45), rgba(200, 220, 255, 0.45) 360deg, transparent 360deg, transparent 540deg);
+    pointer-events: none;
+}
+
+#dk-time-dial .dk-dial-pointer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    font-size: 14px;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#dk-time-dial .dk-dial-text {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 9px;
+    font-weight: bold;
+    color: rgba(220, 230, 255, 0.9);
+    text-align: center;
+    line-height: 1;
+}
+
+#dk-time-dial .dk-dial-frozen {
+    position: absolute;
+    bottom: -14px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 7px;
+    color: rgba(255, 200, 80, 0.8);
+    white-space: nowrap;
+}
+
+/* ============================================================
+   TIME DIAL — Time-of-Day Slider Popup
+   ============================================================ */
+
+.dk-time-dial-popup {
+    position: fixed;
+    z-index: 600;
+    min-width: 260px;
+    background: linear-gradient(135deg, rgba(25, 30, 45, 0.97), rgba(18, 22, 35, 0.97));
+    border: 1px solid rgba(100, 140, 200, 0.3);
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(80, 120, 200, 0.15);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* Popup header */
+.dk-time-dial-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 6px;
+    border-bottom: 1px solid rgba(100, 140, 200, 0.15);
+}
+
+.dk-time-dial-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: rgba(180, 200, 240, 0.9);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dk-time-dial-close {
+    background: none;
+    border: none;
+    color: rgba(160, 170, 200, 0.6);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.15s ease;
+}
+
+.dk-time-dial-close:hover {
+    color: rgba(220, 230, 255, 0.9);
+}
+
+/* Slider row */
+.dk-time-dial-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.dk-time-dial-label {
+    font-size: 9px;
+    color: rgba(140, 160, 200, 0.6);
+    white-space: nowrap;
+    min-width: 28px;
+    text-align: center;
+}
+
+/* Custom range slider styling */
+.dk-time-dial-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg,
+            rgba(40, 50, 80, 0.8) 0%,
+            rgba(80, 100, 160, 0.6) 25%,
+            rgba(180, 200, 240, 0.7) 50%,
+            rgba(220, 160, 80, 0.6) 75%,
+            rgba(40, 50, 80, 0.8) 100%);
+    outline: none;
+    cursor: pointer;
+}
+
+/* Slider thumb — custom styled */
+.dk-time-dial-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%,
+            rgba(255, 250, 230, 1) 0%,
+            rgba(255, 220, 140, 0.9) 50%,
+            rgba(255, 180, 80, 0.8) 100%);
+    box-shadow: 0 0 6px rgba(255, 200, 100, 0.5), 0 0 12px rgba(255, 180, 80, 0.3);
+    cursor: grab;
+    transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.dk-time-dial-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 8px rgba(255, 200, 100, 0.7), 0 0 16px rgba(255, 180, 80, 0.4);
+    transform: scale(1.1);
+}
+
+.dk-time-dial-slider::-webkit-slider-thumb:active {
+    cursor: grabbing;
+    box-shadow: 0 0 10px rgba(255, 200, 100, 0.8), 0 0 20px rgba(255, 180, 80, 0.5);
+    transform: scale(1.15);
+}
+
+/* Firefox slider thumb */
+.dk-time-dial-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%,
+            rgba(255, 250, 230, 1) 0%,
+            rgba(255, 220, 140, 0.9) 50%,
+            rgba(255, 180, 80, 0.8) 100%);
+    box-shadow: 0 0 6px rgba(255, 200, 100, 0.5), 0 0 12px rgba(255, 180, 80, 0.3);
+    border: none;
+    cursor: grab;
+}
+
+/* Time display */
+.dk-time-dial-time-display {
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: rgba(220, 230, 255, 0.9);
+    padding: 0 12px 8px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(150, 180, 240, 0.3);
+}
+
+/* Control buttons row */
+.dk-time-dial-controls {
+    display: flex;
+    gap: 6px;
+    padding: 0 12px 10px;
+}
+
+.dk-time-dial-freeze,
+.dk-time-dial-survival {
+    flex: 1;
+    padding: 5px 8px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border: 1px solid rgba(100, 140, 200, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: rgba(30, 35, 55, 0.6);
+    color: rgba(160, 180, 220, 0.8);
+}
+
+.dk-time-dial-freeze:hover,
+.dk-time-dial-survival:hover {
+    background: rgba(40, 50, 75, 0.7);
+    border-color: rgba(120, 160, 220, 0.4);
+    color: rgba(200, 215, 255, 0.95);
+}
+
+.dk-time-dial-freeze:active,
+.dk-time-dial-survival:active {
+    background: rgba(50, 60, 90, 0.7);
+    transform: scale(0.97);
+}
+
+/* Active frozen state */
+.dk-time-dial-freeze-active {
+    background: rgba(60, 80, 120, 0.5) !important;
+    border-color: rgba(140, 180, 255, 0.4) !important;
+    color: rgba(180, 210, 255, 0.95) !important;
+    box-shadow: 0 0 8px rgba(100, 150, 255, 0.2);
+}
+
+.dk-time-dial-freeze-active:hover {
+    background: rgba(70, 90, 130, 0.6) !important;
+    border-color: rgba(160, 200, 255, 0.5) !important;
+}
+
+/* Survival button — distinct color */
+.dk-time-dial-survival {
+    border-color: rgba(100, 180, 120, 0.25);
+}
+
+.dk-time-dial-survival:hover {
+    border-color: rgba(100, 200, 140, 0.4);
+    color: rgba(180, 240, 200, 0.95);
+}
+
+.dk-time-dial-survival:active {
+    background: rgba(40, 70, 50, 0.6) !important;
+}

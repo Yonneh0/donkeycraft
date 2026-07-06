@@ -1,0 +1,22 @@
+/* Donkeycraft — Minimap UI Styles */
+/* Circular minimap in top-left corner, compass ring, player indicator */
+
+/* Minimap — top-left corner, circular */
+#dk-minimap-canvas {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 350;
+    width: var(--minimap-size, 150px);
+    height: var(--minimap-size, 150px);
+    border-radius: 50%;
+    border: 2px solid rgba(100, 200, 100, 0.4);
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+    display: block;
+    background: rgba(10, 15, 20, 0.85);
+}
+
+/* Hide minimap when full map view is open */
+body.dk-map-open #dk-minimap-canvas {
+    display: none !important;
+}
