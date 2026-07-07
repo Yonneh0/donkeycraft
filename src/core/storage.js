@@ -287,28 +287,29 @@
             return Promise.resolve();
         }
 
+        var writesCopy = _pendingWrites.slice();
+        _pendingWrites = [];
+
         // Return a new promise that resolves when the transaction completes
         _flushPromise = new Promise(function (resolve) {
             try {
                 var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
                 var store = tx.objectStore(CHUNK_STORE_NAME);
 
-                for (var i = 0; i < _pendingWrites.length; i++) {
-                    var write = _pendingWrites[i];
+                for (var i = 0; i < writesCopy.length; i++) {
+                    var write = writesCopy[i];
                     store.put({ key: write.key, data: write.data, savedAt: Date.now() });
                 }
 
                 tx.oncomplete = function () {
-                    _pendingWrites = [];
                     _flushPromise = null;
                     resolve();
                 };
 
-                tx.onerror = function () {
+                tx.onerror = function (error) {
                     // Check for quota exceeded error
                     if (tx.error && tx.error.name === 'QuotaExceededError') {
                         _warn('IndexedDB quota exceeded — clearing old cache entries');
-                        // Clear only the chunk store, not metadata, to avoid transaction conflicts
                         try {
                             var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
                             clearTx.objectStore(CHUNK_STORE_NAME).clear();
@@ -319,13 +320,11 @@
                             clearTx.onerror = function() { /* ignore */ };
                         } catch (e) { /* ignore */ }
                     }
-                    _pendingWrites = [];
                     _flushPromise = null;
-                    resolve(); // Resolve anyway to avoid hanging
+                    resolve();
                 };
             } catch (e) {
                 _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
-                _pendingWrites = [];
                 _flushPromise = null;
                 resolve();
             }
@@ -519,40 +518,30 @@
      * @returns {Promise} Resolves when all writes are complete.
      */
     function flush() {
-        // No pending work — resolve immediately
+        // No pending work and no in-progress flush — resolve immediately
         if (_pendingWrites.length === 0 && !_flushPromise) {
             return Promise.resolve();
         }
 
-        // If a flush is already in progress, wait for it
+        // If a flush is already in progress, wait for it with timeout
         if (_flushPromise) {
-            // Wrap with timeout to prevent hanging indefinitely
             return Promise.race([
                 _flushPromise,
-                new Promise(function (resolve) {
-                    setTimeout(resolve, 2000);
-                })
-            ]).then(function () {
-                // Silently resolve on timeout
-            });
+                new Promise(function (resolve) { setTimeout(resolve, 2000); })
+            ]).catch(function() { /* ignore timeout */ });
         }
 
-        // Trigger a new flush and return its promise with timeout protection
+        // Trigger a new flush
         var flushPromise = _flushPendingWrites();
         if (!flushPromise) {
             return Promise.resolve();
         }
 
-        // Return the flush promise with a 2-second timeout fallback
         _flushPromise = flushPromise;
         return Promise.race([
             flushPromise,
-            new Promise(function (resolve) {
-                setTimeout(resolve, 2000);
-            })
-        ]).then(function () {
-            // Resolve successfully on either completion or timeout
-        });
+            new Promise(function (resolve) { setTimeout(resolve, 2000); })
+        ]).catch(function() { /* ignore timeout */ });
     }
 
     /**

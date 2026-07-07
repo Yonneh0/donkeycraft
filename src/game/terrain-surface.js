@@ -68,22 +68,26 @@
     /**
      * Resolve surface-related block IDs from BlockRegistry.
      * Tries multiple naming conventions (snake_case, camelCase, no prefix) for cross-compatibility.
+     * Includes aliases for both camelCase (block.js) and snake_case (standard) naming styles.
      * @private
      */
     function _resolveSurfaceBlocks() {
         if (!Donkeycraft.BlockRegistry) return;
 
-        // Define primary names and fallback variants for each surface block type
+        // Define primary names and fallback variants for each surface block type.
+        // Covers both snake_case (Minecraft 1.13+) and camelCase (legacy) naming conventions.
         var blockVariants = [
-            { key: 'grass_block', variants: ['grass_block', 'grass', 'grassblock'] },
+            { key: 'grass_block', variants: ['grass_block', 'grass_block_top', 'grass_block_side', 'grass', 'grassblock'] },
             { key: 'dirt', variants: ['dirt'] },
             { key: 'stone', variants: ['stone'] },
             { key: 'sand', variants: ['sand'] },
-            { key: 'snow_block', variants: ['snow_block', 'snow'] },
+            // snow_block uses camelCase 'snowBlock' in block.js — must include both forms
+            { key: 'snow_block', variants: ['snow_block', 'snowBlock', 'snow_layer', 'snow'] },
             { key: 'ice', variants: ['ice'] },
             { key: 'packed_ice', variants: ['packed_ice', 'packedice'] },
-            { key: 'sandstone', variants: ['sandstone'] },
-            { key: 'desert_stone', variants: ['desert_stone', 'desert_stone_block', 'desertstone'] },
+            { key: 'sandstone', variants: ['sandstone', 'chiseled_sandstone', 'cut_sandstone'] },
+            // desert_stone may not exist in block.js — fall back to stone
+            { key: 'desert_stone', variants: ['desert_stone', 'desert_stone_block', 'desertstone', 'stone'] },
             { key: 'rich_dirt', variants: ['rich_dirt', 'richdirt'] },
             { key: 'topsoil', variants: ['topsoil', 'rich_dirt'] } // topsoil falls back to rich_dirt
         ];
@@ -104,6 +108,7 @@
 
     /**
      * Build surface configurations for each biome.
+     * Validates that at least one layer has a valid block ID before registering.
      * @private
      */
     function _buildSurfaceConfigurations() {
@@ -116,9 +121,11 @@
 
         // Arctic biome — snow top, ice in shallow water, packed ice at depth
         // IMPORTANT: Fallback chain must never end at 0 (air) — always fall back to stone
+        var arcticSnowId = _resolvedBlocks['snow_block'] || _resolvedBlocks['snowBlock'] || _resolvedBlocks['stone'];
+        var arcticIceId = _resolvedBlocks['packed_ice'] || _resolvedBlocks['ice'] || _resolvedBlocks['stone'];
         _surfaceLayers['arctic'] = [
-            new SurfaceLayer('snow_top', _resolvedBlocks['snow_block'] || _resolvedBlocks['snow_layer'] || _resolvedBlocks['stone'] || 1, 0, 0, ['arctic']),
-            new SurfaceLayer('ice_sub', _resolvedBlocks['packed_ice'] || _resolvedBlocks['ice'] || _resolvedBlocks['stone'] || 1, 1, 2, ['arctic']),
+            new SurfaceLayer('snow_top', arcticSnowId || _resolvedBlocks['stone'] || 1, 0, 0, ['arctic']),
+            new SurfaceLayer('ice_sub', arcticIceId || _resolvedBlocks['stone'] || 1, 1, 2, ['arctic']),
             new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 1, 3, WORLD_HEIGHT, ['arctic'])
         ];
 
@@ -176,7 +183,7 @@
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {string} biomeName - Biome name for this chunk.
-     * @param {number[]} heightmap - Heightmap array.
+     * @param {number[]} heightmap - Heightmap array with terrain heights.
      * @returns {{blocksModified: number}} Generation stats with total blocks modified count.
      */
     function applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap) {
@@ -230,10 +237,22 @@
 
                 surfaceY = Math.floor(surfaceY);
 
-                // Walk down from surface to Y=0, applying layers based on depth
+                // Walk down from surface to Y=0, applying layers based on depth.
+                // Stops early once the deepest layer (typically stone) is applied
+                // to avoid unnecessary iterations through lower Y levels.
+                var maxLayerDepth = 0;
+                for (var li = 0; li < layers.length; li++) {
+                    if (layers[li].maxDepth > maxLayerDepth) maxLayerDepth = layers[li].maxDepth;
+                }
+                // Cap maxLayerDepth to a reasonable value relative to world height
+                var effectiveMaxDepth = Math.min(maxLayerDepth, WORLD_HEIGHT - 1);
+
                 for (var y = surfaceY; y >= 0; y--) {
-                    var currentBlock = chunk.getBlock(x, y, z);
                     var depth = surfaceY - y;
+                    // Stop iterating once we've passed the deepest layer
+                    if (depth > effectiveMaxDepth) break;
+
+                    var currentBlock = chunk.getBlock(x, y, z);
 
                     // Find matching layer for this depth
                     for (var i = 0; i < layers.length; i++) {

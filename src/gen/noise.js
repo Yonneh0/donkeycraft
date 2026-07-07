@@ -180,6 +180,56 @@
     }
 
     /**
+     * Shuffle the PerlinNoise permutation table deterministically from a seed.
+     * Uses Numerical Recipes LCG (same as PerlinNoise.init) for consistency.
+     * This must be called before generating textures to ensure deterministic noise.
+     * @param {number} seed - Numeric seed value.
+     * @returns {boolean} True if successful.
+     * @private
+     */
+    function _shufflePerm(seed) {
+        if (!Donkeycraft.PerlinNoise || typeof Donkeycraft.PerlinNoise._setPerm !== 'function') {
+            // If PerlinNoise doesn't have _setPerm, try to init it with the seed directly
+            if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
+                try {
+                    Donkeycraft.PerlinNoise.init(seed);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            }
+            return false;
+        }
+        try {
+            // Create a shuffled permutation using the seed
+            var p = new Uint8Array(256);
+            for (var i = 0; i < 256; i++) p[i] = i;
+
+            // Use Numerical Recipes LCG for deterministic shuffling
+            var s = (seed !== undefined && seed !== null && typeof seed === 'number' && !isNaN(seed))
+                ? Math.floor(Math.abs(seed)) : 42;
+            s = ((s % 2147483646) + 2147483646) % 2147483646 + 1;
+            for (var i = 255; i > 0; i--) {
+                s = (s * 16807) % 2147483647;
+                var j = s % (i + 1);
+                var tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+            }
+
+            // Build the 512-element perm table
+            var perm = new Uint8Array(512);
+            for (var i = 0; i < 512; i++) {
+                perm[i] = p[i & 255];
+            }
+
+            // Set on PerlinNoise
+            Donkeycraft.PerlinNoise._setPerm(perm);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
      * Create a NEW permutation table shuffled deterministically from a seed.
      * Creates an isolated copy so it doesn't affect the global PerlinNoise state.
      * @param {number} seed - Numeric seed value.
@@ -495,7 +545,7 @@
      */
     Donkeycraft._gen = Donkeycraft._gen || {};
     Donkeycraft._gen._ensureNoiseInit = _ensureNoiseInit;
-    // _shufflePerm removed — _createShuffledPerm handles permutation shuffling internally
+    Donkeycraft._gen._shufflePerm = _shufflePerm;
     Donkeycraft._gen._createShuffledPerm = _createShuffledPerm;
     Donkeycraft._gen._noise2D = _noise2D;
     Donkeycraft._gen._fbm = _fbm;

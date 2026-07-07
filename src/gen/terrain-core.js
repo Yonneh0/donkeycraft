@@ -53,19 +53,14 @@
     /**
      * Generate a deterministic hash from seed and chunk coordinates.
      * Used for cache key generation and noise offsetting.
-     * Uses 32-bit masking at each arithmetic step to ensure consistent
-     * behavior across all JavaScript engines and browsers, including
-     * for negative chunk coordinates.
      * @param {number} chunkX - Chunk X coordinate (may be negative).
      * @param {number} chunkZ - Chunk Z coordinate (may be negative).
      * @returns {number} Deterministic unsigned 32-bit hash.
      * @private
      */
     function _chunkHash(chunkX, chunkZ) {
-        // Mask to 32-bit signed integers first
         var x = chunkX | 0;
         var z = chunkZ | 0;
-        // FNV-1a inspired hash with 32-bit masking at each step
         var h = ((x * 374761393 + z * 668265263) ^ 0x5bd1e995) & 0xFFFFFFFF;
         h = (((h >>> 13) ^ h) * 0x5bd1e995) & 0xFFFFFFFF;
         return ((h ^ (h >>> 15)) & 0xFFFFFFFF) >>> 0;
@@ -97,11 +92,8 @@
      * @private
      */
     function _recordCacheAccess(isHit) {
-        if (isHit) {
-            _cacheHitCount++;
-        } else {
-            _cacheMissCount++;
-        }
+        if (isHit) _cacheHitCount++;
+        else _cacheMissCount++;
     }
 
     // ============================================================
@@ -118,9 +110,7 @@
 
         // Reinitialize PerlinNoise with new seed
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.init === 'function') {
-            try {
-                Donkeycraft.PerlinNoise.init(_seed);
-            } catch (e) { /* ignore */ }
+            try { Donkeycraft.PerlinNoise.init(_seed); } catch (e) { /* ignore */ }
         }
 
         // Seed the noise module's internal state
@@ -128,18 +118,12 @@
             Donkeycraft._gen._ensureNoiseInit();
         }
 
-        // Clear memory cache when seed changes
+        // Clear cache when seed changes
         if (Donkeycraft.Storage && Donkeycraft.Storage.clearAllCaches) {
-            try {
-                Donkeycraft.Storage.clearAllCaches();
-            } catch (e) { /* ignore */ }
+            try { Donkeycraft.Storage.clearAllCaches(); } catch (e) { /* ignore */ }
         }
 
-        // Notify listeners of seed change
-        _notifySeedChanged({
-            oldSeed: oldSeed,
-            newSeed: _seed
-        });
+        _notifySeedChanged({ oldSeed: oldSeed, newSeed: _seed });
     }
 
     /**
@@ -303,7 +287,6 @@
 
     /**
      * Generate chunk data without caching (internal).
-     * Uses SurfaceGenerator for fractal terrain heightmaps.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
@@ -315,12 +298,9 @@
         }
 
         try {
-            // Resolve biome name from ID for SurfaceGenerator
             var biomeName = _resolveBiomeName(_currentBiomeId);
-
             var heightmap = Donkeycraft.SurfaceGenerator.generateHeightmap(chunkX, chunkZ, biomeName);
             _totalChunksGenerated++;
-
             return Promise.resolve({
                 heightmap: heightmap,
                 cacheHit: false,
@@ -336,26 +316,19 @@
 
     /**
      * Resolve a biome ID to its name string for SurfaceGenerator.
-     * Uses a single canonical ID-to-name mapping to ensure consistent results
-     * regardless of how setBiome was called (number, string, or Biome object).
      * @param {number} biomeId - Biome ID.
      * @returns {string} Biome name ('grass', 'arctic', 'desert', 'forest').
      * @private
      */
     function _resolveBiomeName(biomeId) {
-        // Validate and clamp biome ID to valid range
         var id = Math.max(0, Math.min(3, Math.floor(biomeId)));
-        
-        // Single canonical mapping — always use direct ID-to-name
-        // This eliminates inconsistent results from multiple fallback paths
         switch (id) {
             case 0: return 'grass';
             case 1: return 'arctic';
             case 2: return 'desert';
             case 3: return 'forest';
+            default: return 'grass';
         }
-
-        return 'grass'; // Default fallback
     }
 
     /**
@@ -554,14 +527,11 @@
      * @returns {Promise<boolean>} True if initialization successful.
      */
     function init() {
-        // Initialize storage if available
         if (Donkeycraft.Storage && typeof Donkeycraft.Storage.init === 'function') {
             return Donkeycraft.Storage.init().then(function (ready) {
-                // Initialize noise with default seed
                 setSeed(_seed);
                 return true;
             }).catch(function (e) {
-                // Storage init failed — continue without it
                 if (typeof console !== 'undefined' && console.warn) {
                     console.warn('[TerrainCore] Storage initialization failed:', e && e.message ? e.message : String(e));
                 }
@@ -569,8 +539,6 @@
                 return false;
             });
         }
-
-        // No storage — just initialize noise
         setSeed(_seed);
         return Promise.resolve(true);
     }

@@ -394,6 +394,43 @@
             return _allBiomes[Math.floor(Math.random() * _allBiomes.length)];
         }
 
+        /**
+         * Get a biome by climate parameters (temperature and rainfall).
+         * Uses biome temperature and rainfall properties to find the best match.
+         * Temperature: 0 = arctic, 0.33-0.66 = grass/forest, 0.66-1.0 = desert
+         * Rainfall: high = forest (wet), low = grass/desert (dry)
+         * @param {number} temperature - Temperature value [0, 1].
+         * @param {number} rainfall - Rainfall value [0, 1].
+         * @returns {Donkeycraft.Biome|null} The best matching biome, or null if none found.
+         */
+        function getBiomeByClimate(temperature, rainfall) {
+            // Clamp inputs to valid range
+            temperature = Math.max(0, Math.min(1, temperature || 0.5));
+            rainfall = Math.max(0, Math.min(1, rainfall || 0.5));
+
+            if (_allBiomes.length === 0) {
+                return null;
+            }
+
+            // Find the biome with the smallest climate distance
+            var bestBiome = _allBiomes[0];
+            var bestDist = Infinity;
+
+            for (var i = 0; i < _allBiomes.length; i++) {
+                var b = _allBiomes[i];
+                // Euclidean distance in climate space (temperature, rainfall)
+                var dT = b.temperature - temperature;
+                var dR = b.rainfall - rainfall;
+                var dist = dT * dT + dR * dR;
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestBiome = b;
+                }
+            }
+
+            return bestBiome;
+        }
+
         // Initialize on load (deferred to ensure all modules are loaded)
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
@@ -417,6 +454,7 @@
             getBiomeCount: getBiomeCount,
             hasBiome: hasBiome,
             getRandomBiome: getRandomBiome,
+            getBiomeByClimate: getBiomeByClimate,
             getTerrainParameters: getTerrainParameters,
             isReady: function() { return _initialized; }
         };

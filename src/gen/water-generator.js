@@ -421,8 +421,8 @@
 
             // River loop detection: track visited positions to prevent infinite loops
             // in flat terrain where multiple cells have equal height.
-            // Use a simple hash-based visited set (limited capacity).
-            var visitedKey = Math.floor(worldX * 1000 + worldZ);
+            // Uses a proper 2D hash to avoid collisions at large coordinates.
+            var visitedKey = _hash2D(worldX, worldZ);
             if (_riverVisited.has(visitedKey)) {
                 // Loop detected — river dissipates
                 break;

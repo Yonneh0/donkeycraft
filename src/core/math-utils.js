@@ -1032,6 +1032,17 @@
             };
         }
 
+        /**
+         * Set the permutation table directly. Used by texture generators
+         * to create isolated shuffled permutations for deterministic noise.
+         * @param {Uint8Array} perm - New permutation table of length 512.
+         */
+        function setPerm(perm) {
+            if (perm instanceof Uint8Array && perm.length >= 512) {
+                _perm.set(perm);
+            }
+        }
+
         return {
             init: init,
             noise3D: makeValidatedNoise3D(noise3D),
@@ -1039,6 +1050,7 @@
             noise1D: makeValidatedNoise1D(noise1D),
             fbm: fbm,
             _getPerm: function () { return _perm; },
+            _setPerm: setPerm,
             _isInitialized: function () { return _initialized; }
         };
     })();
