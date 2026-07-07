@@ -292,54 +292,62 @@
         var writesCopy = _pendingWrites.slice();
         _pendingWrites = [];
 
-        // Chain off any in-progress flush to prevent race conditions
-        var chainPromise = _flushPromise && !_flushPromise._resolved ? _flushPromise : Promise.resolve();
+        // Chain off any in-progress flush to prevent race conditions.
+        // Use a proper sentinel value (_resolved) that is set BEFORE the promise is created,
+        // so the chaining check works correctly on first flush.
+        var chainPromise = (_flushPromise && !_flushPromise._resolved) ? _flushPromise : Promise.resolve();
 
-        _flushPromise = chainPromise.then(function () {
-            return new Promise(function (resolve) {
-                try {
-                    var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-                    var store = tx.objectStore(CHUNK_STORE_NAME);
+        // Create a proper thenable object with _resolved tracking from the start
+        var newFlushPromise = {
+            _resolved: false,
+            then: function (onFulfilled, onRejected) {
+                return chainPromise.then(function () {
+                    return new Promise(function (resolve) {
+                        try {
+                            var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                            var store = tx.objectStore(CHUNK_STORE_NAME);
 
-                    for (var i = 0; i < writesCopy.length; i++) {
-                        var write = writesCopy[i];
-                        store.put({ key: write.key, data: write.data, savedAt: Date.now() });
-                    }
+                            for (var i = 0; i < writesCopy.length; i++) {
+                                var write = writesCopy[i];
+                                store.put({ key: write.key, data: write.data, savedAt: Date.now() });
+                            }
 
-                    tx.oncomplete = function () {
-                        _flushPromise = null;
-                        resolve();
-                    };
+                            tx.oncomplete = function () {
+                                newFlushPromise._resolved = true;
+                                _flushPromise = null;
+                                resolve();
+                            };
 
-                    tx.onerror = function () {
-                        // Check for quota exceeded error
-                        if (tx.error && tx.error.name === 'QuotaExceededError') {
-                            _warn('IndexedDB quota exceeded — clearing old cache entries');
-                            try {
-                                var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-                                clearTx.objectStore(CHUNK_STORE_NAME).clear();
-                                clearTx.oncomplete = function () {
-                                    _memoryCache.clear();
-                                    _lruOrder = [];
-                                };
-                                clearTx.onerror = function() { /* ignore */ };
-                            } catch (e) { /* ignore */ }
+                            tx.onerror = function () {
+                                // Check for quota exceeded error
+                                if (tx.error && tx.error.name === 'QuotaExceededError') {
+                                    _warn('IndexedDB quota exceeded — clearing old cache entries');
+                                    try {
+                                        var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                                        clearTx.objectStore(CHUNK_STORE_NAME).clear();
+                                        clearTx.oncomplete = function () {
+                                            _memoryCache.clear();
+                                            _lruOrder = [];
+                                        };
+                                        clearTx.onerror = function() { /* ignore */ };
+                                    } catch (e) { /* ignore */ }
+                                }
+                                newFlushPromise._resolved = true;
+                                _flushPromise = null;
+                                resolve();
+                            };
+                        } catch (e) {
+                            _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
+                            newFlushPromise._resolved = true;
+                            _flushPromise = null;
+                            resolve();
                         }
-                        _flushPromise = null;
-                        resolve();
-                    };
-                } catch (e) {
-                    _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
-                    _flushPromise = null;
-                    resolve();
-                }
-            });
-        });
+                    });
+                }).then(onFulfilled, onRejected);
+            }
+        };
 
-        // Mark as resolved for chaining purposes
-        _flushPromise._resolved = false;
-        _flushPromise.then(function () { _flushPromise._resolved = true; });
-
+        _flushPromise = newFlushPromise;
         return _flushPromise;
     }
 

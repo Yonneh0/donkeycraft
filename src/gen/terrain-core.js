@@ -242,8 +242,9 @@
 
         var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed);
 
-        // Skip caching for invalid cache keys (bad inputs)
+        // Skip caching for invalid cache keys (bad inputs) — but still record as cache miss
         if (_isInvalidCacheKey(cacheKey)) {
+            _recordCacheAccess(false);
             return _generateChunkData(chunkX, chunkZ);
         }
 

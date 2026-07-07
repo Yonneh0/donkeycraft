@@ -832,6 +832,24 @@
             var meshBuffers = {};
             var dirtyChunks = new Set();
 
+            /**
+             * Clear mesh buffers and properly delete WebGL buffers to prevent memory leaks.
+             * Called during terrain regeneration to free old GPU resources.
+             * @private
+             */
+            function _clearMeshBuffers() {
+                for (var key in meshBuffers) {
+                    if (meshBuffers.hasOwnProperty(key)) {
+                        var buf = meshBuffers[key];
+                        if (buf.posBuf) gl.deleteBuffer(buf.posBuf);
+                        if (buf.colorBuf) gl.deleteBuffer(buf.colorBuf);
+                        if (buf.alphaBuf) gl.deleteBuffer(buf.alphaBuf);
+                        if (buf.normBuf) gl.deleteBuffer(buf.normBuf);
+                    }
+                }
+                meshBuffers = {};
+            }
+
             // Sky buffer cache (created once)
             var skyBuffersCreated = false;
             var skyPosBuf = null, skyColBuf = null;
@@ -1256,13 +1274,12 @@
 
             // ============================================================
             // Terrain regeneration — uses TerrainCore pipeline with ChunkGrid integration
+            // Fixed: All chunk generation is now properly awaited before marking chunks ready
             // ============================================================
             function regenerateTerrain() {
                 chunks.clear();
-                meshBuffers = {};
+                _clearMeshBuffers();
                 dirtyChunks.clear();
-
-                var allBiomes = Donkeycraft.BiomeRegistry ? Donkeycraft.BiomeRegistry.getAllBiomes() : [];
 
                 // Determine the grid bounds from ChunkGrid or legacy radii
                 var bounds, radii;
@@ -1286,8 +1303,8 @@
                     };
                 }
 
-                var generationStartTime = Date.now();
-                var totalChunks = 0;
+                // Create all chunks and collect generation promises
+                var pendingChunks = [];
 
                 for (var cx = bounds.minX; cx <= bounds.maxX; cx++) {
                     for (var cz = bounds.minZ; cz <= bounds.maxZ; cz++) {
@@ -1301,64 +1318,74 @@
                             Donkeycraft.TerrainCore.setSeed(worldSeed);
                             Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
 
-                            Donkeycraft.TerrainCore.generateChunk(cx, cz).then(function (result) {
-                                // Heightmap generated — apply full pipeline
-                                _applyGenerationPipeline(chunk, cx, cz, result.heightmap, biomeId);
-                            }).catch(function (e) {
-                                // Generation failed — use fallback
-                                if (typeof console !== 'undefined' && console.warn) {
-                                    console.warn('[Terrain] Generation failed for chunk (' + cx + ',' + cz + '):', e && e.message ? e.message : String(e));
-                                }
-                                _applyGenerationPipeline(chunk, cx, cz, null, biomeId);
+                            // Store chunk in pending list — DO NOT add to chunks map yet
+                            pendingChunks.push({
+                                key: key,
+                                chunk: chunk,
+                                cx: cx,
+                                cz: cz,
+                                biomeId: biomeId
                             });
                         } else {
                             // Fallback: legacy generation (synchronous)
                             _generateChunkFallback(chunk, cx, cz, biomeId);
                             chunks.set(key, chunk);
                             dirtyChunks.add(key);
-                            totalChunks++;
-                            continue;
                         }
-
-                        chunks.set(key, chunk);
-                        dirtyChunks.add(key);
-                        totalChunks++;
                     }
                 }
 
-                document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
-                document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
+                // Wait for all async chunk generations to complete before marking chunks ready
+                if (pendingChunks.length > 0) {
+                    var generationPromises = [];
 
-                // Refresh chunk grid visual to reflect new bounds/center
-                renderChunkGrid();
+                    for (var i = 0; i < pendingChunks.length; i++) {
+                        var pc = pendingChunks[i];
+                        var promise = Donkeycraft.TerrainCore.generateChunk(pc.cx, pc.cz).then(function (result) {
+                            // Heightmap generated — NOW add chunk to map and mark dirty
+                            if (result && result.heightmap && Array.isArray(result.heightmap)) {
+                                // Store heightmap on chunk for later use by mesh builders
+                                pc.chunk._cachedHeightmap = result.heightmap;
+                            }
+                            chunks.set(pc.key, pc.chunk);
+                            dirtyChunks.add(pc.key);
+                        }).catch(function (e) {
+                            // Generation failed — use fallback
+                            if (typeof console !== 'undefined' && console.warn) {
+                                console.warn('[Terrain] Generation failed for chunk (' + pc.cx + ',' + pc.cz + '):', e && e.message ? e.message : String(e));
+                            }
+                            // Still add the chunk so it renders (empty terrain)
+                            chunks.set(pc.key, pc.chunk);
+                            dirtyChunks.add(pc.key);
+                        });
+                        generationPromises.push(promise);
+                    }
 
-                // Update stats after generation
-                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
-                    var stats = Donkeycraft.TerrainCore.getStats();
-                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
-                }
-            }
+                    // Update stats after ALL generations complete
+                    Promise.all(generationPromises).then(function () {
+                        document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
+                        document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
 
-            /**
-             * Apply the full generation pipeline to a chunk.
-             * Marks the chunk dirty after completion so the mesh rebuilds with generated data.
-             * @param {Donkeycraft.Chunk} chunk - The chunk to populate.
-             * @param {number} cx - Chunk X coordinate.
-             * @param {number} cz - Chunk Z coordinate.
-             * @param {number[]} heightmap - Generated heightmap (or null for fallback).
-             * @param {number} biomeId - Biome ID.
-             * @private
-             */
-            function _applyGenerationPipeline(chunk, cx, cz, heightmap, biomeId) {
-                // Use StructureGenerator for full pipeline: terrain → surface → ores → caves → water → decoration
-                if (Donkeycraft.StructureGenerator) {
-                    Donkeycraft.StructureGenerator.generateChunkFull(chunk, biomeId);
+                        // Refresh chunk grid visual to reflect new bounds/center
+                        renderChunkGrid();
+
+                        // Update stats after generation
+                        if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
+                            var stats = Donkeycraft.TerrainCore.getStats();
+                            document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+                        }
+                    });
                 } else {
-                    _generateChunkFallback(chunk, cx, cz, biomeId);
+                    // All synchronous — update stats immediately
+                    document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
+                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
+                    renderChunkGrid();
+
+                    if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
+                        var stats = Donkeycraft.TerrainCore.getStats();
+                        document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+                    }
                 }
-                // Mark chunk dirty so mesh rebuilds with generated terrain data
-                var key = cx + ',' + cz;
-                dirtyChunks.add(key);
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)

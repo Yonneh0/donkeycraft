@@ -48,6 +48,18 @@
     var LAVA_CAVE_Y_LEVEL = 10;
 
     /**
+     * Biome-specific cave generation Y-range configuration.
+     * Each biome can have different startY (max depth) and endY (min depth) values.
+     * @type {Object.<string, {startY: number, endY: number}>}
+     */
+    var CAVE_Y_RANGES = {
+        grass: { startY: 140, endY: 5 },
+        arctic: { startY: 100, endY: 5 },
+        desert: { startY: 120, endY: 10 },
+        forest: { startY: 130, endY: 3 }
+    };
+
+    /**
      * Maximum radius of cave tunnels (in blocks).
      * Valid range: 1-10. Higher values = larger caves.
      * @type {number}
