@@ -1766,20 +1766,49 @@
                                     nid = getBlockAt(ngx, ngy, ngz);
                                 }
 
-                                // Skip faces that cross +X and +Z chunk boundaries to eliminate duplicate geometry.
-                                // When two adjacent chunks have different block types at their border, both would
-                                // otherwise render a face at the exact same world position, causing z-fighting.
-                                // By only rendering the "western" or "northern" side, each boundary is drawn exactly once.
-                                var chunkBoundaryX = (nx >= cs || nx < 0);
-                                var chunkBoundaryZ = (nz >= cs || nz < 0);
-                                if ((face.d[0] === 1 && chunkBoundaryX) || (face.d[2] === 1 && chunkBoundaryZ)) {
-                                    continue;
-                                }
-
                                 // Show face if neighbor is air OR a different block type.
                                 // Only cull faces between identical adjacent blocks (like-block borders).
                                 // All transitions between different block types must be visible.
                                 if (nid === 0 || nid !== bid) {
+                                    // ---- Chunk boundary deduplication (conditional) ----
+                                    // When two adjacent LOADED chunks have different block types at their
+                                    // shared border, both would render a face at the exact same world
+                                    // position, causing z-fighting. To prevent this, we only render the
+                                    // "western" or "southern" side of each internal boundary.
+                                    //
+                                    // CRITICAL: We ONLY skip when the neighbor chunk is LOADED and has the
+                                    // SAME block type (like-block border). If the neighbor chunk is NOT
+                                    // loaded (unloaded = air), we MUST render the face to show the
+                                    // transition from terrain block to air/void.
+                                    var chunkBoundaryX = (nx >= cs || nx < 0);
+                                    var chunkBoundaryZ = (nz >= cs || nz < 0);
+
+                                    // Check if the neighbor chunk is loaded
+                                    var neighborChunkLoaded = false;
+                                    if (chunkBoundaryX || chunkBoundaryZ) {
+                                        var ngxWorld = chunk.chunkX * cs + nx;
+                                        var ngzWorld = chunk.chunkZ * cs + nz;
+                                        var ngxChunk = Math.floor(ngxWorld / cs);
+                                        var ngzChunk = Math.floor(ngzWorld / cs);
+                                        // Clamp to valid range
+                                        ngxChunk = Math.max(-1000, Math.min(1000, ngxChunk));
+                                        ngzChunk = Math.max(-1000, Math.min(1000, ngzChunk));
+                                        neighborChunkLoaded = chunks.has(ngxChunk + ',' + ngzChunk);
+                                    }
+
+                                    // Only skip +X/+Z faces at chunk boundaries when the neighbor chunk
+                                    // is loaded AND has the same block type (like-block border).
+                                    // When neighbor is unloaded (nid === 0) or different block type,
+                                    // we MUST render the face.
+                                    var shouldSkipBoundary = false;
+                                    if (neighborChunkLoaded && nid === bid) {
+                                        if (face.d[0] === 1 && nx >= cs) shouldSkipBoundary = true;
+                                        if (face.d[2] === 1 && nz >= cs) shouldSkipBoundary = true;
+                                    }
+
+                                    if (shouldSkipBoundary) {
+                                        continue;
+                                    }
                                     // Each quad = 6 vertices (2 triangles), consistent winding [0,1,2] + [0,2,3]
                                     var triIndices = [0, 1, 2, 0, 2, 3];
                                     for (var ti = 0; ti < 6; ti++) {
