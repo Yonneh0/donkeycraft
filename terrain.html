@@ -1419,10 +1419,30 @@
                     }
                 }
 
-                if (options.caves && Donkeycraft.CaveGenerator) Donkeycraft.CaveGenerator.generateCaves(chunk, biomeId);
+                if (options.caves && Donkeycraft.CaveGenerator) Donkeycraft.CaveGenerator.generateCaves(chunk, cx !== undefined ? cx : chunk.chunkX, cz !== undefined ? cz : chunk.chunkZ, heightmap);
                 if (options.ores && Donkeycraft.OreGenerator) { Donkeycraft.OreGenerator.init(); Donkeycraft.OreGenerator.placeOres(chunk, biomeId); }
-                if (options.water && Donkeycraft.WaterGenerator && heightmap) Donkeycraft.WaterGenerator.placeWater(chunk, biomeId, heightmap);
-                if (options.surface && Donkeycraft.TerrainSurface && heightmap) Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, biomeId, heightmap);
+                // Water placement: use full signature with chunk coordinates for proper biome resolution
+                if (options.water && Donkeycraft.WaterGenerator && heightmap) {
+                    try {
+                        var waterOpts = { caves: options.caves, ores: options.ores, water: true, surface: options.surface, decorations: options.decorations };
+                        Donkeycraft.WaterGenerator.placeWater(chunk, cx !== undefined ? cx : chunk.chunkX, cz !== undefined ? cz : chunk.chunkZ, biomeId, heightmap, waterOpts);
+                    } catch (e) {
+                        if (typeof console !== 'undefined' && console.warn) console.warn('[Terrain] Water generation failed:', e && e.message ? e.message : String(e));
+                    }
+                }
+                // Surface layers: use correct method name (applySurfaceLayers, plural) with full parameters
+                if (options.surface && Donkeycraft.TerrainSurface && heightmap) {
+                    try {
+                        var biomeName = 'grass';
+                        if (Donkeycraft.BiomeRegistry) {
+                            var b = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
+                            if (b) biomeName = b.name;
+                        }
+                        Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, cx !== undefined ? cx : chunk.chunkX, cz !== undefined ? cz : chunk.chunkZ, biomeName, heightmap);
+                    } catch (e) {
+                        if (typeof console !== 'undefined' && console.warn) console.warn('[Terrain] Surface generation failed:', e && e.message ? e.message : String(e));
+                    }
+                }
             }
 
             // ============================================================

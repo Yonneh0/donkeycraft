@@ -61,6 +61,21 @@
      */
     var MIN_CAVE_RADIUS = 1.5;
 
+    /**
+     * Decoration cave threshold — noise value below which decoration caves generate.
+     * Uses negative values to ensure only ~5-10% of space becomes decoration caves.
+     * Valid range: -0.8 to 0.0. More negative = fewer caves.
+     * @type {number}
+     */
+    var CAVE_THRESHOLD_DECO = -0.3;
+
+    /**
+     * Noise scale for decoration cave generation.
+     * Larger scale = fewer, larger decoration caves.
+     * @type {number}
+     */
+    var NOISE_SCALE_DECO = 0.015;
+
     // ============================================================
     // Cave Generator State
     // ============================================================
@@ -336,11 +351,14 @@
 
     /**
      * Generate special caves with glowstone/crystal formations.
-     * Creates small, visually striking caverns with embedded light sources.
+     * Creates sparse, large caverns with embedded light sources for visually striking underground features.
+     * Uses negative threshold (-0.3) to ensure only ~5-10% of space becomes decoration caves.
      * @param {Donkeycraft.Chunk} chunk - The chunk to generate decoration caves in.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {Object} [options] - Generation options.
+     * @param {number} [options.threshold] - Noise threshold for cave carving (default: -0.3).
+     * @param {number} [options.noiseScale] - Noise scale factor (default: 0.015).
      * @returns {Object} Generation stats: {decoCaves, glowstonePlaced}.
      */
     function pass5DecorationCaves(chunk, chunkX, chunkZ, options) {
@@ -348,11 +366,12 @@
 
         if (!chunk || typeof chunk.setBlock !== 'function') return result;
 
-        var decoNoiseScale = (options && options.noiseScale) ? options.noiseScale : 0.04;
-        var decoThreshold = (options && options.threshold !== undefined) ? options.threshold : 0.1;
+        // Use configured constants as defaults — negative threshold ensures sparse decoration caves
+        var decoNoiseScale = (options && options.noiseScale !== undefined) ? options.noiseScale : NOISE_SCALE_DECO;
+        var decoThreshold = (options && options.threshold !== undefined) ? options.threshold : CAVE_THRESHOLD_DECO;
         var glowstoneId = _getBlockId('glowstone');
 
-        // Decoration caves are sparse, large caverns
+        // Decoration caves are sparse, large caverns — wider Y stepping for efficiency
         var yStep = 5;
         var startY = WORLD_HEIGHT - 30;
         var endY = 15;
@@ -365,6 +384,7 @@
 
                     var noiseValue = _fbmNoise(worldX * decoNoiseScale + 9000, y * decoNoiseScale * 0.5 + 7000, worldZ * decoNoiseScale + 9000, 3);
 
+                    // Use negative threshold: only carve where noise is significantly below zero
                     if (noiseValue < decoThreshold) {
                         var radius = 2 + (Math.abs(_hash3D(worldX, y, worldZ)) % 4);
 

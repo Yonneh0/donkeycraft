@@ -310,9 +310,15 @@
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-                    // Validate: ore must be placed inside solid rock or replace other ores
+                    // Validate: ore must be placed inside solid rock or replace other ores/stone variants
+                    // This allows natural geological layering where newer veins replace older ones
                     var currentBlock = chunk.getBlock(bx, by, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, by, bz, oreBlockId);
+                        placed++;
+                    } else if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(currentBlock)) {
+                        // Also allow replacement of any solid block for natural ore distribution
+                        // This prevents ores from floating in air and ensures they're embedded in rock
                         chunk.setBlock(bx, by, bz, oreBlockId);
                         placed++;
                     }
@@ -373,8 +379,13 @@
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0 || by >= WORLD_HEIGHT) continue;
 
+                    // Validate: ore must be placed inside solid rock or replace other ores/stone variants
                     var currentBlock = chunk.getBlock(bx, by, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, by, bz, oreBlockId);
+                        placed++;
+                    } else if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(currentBlock)) {
+                        // Also allow replacement of any solid block for natural ore distribution
                         chunk.setBlock(bx, by, bz, oreBlockId);
                         placed++;
                     }
@@ -427,8 +438,13 @@
 
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
 
+                    // Validate: ore must be placed inside solid rock or replace other ores/stone variants
                     var currentBlock = chunk.getBlock(bx, currentY, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
+                        chunk.setBlock(bx, currentY, bz, oreBlockId);
+                        placed++;
+                    } else if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(currentBlock)) {
+                        // Also allow replacement of any solid block for natural ore distribution
                         chunk.setBlock(bx, currentY, bz, oreBlockId);
                         placed++;
                     }

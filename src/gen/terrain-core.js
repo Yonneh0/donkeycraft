@@ -212,13 +212,24 @@
      * @private
      */
     function _biomeNameToId(name) {
-        switch (name) {
+        if (!name || typeof name !== 'string') return 0;
+        switch (name.trim().toLowerCase()) {
             case 'grass': return 0;
             case 'arctic': return 1;
             case 'desert': return 2;
             case 'forest': return 3;
             default: return 0;
         }
+    }
+
+    /**
+     * Check if a cache key is the invalid sentinel value.
+     * @param {string} key - Cache key to check.
+     * @returns {boolean} True if key is the invalid sentinel.
+     * @private
+     */
+    function _isInvalidCacheKey(key) {
+        return key === 'terrain__invalid';
     }
 
     /**
@@ -247,6 +258,11 @@
         }
 
         var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed);
+
+        // Skip caching for invalid cache keys (bad inputs)
+        if (_isInvalidCacheKey(cacheKey)) {
+            return _generateChunkData(chunkX, chunkZ);
+        }
 
         // Check storage once and store result to avoid race conditions
         var storageReady = Donkeycraft.Storage && Donkeycraft.Storage.isReady();
@@ -356,7 +372,26 @@
         _generationStartTime = Date.now();
         _totalChunksGenerated = 0;
 
-        var gridChunks = Donkeycraft.ChunkGrid ? Donkeycraft.ChunkGrid.getGridChunks() : [];
+        var gridChunks = [];
+        if (Donkeycraft.ChunkGrid && typeof Donkeycraft.ChunkGrid.getGridChunks === 'function') {
+            try {
+                gridChunks = Donkeycraft.ChunkGrid.getGridChunks();
+            } catch (e) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[TerrainCore] ChunkGrid.getGridChunks failed:', e && e.message ? e.message : String(e));
+                }
+            }
+        }
+
+        // Validate grid chunks before proceeding
+        if (!Array.isArray(gridChunks) || gridChunks.length === 0) {
+            _generationInProgress = false;
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[TerrainCore] No chunks in grid to generate');
+            }
+            return Promise.resolve([]);
+        }
+
         var promises = [];
 
         for (var i = 0; i < gridChunks.length; i++) {
@@ -370,9 +405,21 @@
             }(gridChunks[i].x, gridChunks[i].z));
         }
 
-        return Promise.all(promises).then(function (results) {
+        return Promise.allSettled(promises).then(function (results) {
             _generationInProgress = false;
-            return results;
+            // Return settled results as plain array
+            var settledResults = [];
+            for (var i = 0; i < results.length; i++) {
+                if (results[i].status === 'fulfilled') {
+                    settledResults.push(results[i].value);
+                } else {
+                    if (typeof console !== 'undefined' && console.warn) {
+                        console.warn('[TerrainCore] Chunk generation rejected:', results[i].reason && results[i].reason.message ? results[i].reason.message : String(results[i].reason));
+                    }
+                    settledResults.push({ heightmap: [], cacheHit: false, error: results[i].reason && results[i].reason.message ? results[i].reason.message : String(results[i].reason) });
+                }
+            }
+            return settledResults;
         }).catch(function (error) {
             // Fallback: should not happen with individual catch handlers above
             _generationInProgress = false;
@@ -571,7 +618,8 @@
 
         // Internal access (for other modules)
         _makeCacheKey: _makeCacheKey,
-        _chunkHash: _chunkHash
+        _chunkHash: _chunkHash,
+        _isInvalidCacheKey: _isInvalidCacheKey
     };
 
 })();

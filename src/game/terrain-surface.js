@@ -46,6 +46,7 @@
      */
     var _surfaceLayers = {};
     var _resolvedBlocks = {};
+    var _initialized = false; // Track whether init has been called
 
     /**
      * Initialize the surface registry — resolve block IDs from BlockRegistry.
@@ -53,6 +54,15 @@
     function init() {
         _resolveSurfaceBlocks();
         _buildSurfaceConfigurations();
+        _initialized = true;
+    }
+
+    /**
+     * Check whether the surface registry has been initialized.
+     * @returns {boolean} True if init() has been called.
+     */
+    function isInitialized() {
+        return _initialized;
     }
 
     /**
@@ -182,6 +192,14 @@
             biomeName = biomeName.trim().toLowerCase();
         }
 
+        // Skip if init hasn't been called yet — terrain generation will retry after init
+        if (!_initialized) {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[TerrainSurface] Not initialized yet, skipping surface layers for biome "' + biomeName + '"');
+            }
+            return stats;
+        }
+
         var layers = _surfaceLayers[biomeName];
         if (!layers) {
             // Default to grass biome surface with validation
@@ -287,6 +305,7 @@
         // Initialization / lifecycle
         init: init,
         destroy: destroy,
+        isInitialized: isInitialized,
 
         // Configuration access
         getSurfaceLayers: getSurfaceLayers,

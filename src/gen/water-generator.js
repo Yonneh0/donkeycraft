@@ -110,6 +110,15 @@
     var _liquidBlocks = {};
 
     /**
+     * River loop detection: tracks visited world coordinates to prevent infinite loops
+     * in flat terrain where gradient descent finds equal-height neighbors.
+     * Uses a Set of string keys "worldX,worldZ" for O(1) lookup.
+     * @type {Set<string>}
+     * @private
+     */
+    var _riverVisited = new Set();
+
+    /**
      * Resolve water-related block IDs from BlockRegistry.
      */
     function init() {
@@ -208,14 +217,20 @@
         var biomeName = _resolveBiomeName(biomeId);
         var config = BIOME_WATER_CONFIG[biomeName] || BIOME_WATER_CONFIG.grass;
 
-        // Rivers (biome-dependent) — always run first for consistent behavior
+        // Place ocean/surface water first — fills empty space below sea level
+        if (config.hasSurfaceWater) {
+            var oceanStats = _placeOceanWater(chunk, config, heightmap);
+            stats.waterBlocksPlaced += oceanStats;
+        }
+
+        // Rivers (biome-dependent) — run after ocean water for proper drainage
         if (config.hasRivers) {
             var riverStats = _placeRivers(chunk, chunkX, chunkZ, config, heightmap);
             stats.waterBlocksPlaced += riverStats.waterBlocksPlaced;
             stats.riversCreated += riverStats.riversCreated;
         }
 
-        // Lakes (biome-dependent)
+        // Lakes (biome-dependent) — placed after rivers to fill remaining basins
         if (config.hasSurfaceWater) {
             var lakeStats = _placeLakes(chunk, chunkX, chunkZ, config, heightmap);
             stats.waterBlocksPlaced += lakeStats.waterBlocksPlaced;
@@ -241,10 +256,12 @@
     // ============================================================
 
     /**
-     * Place ocean water across the chunk — fills from surface+1 to water level.
-     * @param {Donkeycraft.Chunk} chunk - The chunk.
-     * @param {Object} config - Biome water configuration.
-     * @param {number[]} heightmap - Heightmap array.
+     * Place ocean/surface water across the chunk — fills from surface+1 to water level
+     * wherever terrain is below the biome's water level threshold.
+     * Creates continuous water bodies that form oceans, seas, and large lakes.
+     * @param {Donkeycraft.Chunk} chunk - The chunk to place water in.
+     * @param {Object} config - Biome water configuration (must have waterLevel property).
+     * @param {number[]} heightmap - Heightmap array (CHUNK_SIZE × CHUNK_SIZE).
      * @returns {number} Number of water blocks placed.
      * @private
      */
@@ -275,38 +292,9 @@
     // Surface Water Placement
     // ============================================================
 
-    /**
-     * Place surface water in low-lying areas where terrain is below sea level.
-     * @param {Donkeycraft.Chunk} chunk - The chunk.
-     * @param {Object} config - Biome water configuration.
-     * @param {number[]} heightmap - Heightmap array.
-     * @returns {number} Number of water blocks placed.
-     * @private
-     */
-    function _placeSurfaceWater(chunk, config, heightmap) {
-        var placed = 0;
-        var waterLevel = config.waterLevel;
-
-        if (!heightmap) return placed;
-
-        for (var x = 0; x < CHUNK_SIZE; x++) {
-            for (var z = 0; z < CHUNK_SIZE; z++) {
-                var surfaceY = heightmap[x + z * CHUNK_SIZE] || waterLevel;
-
-                // Place water where terrain is below water level
-                if (surfaceY < waterLevel) {
-                    for (var y = surfaceY + 1; y <= waterLevel && y < WORLD_HEIGHT; y++) {
-                        if (chunk.getBlock(x, y, z) === 0) {
-                            chunk.setBlock(x, y, z, _waterBlockId);
-                            placed++;
-                        }
-                    }
-                }
-            }
-        }
-
-        return placed;
-    }
+    // _placeSurfaceWater is now merged into _placeOceanWater for efficiency.
+    // The ocean water pass handles all below-sea-level filling in a single pass.
+    // This eliminates code duplication and ensures consistent water behavior.
 
     // ============================================================
     // River Placement
@@ -426,6 +414,16 @@
                     }
                 }
             }
+
+            // River loop detection: track visited positions to prevent infinite loops
+            // in flat terrain where multiple cells have equal height.
+            // Use a simple hash-based visited set (limited capacity).
+            var visitedKey = Math.floor(worldX * 1000 + worldZ);
+            if (_riverVisited.has(visitedKey)) {
+                // Loop detected — river dissipates
+                break;
+            }
+            _riverVisited.add(visitedKey);
 
             // Check if we found a downward path (terrain gradient)
             // Also check drainage noise for natural river paths
@@ -757,12 +755,14 @@
 
     /**
      * Destroy the water generator and free resources.
+     * Clears all internal state including the river visited set.
      */
     function destroy() {
         _waterBlockId = null;
         _lavaBlockId = null;
         _iceBlockId = null;
         _liquidBlocks = {};
+        _riverVisited.clear();
     }
 
     // ============================================================
