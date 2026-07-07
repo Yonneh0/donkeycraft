@@ -473,9 +473,9 @@
 
     /**
      * Fill a cave area with lava up to a certain level.
-     * Replaces air and water blocks with lava for realistic underground lava lakes.
-     * Creates hemispherical lava pools by iterating the full sphere radius
-     * but only placing lava at or below the center Y level (lava floats on water table).
+     * Creates hemispherical lava pools by iterating only the lower hemisphere
+     * (at or below center Y) for realistic lava lakes that fill from the bottom up.
+     * Lava floats on water, so it accumulates at the water table level.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y (lava lake surface level).
@@ -492,25 +492,21 @@
         var count = 0;
         var rInt = Math.ceil(radius);
 
-        // Iterate full sphere but only place lava at or below center Y level.
+        // Iterate only the lower hemisphere (dy from 0 to rInt) for efficiency.
         // This creates realistic lava lakes that fill from the bottom up to the surface level.
         for (var dx = -rInt; dx <= rInt; dx++) {
-            for (var dy = -rInt; dy <= rInt; dy++) {
+            for (var dy = 0; dy <= rInt; dy++) {
                 for (var dz = -rInt; dz <= rInt; dz++) {
                     var distSquared = dx * dx + dy * dy + dz * dz;
 
                     if (distSquared > rSquared) continue;
 
                     var bx = cx + dx;
-                    var by = cy + dy;
+                    var by = cy - dy; // Subtract to go downward from surface level
                     var bz = cz + dz;
 
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0) continue;
-
-                    // Only place lava at or below the center Y level (lava lake surface).
-                    // Lava floats on water, so it accumulates at the water table level.
-                    if (by > cy) continue;
 
                     var currentBlock = chunk.getBlock(bx, by, bz);
                     // Fill air and water blocks with lava for realistic lava lake behavior

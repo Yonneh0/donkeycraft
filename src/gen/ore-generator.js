@@ -332,14 +332,13 @@
     /**
      * Place a layered (sedimentary) ore vein.
      * Creates flat, horizontal deposits typical of sedimentary ores like coal.
-     * Validates placement in stone or replaces existing ores for natural geological layering.
-     * Uses proper Y-dimension clamping to prevent ellipsoidal check from allowing
-     * blocks outside the intended layer thickness.
+     * Uses noise-based density falloff for natural vein edges.
+     * Validates placement in solid rock or replaces existing ores for natural layering.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y.
      * @param {number} cz - Center Z.
-     * @param {number} radius - Vein radius.
+     * @param {number} radius - Vein radius (XZ width).
      * @param {number} oreBlockId - Ore block ID.
      * @param {number} stoneId - Stone block ID for validation.
      * @returns {number} Number of ore blocks placed.
@@ -349,18 +348,14 @@
         if (!oreBlockId) return 0;
 
         var layerHeight = Math.max(1, Math.floor(radius / 2));
+        var rInt = Math.ceil(radius);
         var placed = 0;
 
         for (var dy = -layerHeight; dy <= layerHeight; dy++) {
-            for (var dx = -radius; dx <= radius; dx++) {
-                for (var dz = -radius; dz <= radius; dz++) {
-                    // Clamp Y offset to layer height to prevent ellipsoidal check
-                    // from allowing blocks outside the intended layer thickness
-                    var dyClamped = Math.max(-layerHeight, Math.min(layerHeight, dy));
-
+            for (var dx = -rInt; dx <= rInt; dx++) {
+                for (var dz = -rInt; dz <= rInt; dz++) {
                     // Elliptical shape: wider in XZ, thinner in Y
-                    var normalizedDist = (dx * dx + dz * dz) / (radius * radius) + (dyClamped * dyClamped) / (layerHeight * layerHeight);
-
+                    var normalizedDist = (dx * dx) / (radius * radius) + (dy * dy) / (layerHeight * layerHeight);
                     if (normalizedDist > 1) continue;
 
                     // Noise-based density falloff for natural vein edges
@@ -376,16 +371,16 @@
                     var by = cy + dy;
                     var bz = cz + dz;
 
+                    // Check bounds
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-                    // Validate: ore must be placed inside solid rock or replace other ores/stone variants
+                    // Validate: ore must be placed inside solid rock or replace other ores
                     var currentBlock = chunk.getBlock(bx, by, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
                         chunk.setBlock(bx, by, bz, oreBlockId);
                         placed++;
                     } else if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(currentBlock)) {
-                        // Also allow replacement of any solid block for natural ore distribution
                         chunk.setBlock(bx, by, bz, oreBlockId);
                         placed++;
                     }
@@ -399,8 +394,8 @@
     /**
      * Place a vertical pipe (hydrothermal) ore vein.
      * Creates tube-like deposits typical of hydrothermal vents, e.g., gold veins.
-     * Validates placement in stone or replaces existing ores for natural geological layering.
      * Pipes taper at top and bottom for natural appearance.
+     * Validates placement in solid rock or replaces existing ores for natural layering.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y (bottom of pipe).
@@ -424,27 +419,23 @@
             // Taper radius at top and bottom for natural pipe shape
             var taperFactor = 1 - Math.abs(y - pipeHeight / 2) / (pipeHeight / 2);
             var currentRadius = radius * (0.5 + taperFactor * 0.5);
-
             var rInt = Math.ceil(currentRadius);
 
             for (var dx = -rInt; dx <= rInt; dx++) {
                 for (var dz = -rInt; dz <= rInt; dz++) {
-                    var distSquared = dx * dx + dz * dz;
-
-                    if (distSquared > currentRadius * currentRadius) continue;
+                    if (dx * dx + dz * dz > currentRadius * currentRadius) continue;
 
                     var bx = cx + dx;
                     var bz = cz + dz;
 
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
 
-                    // Validate: ore must be placed inside solid rock or replace other ores/stone variants
+                    // Validate: ore must be placed inside solid rock or replace other ores
                     var currentBlock = chunk.getBlock(bx, currentY, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
                         chunk.setBlock(bx, currentY, bz, oreBlockId);
                         placed++;
                     } else if (Donkeycraft.BlockRegistry && Donkeycraft.BlockRegistry.isSolid(currentBlock)) {
-                        // Also allow replacement of any solid block for natural ore distribution
                         chunk.setBlock(bx, currentY, bz, oreBlockId);
                         placed++;
                     }

@@ -314,9 +314,9 @@
                         var snowBlockId = _resolvedBlocks['snow_block'] || 0;
 
                         var isReplaceable = currentBlock === 0 || // air
-                                           currentBlock === waterId || // water
-                                           currentBlock === snowLayerId || // snow layer
-                                           currentBlock === snowBlockId; // snow block
+                            currentBlock === waterId || // water
+                            currentBlock === snowLayerId || // snow layer
+                            currentBlock === snowBlockId; // snow block
 
                         if (isReplaceable) {
                             chunk.setBlock(bx, by, bz, leafBlock);
@@ -641,6 +641,10 @@
 
         // Pass 2: Apply surface layers via TerrainSurface
         if (opts.surface && typeof Donkeycraft.TerrainSurface.applySurfaceLayers === 'function') {
+            // Self-initialize TerrainSurface if needed (handles module load order race conditions)
+            if (!Donkeycraft.TerrainSurface.isInitialized()) {
+                try { Donkeycraft.TerrainSurface.init(); } catch (e) { /* ignore */ }
+            }
             var surfaceStats = Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap);
             stats.surfaceApplied = true;
             stats.blocksModified += surfaceStats.blocksModified || 0;
@@ -657,10 +661,10 @@
         if (opts.caves && typeof Donkeycraft.CaveGenerator.generateCaves === 'function') {
             var caveStats = Donkeycraft.CaveGenerator.generateCaves(chunk, chunkX, chunkZ, heightmap);
             stats.cavesCarved += (caveStats.pass1 ? caveStats.pass1.mainCavesCarved : 0) +
-                                  (caveStats.pass2 ? caveStats.pass2.smallCavesCarved : 0) +
-                                  (caveStats.pass3 ? caveStats.pass3.entrancesCarved : 0) +
-                                  (caveStats.pass4 ? caveStats.pass4.lavaCavesCarved : 0) +
-                                  (caveStats.pass5 ? caveStats.pass5.decoCaves : 0);
+                (caveStats.pass2 ? caveStats.pass2.smallCavesCarved : 0) +
+                (caveStats.pass3 ? caveStats.pass3.entrancesCarved : 0) +
+                (caveStats.pass4 ? caveStats.pass4.lavaCavesCarved : 0) +
+                (caveStats.pass5 ? caveStats.pass5.decoCaves : 0);
             stats.blocksModified += caveStats.totalBlocksModified || 0;
         }
 

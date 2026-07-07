@@ -374,7 +374,7 @@
         var promises = [];
 
         for (var i = 0; i < gridChunks.length; i++) {
-            (function(chunkX, chunkZ) {
+            (function (chunkX, chunkZ) {
                 promises.push(generateChunk(chunkX, chunkZ).catch(function (e) {
                     if (typeof console !== 'undefined' && console.warn) {
                         console.warn('[TerrainCore] Failed to generate chunk (' + chunkX + ',' + chunkZ + '):', e && e.message ? e.message : String(e));

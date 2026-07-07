@@ -1341,6 +1341,7 @@
 
             /**
              * Apply the full generation pipeline to a chunk.
+             * Marks the chunk dirty after completion so the mesh rebuilds with generated data.
              * @param {Donkeycraft.Chunk} chunk - The chunk to populate.
              * @param {number} cx - Chunk X coordinate.
              * @param {number} cz - Chunk Z coordinate.
@@ -1355,6 +1356,9 @@
                 } else {
                     _generateChunkFallback(chunk, cx, cz, biomeId);
                 }
+                // Mark chunk dirty so mesh rebuilds with generated terrain data
+                var key = cx + ',' + cz;
+                dirtyChunks.add(key);
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)

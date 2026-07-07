@@ -266,6 +266,7 @@
     /**
      * Flush all pending writes to IndexedDB in a single transaction.
      * Returns a Promise that resolves when the flush is complete.
+     * Uses a chain of promises to ensure sequential flushes without race conditions.
      * @returns {Promise} Resolves when flush is done.
      * @private
      */
@@ -287,48 +288,57 @@
             return Promise.resolve();
         }
 
+        // Capture writes before clearing — only flush the current batch
         var writesCopy = _pendingWrites.slice();
         _pendingWrites = [];
 
-        // Return a new promise that resolves when the transaction completes
-        _flushPromise = new Promise(function (resolve) {
-            try {
-                var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-                var store = tx.objectStore(CHUNK_STORE_NAME);
+        // Chain off any in-progress flush to prevent race conditions
+        var chainPromise = _flushPromise && !_flushPromise._resolved ? _flushPromise : Promise.resolve();
 
-                for (var i = 0; i < writesCopy.length; i++) {
-                    var write = writesCopy[i];
-                    store.put({ key: write.key, data: write.data, savedAt: Date.now() });
-                }
+        _flushPromise = chainPromise.then(function () {
+            return new Promise(function (resolve) {
+                try {
+                    var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                    var store = tx.objectStore(CHUNK_STORE_NAME);
 
-                tx.oncomplete = function () {
-                    _flushPromise = null;
-                    resolve();
-                };
-
-                tx.onerror = function (error) {
-                    // Check for quota exceeded error
-                    if (tx.error && tx.error.name === 'QuotaExceededError') {
-                        _warn('IndexedDB quota exceeded — clearing old cache entries');
-                        try {
-                            var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-                            clearTx.objectStore(CHUNK_STORE_NAME).clear();
-                            clearTx.oncomplete = function () {
-                                _memoryCache.clear();
-                                _lruOrder = [];
-                            };
-                            clearTx.onerror = function() { /* ignore */ };
-                        } catch (e) { /* ignore */ }
+                    for (var i = 0; i < writesCopy.length; i++) {
+                        var write = writesCopy[i];
+                        store.put({ key: write.key, data: write.data, savedAt: Date.now() });
                     }
+
+                    tx.oncomplete = function () {
+                        _flushPromise = null;
+                        resolve();
+                    };
+
+                    tx.onerror = function () {
+                        // Check for quota exceeded error
+                        if (tx.error && tx.error.name === 'QuotaExceededError') {
+                            _warn('IndexedDB quota exceeded — clearing old cache entries');
+                            try {
+                                var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                                clearTx.objectStore(CHUNK_STORE_NAME).clear();
+                                clearTx.oncomplete = function () {
+                                    _memoryCache.clear();
+                                    _lruOrder = [];
+                                };
+                                clearTx.onerror = function() { /* ignore */ };
+                            } catch (e) { /* ignore */ }
+                        }
+                        _flushPromise = null;
+                        resolve();
+                    };
+                } catch (e) {
+                    _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
                     _flushPromise = null;
                     resolve();
-                };
-            } catch (e) {
-                _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
-                _flushPromise = null;
-                resolve();
-            }
+                }
+            });
         });
+
+        // Mark as resolved for chaining purposes
+        _flushPromise._resolved = false;
+        _flushPromise.then(function () { _flushPromise._resolved = true; });
 
         return _flushPromise;
     }

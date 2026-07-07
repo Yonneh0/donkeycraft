@@ -50,9 +50,9 @@
      */
     function _isInGrid(chunkX, chunkZ) {
         return chunkX >= _centerChunkX - _radiusW &&
-               chunkX <= _centerChunkX + _radiusE &&
-               chunkZ >= _centerChunkZ - _radiusN &&
-               chunkZ <= _centerChunkZ + _radiusS;
+            chunkX <= _centerChunkX + _radiusE &&
+            chunkZ >= _centerChunkZ - _radiusN &&
+            chunkZ <= _centerChunkZ + _radiusS;
     }
 
     /**
