@@ -104,7 +104,7 @@
         var hpPerHeart = 10;
         var startHP = index * hpPerHeart;       // HP this heart starts at
         var endHP = startHP + hpPerHeart;        // HP this heart ends at
-        
+
         if (health <= startHP) return 0;          // Heart is empty
         if (health >= endHP) return 10;           // Heart is full
         return health - startHP;                  // Partial fill (1-9)
@@ -119,12 +119,12 @@
      */
     Donkeycraft.HealthBar.prototype._getHeartSVG = function (fillLevel) {
         fillLevel = Math.max(0, Math.min(10, Math.round(fillLevel)));
-        
+
         // Calculate clip rectangle: height percentage and Y position
         var fillPercent = fillLevel / 10;
         var clipHeight = fillPercent * 18; // SVG viewBox height is 18
         var clipY = 18 - clipHeight;       // Bottom-aligned clip
-        
+
         // Unique ID for clipPath to avoid conflicts
         var clipId = 'dk-hb-' + Math.random().toString(36).substr(2, 9);
 

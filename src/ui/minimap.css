@@ -5,7 +5,8 @@
 
 /* Centralized CSS custom properties for minimap sizing */
 :root {
-    --minimap-size: 150px;        /* Minimap diameter in pixels */
+    --minimap-size: 150px;
+    /* Minimap diameter in pixels */
 }
 
 /* Minimap — top-left corner, circular */

@@ -329,7 +329,7 @@
                                             _memoryCache.clear();
                                             _lruOrder = [];
                                         };
-                                        clearTx.onerror = function() { /* ignore */ };
+                                        clearTx.onerror = function () { /* ignore */ };
                                     } catch (e) { /* ignore */ }
                                 }
                                 newFlushPromise._resolved = true;
@@ -503,7 +503,7 @@
                         _warn('Storage version mismatch: stored=' + (meta && meta.version ? meta.version : 'unknown') + ', expected=' + STORAGE_VERSION);
                         clearAllCaches();
                     }
-                }).catch(function(e) { /* ignore metadata load errors */ });
+                }).catch(function (e) { /* ignore metadata load errors */ });
             }
 
             return true;
@@ -546,7 +546,7 @@
             return Promise.race([
                 _flushPromise,
                 new Promise(function (resolve) { setTimeout(resolve, 2000); })
-            ]).catch(function() { /* ignore timeout */ });
+            ]).catch(function () { /* ignore timeout */ });
         }
 
         // Trigger a new flush
@@ -559,7 +559,7 @@
         return Promise.race([
             flushPromise,
             new Promise(function (resolve) { setTimeout(resolve, 2000); })
-        ]).catch(function() { /* ignore timeout */ });
+        ]).catch(function () { /* ignore timeout */ });
     }
 
     /**
@@ -575,7 +575,7 @@
             clearMemoryCache();
             _isInitialized = false;
             INDEXEDDB_AVAILABLE = false;
-        }).catch(function(e) {
+        }).catch(function (e) {
             // Even if flush fails, clean up
             if (_db) {
                 try { _db.close(); } catch (e) { /* ignore */ }

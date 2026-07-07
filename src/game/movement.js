@@ -608,7 +608,7 @@
                 } else {
                     player.maxFallDistance = 0;
                 }
-                } else if (anyInWater) {
+            } else if (anyInWater) {
                 // Landing in water: water absorbs ALL fall impact, no damage taken.
                 player.maxFallDistance = 0;
             } else {

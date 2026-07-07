@@ -28,16 +28,16 @@
         var colors = {};
 
         // Terrain blocks
-        colors[0]  = 'transparent';       // air
-        colors[1]  = '#7a7a7a';           // stone
-        colors[2]  = '#b08060';           // granite
-        colors[3]  = '#c0c8d0';           // diorite
-        colors[4]  = '#6a6a6a';           // andesite
-        colors[5]  = '#4a4a5a';           // deepslate
-        colors[6]  = '#5a5a6a';           // cobbled_deepslate
-        colors[7]  = '#7c5c3a';           // dirt
-        colors[8]  = '#4a8c2c';           // grass_block (top)
-        colors[9]  = '#9a9080';           // gravel
+        colors[0] = 'transparent';       // air
+        colors[1] = '#7a7a7a';           // stone
+        colors[2] = '#b08060';           // granite
+        colors[3] = '#c0c8d0';           // diorite
+        colors[4] = '#6a6a6a';           // andesite
+        colors[5] = '#4a4a5a';           // deepslate
+        colors[6] = '#5a5a6a';           // cobbled_deepslate
+        colors[7] = '#7c5c3a';           // dirt
+        colors[8] = '#4a8c2c';           // grass_block (top)
+        colors[9] = '#9a9080';           // gravel
         colors[10] = '#d4c478';           // sand (desert)
         colors[11] = '#c0a060';           // sand (badlands)
         colors[12] = '#d4c478';           // sand (generic)

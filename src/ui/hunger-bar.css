@@ -104,10 +104,12 @@
         transform: scale(1);
         filter: brightness(1);
     }
+
     50% {
         transform: scale(1.35);
         filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
     }
+
     100% {
         transform: scale(1);
         filter: brightness(1);
@@ -119,10 +121,12 @@
         transform: scale(1);
         filter: brightness(1);
     }
+
     50% {
         transform: scale(1.35);
         filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
     }
+
     100% {
         transform: scale(1);
         filter: brightness(1);
@@ -146,10 +150,12 @@
         opacity: 1;
         filter: brightness(1) saturate(1);
     }
+
     50% {
         opacity: 0.4;
         filter: brightness(0.6) saturate(0.3);
     }
+
     100% {
         opacity: 1;
         filter: brightness(1) saturate(1);
@@ -161,10 +167,12 @@
         opacity: 1;
         filter: brightness(1) saturate(1);
     }
+
     50% {
         opacity: 0.4;
         filter: brightness(0.6) saturate(0.3);
     }
+
     100% {
         opacity: 1;
         filter: brightness(1) saturate(1);
@@ -180,30 +188,81 @@
 
 /* Mild shake: 30-60% remaining */
 @keyframes hunger-shake-mild {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(1.5px); }
-    50% { transform: translateX(-1.5px); }
-    75% { transform: translateX(1.5px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(1.5px);
+    }
+
+    50% {
+        transform: translateX(-1.5px);
+    }
+
+    75% {
+        transform: translateX(1.5px);
+    }
 }
 
 /* Moderate shake: 15-35% remaining */
 @keyframes hunger-shake-moderate {
-    0%, 100% { transform: translateX(0); }
-    20% { transform: translateX(2.5px); }
-    40% { transform: translateX(-2.5px); }
-    60% { transform: translateX(2.5px); }
-    80% { transform: translateX(-2.5px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    20% {
+        transform: translateX(2.5px);
+    }
+
+    40% {
+        transform: translateX(-2.5px);
+    }
+
+    60% {
+        transform: translateX(2.5px);
+    }
+
+    80% {
+        transform: translateX(-2.5px);
+    }
 }
 
 /* Intense shake: <15% remaining */
 @keyframes hunger-shake-intense {
-    0%, 100% { transform: translateX(0); }
-    14% { transform: translateX(4px); }
-    28% { transform: translateX(-4px); }
-    42% { transform: translateX(4px); }
-    57% { transform: translateX(-4px); }
-    71% { transform: translateX(4px); }
-    85% { transform: translateX(-4px); }
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    14% {
+        transform: translateX(4px);
+    }
+
+    28% {
+        transform: translateX(-4px);
+    }
+
+    42% {
+        transform: translateX(4px);
+    }
+
+    57% {
+        transform: translateX(-4px);
+    }
+
+    71% {
+        transform: translateX(4px);
+    }
+
+    85% {
+        transform: translateX(-4px);
+    }
 }
 
 /* ============================================================
@@ -237,6 +296,7 @@
         opacity: 1;
         transform: translateX(-50%) translateY(0);
     }
+
     100% {
         opacity: 0;
         transform: translateX(-50%) translateY(-20px);

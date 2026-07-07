@@ -291,8 +291,8 @@
                 var clr = colors[bid];
                 if (clr) {
                     return 'rgb(' + Math.round(clr[0] * 255) + ',' +
-                           Math.round(clr[1] * 255) + ',' +
-                           Math.round(clr[2] * 255) + ')';
+                        Math.round(clr[1] * 255) + ',' +
+                        Math.round(clr[2] * 255) + ')';
                 }
             }
         }

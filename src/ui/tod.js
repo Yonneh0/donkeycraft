@@ -89,8 +89,8 @@
         el.className = 'dk-interactive';
         el.innerHTML =
             '<div class="dk-dial-ring">' +
-                '<div class="dk-dial-daylight"></div>' +
-                '<div class="dk-dial-pointer"></div>' +
+            '<div class="dk-dial-daylight"></div>' +
+            '<div class="dk-dial-pointer"></div>' +
             '</div>' +
             '<div class="dk-dial-text">12:00 PM</div>';
 
@@ -238,13 +238,13 @@
         popup.style.display = 'none';
         popup.innerHTML =
             '<div class="dk-time-header">' +
-                '<button class="dk-time-freeze-btn">Freeze</button>' +
-                '<button class="dk-time-close" title="Close (Esc)">✕</button>' +
+            '<button class="dk-time-freeze-btn">Freeze</button>' +
+            '<button class="dk-time-close" title="Close (Esc)">✕</button>' +
             '</div>' +
             '<div class="dk-time-slider-row">' +
-                '<span class="dk-time-label">12 AM</span>' +
-                '<input type="range" class="dk-time-slider" min="0" max="23999" value="6000" step="1">' +
-                '<span class="dk-time-label">12 AM</span>' +
+            '<span class="dk-time-label">12 AM</span>' +
+            '<input type="range" class="dk-time-slider" min="0" max="23999" value="6000" step="1">' +
+            '<span class="dk-time-label">12 AM</span>' +
             '</div>';
 
         document.body.appendChild(popup);

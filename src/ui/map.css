@@ -39,7 +39,8 @@
     border-bottom-left-radius: 8px;
     box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.6);
     overflow: hidden;
-    pointer-events: auto; /* Allows event propagation to child canvas */
+    pointer-events: auto;
+    /* Allows event propagation to child canvas */
 }
 
 /* Close button on map panel */

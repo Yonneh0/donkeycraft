@@ -1,4 +1,3 @@
-
 /* ============================================================
    ANVIL UI
    ============================================================ */
@@ -8,14 +7,14 @@
     align-items: center;
     gap: 16px;
     padding: 20px;
-    background: rgba(35,35,45,0.95);
+    background: rgba(35, 35, 45, 0.95);
     border-radius: 6px;
 }
 
 .dk-anvil-input {
     width: 56px;
     height: 56px;
-    background: rgba(80,70,100,0.8);
+    background: rgba(80, 70, 100, 0.8);
     border: 2px solid #665588;
     border-radius: 3px;
     display: flex;
@@ -27,7 +26,7 @@
 .dk-anvil-output {
     width: 64px;
     height: 64px;
-    background: rgba(80,70,100,0.8);
+    background: rgba(80, 70, 100, 0.8);
     border: 2px solid #8866aa;
     border-radius: 3px;
     display: flex;

@@ -878,7 +878,7 @@
         if (this._pendingChunkQueue.size >= this._maxPendingChunks) return false;
 
         var totalCells = (this._chunkRadiusN + this._chunkRadiusS + 1) *
-                         (this._chunkRadiusW + this._chunkRadiusE + 1);
+            (this._chunkRadiusW + this._chunkRadiusE + 1);
         if (totalCells > this._maxGridCells) return false;
 
         this._pendingChunkQueue.set(key, { promise: null, cx: cx, cz: cz, completed: false });
@@ -1409,8 +1409,10 @@
                 selectedBiomeId: this._selectedBiomeId,
                 worldSeed: this._worldSeed,
                 options: this._options,
-                camera: { x: this._camera.x, y: this._camera.y, z: this._camera.z,
-                          yaw: this._camera.yaw, pitch: this._camera.pitch },
+                camera: {
+                    x: this._camera.x, y: this._camera.y, z: this._camera.z,
+                    yaw: this._camera.yaw, pitch: this._camera.pitch
+                },
                 currentChunkX: this._currentChunkX,
                 currentChunkZ: this._currentChunkZ
             };

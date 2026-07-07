@@ -346,7 +346,7 @@
                             try { Donkeycraft.EndGenerator.generateEndTerrain(chunk, chunk.chunkX, chunk.chunkZ); terrainGenerated = true; } catch (e) { /* skip */ }
                         }
                         break;
-        default: // Overworld — delegate to ChunkManager's built-in generation
+                    default: // Overworld — delegate to ChunkManager's built-in generation
                         if (chunkManager.generateChunkTerrain) {
                             var genResult = chunkManager.generateChunkTerrain(chunk.chunkX, chunk.chunkZ);
                             terrainGenerated = !!genResult;

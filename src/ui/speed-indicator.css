@@ -20,7 +20,8 @@
    ============================================================ */
 
 .dk-speed-indicator {
-    display: none; /* Hidden by default — shown via JS for survival/creative */
+    display: none;
+    /* Hidden by default — shown via JS for survival/creative */
     align-items: center;
     justify-content: center;
     gap: 0;
@@ -35,7 +36,8 @@
     transition: opacity 200ms ease, transform 200ms ease;
     position: relative;
     height: 48px;
-    width: 260px; /* Fixed width for proper stop spacing */
+    width: 260px;
+    /* Fixed width for proper stop spacing */
     min-width: 260px;
     max-width: 260px;
     cursor: pointer;
@@ -53,7 +55,8 @@
     flex: 1;
     height: 100%;
     padding: 0 4px;
-    min-width: 0; /* Allow flex item to shrink if needed */
+    min-width: 0;
+    /* Allow flex item to shrink if needed */
 }
 
 /* Track line — subtle outline frame */
@@ -98,9 +101,11 @@
     0% {
         box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
     }
+
     50% {
         box-shadow: 0 0 16px rgba(46, 204, 113, 0.5), inset 0 0 8px rgba(46, 204, 113, 0.2);
     }
+
     100% {
         box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
     }
@@ -120,7 +125,8 @@
     justify-content: center;
     gap: 2px;
     padding: 4px 6px;
-    min-width: 48px; /* Ensure enough space for icon + label */
+    min-width: 48px;
+    /* Ensure enough space for icon + label */
     pointer-events: none;
     transition: opacity 150ms ease, transform 150ms ease;
     z-index: 1;
@@ -185,7 +191,8 @@
 }
 
 .dk-speed-indicator.dk-dragging .dk-speed-thumb {
-    transition: none; /* No animation during drag for responsiveness */
+    transition: none;
+    /* No animation during drag for responsiveness */
     width: 40px;
     height: 40px;
 }
@@ -207,20 +214,20 @@
         padding: 6px 8px;
         height: 40px;
     }
-    
+
     .dk-speed-stop {
         min-width: 32px;
         padding: 2px 4px;
     }
-    
+
     .dk-speed-stop-icon {
         font-size: 14px;
     }
-    
+
     .dk-speed-stop-label {
         font-size: 7px;
     }
-    
+
     .dk-speed-thumb {
         width: 30px;
         height: 30px;

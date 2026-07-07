@@ -563,7 +563,7 @@
         });
 
         // Clean up will-change after animation completes
-        animation.onfinish = (function(self) {
+        animation.onfinish = (function (self) {
             if (self._barRow) {
                 self._barRow.style.willChange = 'auto';
             }

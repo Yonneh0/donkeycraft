@@ -150,7 +150,7 @@
          */
         var self = this;
         Object.defineProperty(this, 'isDesert', {
-            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isDesert : (id === 2); }
+            get: function () { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isDesert : (id === 2); }
         });
 
         /**
@@ -159,7 +159,7 @@
          * @type {boolean}
          */
         Object.defineProperty(this, 'isArctic', {
-            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isArctic : (id === 1); }
+            get: function () { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isArctic : (id === 1); }
         });
 
         /**
@@ -168,7 +168,7 @@
          * @type {boolean}
          */
         Object.defineProperty(this, 'isForest', {
-            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isForest : (id === 3); }
+            get: function () { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isForest : (id === 3); }
         });
 
         /**
@@ -456,7 +456,7 @@
             getRandomBiome: getRandomBiome,
             getBiomeByClimate: getBiomeByClimate,
             getTerrainParameters: getTerrainParameters,
-            isReady: function() { return _initialized; }
+            isReady: function () { return _initialized; }
         };
     })();
 

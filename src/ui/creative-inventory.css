@@ -6,7 +6,7 @@
     display: flex;
     width: 100%;
     height: 100%;
-    background: rgba(20,20,30,0.95);
+    background: rgba(20, 20, 30, 0.95);
     border-radius: 6px;
     overflow: hidden;
 }
@@ -14,7 +14,7 @@
 /* Left panel — tabs + search */
 .dk-creative-left-panel {
     width: 180px;
-    background: rgba(40,40,50,0.9);
+    background: rgba(40, 40, 50, 0.9);
     border-right: 2px solid #333;
     display: flex;
     flex-direction: column;
@@ -151,7 +151,7 @@
 .dk-creative-item {
     width: 40px;
     height: 40px;
-    background: rgba(80,80,80,0.6);
+    background: rgba(80, 80, 80, 0.6);
     border: 1px solid #555;
     border-radius: 3px;
     display: flex;
@@ -163,19 +163,19 @@
 }
 
 .dk-creative-item:hover {
-    background: rgba(100,100,100,0.8);
+    background: rgba(100, 100, 100, 0.8);
     border-color: #888;
 }
 
 /* Selected item state */
 .dk-creative-item.selected {
     border-color: #6af;
-    background: rgba(80,120,200,0.3);
+    background: rgba(80, 120, 200, 0.3);
 }
 
 /* Non-selected hover state override */
 .dk-creative-item:not(.selected):hover {
-    background: rgba(100,100,120,0.8);
+    background: rgba(100, 100, 120, 0.8);
 }
 
 /* ============================================================
