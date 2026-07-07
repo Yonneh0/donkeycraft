@@ -126,7 +126,7 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-terrain.html        # Singlefile Terrain Generator Viewer/Debugger
+terrain.html        # Standalone terrain viewer/debugger — lightweight entry point that loads extracted modules
 textures.html       # Singlefile Texture Extractor, to create js assets from tile sets
 README.md           # This file
 ref/                # Temporary development references (local)
@@ -149,6 +149,7 @@ src/                # Sauce
   game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification
+    block-colors.js       # Block color and alpha lookup system (procedural color from block names)
     block.js              # Block definitions (257 blocks)
     block-action.js       # Block breaking with tool multipliers
     block-models.js       # Face/texture models with AO
@@ -213,6 +214,8 @@ src/                # Sauce
   render/
     break-particles.js    # Block breaking particles
     camera.js             # First-person camera
+    debug-render.js       # DebugTerrainRenderer: WebGL context, mesh building, chunk loading, render loop
+    debug-shaders.js      # WebGL shader string constants for terrain debug renderer
     chunk-mesh.js         # Per-chunk GPU buffer management
     entity-renderer.js    # Bone-based skeletal animation, mesh caching, frustum culling, context loss recovery
     fog.js                # Distance fog
@@ -230,6 +233,8 @@ src/                # Sauce
   ui/
     anvil-ui.css          # Anvil UI styles
     anvil-ui.js           # Anvil UI (rename/repair)
+    terrain-debug-ui.css  # Terrain debug UI panel styles (chunk grid, buttons, controls)
+    terrain-debug-ui.js   # TerrainDebugUI: DOM creation, event handlers, biome selector, chunk grid visualization
     chest-ui.css          # Chest GUI styles
     chest-ui.js           # Chest GUI
     crafting-grid.css     # Crafting table styles
