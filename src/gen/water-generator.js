@@ -112,9 +112,9 @@
     /**
      * River loop detection: tracks visited world coordinates per-chunk to prevent infinite loops
      * in flat terrain where gradient descent finds equal-height neighbors.
-     * Uses a Set of string keys "worldX,worldZ" for O(1) lookup.
+     * Uses a Set of numeric hashes for O(1) lookup.
      * Cleared at the start of each _placeRivers() call to avoid accumulation across chunks.
-     * @type {Set<string>}
+     * @type {Set<number>}
      * @private
      */
     var _riverVisited = new Set();
@@ -421,13 +421,17 @@
 
             // River loop detection: track visited positions to prevent infinite loops
             // in flat terrain where multiple cells have equal height.
-            // Uses a proper 2D hash to avoid collisions at large coordinates.
             var visitedKey = _hash2D(worldX, worldZ);
             if (_riverVisited.has(visitedKey)) {
                 // Loop detected — river dissipates
                 break;
             }
             _riverVisited.add(visitedKey);
+
+            // Safety limit: prevent infinite loops from corrupted heightmap data
+            if (step > riverLength * 3) {
+                break;
+            }
 
             // Check if we found a downward path (terrain gradient)
             // Also check drainage noise for natural river paths
@@ -681,7 +685,8 @@
      * @private
      */
     function _resolveBiomeName(biomeId) {
-        switch (biomeId) {
+        var id = Math.max(0, Math.min(3, Math.floor(biomeId)));
+        switch (id) {
             case 0: return 'grass';
             case 1: return 'arctic';
             case 2: return 'desert';
@@ -781,10 +786,6 @@
     function _clearRiverVisited() {
         _riverVisited.clear();
     }
-
-    // ============================================================
-    // Public API
-    // ============================================================
 
     /**
      * Donkeycraft.WaterGenerator — Realistic water placement system.

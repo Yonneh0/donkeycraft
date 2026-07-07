@@ -470,9 +470,6 @@
 
     /**
      * Calculate shore distance factor for coastline smoothing.
-     * Uses terrain height relative to sea level to determine if we're in a shore zone.
-     * The estimated height matches the exact height calculation formula used in generateHeightmap
-     * to ensure consistent beach transitions between land and water.
      * Shore transition occurs when estimated height is between shoreLevelMin and shoreLevelMax,
      * creating smooth gradients that prevent harsh cliff-like coastlines.
      * @param {number} continentalNoise - Continental noise value [-1, 1].
@@ -486,23 +483,19 @@
      */
     function _calculateShoreDistance(continentalNoise, terrainNoise, detailNoise, ridgeNoise, microNoise, params) {
         // Estimate terrain height using the EXACT same combination formula as generateHeightmap
-        // This ensures shore transitions match actual terrain height
         var estimatedHeight = params.baseHeight
-            + _clampNoise(continentalNoise) * params.heightVariation * 0.3   // Continental (30%)
-            + _clampNoise(terrainNoise) * params.heightVariation * 0.25     // Terrain (25%)
-            + _clampNoise(detailNoise) * params.heightVariation * 0.15      // Detail (15%)
-            + _clampNoise(ridgeNoise) * params.heightVariation * 0.2        // Ridge (20%)
-            + _clampNoise(microNoise) * params.heightVariation * 0.1;       // Micro (10%)
+            + _clampNoise(continentalNoise) * params.heightVariation * 0.3
+            + _clampNoise(terrainNoise) * params.heightVariation * 0.25
+            + _clampNoise(detailNoise) * params.heightVariation * 0.15
+            + _clampNoise(ridgeNoise) * params.heightVariation * 0.2
+            + _clampNoise(microNoise) * params.heightVariation * 0.1;
 
         // Shore zone: terrain is between shoreLevelMin and shoreLevelMax
-        if (estimatedHeight < params.shoreLevelMin) {
-            return 0; // Deep water, no shore transition needed
-        } else if (estimatedHeight > params.shoreLevelMax) {
-            return 0; // Land, no shore transition needed
-        } else {
-            // Smooth transition in shore zone: linearly interpolate from min to max
-            return (estimatedHeight - params.shoreLevelMin) / (params.shoreLevelMax - params.shoreLevelMin);
+        if (estimatedHeight < params.shoreLevelMin || estimatedHeight > params.shoreLevelMax) {
+            return 0;
         }
+        // Smooth transition in shore zone
+        return (estimatedHeight - params.shoreLevelMin) / (params.shoreLevelMax - params.shoreLevelMin);
     }
 
     /**

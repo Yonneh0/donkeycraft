@@ -11,7 +11,6 @@
     // ============================================================
     // Constants
     // ============================================================
-    var SEED_MASK_32BIT = 0xFFFFFFFF;
     var DEFAULT_SEED = 42;
 
     /**
@@ -59,8 +58,8 @@
      * @private
      */
     function _chunkHash(chunkX, chunkZ) {
-        var x = chunkX | 0;
-        var z = chunkZ | 0;
+        var x = (chunkX | 0) >>> 0;
+        var z = (chunkZ | 0) >>> 0;
         var h = ((x * 374761393 + z * 668265263) ^ 0x5bd1e995) & 0xFFFFFFFF;
         h = (((h >>> 13) ^ h) * 0x5bd1e995) & 0xFFFFFFFF;
         return ((h ^ (h >>> 15)) & 0xFFFFFFFF) >>> 0;
@@ -289,7 +288,7 @@
      * Generate chunk data without caching (internal).
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
-     * @returns {Promise<{heightmap: number[], cacheHit: boolean}>} Generated heightmap data.
+     * @returns {Promise<{heightmap: number[], cacheHit: boolean, generationTime?: number}>} Generated heightmap data.
      * @private
      */
     function _generateChunkData(chunkX, chunkZ) {
@@ -297,6 +296,7 @@
             return Promise.resolve({ heightmap: [], cacheHit: false });
         }
 
+        var startTime = Date.now();
         try {
             var biomeName = _resolveBiomeName(_currentBiomeId);
             var heightmap = Donkeycraft.SurfaceGenerator.generateHeightmap(chunkX, chunkZ, biomeName);
@@ -304,23 +304,29 @@
             return Promise.resolve({
                 heightmap: heightmap,
                 cacheHit: false,
-                generationTime: Date.now() - _generationStartTime
+                generationTime: Date.now() - startTime
             });
         } catch (e) {
             if (typeof console !== 'undefined' && console.warn) {
                 console.warn('[TerrainCore] Generation error for chunk (' + chunkX + ',' + chunkZ + '):', e && e.message ? e.message : String(e));
             }
-            return Promise.resolve({ heightmap: [], cacheHit: false, error: e.message });
+            return Promise.resolve({ heightmap: [], cacheHit: false, generationTime: Date.now() - startTime, error: e.message });
         }
     }
 
     /**
      * Resolve a biome ID to its name string for SurfaceGenerator.
+     * Uses the cached _currentBiomeName when available for consistency,
+     * falling back to canonical ID-to-name mapping.
      * @param {number} biomeId - Biome ID.
      * @returns {string} Biome name ('grass', 'arctic', 'desert', 'forest').
      * @private
      */
     function _resolveBiomeName(biomeId) {
+        // Use cached biome name if available and consistent with the ID
+        if (_currentBiomeName && _biomeNameToId(_currentBiomeName) === biomeId) {
+            return _currentBiomeName;
+        }
         var id = Math.max(0, Math.min(3, Math.floor(biomeId)));
         switch (id) {
             case 0: return 'grass';
