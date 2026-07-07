@@ -7,8 +7,10 @@
 
     /**
      * EventBus — manages event listeners and dispatches events.
-     * Supports namespaced events, one-time listeners, and safe static emission.
+     * Supports namespaced events, one-time listeners, safe static emission (emitSafe/onSafe),
+     * listener counting, and automatic memory leak prevention.
      * @param {string} [namespace=''] - Optional namespace prefix for events (e.g., 'world', 'player').
+     * @constructor
      */
     Donkeycraft.EventBus = function (namespace) {
         this._namespace = namespace || '';
@@ -17,6 +19,9 @@
 
     /**
      * Register a listener for an event.
+     * The returned unsubscribe function can be called at any time to remove this listener
+     * without waiting for the event to fire. For `once()` listeners, calling unsubscribe
+     * before the event fires also prevents the callback from ever firing.
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - Function to call when event fires.
      * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
@@ -39,6 +44,8 @@
      * Register a one-time listener for an event. The callback fires exactly once,
      * then is automatically removed. Calling the returned unsubscribe before the
      * event emits also prevents firing without removing from the listener array.
+     * Both `off(event, originalCallback)` and the returned unsubscribe function
+     * properly remove `once()` listeners.
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - Function to call when event fires (once).
      * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the EventBus instance.
@@ -86,6 +93,7 @@
      * Remove a previously registered listener for an event.
      * Works with both regular (`on`) and one-time (`once`) callbacks.
      * For `once()` listeners, removes by matching the _originalCallback tag.
+     * Also cleans up empty listener arrays to prevent memory leaks.
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {Function} callback - The exact callback function reference to remove.
      */
@@ -94,7 +102,6 @@
         if (!this._listeners[key]) return;
 
         // Filter out entries matching either the wrapped callback or the original callback.
-        var before = this._listeners[key].length;
         this._listeners[key] = this._listeners[key].filter(function (entry) {
             return entry.callback !== callback && entry._originalCallback !== callback;
         });
@@ -106,9 +113,21 @@
     };
 
     /**
+     * Get the number of listeners for a specific event.
+     * @param {string} event - Event name (namespace prefix is automatically prepended).
+     * @returns {number} Number of registered listeners for this event.
+     */
+    Donkeycraft.EventBus.prototype.listenerCount = function (event) {
+        var key = this._namespace + event;
+        return this._listeners[key] ? this._listeners[key].length : 0;
+    };
+
+    /**
      * Dispatch an event to all registered listeners.
      * Listeners are invoked in registration order. Exceptions in one listener
-     * do not prevent subsequent listeners from firing.
+     * do not prevent subsequent listeners from firing (safe emission).
+     * A copy of the listener array is made before iteration to safely handle
+     * listeners that remove themselves during emission.
      * @param {string} event - Event name (namespace prefix is automatically prepended).
      * @param {...*} args - Arguments passed to each listener callback.
      */
@@ -132,7 +151,8 @@
     };
 
     /**
-     * Clear all listeners.
+     * Clear all listeners and reset the event bus to its initial state.
+     * All pending unsubscribe functions become no-ops.
      */
     Donkeycraft.EventBus.prototype.clear = function () {
         this._listeners = {};
@@ -143,6 +163,7 @@
      * This is the correct method for standalone modules (entities, redstone, interaction)
      * that do not have a direct reference to their owning EventBus instance.
      * Call EventBus.setGlobal() during game initialization to register the global instance.
+     * Silently returns if no global instance is registered.
      * @param {string} event - Event name (no namespace prefix — uses the global instance directly).
      * @param {...*} args - Arguments passed to each listener callback.
      */
@@ -154,8 +175,9 @@
     };
 
     /**
-     * Register the global EventBus instance for use by emitSafe().
+     * Register the global EventBus instance for use by emitSafe() and onSafe().
      * Call this once during game initialization with the main game's EventBus.
+     * Silently ignores invalid instances.
      * @param {Donkeycraft.EventBus} instance - The global EventBus instance.
      */
     Donkeycraft.EventBus.setGlobal = function (instance) {
@@ -169,10 +191,11 @@
      * This is the correct method for standalone modules (entities, redstone, interaction)
      * that do not have a direct reference to their owning EventBus instance.
      * Call EventBus.setGlobal() during game initialization to register the global instance.
+     * Returns null if no global instance is registered.
      * @param {string} event - Event name (no namespace prefix — uses the global instance directly).
      * @param {Function} callback - Function to call when event fires.
      * @param {*} [context] - Optional context object to bind as `this` for the callback. Defaults to the global instance.
-     * @returns {Function} Unsubscribe function that removes this listener without firing, or null if no global instance is registered.
+     * @returns {Function|null} Unsubscribe function that removes this listener without firing, or null if no global instance is registered.
      */
     Donkeycraft.EventBus.onSafe = function (event, callback, context) {
         var globalInstance = Donkeycraft.EventBus._global;

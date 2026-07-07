@@ -390,8 +390,10 @@
     /**
      * Clear all cached assets that are older than the expiration threshold.
      * Default expiration is 24 hours (86400000 ms).
+     * On error, resolves with the number of entries cleared up to the failure point
+     * rather than rejecting, allowing graceful degradation.
      * @param {number} [maxAgeMs=86400000] — Maximum age in milliseconds before an entry is considered expired.
-     * @returns {Promise<number>} Number of entries cleared.
+     * @returns {Promise<number>} Number of entries cleared (may be partial on error).
      */
     Donkeycraft.AssetCache.prototype.clearExpired = function (maxAgeMs) {
         var self = this;
@@ -434,7 +436,8 @@
 
     /**
      * Clear all cached assets.
-     * @returns {Promise<number>} Number of entries cleared.
+     * Always resolves (never rejects) to allow graceful degradation on error.
+     * @returns {Promise<number>} Number of entries cleared (always 0 on failure).
      */
     Donkeycraft.AssetCache.prototype.clearAll = function () {
         var self = this;
@@ -526,6 +529,23 @@
         var self = this;
         return self.getUsageStats().then(function (stats) {
             return stats.totalSize;
+        });
+    };
+
+    /**
+     * Get cache size in human-readable format (bytes, KB, MB).
+     * @returns {Promise<string>} Human-readable size string.
+     */
+    Donkeycraft.AssetCache.prototype.getFormattedSize = function () {
+        var self = this;
+        return self.getTotalSize().then(function (bytes) {
+            if (bytes < 1024) {
+                return bytes + ' B';
+            }
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + ' KB';
+            }
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         });
     };
 

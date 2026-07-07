@@ -145,7 +145,8 @@ src/                # Sauce
     math-utils.js         # Vector3, Matrix4, Quaternion, noise functions
     namespace.js          # Global Donkeycraft namespace object
     timer.js              # Delta-time accumulator, tick scheduler
-    world-store.js        # IndexedDB chunk storage
+    world-store.js        # IndexedDB world persistence (save/load worlds, chunks)
+    storage.js            # Hybrid IndexedDB + LRU memory cache for terrain chunks
   game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification

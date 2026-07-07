@@ -65,7 +65,7 @@
      * @memberof Donkeycraft.WorldStore
      * @private
      * @param {string} eventName - Event name.
-     * @param {Object} data - Event payload.
+     * @param {Object} [data={}] - Event payload.
      */
     Donkeycraft.WorldStore.prototype._emit = function (eventName, data) {
         if (this._eventBus) {
@@ -113,9 +113,6 @@
 
                 request.onupgradeneeded = function (event) {
                     var db = event.target.result;
-
-                    // Store schema version sentinel to detect incompatible data on upgrade
-                    var VERSION_KEY = '__schemaVersion__';
                     var metaStoreName = '__meta__';
                     var oldVersion = event.oldVersion;
 
@@ -129,9 +126,21 @@
                         db.createObjectStore(Donkeycraft.WORLD_STORE_STORE_NAME, { keyPath: 'worldName' });
                     }
 
-                    // If upgrading from an old version, log a warning
-                    if (oldVersion < Donkeycraft.WORLD_STORE_VERSION) {
-                        // Database upgraded
+                    // Store/update schema version sentinel to detect incompatible data on upgrade
+                    try {
+                        var metaTx = db.transaction([metaStoreName], 'readwrite');
+                        var metaStore = metaTx.objectStore(metaStoreName);
+                        metaStore.put({ key: '__schemaVersion__', value: Donkeycraft.WORLD_STORE_VERSION, upgradedAt: Date.now() });
+                        metaTx.oncomplete = function () {
+                            if (oldVersion > 0) {
+                                Donkeycraft.Logger.info('WorldStore', 'Database upgraded from version ' + oldVersion + ' to ' + Donkeycraft.WORLD_STORE_VERSION);
+                            }
+                        };
+                        metaTx.onerror = function () {
+                            Donkeycraft.Logger.warn('WorldStore', 'Failed to update schema version sentinel');
+                        };
+                    } catch (e) {
+                        Donkeycraft.Logger.warn('WorldStore', 'Error updating schema version: ' + e.message);
                     }
                 };
             } catch (e) {
@@ -154,11 +163,12 @@
     /**
      * _normalizeChunks — normalize chunk data to internal format.
      * Handles both old format ({ cx, cz, blockData, skyLight, blockLight }) and new format ({ cx, cz, data: { blockData, skyLight, blockLight } }).
-     * Validates that TypedArray data can be serialized; skips invalid entries with warnings.
+     * Copies TypedArray data into plain arrays for safe JSON serialization.
+     * Validates all entries; skips invalid entries with warnings.
      * @memberof Donkeycraft.WorldStore
      * @private
      * @param {Array} chunks — Raw chunk array from storage.
-     * @returns {Array} Normalized chunk array in format [{ cx, cz, data: { blockData, skyLight, blockLight } }].
+     * @returns {Array} Normalized chunk array in format [{ cx, cz, data: { blockData: number[]|null, skyLight: number[]|number, blockLight: number[]|number } }].
      */
     Donkeycraft.WorldStore.prototype._normalizeChunks = function (chunks) {
         if (!chunks || !Array.isArray(chunks)) {
@@ -179,19 +189,71 @@
                 // New format: { cx, cz, data: { blockData, skyLight, blockLight } }
                 // Validate that data has at least one expected property
                 if (c.data.blockData !== undefined || c.data.skyLight !== undefined || c.data.blockLight !== undefined) {
-                    normalized.push({ cx: c.cx, cz: c.cz, data: c.data });
+                    // Normalize each field: copy TypedArrays to plain arrays, pass through numbers/nulls
+                    var normBlockData = null;
+                    if (c.data.blockData instanceof Uint16Array || Array.isArray(c.data.blockData)) {
+                        normBlockData = Array.prototype.slice.call(c.data.blockData);
+                    } else if (c.data.blockData !== null && c.data.blockData !== undefined) {
+                        Donkeycraft.Logger.warn('WorldStore', 'Chunk (' + c.cx + ',' + c.cz + '): blockData has unexpected type: ' + typeof c.data.blockData);
+                    }
+
+                    var normSkyLight = 0;
+                    if (c.data.skyLight instanceof Uint8Array || Array.isArray(c.data.skyLight)) {
+                        normSkyLight = Array.prototype.slice.call(c.data.skyLight);
+                    } else if (typeof c.data.skyLight === 'number') {
+                        normSkyLight = c.data.skyLight;
+                    }
+
+                    var normBlockLight = 0;
+                    if (c.data.blockLight instanceof Uint8Array || Array.isArray(c.data.blockLight)) {
+                        normBlockLight = Array.prototype.slice.call(c.data.blockLight);
+                    } else if (typeof c.data.blockLight === 'number') {
+                        normBlockLight = c.data.blockLight;
+                    }
+
+                    normalized.push({
+                        cx: c.cx,
+                        cz: c.cz,
+                        data: {
+                            blockData: normBlockData,
+                            skyLight: normSkyLight,
+                            blockLight: normBlockLight
+                        }
+                    });
                 } else {
                     Donkeycraft.Logger.warn('WorldStore', 'Skipping chunk entry at index ' + i + ' (cx=' + c.cx + ', cz=' + c.cz + '): data object has no expected properties');
                 }
             } else if (c.blockData !== undefined) {
                 // Old format: { cx, cz, blockData, skyLight, blockLight }
+                // Normalize TypedArrays to plain arrays for JSON serialization
+                var oldBlockData = null;
+                if (c.blockData instanceof Uint16Array || Array.isArray(c.blockData)) {
+                    oldBlockData = Array.prototype.slice.call(c.blockData);
+                } else if (c.blockData !== null && c.blockData !== undefined) {
+                    Donkeycraft.Logger.warn('WorldStore', 'Chunk (' + c.cx + ',' + c.cz + '): blockData has unexpected type: ' + typeof c.blockData);
+                }
+
+                var oldSkyLight = 0;
+                if (c.skyLight instanceof Uint8Array || Array.isArray(c.skyLight)) {
+                    oldSkyLight = Array.prototype.slice.call(c.skyLight);
+                } else if (typeof c.skyLight === 'number') {
+                    oldSkyLight = c.skyLight;
+                }
+
+                var oldBlockLight = 0;
+                if (c.blockLight instanceof Uint8Array || Array.isArray(c.blockLight)) {
+                    oldBlockLight = Array.prototype.slice.call(c.blockLight);
+                } else if (typeof c.blockLight === 'number') {
+                    oldBlockLight = c.blockLight;
+                }
+
                 normalized.push({
                     cx: c.cx,
                     cz: c.cz,
                     data: {
-                        blockData: c.blockData || null,
-                        skyLight: c.skyLight || 0,
-                        blockLight: c.blockLight || 0
+                        blockData: oldBlockData,
+                        skyLight: oldSkyLight,
+                        blockLight: oldBlockLight
                     }
                 });
             } else {
@@ -204,12 +266,14 @@
 
     /**
      * Save a world's level data and chunks to IndexedDB.
+     * Serializes all data (including plain array chunk data) to JSON for storage.
+     * Handles quota exceeded errors gracefully with event emission.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name/identifier.
      * @param {Object} levelData — Serialized level data (spawn, game mode, time, seed).
-     * @param {Array} chunks — Array of {cx, cz, blockData, skyLight, blockLight} or {cx, cz, data: {...}} objects.
+     * @param {Array} chunks — Array of {cx, cz, data: {blockData, skyLight, blockLight}} objects.
      * @throws {Error} If worldName is empty.
-     * @returns {Promise<boolean>} Resolves true on success.
+     * @returns {Promise<boolean>} Resolves true on success, false otherwise.
      */
     Donkeycraft.WorldStore.prototype.saveWorld = function (worldName, levelData, chunks) {
         var self = this;
@@ -270,10 +334,11 @@
     /**
      * Load a world's level data and chunks from IndexedDB.
      * Normalizes chunk data to internal format ({ cx, cz, data: {...} }).
+     * Handles TypedArray deserialization from stored plain arrays.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name/identifier.
      * @throws {Error} If worldName is empty.
-     * @returns {Promise<Object|null>} Resolves with {levelData, chunks, savedAt} or null if not found.
+     * @returns {Promise<Object|null>} Resolves with {levelData: Object, chunks: Array, savedAt: number} or null if not found.
      */
     Donkeycraft.WorldStore.prototype.loadWorld = function (worldName) {
         var self = this;
@@ -320,10 +385,11 @@
 
     /**
      * Delete a world from IndexedDB.
+     * Emits 'world:deleted' on success or 'world:delete-error' on failure.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name/identifier.
      * @throws {Error} If worldName is empty.
-     * @returns {Promise<boolean>} Resolves true if deleted.
+     * @returns {Promise<boolean>} Resolves true if deleted, false otherwise.
      */
     Donkeycraft.WorldStore.prototype.deleteWorld = function (worldName) {
         var self = this;
@@ -361,9 +427,11 @@
     };
 
     /**
-     * List all saved world names.
+     * List all saved world names from IndexedDB.
+     * Returns an array of world name strings, sorted alphabetically.
+     * Emits 'worlds:listed' event with count.
      * @memberof Donkeycraft.WorldStore
-     * @returns {Promise<Array<string>>} Array of world name strings.
+     * @returns {Promise<Array<string>>} Array of world name strings, sorted alphabetically.
      */
     Donkeycraft.WorldStore.prototype.listWorlds = function () {
         var self = this;
@@ -390,6 +458,8 @@
                         // End of cursor — resolve only once
                         if (!resolved) {
                             resolved = true;
+                            // Sort alphabetically for consistent ordering
+                            worlds.sort();
                             self._emit('worlds:listed', { count: worlds.length });
                             resolve(worlds);
                         }
@@ -413,13 +483,14 @@
     /**
      * Save a single chunk to the specified world.
      * Loads existing world data, updates or adds the chunk, then saves back.
+     * Properly handles chunk data for JSON serialization.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name.
      * @param {number} cx — Chunk X coordinate.
      * @param {number} cz — Chunk Z coordinate.
      * @param {Object} chunkData — Chunk data {blockData, skyLight, blockLight}.
      * @throws {Error} If cx or cz are not finite numbers.
-     * @returns {Promise<boolean>} Resolves true on success.
+     * @returns {Promise<boolean>} Resolves true on success, false otherwise.
      */
     Donkeycraft.WorldStore.prototype.saveChunk = function (worldName, cx, cz, chunkData) {
         var self = this;
@@ -468,12 +539,13 @@
 
     /**
      * Load a single chunk from the specified world.
+     * Returns chunk data in the normalized format {blockData, skyLight, blockLight}.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name.
      * @param {number} cx — Chunk X coordinate.
      * @param {number} cz — Chunk Z coordinate.
      * @throws {Error} If cx or cz are not finite numbers.
-     * @returns {Promise<Object|null>} Resolves with chunk data object {blockData, skyLight, blockLight} or null.
+     * @returns {Promise<Object|null>} Resolves with chunk data object {blockData: number[]|null, skyLight: number[]|number, blockLight: number[]|number} or null.
      */
     Donkeycraft.WorldStore.prototype.loadChunk = function (worldName, cx, cz) {
         var self = this;
@@ -505,10 +577,10 @@
     };
 
     /**
-     * Get the level data for a world.
+     * Get the level data for a world without loading chunks.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name.
-     * @returns {Promise<Object|null>} Resolves with level data object or null.
+     * @returns {Promise<Object|null>} Resolves with level data object or null if world not found.
      */
     Donkeycraft.WorldStore.prototype.getLevelData = function (worldName) {
         var self = this;
@@ -529,10 +601,11 @@
 
     /**
      * Set/Update the level data for a world.
+     * Preserves existing chunks while updating level data.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name.
      * @param {Object} levelData — Level data object.
-     * @returns {Promise<boolean>} Resolves true on success.
+     * @returns {Promise<boolean>} Resolves true on success, false otherwise.
      */
     Donkeycraft.WorldStore.prototype.setLevelData = function (worldName, levelData) {
         var self = this;
@@ -561,10 +634,11 @@
     /**
      * Save all dirty chunks from the chunk manager in batches.
      * Uses Config.CHUNKS_PER_SAVE for batch size and Config.SAVE_BATCH_DELAY for inter-batch delay.
-     * Properly serializes full blockData, skyLight, and blockLight TypedArray data.
+     * Properly serializes full blockData, skyLight, and blockLight TypedArray data into plain arrays.
+     * Marks saved chunks as clean after successful save.
      * @memberof Donkeycraft.WorldStore
      * @param {string} worldName — World name.
-     * @throws {Error} If worldName is empty.
+     * @throws {Error} If worldName is empty or invalid.
      * @returns {Promise<number>} Number of chunks saved.
      */
     Donkeycraft.WorldStore.prototype.saveDirtyChunks = function (worldName) {
@@ -691,6 +765,7 @@
 
     /**
      * Close the IndexedDB connection and release all references.
+     * Emits 'storage:closed' event after closing.
      * @memberof Donkeycraft.WorldStore
      */
     Donkeycraft.WorldStore.prototype.destroy = function () {

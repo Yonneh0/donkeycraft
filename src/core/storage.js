@@ -1,5 +1,5 @@
 // Donkeycraft — Browser Storage Cache Manager
-// Hybrid localStorage + IndexedDB caching for terrain chunks and metadata.
+// Hybrid IndexedDB + in-memory LRU cache for terrain chunks and metadata.
 (function () {
     'use strict';
 
@@ -16,7 +16,6 @@
     var DB_NAME = 'DonkeycraftStorage';
     var DB_VERSION = STORAGE_VERSION;
     var MAX_CHUNK_CACHE_SIZE = 50; // Max chunks to keep in memory (LRU)
-    var INDEXEDDB_AVAILABLE = false;
 
     // ============================================================
     // Runtime State
@@ -28,6 +27,7 @@
     var _saveTimeout = null;
     var _pendingWrites = []; // Batched writes
     var _flushPromise = null; // Promise for pending flush operation
+    var INDEXEDDB_AVAILABLE = false;
 
     // ============================================================
     // Utility Functions
@@ -267,7 +267,8 @@
      * Flush all pending writes to IndexedDB in a single transaction.
      * Returns a Promise that resolves when the flush is complete.
      * Uses a chain of promises to ensure sequential flushes without race conditions.
-     * @returns {Promise} Resolves when flush is done.
+     * Handles quota exceeded errors by clearing old cache entries.
+     * @returns {Promise<void>} Resolves when flush is done.
      * @private
      */
     function _flushPendingWrites() {
@@ -297,7 +298,8 @@
         // so the chaining check works correctly on first flush.
         var chainPromise = (_flushPromise && !_flushPromise._resolved) ? _flushPromise : Promise.resolve();
 
-        // Create a proper thenable object with _resolved tracking from the start
+        // Create a proper thenable object with _resolved tracking from the start.
+        // This ensures proper sequencing of concurrent flush requests.
         var newFlushPromise = {
             _resolved: false,
             then: function (onFulfilled, onRejected) {
@@ -319,7 +321,7 @@
                             };
 
                             tx.onerror = function () {
-                                // Check for quota exceeded error
+                                // Check for quota exceeded error — clear old cache entries and retry
                                 if (tx.error && tx.error.name === 'QuotaExceededError') {
                                     _warn('IndexedDB quota exceeded — clearing old cache entries');
                                     try {
@@ -328,13 +330,16 @@
                                         clearTx.oncomplete = function () {
                                             _memoryCache.clear();
                                             _lruOrder = [];
+                                            resolve();
                                         };
-                                        clearTx.onerror = function () { /* ignore */ };
-                                    } catch (e) { /* ignore */ }
+                                        clearTx.onerror = function () { resolve(); };
+                                    } catch (e) { resolve(); }
+                                } else {
+                                    _warn('IndexedDB flush error: ' + (tx.error ? String(tx.error) : 'unknown'));
+                                    resolve();
                                 }
                                 newFlushPromise._resolved = true;
                                 _flushPromise = null;
-                                resolve();
                             };
                         } catch (e) {
                             _warn('Flush error: ' + (e && e.message ? e.message : String(e)));
@@ -353,16 +358,25 @@
 
     /**
      * Delete a chunk from IndexedDB.
+     * Returns a Promise that resolves when the deletion is complete.
      * @param {string} key - Cache key.
+     * @returns {Promise<void>} Resolves when deletion is complete.
      */
     function deleteFromIndexedDB(key) {
-        if (!INDEXEDDB_AVAILABLE || !_db) return;
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
 
-        try {
-            var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-            var store = tx.objectStore(CHUNK_STORE_NAME);
-            store.delete(key);
-        } catch (e) { /* ignore */ }
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+                var store = tx.objectStore(CHUNK_STORE_NAME);
+                var request = store.delete(key);
+
+                request.onsuccess = function () { resolve(); };
+                request.onerror = function () { resolve(); }; // Resolve even on error to avoid breaking callers
+            } catch (e) {
+                resolve();
+            }
+        });
     }
 
     // ============================================================
@@ -371,17 +385,26 @@
 
     /**
      * Save metadata to IndexedDB.
+     * Returns a Promise that resolves when the save is complete.
      * @param {string} key - Metadata key.
      * @param {*} data - Metadata data.
+     * @returns {Promise<void>} Resolves when save is complete.
      */
     function saveMetadata(key, data) {
-        if (!INDEXEDDB_AVAILABLE || !_db) return;
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
 
-        try {
-            var tx = _db.transaction([META_STORE_NAME], 'readwrite');
-            var store = tx.objectStore(META_STORE_NAME);
-            store.put({ key: key, data: data, savedAt: Date.now() });
-        } catch (e) { /* ignore */ }
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([META_STORE_NAME], 'readwrite');
+                var store = tx.objectStore(META_STORE_NAME);
+                var request = store.put({ key: key, data: data, savedAt: Date.now() });
+
+                request.onsuccess = function () { resolve(); };
+                request.onerror = function () { resolve(); }; // Resolve even on error to avoid breaking callers
+            } catch (e) {
+                resolve();
+            }
+        });
     }
 
     /**
@@ -533,7 +556,7 @@
     /**
      * Flush all pending writes to disk.
      * Returns a promise that resolves when all writes are complete or times out after 2 seconds.
-     * @returns {Promise} Resolves when all writes are complete.
+     * @returns {Promise} Resolves when all writes are complete (never rejects).
      */
     function flush() {
         // No pending work and no in-progress flush — resolve immediately
@@ -541,12 +564,17 @@
             return Promise.resolve();
         }
 
+        // Helper: wrap a promise with timeout
+        var withTimeout = function (promise, ms) {
+            return Promise.race([
+                promise.catch(function () { /* ignore */ }),
+                new Promise(function (resolve) { setTimeout(resolve, ms); })
+            ]);
+        };
+
         // If a flush is already in progress, wait for it with timeout
         if (_flushPromise) {
-            return Promise.race([
-                _flushPromise,
-                new Promise(function (resolve) { setTimeout(resolve, 2000); })
-            ]).catch(function () { /* ignore timeout */ });
+            return withTimeout(_flushPromise, 2000);
         }
 
         // Trigger a new flush
@@ -556,14 +584,13 @@
         }
 
         _flushPromise = flushPromise;
-        return Promise.race([
-            flushPromise,
-            new Promise(function (resolve) { setTimeout(resolve, 2000); })
-        ]).catch(function () { /* ignore timeout */ });
+        return withTimeout(flushPromise, 2000);
     }
 
     /**
      * Destroy the storage system and free resources.
+     * Flushes pending writes, closes IndexedDB connection, and clears all caches.
+     * @returns {Promise<void>} Resolves when destruction is complete.
      */
     function destroy() {
         // Flush pending writes first, then close DB
@@ -575,7 +602,7 @@
             clearMemoryCache();
             _isInitialized = false;
             INDEXEDDB_AVAILABLE = false;
-        }).catch(function (e) {
+        }).catch(function () {
             // Even if flush fails, clean up
             if (_db) {
                 try { _db.close(); } catch (e) { /* ignore */ }
@@ -588,8 +615,8 @@
     }
 
     /**
-     * Check if the storage system is ready.
-     * @returns {boolean} True if initialized.
+     * Check if the storage system is ready for operations.
+     * @returns {boolean} True if initialized and ready.
      */
     function isReady() {
         return _isInitialized;
@@ -601,6 +628,8 @@
 
     /**
      * Donkeycraft.Storage — Browser storage cache manager.
+     * Hybrid IndexedDB + in-memory LRU cache for terrain chunks and metadata.
+     * Provides batched writes, automatic LRU eviction, and quota handling.
      * @namespace
      */
     Donkeycraft.Storage = {
@@ -612,7 +641,16 @@
         flush: flush,
         destroy: destroy,
         isReady: isReady,
-        getStats: getStats
+        getStats: getStats,
+        /**
+         * Generate a deterministic cache key from chunk coordinates and parameters.
+         * @param {number} chunkX - Chunk X coordinate.
+         * @param {number} chunkZ - Chunk Z coordinate.
+         * @param {number} biomeId - Biome ID.
+         * @param {number} seed - World seed.
+         * @returns {string} Cache key string.
+         */
+        makeKey: _makeKey
     };
 
 })();

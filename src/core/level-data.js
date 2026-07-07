@@ -25,50 +25,50 @@
      * Player data is created lazily via `_ensurePlayerData()` when any setter
      * (e.g., `setPlayerPosition`, `setPlayerHealth`) is called without first
      * calling `setPlayerData()`. This means player data will have default values
-     * (health=20, inventory=[], hunger=20) if never explicitly set.
+     * (health=20, inventory=[], hunger=12) if never explicitly set.
      *
      * @constructor
      */
     Donkeycraft.LevelData = function () {
-        /** @type {number} — Spawn X coordinate. */
+        /** @type {number} Spawn X coordinate. */
         this._spawnX = Donkeycraft.DEFAULT_SPAWN_X;
 
-        /** @type {number} — Spawn Y coordinate. */
+        /** @type {number} Spawn Y coordinate. */
         this._spawnY = Donkeycraft.DEFAULT_SPAWN_Y;
 
-        /** @type {number} — Spawn Z coordinate. */
+        /** @type {number} Spawn Z coordinate. */
         this._spawnZ = Donkeycraft.DEFAULT_SPAWN_Z;
 
-        /** @type {string} — Game mode ('survival', 'creative', 'spectator'). */
+        /** @type {string} Game mode ('survival', 'creative', 'spectator'). */
         this._gameMode = 'survival';
 
-        /** @type {number} — Total world ticks. */
+        /** @type {number} Total world ticks. */
         this._worldTime = 0;
 
-        /** @type {number} — World seed value. */
+        /** @type {number} World seed value. */
         this._seed = 42;
 
-        /** @type {string} — World name. */
+        /** @type {string} World name. */
         this._worldName = 'DefaultWorld';
 
-        /** @type {Object|null} — Player data object (position, rotation, health, inventory, etc.) or null. */
+        /** @type {Object|null} Player data object (position, rotation, health, inventory, etc.) or null. */
         this._playerData = null;
 
-        /** @type {number} — Unix timestamp in ms of the last successful save. */
+        /** @type {number} Unix timestamp in ms of the last successful save. */
         this._lastSaved = 0;
 
         // --- Auto-save system ---
 
-        /** @type {number} — Accumulated auto-save time in milliseconds. */
+        /** @type {number} Accumulated auto-save time in milliseconds. */
         this._autoSaveTimer = 0;
 
-        /** @type {number} — Auto-save interval in milliseconds. */
+        /** @type {number} Auto-save interval in milliseconds. */
         this._autoSaveInterval = Donkeycraft.DEFAULT_AUTO_SAVE_INTERVAL;
 
-        /** @type {Donkeycraft.WorldStore|null} — WorldStore instance for persistence. */
+        /** @type {Donkeycraft.WorldStore|null} WorldStore instance for persistence. */
         this._worldStore = null;
 
-        /** @type {string|null} — World name reference for auto-save targeting. */
+        /** @type {string|null} World name reference for auto-save targeting. */
         this._worldNameRef = null;
 
         /** @type {boolean} */
@@ -181,6 +181,15 @@
     };
 
     /**
+     * Increment the world time by a specific amount.
+     * Safely handles negative amounts by treating them as zero.
+     * @param {number} amount — Amount to increment by (must be non-negative).
+     */
+    Donkeycraft.LevelData.prototype.incrementTime = function (amount) {
+        this._worldTime += Math.max(0, amount);
+    };
+
+    /**
      * Set the world seed.
      * @param {number} seed — World seed value.
      */
@@ -221,7 +230,7 @@
             this._playerData = {
                 position: data.position || { x: 0, y: 64, z: 0 },
                 rotation: data.rotation || { yaw: 0, pitch: 0 },
-                health: data.health || 20,
+                health: data.health !== undefined ? data.health : 20,
                 maxHealth: data.maxHealth || 20,
                 gameMode: data.gameMode || this._gameMode,
                 inventory: data.inventory || [],
@@ -275,6 +284,7 @@
      * Update player rotation (yaw and pitch).
      * Yaw is unconstrained (full 360°). Pitch is clamped to [-π/2, π/2]
      * to prevent the camera from flipping upside-down.
+     * Safely handles missing Donkeycraft.clamp by using Math.max/Math.min fallback.
      * @param {number} yaw — Yaw angle in radians (unconstrained).
      * @param {number} pitch — Pitch angle in radians (clamped to [-π/2, π/2]).
      */
@@ -282,23 +292,30 @@
         this._ensurePlayerData();
         // Clamp pitch to [-π/2, π/2] to prevent inverted camera views.
         var maxPitch = Math.PI / 2;
+        var clampedPitch = (pitch !== undefined && pitch !== null) ? pitch : 0;
+        if (typeof Donkeycraft.clamp === 'function') {
+            clampedPitch = Donkeycraft.clamp(clampedPitch, -maxPitch, maxPitch);
+        } else {
+            clampedPitch = Math.max(-maxPitch, Math.min(maxPitch, clampedPitch));
+        }
         this._playerData.rotation.yaw = yaw || 0;
-        this._playerData.rotation.pitch = (pitch !== undefined && pitch !== null)
-            ? Donkeycraft.clamp(pitch, -maxPitch, maxPitch)
-            : 0;
+        this._playerData.rotation.pitch = clampedPitch;
     };
 
     /**
      * Update player health (clamped to [0, maxHealth]).
      * Sets `alive` to false if health drops to 0.
+     * Safely handles missing Donkeycraft.clamp by using Math.max/Math.min fallback.
      * @param {number} health — Current health value (0-20).
      */
     Donkeycraft.LevelData.prototype.setPlayerHealth = function (health) {
         this._ensurePlayerData();
-        // Guard: clamp is provided by math-utils.js (Donkeycraft.clamp).
-        var clampedHealth = (typeof Donkeycraft.clamp === 'function')
-            ? Donkeycraft.clamp(Math.round(health || 0), 0, this._playerData.maxHealth)
-            : Math.max(0, Math.min(Math.round(health || 0), this._playerData.maxHealth));
+        var clampedHealth;
+        if (typeof Donkeycraft.clamp === 'function') {
+            clampedHealth = Donkeycraft.clamp(Math.round(health || 0), 0, this._playerData.maxHealth);
+        } else {
+            clampedHealth = Math.max(0, Math.min(Math.round(health || 0), this._playerData.maxHealth));
+        }
         this._playerData.health = clampedHealth;
         this._playerData.alive = this._playerData.health > 0;
     };
@@ -330,11 +347,18 @@
 
     /**
      * Update food level (max 12).
+     * Safely handles missing Donkeycraft.clamp by using Math.max/Math.min fallback.
      * @param {number} foodLevel — Food value (0-12).
      */
     Donkeycraft.LevelData.prototype.setHunger = function (foodLevel) {
         this._ensurePlayerData();
-        this._playerData.foodLevel = Donkeycraft.clamp(Math.round(foodLevel || 0), 0, 12);
+        var clampedFood;
+        if (typeof Donkeycraft.clamp === 'function') {
+            clampedFood = Donkeycraft.clamp(Math.round(foodLevel || 0), 0, 12);
+        } else {
+            clampedFood = Math.max(0, Math.min(Math.round(foodLevel || 0), 12));
+        }
+        this._playerData.foodLevel = clampedFood;
     };
 
     /**
@@ -347,11 +371,18 @@
 
     /**
      * Update hydration level.
+     * Safely handles missing Donkeycraft.clamp by using Math.max/Math.min fallback.
      * @param {number} hydration — Hydration value (0-6).
      */
     Donkeycraft.LevelData.prototype.setHydration = function (hydration) {
         this._ensurePlayerData();
-        this._playerData.hydration = Donkeycraft.clamp(hydration || 0, 0, 6);
+        var clampedHydration;
+        if (typeof Donkeycraft.clamp === 'function') {
+            clampedHydration = Donkeycraft.clamp(hydration || 0, 0, 6);
+        } else {
+            clampedHydration = Math.max(0, Math.min(hydration || 0, 6));
+        }
+        this._playerData.hydration = clampedHydration;
     };
 
     /**
