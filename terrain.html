@@ -438,6 +438,20 @@
         varying vec4 vColor;
         void main() { gl_FragColor = vColor; }
     `;
+        // Depth-only shader for pre-pass: writes depth values without affecting color buffer
+        var DK_DEPTH_VS = `
+        attribute vec3 aPosition;
+        uniform mat4 uProjection;
+        uniform mat4 uView;
+        uniform mat4 uModel;
+        void main() {
+            gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);
+        }
+    `;
+        var DK_DEPTH_FS = `
+        precision mediump float;
+        void main() { }
+    `;
     </script>
 
     <!-- Application -->
@@ -1739,23 +1753,33 @@
                             for (var f = 0; f < _FACE_DEFS.length; f++) {
                                 var face = _FACE_DEFS[f];
                                 var nx = x + face.d[0], ny = y + face.d[1], nz = z + face.d[2];
-                                var nid = 0, neighborTransparent = true;
+                                var nid = 0;
 
                                 if (nx >= 0 && nx < cs && ny >= 0 && ny < ws && nz >= 0 && nz < cs) {
                                     // Neighbor within same chunk
                                     nid = chunk.getBlock(nx, ny, nz);
-                                    neighborTransparent = isTransparent(nid);
                                 } else {
                                     // Neighbor in adjacent chunk — look up by world coords
                                     var ngx = chunk.chunkX * cs + nx;
                                     var ngy = ny;
                                     var ngz = chunk.chunkZ * cs + nz;
                                     nid = getBlockAt(ngx, ngy, ngz);
-                                    neighborTransparent = isTransparent(nid);
                                 }
 
-                                // Show face if neighbor is air OR transparent
-                                if (nid === 0 || neighborTransparent) {
+                                // Skip faces that cross +X and +Z chunk boundaries to eliminate duplicate geometry.
+                                // When two adjacent chunks have different block types at their border, both would
+                                // otherwise render a face at the exact same world position, causing z-fighting.
+                                // By only rendering the "western" or "northern" side, each boundary is drawn exactly once.
+                                var chunkBoundaryX = (nx >= cs || nx < 0);
+                                var chunkBoundaryZ = (nz >= cs || nz < 0);
+                                if ((face.d[0] === 1 && chunkBoundaryX) || (face.d[2] === 1 && chunkBoundaryZ)) {
+                                    continue;
+                                }
+
+                                // Show face if neighbor is air OR a different block type.
+                                // Only cull faces between identical adjacent blocks (like-block borders).
+                                // All transitions between different block types must be visible.
+                                if (nid === 0 || nid !== bid) {
                                     // Each quad = 6 vertices (2 triangles), consistent winding [0,1,2] + [0,2,3]
                                     var triIndices = [0, 1, 2, 0, 2, 3];
                                     for (var ti = 0; ti < 6; ti++) {
@@ -1970,9 +1994,9 @@
                 chunks.forEach(function (ch) { buildChunkMesh(ch); });
 
                 // ---- Pass 2: Terrain rendering with alpha blending ----
-                gl.enable(gl.DEPTH_TEST);
-                gl.depthMask(true);
-                gl.disable(gl.CULL_FACE);
+                // Single pass with depthMask(false): depth testing prevents rendering behind
+                // geometry, but no new depth values are written, allowing proper far-to-near
+                // transparent blending for semi-transparent blocks.
 
                 gl.useProgram(terrainProgram);
                 gl.uniformMatrix4fv(terrainLocs.uProjection, false, proj);
@@ -1991,12 +2015,16 @@
                 });
                 chunkList.sort(function (a, b) { return b.dist - a.dist; });
 
-                // Enable blending for transparent blocks
+                // Enable blending for transparent rendering with depthMask(false).
+                // Depth testing prevents rendering behind geometry, but no new depth
+                // values are written, so distant transparent faces blend correctly
+                // through semi-transparent surfaces.
+                gl.enable(gl.DEPTH_TEST);
+                gl.depthMask(false);
                 gl.enable(gl.BLEND);
                 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+                gl.disable(gl.CULL_FACE);
 
-                // Single pass: render all chunks sorted far-to-near
-                // Per-block alpha in the shader handles transparency correctly
                 for (var i = 0; i < chunkList.length; i++) {
                     var ch = chunkList[i].chunk;
                     var buf = meshBuffers[ch.chunkX + ',' + ch.chunkZ];
@@ -2008,7 +2036,6 @@
                     cm[14] = ch.chunkZ * Donkeycraft.Config.CHUNK_SIZE;
                     gl.uniformMatrix4fv(terrainLocs.uModel, false, cm);
 
-                    // Each attribute buffer is separate and tightly packed (stride=0)
                     gl.enableVertexAttribArray(terrainLocs.aPosition);
                     gl.bindBuffer(gl.ARRAY_BUFFER, buf.posBuf);
                     gl.vertexAttribPointer(terrainLocs.aPosition, 3, gl.FLOAT, false, 0, 0);
