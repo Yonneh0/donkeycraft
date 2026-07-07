@@ -515,44 +515,43 @@
 
     /**
      * Flush all pending writes to disk.
+     * Returns a promise that resolves when all writes are complete or times out after 2 seconds.
      * @returns {Promise} Resolves when all writes are complete.
      */
     function flush() {
+        // No pending work — resolve immediately
         if (_pendingWrites.length === 0 && !_flushPromise) {
             return Promise.resolve();
         }
 
         // If a flush is already in progress, wait for it
         if (_flushPromise) {
-            return _flushPromise;
+            // Wrap with timeout to prevent hanging indefinitely
+            return Promise.race([
+                _flushPromise,
+                new Promise(function (resolve) {
+                    setTimeout(resolve, 2000);
+                })
+            ]).then(function () {
+                // Silently resolve on timeout
+            });
         }
 
-        // Trigger a new flush and return its promise directly
-        _flushPendingWrites();
+        // Trigger a new flush and return its promise with timeout protection
+        var flushPromise = _flushPendingWrites();
+        if (!flushPromise) {
+            return Promise.resolve();
+        }
 
-        // Return a promise that resolves when the IndexedDB transaction completes
-        // or times out after 2 seconds (whichever comes first)
-        return new Promise(function (resolve) {
-            var completed = false;
-
-            // If _flushPromise exists, wait for it
-            if (_flushPromise) {
-                _flushPromise.then(function () {
-                    completed = true;
-                    resolve();
-                }).catch(function () {
-                    completed = true;
-                    resolve();
-                });
-            }
-
-            // Timeout fallback: resolve after 2 seconds to avoid hanging forever
-            setTimeout(function () {
-                if (!completed) {
-                    completed = true;
-                    resolve();
-                }
-            }, 2000);
+        // Return the flush promise with a 2-second timeout fallback
+        _flushPromise = flushPromise;
+        return Promise.race([
+            flushPromise,
+            new Promise(function (resolve) {
+                setTimeout(resolve, 2000);
+            })
+        ]).then(function () {
+            // Resolve successfully on either completion or timeout
         });
     }
 

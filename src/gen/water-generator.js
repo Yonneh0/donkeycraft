@@ -110,9 +110,10 @@
     var _liquidBlocks = {};
 
     /**
-     * River loop detection: tracks visited world coordinates to prevent infinite loops
+     * River loop detection: tracks visited world coordinates per-chunk to prevent infinite loops
      * in flat terrain where gradient descent finds equal-height neighbors.
      * Uses a Set of string keys "worldX,worldZ" for O(1) lookup.
+     * Cleared at the start of each _placeRivers() call to avoid accumulation across chunks.
      * @type {Set<string>}
      * @private
      */
@@ -317,6 +318,9 @@
         var stats = { waterBlocksPlaced: 0, riversCreated: 0 };
 
         if (!heightmap) return stats;
+
+        // Clear river visited set to prevent accumulation across chunk generations
+        _clearRiverVisited();
 
         // River generation parameters
         var riverNoiseScale = 0.005;
@@ -762,6 +766,19 @@
         _lavaBlockId = null;
         _iceBlockId = null;
         _liquidBlocks = {};
+        _riverVisited.clear();
+    }
+
+    // ============================================================
+    // Internal: Clear river visited set (called per-chunk)
+    // ============================================================
+
+    /**
+     * Clear the river visited set to prevent accumulation across chunk generations.
+     * Must be called at the start of each _placeRivers() invocation.
+     * @private
+     */
+    function _clearRiverVisited() {
         _riverVisited.clear();
     }
 
