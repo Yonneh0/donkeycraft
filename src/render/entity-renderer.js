@@ -891,14 +891,17 @@
         // World transform cache: boneName → {x, y, z, rx, ry, rz, pivot}
         var worldTransforms = {};
 
+        // Entity yaw: use a local variable to avoid cross-entity contamination
+        // when multiple entities render concurrently in the same frame.
+        var entityYaw = rot ? rot.yaw : 0;
+
         // Helper: compute world transform for a bone given its parent's world transform (or entity origin)
-        var self = this;
         function computeBoneWorld(boneDef, parentWorld, boneAnim) {
             var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
             var pivot = boneDef.pivot || null;
 
-            // Entity yaw is needed for both root and child bones — declared at function scope (line 959).
-            var yaw = self._yaw;
+            // Use local entityYaw variable instead of instance property.
+            var yaw = entityYaw;
 
             if (!parentWorld) {
                 // Root bone: transform is entity position + bone offset
@@ -928,11 +931,11 @@
             // For hierarchical bones, the offset is relative to parent's local coordinate system.
             // We apply entity yaw to the offset (same as root bone) since animation rotations
             // are in entity-local space.
-            var cosYaw = Math.cos(yaw);
-            var sinYaw = Math.sin(yaw);
+            var cosYaw2 = Math.cos(yaw);
+            var sinYaw2 = Math.sin(yaw);
 
-            var localOffsetX = offset.x * cosYaw - offset.z * sinYaw;
-            var localOffsetZ = offset.x * sinYaw + offset.z * cosYaw;
+            var localOffsetX = offset.x * cosYaw2 - offset.z * sinYaw2;
+            var localOffsetZ = offset.x * sinYaw2 + offset.z * cosYaw2;
             var localOffsetY = offset.y;
 
             var finalX = px + localOffsetX;
@@ -956,9 +959,6 @@
             };
         }
 
-        // Entity yaw: hoisted to function scope to avoid shadowing in computeBoneWorld.
-        this._yaw = rot ? rot.yaw : 0;
-
         // Process root bones first
         for (var k = 0; k < rootBones.length; k++) {
             var rb = rootBones[k];
@@ -975,6 +975,36 @@
         }
 
         return worldTransforms;
+    };
+
+    /**
+     * _computeBoneYaw — Compute yaw-adjusted position for a single bone offset.
+     *
+     * Utility method for external code that needs to apply entity yaw to a bone's offset
+     * without building the full hierarchy. Uses the same rotation logic as _buildBoneHierarchy
+     * but operates on a single offset vector.
+     *
+     * @private
+     * @param {number} offsetX - Bone offset X in entity-local space.
+     * @param {number} offsetY - Bone offset Y in entity-local space.
+     * @param {number} offsetZ - Bone offset Z in entity-local space.
+     * @param {number} yaw - Entity yaw in radians.
+     * @param {{x: number, y: number, z: number}} entityPos - Entity world position.
+     * @returns {{x: number, y: number, z: number}} World-space position after yaw rotation.
+     */
+    Donkeycraft.EntityRenderer.prototype._computeBoneYaw = function (offsetX, offsetY, offsetZ, yaw, entityPos) {
+        var cosYaw = Math.cos(yaw);
+        var sinYaw = Math.sin(yaw);
+
+        var localOffsetX = offsetX * cosYaw - offsetZ * sinYaw;
+        var localOffsetZ = offsetX * sinYaw + offsetZ * cosYaw;
+        var localOffsetY = offsetY;
+
+        return {
+            x: entityPos.x + localOffsetX,
+            y: entityPos.y + localOffsetY,
+            z: entityPos.z + localOffsetZ
+        };
     };
 
     /**

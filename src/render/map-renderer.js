@@ -140,7 +140,7 @@
 
         // Other common blocks
         colors[97] = '#e8d0a0';           // iron_block
-        colors[98] = '#f0e8c0';           // gold_block
+        colors[98] = '#ffd700';           // gold_block (primary entry)
         colors[99] = '#60d060';           // emerald_block
         colors[100] = '#70b0d0';          // diamond_block
         colors[101] = '#a0a0a0';          // stone_bricks
@@ -212,14 +212,14 @@
         colors[222] = '#ffd700';          // gold_ingot
         colors[223] = '#6a5040';          // netherite_ingot
         colors[224] = '#5a4535';          // netherite_block
-        colors[225] = '#ffd700';          // gold_block
-        colors[226] = '#d0b090';          // iron_block
-        colors[227] = '#40e0d0';          // diamond_block
-        colors[228] = '#50c0a0';          // emerald_block
+        colors[225] = '#ffd700';          // gold_block (duplicate of ID 98)
+        colors[226] = '#d0b090';          // iron_block (duplicate of ID 221 — different from ID 97)
+        colors[227] = '#40e0d0';          // diamond_block (duplicate of ID 218)
+        colors[228] = '#50c0a0';          // emerald_block (duplicate of ID 219)
         colors[229] = '#aa4444';          // redstone_dust
-        colors[230] = '#aa4444';          // redstone_block
-        colors[231] = '#3050a0';          // lapis_block
-        colors[232] = '#2a2a2a';          // coal_block
+        colors[230] = '#aa4444';          // redstone_block (duplicate of ID 229)
+        colors[231] = '#3050a0';          // lapis_block (duplicate of ID 220)
+        colors[232] = '#2a2a2a';          // coal_block (duplicate of ID 214)
 
         // Quartz blocks (IDs 234-238)
         colors[234] = '#e8e0d0';          // quartz_block
@@ -250,8 +250,8 @@
         colors[255] = '#d04040';          // red_stained_glass
         colors[256] = '#2a2a2a';          // black_stained_glass
 
-        // Nether blocks (IDs 257-274)
-        colors[257] = '#8a3a3a';          // netherrack
+        // Nether blocks (IDs 257-274) — note: ID 257 is a duplicate of ID 76 (netherrack)
+        colors[257] = '#8a3a3a';          // netherrack (duplicate of ID 76)
         colors[258] = '#5a4a3a';          // soul_sand
         colors[259] = '#6a5a4a';          // soul_soil
         colors[260] = '#a08060';          // gilded_blackstone
@@ -275,18 +275,18 @@
         colors[276] = '#6a3a8a';          // nether_portal
         colors[277] = '#1a1a2a';          // end_portal
 
-        // End blocks (IDs 287-294)
-        colors[287] = '#5a3a5a';          // chorus_plant
-        colors[288] = '#a060a0';          // chorus_flower
-        colors[289] = '#d0b0d0';          // purpur_block
-        colors[290] = '#c0a0c0';          // purpur_pillar
-        colors[291] = '#c8b8a0';          // end_stone_brick_wall
+        // End blocks (IDs 287-294) — note: ID 287/288 are duplicates of IDs 138/139
+        colors[287] = '#5a3a5a';          // chorus_plant (duplicate of ID 138)
+        colors[288] = '#a060a0';          // chorus_flower (duplicate of ID 139)
+        colors[289] = '#d0b0d0';          // purpur_block (duplicate of ID 94)
+        colors[290] = '#c0a0c0';          // purpur_pillar (duplicate of ID 95)
+        colors[291] = '#c8b8a0';          // end_stone_brick_wall (duplicate of ID 96)
         colors[292] = '#d0b0d0';          // end_stone_bricks_stairs
         colors[293] = '#f06040';          // shroomlight
         colors[294] = '#4a8a2a';          // pitcher_pod
 
-        // Additional common blocks not yet covered
-        colors[1000] = '#1a1a1a';         // bedrock
+        // Additional common blocks not yet covered — note: ID 1000 is a duplicate of ID 66 (bedrock)
+        colors[1000] = '#1a1a1a';         // bedrock (duplicate of ID 66 with different color)
 
         _blockColors = colors;
         return _blockColors;

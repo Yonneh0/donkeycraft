@@ -9,26 +9,6 @@
     var RENDER_DISTANCE = Donkeycraft.Config.RENDER_DISTANCE;
 
     /**
-     * Cached identity matrix to avoid per-frame allocation in render().
-     * Created once on first access via lazy initialization.
-     * @type {Donkeycraft.Matrix4|null}
-     * @private
-     */
-    var _identityMatrixCache = null;
-
-    /**
-     * Get or create the cached identity matrix.
-     * @returns {Donkeycraft.Matrix4}
-     * @private
-     */
-    function _getCachedIdentityMatrix() {
-        if (!_identityMatrixCache) {
-            _identityMatrixCache = Donkeycraft.Matrix4.createIdentity();
-        }
-        return _identityMatrixCache;
-    }
-
-    /**
      * TerrainRenderer — Manages rendering of the chunk-based terrain.
      * Handles chunk loading/unloading, frustum culling, mesh building, and draw calls.
      * @constructor
@@ -42,6 +22,14 @@
         this._shaderManager = shaderManager;
         this._fog = fog;
         this._lighting = lighting || null;
+
+        /**
+         * Cached identity model matrix to avoid per-frame allocation in render().
+         * Created once on first access via lazy initialization.
+         * @type {Object|null}
+         * @private
+         */
+        this._identityMatrix = null;
 
         // Chunk mesh storage: map "chunkX,chunkZ" → ChunkMesh
         this._chunks = {};
@@ -816,8 +804,10 @@
             }
 
             // ---- Set model matrix (identity for world-space rendering) ----
-            var identityMatrix = _getCachedIdentityMatrix();
-            this._shaderManager.setMat4('uModel', identityMatrix);
+            if (!this._identityMatrix) {
+                this._identityMatrix = Donkeycraft.Matrix4.createIdentity();
+            }
+            this._shaderManager.setMat4('uModel', this._identityMatrix);
 
             // ---- Bind texture unit (atlas on unit 0) ----
             gl.activeTexture(gl.TEXTURE0);
