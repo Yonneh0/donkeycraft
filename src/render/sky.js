@@ -485,7 +485,7 @@
      * 1. Sky dome (depth write disabled, face culling disabled)
      * 2. Sun disc (translucent overlay, depth write disabled)
      * 3. Moon disc (translucent overlay, depth write disabled)
-     * 4. Stars (translucent point sprites, depth write disabled)
+     * 4. Stars (translucent triangle sprite billboards, depth write disabled)
      *
      * CRITICAL: All rendering uses depthMask(false). A try/finally block ensures
      * depthMask(true) is always restored before returning, preventing terrain/particles/GUI
@@ -496,11 +496,15 @@
      * saved and restored to avoid affecting subsequent renderers.
      *
      * @param {Donkeycraft.Camera} camera - The camera instance.
-     * @param {Lighting} lighting - The lighting system instance.
+     * @param {Donkeycraft.Lighting} lighting - The lighting system instance.
+     * @returns {boolean} True if sky was rendered successfully.
      */
     Donkeycraft.Sky.prototype.render = function (camera, lighting) {
         var gl = this._gl;
-        if (!gl || !this._shaderManager) return;
+        if (!gl || !this._shaderManager) return false;
+
+        // Guard: skip rendering if the WebGL context was lost.
+        if (gl.isContextLost()) return false;
 
         // Save current GL state for restoration after sky rendering.
         var prevDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK);

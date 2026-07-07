@@ -150,23 +150,23 @@ src/                # Sauce
   game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification
-     block-colors.js       # Block color and alpha lookup system — procedural RGB/alpha from block names via BlockRegistry, supports wool/concrete/glass families with HSL fallback hashing
-     block.js              # Block definitions — 300+ vanilla blocks with ID, name, hardness, blast resistance, drop metadata, transparency, emissive flags, light levels, and light opacity values
-     block-action.js       # Block breaking mechanics — hardness timer system, tool material speed multipliers (7 tiers), break progress events with debounced visual stages (~6 per block), chunk-aware state cleanup, O(1) chunk index for break state management, block re-verification on completion to prevent double-drops
-     block-models.js       # Baked 3D block models — face definitions (up/down/north/south/east/west), ambient occlusion data with 4 AO weight presets (full/edge/corner/deep), UV coordinate mapping from BlockRegistry via 16×16 atlas grid, texture name resolution for special blocks (grass faces, logs, quartz pillars), exported FACE_* constants
-     block-placement.js    # Block placement system — face normal handling, grid snapping, AABB player collision validation, raycast-based placement using hit position + face normal, world bounds enforcement, 'blockPlaced' event emission
-     block-state.js        # Block state variant system — property key-value maps (axis, color, facing, power), serialization/deserialization, BlockStateRegistry with wool colors, log axis variants, redstone power levels, lever orientations, slab/stair/door/bed states
-     block-types.js        # Block type classification — pre-computed lookup tables for solid, transparent, opaque, liquid, lava-only, replaceable, full-block queries; includes collidable and light-opacity checks with explicit edge-case overrides for glass, plants, slabs, stairs, fences, deepslate, terracotta, lanterns, trapdoors
+    block-action.js       # Block breaking mechanics — hardness timer system, tool material speed multipliers (7 tiers), break progress events with debounced visual stages (~6 per block), chunk-aware state cleanup, O(1) chunk index for break state management, block re-verification on completion to prevent double-drops
+    block-colors.js       # Block color and alpha lookup system — procedural RGB/alpha from block names via BlockRegistry, supports wool/concrete/glass families with HSL fallback hashing
+    block-models.js       # Baked 3D block models — face definitions (up/down/north/south/east/west), ambient occlusion data with 4 AO weight presets (full/edge/corner/deep), UV coordinate mapping from BlockRegistry via 16×16 atlas grid, texture name resolution for special blocks (grass faces, logs, quartz pillars), exported FACE_* constants
+    block-placement.js    # Block placement system — face normal handling, grid snapping, AABB player collision validation, raycast-based placement using hit position + face normal, world bounds enforcement, 'blockPlaced' event emission
+    block-state.js        # Block state variant system — property key-value maps (axis, color, facing, power), serialization/deserialization, BlockStateRegistry with wool colors, log axis variants, redstone power levels, lever orientations, slab/stair/door/bed states
+    block-types.js        # Block type classification — pre-computed lookup tables for solid, transparent, opaque, liquid, lava-only, replaceable, full-block queries; includes collidable and light-opacity checks with explicit edge-case overrides for glass, plants, slabs, stairs, fences, deepslate, terracotta, lanterns, trapdoors
+    block.js              # Block definitions — 300+ vanilla blocks with ID, name, hardness, blast resistance, drop metadata, transparency, emissive flags, light levels, and light opacity values
     boss-mobs.js          # Ender Dragon, Wither
-    chunk.js              # 16×256×16 chunk volume
     chunk-manager.js      # Chunk loading/unloading
+    chunk.js              # 16×256×16 chunk volume
     collision.js          # AABB collision detection
     dimension.js          # Overworld/Nether/End dimension system
     enchantment.js        # 24 vanilla enchantments
-    entity.js             # Base entity class with animation and bone support
     entity-ai.js          # A* 3D pathfinding on navmesh, configurable behavior profiles, state machine (idle/wander/chase/flee/ambush/attack/follow/patrol/hurt), DDA line-of-sight raycasting, attack cooldowns, health-aware flee triggers, navmesh obstacle avoidance
     entity-engine.js      # Animation clips, skeletal animation, kinematics, skeleton templates
     entity-manager.js     # Entity lifecycle, spatial hash, awareness tiers
+    entity.js             # Base entity class with animation and bone support
     experience.js         # XP levels and orbs
     flying.js             # Creative/spectator flying
     game-mode.js          # Survival/Creative/Spectator modes
@@ -176,10 +176,8 @@ src/                # Sauce
     jumping.js            # Jump mechanics
     lighting-engine.js    # Block light propagation (BFS flood fill)
     movement.js           # Walking, sprinting, swimming, flying speeds
-    observers.js          # Observer blocks
     passive-mobs.js       # Cow, pig, sheep, chicken
     physics.js            # Gravity-affected blocks, liquid flow
-    pistons.js            # Pistons and sticky pistons
     player.js             # Player entity (position, velocity, rotation), Hitbox, damage, knockback, fall damage, stamina management
     portal.js             # Inter-dimensional portals
     potion.js             # 18 effects, 40 potions
@@ -187,14 +185,16 @@ src/                # Sauce
     raycast.js            # DDA voxel raycasting
     recipe-registry.js    # Crafting and smelt recipes
     redstone-engine.js    # Tick-based signal propagation
-    repeater-comparator.js# Repeaters (1-4 ticks) and comparators
+    redstone-observers.js # Observer blocks
+    redstone-pistons.js   # Pistons and sticky pistons
+    redstone-repeater-comparator.js# Repeaters (1-4 ticks) and comparators
+    redstone-tnt.js       # TNT explosions
+    redstone-wiring.js    # Redstone dust/wire
     stats.js              # Achievements and statistics
     terrain-surface.js    # Biome surface layers
     texture-atlas.js      # 16×16 texture atlas compilation
     time.js               # World time cycle
-    tnt.js                # TNT explosions
     tool.js               # 7 material tiers
-    wiring.js             # Redstone dust/wire
     world-utils.js        # Coordinate utilities
   gen/
     cave-generator.js     # 3D noise-based cave systems
