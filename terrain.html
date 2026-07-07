@@ -271,7 +271,7 @@
         <h2>Terrain Tester</h2>
         <label>Biome: <select id="ui-biome"></select></label>
         <div class="row"><span>Seed:</span>
-            <input type="number" id="ui-seed" value="42" min="-999999" max="999999">
+            <input type="number" id="ui-seed" value="42" min="-2147483648" max="2147483647">
             <button id="btn-apply-seed">Apply</button>
         </div>
         <div class="row"><span>Loaded Chunks:</span></div>
@@ -709,9 +709,20 @@
             /**
              * Directional chunk render radii from current position.
              * N = North (negative Z), S = South (positive Z), W = West (negative X), E = East (positive X).
+             * Default: 3 in each direction = 7×7 = 49 chunks total.
+             * The "12-chunk base grid" from the plan refers to a 6×6 grid centered on the player,
+             * which translates to radii of 3 in each cardinal direction (covering chunks -3 to +3).
              * @type {number}
              */
-            var chunkRadiusN = 2, chunkRadiusS = 2, chunkRadiusE = 2, chunkRadiusW = 2;
+            var chunkRadiusN = 3, chunkRadiusS = 3, chunkRadiusE = 3, chunkRadiusW = 3;
+
+            /**
+             * Base grid radii — the initial 6×6 (36-chunk) grid before any expansion/contraction.
+             * Used to track the "12-chunk base grid" concept from Phase 1 of the plan.
+             * A 6×6 grid centered on player = 3 chunks in each direction from center.
+             * @type {Object}
+             */
+            var BASE_GRID_RADII = { n: 3, s: 3, e: 3, w: 3 };
 
             /**
              * Maximum allowable radius in any single direction.
@@ -730,6 +741,9 @@
             var selectedBiomeId = 1, worldSeed = 42;
             var options = { caves: true, ores: true, water: true, surface: true };
             var frameCount = 0, lastFpsTime = 0, currentFps = 0, lastSaveTime = 0;
+
+            // Generation timing tracking
+            var generationStartTime = 0, generationElapsedMs = 0;
 
             // Speed levels: walk, jog, sprint
             var SPEED_LEVELS = [4, 8, 16];
@@ -1259,11 +1273,38 @@
              * Update the stats display with terrain generation statistics.
              */
             function _updateStatsDisplay() {
-                document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
+                var statsText = 'Chunks: ' + chunks.size;
                 if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
                     var stats = Donkeycraft.TerrainCore.getStats();
-                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+                    statsText = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
                 }
+                // Add generation time if available
+                if (generationElapsedMs > 0) {
+                    statsText += ' | Gen Time: ' + generationElapsedMs.toFixed(1) + 'ms';
+                }
+                document.getElementById('ui-stats').textContent = statsText;
+            }
+
+            /**
+             * Start timing terrain generation.
+             * @private
+             */
+            function _startGenerationTiming() {
+                generationStartTime = performance.now();
+            }
+
+            /**
+             * Stop timing and record generation elapsed time.
+             * @returns {number} Elapsed milliseconds
+             * @private
+             */
+            function _stopGenerationTiming() {
+                if (generationStartTime > 0) {
+                    generationElapsedMs = performance.now() - generationStartTime;
+                    generationStartTime = 0;
+                    return generationElapsedMs;
+                }
+                return 0;
             }
 
             function resizeCanvas() {
@@ -1275,11 +1316,15 @@
             // ============================================================
             // Terrain regeneration — uses TerrainCore pipeline with ChunkGrid integration
             // Fixed: All chunk generation is now properly awaited before marking chunks ready
+            // Timing: Generation time is tracked and displayed in stats
             // ============================================================
             function regenerateTerrain() {
                 chunks.clear();
                 _clearMeshBuffers();
                 dirtyChunks.clear();
+
+                // Start generation timing
+                _startGenerationTiming();
 
                 // Determine the grid bounds from ChunkGrid or legacy radii
                 var bounds, radii;
@@ -1340,16 +1385,18 @@
                     var generationPromises = [];
 
                     for (var i = 0; i < pendingChunks.length; i++) {
-                        var pc = pendingChunks[i];
-                        var promise = Donkeycraft.TerrainCore.generateChunk(pc.cx, pc.cz).then(function (result) {
-                            // Heightmap generated — NOW add chunk to map and mark dirty
-                            if (result && result.heightmap && Array.isArray(result.heightmap)) {
-                                // Store heightmap on chunk for later use by mesh builders
-                                pc.chunk._cachedHeightmap = result.heightmap;
-                            }
-                            chunks.set(pc.key, pc.chunk);
-                            dirtyChunks.add(pc.key);
-                        }).catch(function (e) {
+                        (function (pc) {
+                            var promise = Donkeycraft.TerrainCore.generateChunk(pc.cx, pc.cz).then(function (result) {
+                                // Heightmap generated — fill chunk with blocks and mark dirty
+                                if (result && result.heightmap && Array.isArray(result.heightmap)) {
+                                    // Store heightmap on chunk for later use
+                                    pc.chunk._cachedHeightmap = result.heightmap;
+                                    // Populate chunk blocks from heightmap
+                                    _fillChunkFromHeightmap(pc.chunk, result.heightmap, pc.biomeId);
+                                }
+                                chunks.set(pc.key, pc.chunk);
+                                dirtyChunks.add(pc.key);
+                            }).catch(function (e) {
                             // Generation failed — use fallback
                             if (typeof console !== 'undefined' && console.warn) {
                                 console.warn('[Terrain] Generation failed for chunk (' + pc.cx + ',' + pc.cz + '):', e && e.message ? e.message : String(e));
@@ -1359,33 +1406,146 @@
                             dirtyChunks.add(pc.key);
                         });
                         generationPromises.push(promise);
+                        })(pendingChunks[i]);
                     }
 
                     // Update stats after ALL generations complete
                     Promise.all(generationPromises).then(function () {
+                        // Stop generation timing
+                        _stopGenerationTiming();
+
                         document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
-                        document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
 
                         // Refresh chunk grid visual to reflect new bounds/center
                         renderChunkGrid();
 
-                        // Update stats after generation
-                        if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
-                            var stats = Donkeycraft.TerrainCore.getStats();
-                            document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
-                        }
+                        // Update stats with timing and generation data
+                        _updateStatsDisplay();
                     });
                 } else {
-                    // All synchronous — update stats immediately
+                    // All synchronous — stop timing and update stats immediately
+                    _stopGenerationTiming();
                     document.getElementById('ui-chunk-pos').textContent = 'CX=' + currentChunkX + ' CZ=' + currentChunkZ;
-                    document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size;
                     renderChunkGrid();
+                    _updateStatsDisplay();
+                }
+            }
 
-                    if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.getStats === 'function') {
-                        var stats = Donkeycraft.TerrainCore.getStats();
-                        document.getElementById('ui-stats').textContent = 'Chunks: ' + chunks.size + ' | Generated: ' + stats.chunksGenerated + ' | Cache Hit Rate: ' + stats.cacheHitRate;
+            /**
+             * Fill a chunk's block data from a heightmap using biome-aware block placement.
+             * Each biome gets unique surface blocks and layer patterns:
+             * - Grass: grass_block + dirt + stone
+             * - Arctic: snow_block + ice + packed_ice
+             * - Desert: sand + sandstone + desert_gravel
+             * - Forest: grass_block + rich_dirt + stone
+             * @param {Donkeycraft.Chunk} chunk - Target chunk.
+             * @param {number[]} heightmap - Heightmap array [CHUNK_SIZE * CHUNK_SIZE].
+             * @param {number} biomeId - Biome ID for surface layer selection.
+             * @private
+             */
+            function _fillChunkFromHeightmap(chunk, heightmap, biomeId) {
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var ws = Donkeycraft.Config.WORLD_HEIGHT;
+
+                // Resolve block IDs from registry
+                function getBlockId(name, fallback) {
+                    var b = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockByName(name) : null;
+                    return b ? b.id : fallback;
+                }
+
+                var bedrockId = getBlockId('bedrock', 1000);
+                var stoneId = getBlockId('stone', 1);
+                var dirtId = getBlockId('dirt', 7);
+                var grassBlockId = getBlockId('grass_block', 8);
+
+                // Biome-specific block resolution — debug logging
+                var biomeType = 'grass'; // default
+                if (Donkeycraft.BiomeRegistry && typeof Donkeycraft.BiomeRegistry.getBiomeById === 'function') {
+                    var biome = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
+                    if (biome && biome.name) biomeType = biome.name.toLowerCase();
+                }
+
+                console.log('[Terrain] _fillChunkFromHeightmap: biomeId=' + biomeId + ', resolved biomeType=' + biomeType);
+
+                var surfaceBlockId, subSurfaceBlockId, subSubBlockId, iceBlockId, snowBlockId, sandId, sandstoneId;
+
+                switch (biomeType) {
+                    case 'arctic':
+                        snowBlockId = getBlockId('snow_block', 80);
+                        iceBlockId = getBlockId('ice', 79);
+                        subSubBlockId = getBlockId('packed_ice', 162);
+                        surfaceBlockId = snowBlockId;
+                        subSurfaceBlockId = iceBlockId;
+                        console.log('[Terrain] Arctic blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
+                        break;
+                    case 'desert':
+                        sandId = getBlockId('sand', 12);
+                        sandstoneId = getBlockId('sandstone', 24);
+                        surfaceBlockId = sandId;
+                        subSurfaceBlockId = sandstoneId;
+                        subSubBlockId = sandstoneId;
+                        console.log('[Terrain] Desert blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
+                        break;
+                    case 'forest':
+                        grassBlockId = getBlockId('grass_block', 8);
+                        surfaceBlockId = grassBlockId;
+                        subSurfaceBlockId = dirtId; // rich dirt (same block for now)
+                        subSubBlockId = stoneId;
+                        console.log('[Terrain] Forest blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
+                        break;
+                    default: // grass
+                        grassBlockId = getBlockId('grass_block', 8);
+                        surfaceBlockId = grassBlockId;
+                        subSurfaceBlockId = dirtId;
+                        subSubBlockId = stoneId;
+                        console.log('[Terrain] Grass blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
+                        break;
+                }
+
+                // Validate heightmap has varied values (debug)
+                var hMin = Infinity, hMax = -Infinity;
+                for (var hi = 0; hi < heightmap.length; hi++) {
+                    if (isFinite(heightmap[hi])) {
+                        if (heightmap[hi] < hMin) hMin = heightmap[hi];
+                        if (heightmap[hi] > hMax) hMax = heightmap[hi];
                     }
                 }
+                console.log('[Terrain] Heightmap range: min=' + hMin + ', max=' + hMax + ', length=' + heightmap.length);
+
+                // Place bedrock at Y=0
+                for (var x = 0; x < cs; x++) {
+                    for (var z = 0; z < cs; z++) {
+                        chunk.setBlock(x, 0, z, bedrockId);
+                    }
+                }
+
+                // Fill terrain columns from heightmap
+                for (var x2 = 0; x2 < cs; x2++) {
+                    for (var z2 = 0; z2 < cs; z2++) {
+                        var h = heightmap[x2 + z2 * cs];
+                        if (!isFinite(h) || h < 1 || h >= ws - 10) h = 64; // Clamp to reasonable default
+                        h = Math.floor(h);
+
+                        for (var y2 = 1; y2 < h; y2++) {
+                            if (y2 < h - 4) {
+                                chunk.setBlock(x2, y2, z2, subSubBlockId);
+                            } else if (y2 < h - 1) {
+                                chunk.setBlock(x2, y2, z2, subSurfaceBlockId);
+                            } else {
+                                // Top layer (just below surface)
+                                chunk.setBlock(x2, y2, z2, subSurfaceBlockId);
+                            }
+                        }
+                        // Place biome-specific surface block
+                        if (surfaceBlockId) {
+                            chunk.setBlock(x2, h, z2, surfaceBlockId);
+                        } else {
+                            chunk.setBlock(x2, h, z2, stoneId);
+                        }
+                    }
+                }
+
+                chunk._dirty = true;
             }
 
             // Fallback chunk generation (when StructureGenerator is unavailable)
@@ -1687,7 +1847,20 @@
                 _createSkyBuffers();
                 if (!skyPosBuf || !skyColBuf) return;
 
+                // Validate attribute locations - skip rendering if shader isn't properly linked
+                if (skyLocs.aPosition < 0 || skyLocs.aColor < 0) {
+                    console.warn('[Terrain] Sky shader attributes not found, skipping sky render');
+                    return;
+                }
+
                 gl.useProgram(skyProgram);
+
+                // Disable ALL possible attributes first to clear stale bindings from previous passes
+                // This prevents INVALID_OPERATION when switching between terrain and sky shaders
+                for (var i = 0; i < 8; i++) {
+                    gl.disableVertexAttribArray(i);
+                }
+
                 gl.uniformMatrix4fv(skyLocs.uProjection, false, proj);
                 gl.uniformMatrix4fv(skyLocs.uView, false, view);
                 var mdl = mat4Create();
@@ -1708,6 +1881,11 @@
                 gl.drawArrays(gl.TRIANGLES, 0, 36);
                 gl.depthMask(true);
                 gl.disable(gl.CULL_FACE);
+
+                // Disable attribute arrays to prevent INVALID_OPERATION in subsequent passes
+                // when a different shader program is used
+                gl.disableVertexAttribArray(skyLocs.aPosition);
+                gl.disableVertexAttribArray(skyLocs.aColor);
             }
 
             // ============================================================
@@ -1853,6 +2031,12 @@
                 // Disable blending after terrain pass
                 gl.disable(gl.BLEND);
                 gl.depthMask(true);
+
+                // Disable ALL terrain shader attribute arrays to prevent stale bindings
+                // from interfering with the next frame's sky render pass
+                for (var i = 0; i < 8; i++) {
+                    gl.disableVertexAttribArray(i);
+                }
 
                 requestAnimationFrame(renderLoop);
             }
