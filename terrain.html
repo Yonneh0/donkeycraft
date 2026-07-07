@@ -723,28 +723,73 @@
             /**
              * Directional chunk render radii from current position.
              * N = North (negative Z), S = South (positive Z), W = West (negative X), E = East (positive X).
-             * Default: 3 in each direction = 7×7 = 49 chunks total.
-             * The "12-chunk base grid" from the plan refers to a 6×6 grid centered on the player,
-             * which translates to radii of 3 in each cardinal direction (covering chunks -3 to +3).
+             * Default: 7/8 in each direction = 16×16 = 256 chunks total.
              * @type {number}
              */
-            var chunkRadiusN = 3, chunkRadiusS = 3, chunkRadiusE = 3, chunkRadiusW = 3;
+            var chunkRadiusN = 7, chunkRadiusS = 8, chunkRadiusE = 8, chunkRadiusW = 7;
 
             /**
-             * Base grid radii — the initial 6×6 (36-chunk) grid before any expansion/contraction.
-             * Used to track the "12-chunk base grid" concept from Phase 1 of the plan.
-             * A 6×6 grid centered on player = 3 chunks in each direction from center.
+             * Base grid radii — the initial 16×16 (256-chunk) grid before any expansion/contraction.
+             * A 16×16 grid centered on player = 7 north + 8 south, 7 west + 8 east.
              * @type {Object}
              */
-            var BASE_GRID_RADII = { n: 3, s: 3, e: 3, w: 3 };
+            var BASE_GRID_RADII = { n: 7, s: 8, e: 8, w: 7 };
 
             /**
              * Maximum allowable radius in any single direction.
              * Controls how far chunks can be loaded from the center chunk in each direction.
-             * Default: 15 (equivalent to legacy render distance of 30 when symmetric).
+             * Default: 31 (equivalent to 64×64 grid when symmetric).
              * @type {number}
              */
-            var MAX_CHUNK_RADIUS = 15;
+            var MAX_CHUNK_RADIUS = 31;
+
+            /**
+             * View distance in world units — how far the player can see.
+             * Chunks within this distance of the viewer are candidates for loading.
+             * @type {number}
+             */
+            var VIEW_DISTANCE_BLOCKS = 128;
+
+            /**
+             * Queue capacity — maximum number of chunks waiting to be loaded at once.
+             * @type {number}
+             */
+            var MAX_PENDING_CHUNKS = 8;
+
+            /**
+             * Trail buffer radius — chunks beyond this distance behind the viewer get unloaded.
+             * @type {number}
+             */
+            var TRAIL_BUFFER_CHUNKS = 4;
+
+            // ============================================================
+            // Dynamic chunk loading — queue and tracking
+            // ============================================================
+
+            /**
+             * Set of chunk keys currently loaded in the chunks map.
+             * @type {Set<string>}
+             */
+            var loadedChunkKeys = new Set();
+
+            /**
+             * Map of chunk keys to their pending generation promises.
+             * Used to track chunks being generated asynchronously.
+             * @type {Map<string, {promise: Promise, cx: number, cz: number, completed: boolean}}
+             */
+            var pendingChunkQueue = new Map();
+
+            /**
+             * Whether the tab/window is currently visible (for pausing loading).
+             * @type {boolean}
+             */
+            var isTabVisible = true;
+
+            /**
+             * Last frame's camera chunk position — used to detect when player crosses a chunk boundary.
+             * @type {{x: number, z: number}}
+             */
+            var lastCameraChunkPos = { x: 0, z: 0 };
 
             /**
              * Maximum total grid cells to prevent browser freeze from corrupted/invalid state.
@@ -1281,6 +1326,267 @@
                 document.addEventListener('mousemove', function (e) { if (!pointerLocked) return; mouseDX += e.movementX || 0; mouseDY += e.movementY || 0; });
                 window.addEventListener('resize', resizeCanvas);
                 resizeCanvas();
+            }
+
+            // ============================================================
+            // Dynamic chunk loading — core functions
+            // ============================================================
+
+            /**
+             * Queue a chunk for asynchronous generation when the viewer approaches it.
+             * Respects MAX_PENDING_CHUNKS limit and skips already-loaded or already-pending chunks.
+             * @param {number} cx - Chunk X coordinate
+             * @param {number} cz - Chunk Z coordinate
+             * @returns {boolean} True if chunk was queued
+             * @private
+             */
+            function queueChunk(cx, cz) {
+                var key = cx + ',' + cz;
+
+                // Skip if already loaded or already pending
+                if (chunks.has(key)) return false;
+                if (pendingChunkQueue.has(key)) return false;
+
+                // Check queue capacity
+                if (pendingChunkQueue.size >= MAX_PENDING_CHUNKS) return false;
+
+                // Check grid bounds safety cap
+                var totalCells = (chunkRadiusN + chunkRadiusS + 1) * (chunkRadiusW + chunkRadiusE + 1);
+                if (totalCells > MAX_GRID_CELLS) return false;
+
+                pendingChunkQueue.set(key, {
+                    promise: null,
+                    cx: cx,
+                    cz: cz,
+                    completed: false
+                });
+
+                return true;
+            }
+
+            /**
+             * Check viewer position against loaded chunks and queue any that should be loaded.
+             * Called every frame in renderLoop. Queues chunks that the player is approaching
+             * based on view distance and movement direction.
+             * @private
+             */
+            function updateViewerChunkQueue() {
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var cx = Math.floor(camera.x / cs);
+                var cz = Math.floor(camera.z / cs);
+
+                // Initialize last position tracking
+                if (lastCameraChunkPos.x === 0 && lastCameraChunkPos.z === 0) {
+                    lastCameraChunkPos.x = cx;
+                    lastCameraChunkPos.z = cz;
+                    return;
+                }
+
+                // Detect which direction the player moved
+                var dx = cx - lastCameraChunkPos.x;
+                var dz = cz - lastCameraChunkPos.z;
+
+                // Only process when player crosses at least one chunk boundary
+                if (Math.abs(dx) >= 1 || Math.abs(dz) >= 1) {
+                    // Determine which chunks to queue based on movement direction
+                    var chunksToQueue = [];
+
+                    // Queue chunks in the direction of movement and adjacent chunks
+                    for (var ddX = -1; ddX <= 1; ddX++) {
+                        for (var ddZ = -1; ddZ <= 1; ddZ++) {
+                            var targetCx = cx + ddX;
+                            var targetCz = cz + ddZ;
+
+                            // Only queue if this chunk is outside the current grid bounds
+                            var gridMinX = currentChunkX - chunkRadiusW;
+                            var gridMaxX = currentChunkX + chunkRadiusE;
+                            var gridMinZ = currentChunkZ - chunkRadiusN;
+                            var gridMaxZ = currentChunkZ + chunkRadiusS;
+
+                            // If outside grid bounds, queue it
+                            if (targetCx < gridMinX || targetCx > gridMaxX ||
+                                targetCz < gridMinZ || targetCz > gridMaxZ) {
+                                chunksToQueue.push({ cx: targetCx, cz: targetCz });
+                            }
+                        }
+                    }
+
+                    // Sort by distance to camera (prioritize closest)
+                    chunksToQueue.sort(function (a, b) {
+                        var distA = (a.cx - cx) * (a.cx - cx) + (a.cz - cz) * (a.cz - cz);
+                        var distB = (b.cx - cx) * (b.cx - cx) + (b.cz - cz) * (b.cz - cz);
+                        return distA - distB;
+                    });
+
+                    // Queue up to 3 chunks per frame to avoid overwhelming the queue
+                    for (var i = 0; i < Math.min(3, chunksToQueue.length); i++) {
+                        queueChunk(chunksToQueue[i].cx, chunksToQueue[i].cz);
+                    }
+
+                    lastCameraChunkPos.x = cx;
+                    lastCameraChunkPos.z = cz;
+                } else {
+                    // Same chunk — check if near boundary and queue in movement direction
+                    var nearBoundaryX = false;
+                    var nearBoundaryZ = false;
+
+                    // Check if near east/west boundary
+                    if (cx - gridMinX <= 1) nearBoundaryX = true;
+                    if (gridMaxX - cx <= 1) nearBoundaryX = true;
+                    // Check if near north/south boundary
+                    if (cz - gridMinZ <= 1) nearBoundaryZ = true;
+                    if (gridMaxZ - cz <= 1) nearBoundaryZ = true;
+
+                    if (nearBoundaryX || nearBoundaryZ) {
+                        // Determine which direction to queue next
+                        var queueTargets = [];
+
+                        if (dx >= 1) queueTargets.push({ cx: cx + 1, cz: cz });
+                        if (dx <= -1) queueTargets.push({ cx: cx - 1, cz: cz });
+                        if (dz >= 1) queueTargets.push({ cx: cx, cz: cz + 1 });
+                        if (dz <= -1) queueTargets.push({ cx: cx, cz: cz - 1 });
+
+                        // Also queue diagonal if both moving
+                        if (Math.abs(dx) >= 1 && Math.abs(dz) >= 1) {
+                            queueTargets.push({ cx: cx + Math.sign(dx), cz: cz + Math.sign(dz) });
+                        }
+
+                        for (var j = 0; j < queueTargets.length; j++) {
+                            if (queueChunk(queueTargets[j].cx, queueTargets[j].cz)) break;
+                        }
+                    }
+                }
+            }
+
+            /**
+             * Process pending chunk queue using requestIdleCallback for smooth non-blocking loading.
+             * Generates one chunk per idle callback cycle to avoid blocking the main thread.
+             * @private
+             */
+            function loadQueuedChunks() {
+                if (pendingChunkQueue.size === 0) return;
+                if (!isTabVisible) return; // Don't load when tab is hidden
+
+                // Find first incomplete pending chunk
+                var entry = null;
+                var entryKey = null;
+                pendingChunkQueue.forEach(function (value, key) {
+                    if (!value.completed && !value.promise) {
+                        entry = value;
+                        entryKey = key;
+                    }
+                });
+
+                if (!entry) return; // All promises already resolving
+
+                // Start generation for this chunk
+                entry.completed = false;
+                var promise = null;
+
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.generateChunk === 'function') {
+                    Donkeycraft.TerrainCore.setSeed(worldSeed);
+                    Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
+                    promise = Donkeycraft.TerrainCore.generateChunk(entry.cx, entry.cz).then(
+                        function (result) {
+                            var key = entry.cx + ',' + entry.cz;
+                            var chunk = new Donkeycraft.Chunk(entry.cx, entry.cz);
+                            chunk.fill(0);
+
+                            if (result && result.heightmap && Array.isArray(result.heightmap)) {
+                                chunk._cachedHeightmap = result.heightmap;
+                                _fillChunkFromHeightmap(chunk, result.heightmap, selectedBiomeId);
+                            }
+                            chunks.set(key, chunk);
+                            dirtyChunks.add(key);
+                            loadedChunkKeys.add(key);
+                        },
+                        function (e) {
+                            if (typeof console !== 'undefined' && console.warn) {
+                                console.warn('[Terrain] Pending generation failed for chunk (' + entry.cx + ',' + entry.cz + '):', e && e.message ? e.message : String(e));
+                            }
+                            // Fallback: create empty chunk
+                            var key = entry.cx + ',' + entry.cz;
+                            var chunk = new Donkeycraft.Chunk(entry.cx, entry.cz);
+                            chunk.fill(0);
+                            chunks.set(key, chunk);
+                            dirtyChunks.add(key);
+                            loadedChunkKeys.add(key);
+                        }
+                    );
+                } else {
+                    // Legacy fallback: synchronous generation
+                    promise = Promise.resolve().then(function () {
+                        var key = entry.cx + ',' + entry.cz;
+                        var chunk = new Donkeycraft.Chunk(entry.cx, entry.cz);
+                        chunk.fill(0);
+                        _generateChunkFallback(chunk, entry.cx, entry.cz, selectedBiomeId);
+                        chunks.set(key, chunk);
+                        dirtyChunks.add(key);
+                        loadedChunkKeys.add(key);
+                    });
+                }
+
+                entry.promise = promise;
+                entry.promise.then(function () {
+                    entry.completed = true;
+                    pendingChunkQueue.delete(entryKey);
+                }).catch(function () {
+                    entry.completed = true;
+                    pendingChunkQueue.delete(entryKey);
+                });
+            }
+
+            /**
+             * Unload chunks that are too far behind the viewer (trail cleanup).
+             * Removes chunks beyond TRAIL_BUFFER_CHUNKS behind the player's movement direction.
+             * @private
+             */
+            function unloadTrailChunks() {
+                if (pendingChunkQueue.size > 0) return; // Don't unload while queuing
+
+                var cs = Donkeycraft.Config.CHUNK_SIZE;
+                var cx = Math.floor(camera.x / cs);
+                var cz = Math.floor(camera.z / cs);
+
+                // Check each loaded chunk — remove those far behind
+                chunks.forEach(function (chunk, key) {
+                    var chunkDx = chunk.chunkX - cx;
+                    var chunkDz = chunk.chunkZ - cz;
+
+                    // Don't unload chunks within the current grid bounds
+                    var gridMinX = currentChunkX - chunkRadiusW;
+                    var gridMaxX = currentChunkX + chunkRadiusE;
+                    var gridMinZ = currentChunkZ - chunkRadiusN;
+                    var gridMaxZ = currentChunkZ + chunkRadiusS;
+
+                    if (chunk.chunkX >= gridMinX && chunk.chunkX <= gridMaxX &&
+                        chunk.chunkZ >= gridMinZ && chunk.chunkZ <= gridMaxZ) {
+                        return; // Within bounds, don't unload
+                    }
+
+                    // Unload chunks far behind the player
+                    var isBehind = false;
+                    if (chunkDx < -TRAIL_BUFFER_CHUNKS) isBehind = true;
+                    if (chunkDx > TRAIL_BUFFER_CHUNKS) isBehind = false;
+                    if (chunkDz < -TRAIL_BUFFER_CHUNKS) isBehind = true;
+                    if (chunkDz > TRAIL_BUFFER_CHUNKS) isBehind = false;
+
+                    // Also check diagonal — unload if far in any direction
+                    var dist = Math.sqrt(chunkDx * chunkDx + chunkDz * chunkDz);
+                    if (dist > TRAIL_BUFFER_CHUNKS * 2) {
+                        // Free WebGL buffers
+                        if (meshBuffers[key]) {
+                            if (meshBuffers[key].posBuf) gl.deleteBuffer(meshBuffers[key].posBuf);
+                            if (meshBuffers[key].colorBuf) gl.deleteBuffer(meshBuffers[key].colorBuf);
+                            if (meshBuffers[key].alphaBuf) gl.deleteBuffer(meshBuffers[key].alphaBuf);
+                            if (meshBuffers[key].normBuf) gl.deleteBuffer(meshBuffers[key].normBuf);
+                            delete meshBuffers[key];
+                        }
+                        chunks.delete(key);
+                        dirtyChunks.delete(key);
+                        loadedChunkKeys.delete(key);
+                    }
+                });
             }
 
             /**
@@ -2008,6 +2314,10 @@
                 var lz = ez - Math.cos(camera.yaw) * Math.cos(camera.pitch);
                 var view = mat4Create();
                 mat4LookAt(view, [ex, ey, ez], [lx, ly, lz], [0, 1, 0]);
+
+                // ---- Dynamic chunk loading: update queue and load pending chunks ----
+                updateViewerChunkQueue();
+                loadQueuedChunks();
 
                 // ---- Pass 1: Sky (behind everything, render inside-out) ----
                 renderSky(proj, view);
