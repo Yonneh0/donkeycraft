@@ -101,7 +101,7 @@
 
         // Grass block face variants — separate block IDs for proper atlas UV mapping
         registerBlock(233, 'grass_block_top', 0.6, 0.6, 8, 1, false, false, 0, 15);
-        registerBlock(140, 'grass_block_side', 0.6, 0.6, 8, 1, false, false, 0, 15);
+        registerBlock(300, 'grass_block_side', 0.6, 0.6, 8, 1, false, false, 0, 15);
 
         // Bedrock (ID 1000) — world boundary block, unbreakable
         registerBlock(1000, 'bedrock', -1, 3600000.0, -1, 0, false, false, 0, 15);
@@ -157,8 +157,8 @@
         registerBlock(49, 'glass_pane', 0.3, 0.3, -1, 0, true, false, 0, 0);
         registerBlock(50, 'ice', 0.5, 0.5, -1, 0, true, false, 0, 0);
         registerBlock(51, 'blue_ice', 2.8, 3.0, -1, 0, true, false, 0, 0);
-        registerBlock(52, 'snow_layer', 0.1, 0.1, 53, 1, true, false, 0, 0);
-        registerBlock(53, 'snowBlock', 0.2, 0.2, 53, 1, false, false, 0, 15);
+        registerBlock(52, 'snow_layer', 0.1, 0.1, -1, 0, true, false, 0, 0);
+        registerBlock(53, 'snow_block', 0.2, 0.2, 53, 1, false, false, 0, 15);
         registerBlock(54, 'piston_head', 0.0, 0.0, -1, 0, true, false, 0, 0);
 
         // Wool colors (IDs 55-70) — 16 colors

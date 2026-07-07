@@ -1,5 +1,6 @@
 // Donkeycraft — Block Type Classification
 // Special block type classification: solid, transparent, liquid, opaque, full-block.
+// Uses BlockRegistry name-based lookups for robust ID-agnostic classification.
 (function () {
     'use strict';
 
@@ -11,203 +12,345 @@
 
     /**
      * BlockTypes — pre-computed lookup tables for block type queries.
+     * Built dynamically from BlockRegistry at initialization time.
+     * @namespace
      */
     Donkeycraft.BlockTypes = (function () {
-        var _solid = {};         // blockId -> true: has full collision box
-        var _transparent = {};   // blockId -> true: alpha/see-through
-        var _opaque = {};        // blockId -> true: fully blocks light (opacity >= 15)
-        var _liquid = {};        // blockId -> true: water or lava
-        var _lava = {};          // blockId -> true: lava only (not water)
-        var _replaceable = {};   // blockId -> true: grass, flowers, replaceable
-        var _fullBlock = {};     // blockId -> true: occupies entire 16x16x16 block
+        /** @type {Object.<number, boolean>} */
+        var _solid = {};
+        /** @type {Object.<number, boolean>} */
+        var _transparent = {};
+        /** @type {Object.<number, boolean>} */
+        var _opaque = {};
+        /** @type {Object.<number, boolean>} */
+        var _liquid = {};
+        /** @type {Object.<number, boolean>} */
+        var _lava = {};
+        /** @type {Object.<number, boolean>} */
+        var _replaceable = {};
+        /** @type {Object.<number, boolean>} */
+        var _fullBlock = {};
 
-        // ---- Build lookup tables from BlockRegistry ----
+        // ============================================================
+        // Helper — resolve block ID by name from BlockRegistry
+        // ============================================================
 
-        var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
-        for (var i = 0; i < blocks.length; i++) {
-            var b = blocks[i];
-            var id = b.id;
-
-            _transparent[id] = b.transparent;
-            _opaque[id] = b.lightOpacity >= 15;
-            _liquid[id] = (b.name === 'water' || b.name === 'lava');
-            _lava[id] = (b.name === 'lava');
-
-            // Replaceable: unbreakable blocks (hardness < 0) or transparent decorative blocks with no drop
-            _replaceable[id] = b.hardness < 0 || (b.dropBlockId === -1 && b.transparent === true && b.lightOpacity === 0);
-
-            // Solid: not transparent and has non-negative hardness
-            _solid[id] = !b.transparent && b.hardness >= 0;
-
-            // Full block: solid, opaque, not a liquid, not a plant/decoration, must have a drop
-            _fullBlock[id] = _solid[id] && _opaque[id] && !_liquid[id] &&
-                b.lightOpacity >= 15 && b.dropBlockId >= 0;
+        /**
+         * Resolve a block ID by name from BlockRegistry.
+         * Returns -1 if the block is not found.
+         * @param {string} name - Block name (case-insensitive).
+         * @returns {number} Block ID, or -1 if not found.
+         * @private
+         */
+        function _resolveBlockId(name) {
+            if (!Donkeycraft.BlockRegistry || typeof Donkeycraft.BlockRegistry.getBlockByName !== 'function') return -1;
+            var block = Donkeycraft.BlockRegistry.getBlockByName(name);
+            return block ? block.id : -1;
         }
 
-        // ---- Explicit overrides for edge cases ----
+        // ============================================================
+        // Build lookup tables from BlockRegistry (ID-agnostic)
+        // ============================================================
 
-        // Glass is transparent but not solid (no collision)
-        _transparent[45] = true;   // glass
-        _solid[45] = false;
+        /**
+         * Initialize all classification lookup tables from BlockRegistry.
+         * Called once during module initialization.
+         * @private
+         */
+        function _initLookups() {
+            if (!Donkeycraft.BlockRegistry) return;
 
-        _transparent[46] = true;   // tinted_glass
-        _solid[46] = false;
+            var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
+            for (var i = 0; i < blocks.length; i++) {
+                var b = blocks[i];
+                var id = b.id;
 
-        _transparent[47] = true;   // glass_pane
-        _solid[47] = false;
+                _transparent[id] = !!b.transparent;
+                _opaque[id] = b.lightOpacity >= 15;
+                _liquid[id] = (b.name === 'water' || b.name === 'lava');
+                _lava[id] = (b.name === 'lava');
 
-        _transparent[48] = true;   // ice
-        _solid[48] = false;
+                // Replaceable: unbreakable blocks (hardness < 0) or transparent decorative blocks with no drop
+                _replaceable[id] = b.hardness < 0 || (b.dropBlockId === -1 && b.transparent === true && b.lightOpacity === 0);
 
-        _transparent[49] = true;   // blue_ice
-        _solid[49] = false;
+                // Solid: not transparent and has non-negative hardness
+                _solid[id] = !b.transparent && b.hardness >= 0;
 
-        // Snow layer is transparent (partial height)
-        _transparent[50] = true;   // snow_layer
-        _solid[50] = false;
+                // Full block: solid, opaque, not a liquid, must have a drop
+                _fullBlock[id] = _solid[id] && _opaque[id] && !_liquid[id] &&
+                    b.lightOpacity >= 15 && b.dropBlockId >= 0;
+            }
 
-        // Piston head is transparent
-        _transparent[52] = true;   // piston_head
-        _solid[52] = false;
+            // ---- Name-based overrides for edge cases ----
+            // These use BlockRegistry lookups instead of hardcoded IDs for robustness.
+            _applyOverrides();
+        }
 
-        // Leaves are transparent but solid (collision)
-        _transparent[118] = true;  // oak_leaves
-        _solid[118] = true;
-        _transparent[119] = true;  // spruce_leaves
-        _solid[119] = true;
-        _transparent[120] = true;  // birch_leaves
-        _solid[120] = true;
-        _transparent[121] = true;  // jungle_leaves
-        _solid[121] = true;
-        _transparent[122] = true;  // acacia_leaves
-        _solid[122] = true;
-        _transparent[123] = true;  // dark_oak_leaves
-        _solid[123] = true;
+        /**
+         * Apply classification overrides by block name.
+         * @private
+         */
+        function _applyOverrides() {
+            var overrideDefs = [
+                // [name, transparent, solid, fullBlock, replaceable]
+                ['glass', true, false, false, false],
+                ['tinted_glass', true, false, false, false],
+                ['glass_pane', true, false, false, false],
+                ['ice', true, false, false, false],
+                ['blue_ice', true, false, false, false],
+                ['snow_layer', true, false, false, false],
+                ['piston_head', true, false, false, false],
+                ['grass', true, false, false, true],
+                ['tall_grass', true, false, false, true],
+                ['fern', true, false, false, true],
+                ['poppy', true, false, false, true],
+                ['blue_orchid', true, false, false, true],
+                ['dandelion', true, false, false, true],
+                ['rose_bush', true, false, false, true],
+                ['sunflower', true, false, false, true],
+                ['lily_pad', true, false, false, false],
+                ['glow_lichen', true, false, false, true],
+                ['dead_bush', true, false, false, true],
+                ['vine', true, false, false, true],
+                ['cave_vines', true, false, false, true],
+                ['sugar_cane', true, false, false, true],
+                ['reeds', true, false, false, true],
+                ['redstone_wire', true, false, false, false],
+                ['redstone_torch', true, false, false, false],
+                ['oak_door', true, false, false, false],
+                ['iron_door', true, false, false, false],
+                ['spruce_door', true, false, false, false],
+                ['stone_button', true, false, false, false],
+                ['oak_button', true, false, false, false],
+                ['lever', true, false, false, false],
+                ['chain', true, false, false, false],
+                ['end_rod', true, false, false, false],
+                ['painting', true, false, false, true],
+                ['stone_pressure_plate', false, false, false, false],
+                ['oak_pressure_plate', false, false, false, false]
+            ];
 
-        // Plants/decorations are transparent and not solid
-        _transparent[158] = true;  // grass
-        _solid[158] = false;
-        _transparent[159] = true;  // tall_grass
-        _solid[159] = false;
-        _transparent[160] = true;  // fern
-        _solid[160] = false;
-        _transparent[161] = true;  // poppy
-        _solid[161] = false;
-        _transparent[162] = true;  // blue_orchid
-        _solid[162] = false;
-        _transparent[163] = true;  // dandelion
-        _solid[163] = false;
-        _transparent[164] = true;  // rose_bush
-        _solid[164] = false;
-        _transparent[165] = true;  // sunflower
-        _solid[165] = false;
-        _transparent[166] = true;  // lily_pad
-        _solid[166] = false;
-        _transparent[167] = true;  // glow_lichen — transparent decorative block
-        _solid[167] = false;
-        _transparent[168] = true;  // dead_bush
-        _solid[168] = false;
-        _transparent[169] = true;  // vine
-        _solid[169] = false;
-        _transparent[170] = true;  // cave_vines
-        _solid[170] = false;
+            for (var o = 0; o < overrideDefs.length; o++) {
+                var def = overrideDefs[o];
+                var bid = _resolveBlockId(def[0]);
+                if (bid === -1) continue;
+                if (def[1]) _transparent[bid] = true;
+                if (!def[2]) _solid[bid] = false;
+                if (def[3]) _fullBlock[bid] = false;
+                if (def[4]) _replaceable[bid] = true;
+            }
 
-        // Sugar cane and reeds are transparent and replaceable
-        _transparent[171] = true;  // sugar_cane
-        _solid[171] = false;
-        _replaceable[171] = true;
-        _transparent[172] = true;  // reeds
-        _solid[172] = false;
-        _replaceable[172] = true;
+            // Leaves: transparent but solid (collision)
+            var leafNames = ['oak_leaves', 'spruce_leaves', 'birch_leaves', 'jungle_leaves', 'acacia_leaves', 'dark_oak_leaves'];
+            for (var l = 0; l < leafNames.length; l++) {
+                var lid = _resolveBlockId(leafNames[l]);
+                if (lid !== -1) {
+                    _transparent[lid] = true;
+                    _solid[lid] = true;
+                }
+            }
 
-        // All plants and decorative blocks are replaceable
-        _replaceable[158] = true;  // grass
-        _replaceable[159] = true;  // tall_grass
-        _replaceable[160] = true;  // fern
-        _replaceable[161] = true;  // poppy
-        _replaceable[162] = true;  // blue_orchid
-        _replaceable[163] = true;  // dandelion
-        _replaceable[164] = true;  // rose_bush
-        _replaceable[165] = true;  // sunflower
-        _replaceable[166] = true;  // lily_pad
-        _replaceable[167] = true;  // glow_lichen
-        _replaceable[168] = true;  // dead_bush
-        _replaceable[169] = true;  // vine
-        _replaceable[170] = true;  // cave_vines
+            // Slabs — half-height, not full blocks but still solid
+            var slabNames = ['stone_slab', 'smooth_stone_slab', 'oak_slab', 'spruce_slab', 'birch_slab', 'cobblestone_slab', 'brick_slab'];
+            for (var s = 0; s < slabNames.length; s++) {
+                var sid = _resolveBlockId(slabNames[s]);
+                if (sid !== -1) _fullBlock[sid] = false;
+            }
 
-        // Redstone wire is transparent
-        _transparent[173] = true;  // redstone_wire
-        _solid[173] = false;
+            // Stairs — partial height, not full blocks
+            var stairNames = ['stone_bricks_stairs', 'oak_stairs', 'cobblestone_stairs', 'brick_stairs', 'smooth_stone_stairs', 'sandstone_stairs'];
+            for (var st = 0; st < stairNames.length; st++) {
+                var stid = _resolveBlockId(stairNames[st]);
+                if (stid !== -1) _fullBlock[stid] = false;
+            }
 
-        // Redstone torch is not solid (small)
-        _transparent[174] = true;  // redstone_torch
-        _solid[174] = false;
+            // Fences and walls — partial height, not full blocks
+            var fenceNames = ['oak_fence', 'cobblestone_wall', 'brick_wall', 'nether_brick_wall', 'sandstone_wall'];
+            for (var f = 0; f < fenceNames.length; f++) {
+                var fid = _resolveBlockId(fenceNames[f]);
+                if (fid !== -1) _fullBlock[fid] = false;
+            }
 
-        // Doors are transparent (half-height)
-        _transparent[148] = true;  // oak_door
-        _solid[148] = false;
-        _transparent[149] = true;  // iron_door
-        _solid[149] = false;
-        _transparent[150] = true;  // spruce_door
-        _solid[150] = false;
+            // Deepslate variants — full solid blocks, not replaceable
+            var deepslateNames = ['deepslate', 'cobbled_deepslate', 'polished_deepslate', 'deepslate_bricks', 'cracked_deepslate_bricks', 'deepslate_tiles', 'cracked_deepslate_tiles'];
+            for (var ds = 0; ds < deepslateNames.length; ds++) {
+                var dsid = _resolveBlockId(deepslateNames[ds]);
+                if (dsid !== -1) {
+                    _solid[dsid] = true;
+                    _opaque[dsid] = true;
+                    _fullBlock[dsid] = true;
+                    _replaceable[dsid] = false;
+                }
+            }
 
-        // Buttons are transparent (on wall)
-        _transparent[143] = true;  // stone_button
-        _solid[143] = false;
-        _transparent[144] = true;  // oak_button
-        _solid[144] = false;
+            // Polished stone variants — full solid blocks
+            var polishedNames = ['polished_diorite', 'polished_andesite', 'polished_granite', 'polished_blackstone', 'polished_blackstone_bricks'];
+            for (var p = 0; p < polishedNames.length; p++) {
+                var pid = _resolveBlockId(polishedNames[p]);
+                if (pid !== -1) {
+                    _solid[pid] = true;
+                    _opaque[pid] = true;
+                    _fullBlock[pid] = true;
+                }
+            }
 
-        // Lever is transparent (on wall)
-        _transparent[145] = true;  // lever
-        _solid[145] = false;
+            // Mossy variants — not full blocks for bricks
+            var mossyNames = ['mossy_cobblestone', 'mossy_stone_bricks', 'mossy_brick'];
+            for (var m = 0; m < mossyNames.length; m++) {
+                var mid = _resolveBlockId(mossyNames[m]);
+                if (mid !== -1) {
+                    _solid[mid] = true;
+                    _fullBlock[mid] = true;
+                }
+            }
 
-        // Chains are not solid (thin)
-        _transparent[157] = true;  // chain
-        _solid[157] = false;
+            // Red terracotta / white terracotta — full solid blocks
+            var terracottaNames = ['terracotta', 'white_terracotta', 'orange_terracotta', 'magenta_terracotta', 'light_blue_terracotta', 'yellow_terracotta', 'lime_terracotta', 'pink_terracotta', 'gray_terracotta', 'light_gray_terracotta', 'cyan_terracotta', 'purple_terracotta', 'blue_terracotta', 'brown_terracotta', 'green_terracotta', 'red_terracotta', 'black_terracotta'];
+            for (var t = 0; t < terracottaNames.length; t++) {
+                var tid = _resolveBlockId(terracottaNames[t]);
+                if (tid !== -1) {
+                    _solid[tid] = true;
+                    _opaque[tid] = true;
+                    _fullBlock[tid] = true;
+                }
+            }
 
-        // End rod is not solid
-        _transparent[156] = true;  // end_rod
-        _solid[156] = false;
+            // Hay bale — full solid block but not opaque (has gaps)
+            var hayId = _resolveBlockId('hay_block');
+            if (hayId !== -1) {
+                _solid[hayId] = true;
+                _fullBlock[hayId] = true;
+            }
 
-        // Paintings are transparent and replaceable
-        _transparent[204] = true;  // painting
-        _solid[204] = false;
-        _replaceable[204] = true;
+            // Anvil — solid but not full block (partial height)
+            var anvilNames = ['anvil', 'chipped_anvil', 'damaged_anvil'];
+            for (var a = 0; a < anvilNames.length; a++) {
+                var aid = _resolveBlockId(anvilNames[a]);
+                if (aid !== -1) _fullBlock[aid] = false;
+            }
 
-        // Vine is transparent and not solid
-        _transparent[169] = true;
-        _solid[169] = false;
+            // Chiseled blocks — full solid blocks
+            var chiseledNames = ['chiseled_polished_blackstone', 'chiseled_deepslate'];
+            for (var ch = 0; ch < chiseledNames.length; ch++) {
+                var chid = _resolveBlockId(chiseledNames[ch]);
+                if (chid !== -1) {
+                    _solid[chid] = true;
+                    _opaque[chid] = true;
+                    _fullBlock[chid] = true;
+                }
+            }
 
-        // Slabs are half-height: not full block but still solid
-        _fullBlock[127] = false;   // stone_slab
-        _fullBlock[128] = false;   // smooth_stone_slab
-        _fullBlock[129] = false;   // oak_slab
-        _fullBlock[131] = false;   // spruce_slab
-        _fullBlock[132] = false;   // birch_slab
-        _fullBlock[133] = false;   // cobblestone_slab
-        _fullBlock[134] = false;   // brick_slab
+            // Note block, jukebox — full solid blocks
+            var noteId = _resolveBlockId('note_block');
+            if (noteId !== -1) {
+                _solid[noteId] = true;
+                _fullBlock[noteId] = true;
+            }
+            var jukeId = _resolveBlockId('jukebox');
+            if (jukeId !== -1) {
+                _solid[jukeId] = true;
+                _fullBlock[jukeId] = true;
+            }
 
-        // Stairs are not full blocks (partial height)
-        _fullBlock[135] = false;   // stone_bricks_stairs
-        _fullBlock[136] = false;   // oak_stairs
-        _fullBlock[137] = false;   // cobblestone_stairs
-        _fullBlock[139] = false;   // brick_stairs
-        _fullBlock[141] = false;   // smooth_stone_stairs
-        _fullBlock[142] = false;   // sandstone_stairs
+            // Lanterns — not full blocks, transparent
+            var lanternNames = ['lantern', 'soul_lantern'];
+            for (var lg = 0; lg < lanternNames.length; lg++) {
+                var lgid = _resolveBlockId(lanternNames[lg]);
+                if (lgid !== -1) {
+                    _transparent[lgid] = true;
+                    _fullBlock[lgid] = false;
+                }
+            }
 
-        // Fences and walls are not full blocks (partial height)
-        _fullBlock[151] = false;   // oak_fence
-        _fullBlock[152] = false;   // cobblestone_wall
-        _fullBlock[153] = false;   // brick_wall
-        _fullBlock[154] = false;   // nether_brick_wall
-        _fullBlock[155] = false;   // sandstone_wall
+            // Campfire, soul_campfire — not full blocks, transparent
+            var campfireNames = ['campfire', 'soul_campfire'];
+            for (var cf = 0; cf < campfireNames.length; cf++) {
+                var cfid = _resolveBlockId(campfireNames[cf]);
+                if (cfid !== -1) {
+                    _transparent[cfid] = true;
+                    _fullBlock[cfid] = false;
+                }
+            }
 
-        // Pressure plates are not full blocks
-        _fullBlock[146] = false;   // stone_pressure_plate
-        _fullBlock[147] = false;   // oak_pressure_plate
+            // Wall variants — not full blocks
+            var wallNames = ['cobblestone_wall', 'brick_wall', 'nether_brick_wall', 'sandstone_wall', 'granite_wall', 'diorite_wall', 'andesite_wall', 'deepslate_wall', 'end_stone_brick_wall'];
+            for (var wl = 0; wl < wallNames.length; wl++) {
+                var wlid = _resolveBlockId(wallNames[wl]);
+                if (wlid !== -1) _fullBlock[wlid] = false;
+            }
 
-        // Ladder is not solid (thin)
-        // (not defined in block.js, but handle gracefully)
+            // Fence gates — not full blocks
+            var gateNames = ['oak_fence_gate', 'spruce_fence_gate', 'birch_fence_gate', 'jungle_fence_gate', 'acacia_fence_gate', 'dark_oak_fence_gate'];
+            for (var fg = 0; fg < gateNames.length; fg++) {
+                var fgid = _resolveBlockId(gateNames[fg]);
+                if (fgid !== -1) _fullBlock[fgid] = false;
+            }
+
+            // Trapdoor — not full blocks, transparent
+            var trapdoorNames = ['oak_trapdoor', 'spruce_trapdoor', 'birch_trapdoor', 'jungle_trapdoor', 'acacia_trapdoor', 'dark_oak_trapdoor', 'iron_trapdoor'];
+            for (var td = 0; td < trapdoorNames.length; td++) {
+                var tdid = _resolveBlockId(trapdoorNames[td]);
+                if (tdid !== -1) {
+                    _transparent[tdid] = true;
+                    _fullBlock[tdid] = false;
+                }
+            }
+
+            // Hopper — not full block
+            var hopperId = _resolveBlockId('hopper');
+            if (hopperId !== -1) _fullBlock[hopperId] = false;
+
+            // Minecart tracks — replaceable, transparent
+            var trackId = _resolveBlockId('rail');
+            if (trackId !== -1) {
+                _transparent[trackId] = true;
+                _replaceable[trackId] = true;
+                _fullBlock[trackId] = false;
+            }
+
+            // End portal frame — full block
+            var epfId = _resolveBlockId('end_portal_frame');
+            if (epfId !== -1) {
+                _solid[epfId] = true;
+                _opaque[epfId] = true;
+                _fullBlock[epfId] = true;
+            }
+
+            // Mob spawner — full block
+            var spawnerId = _resolveBlockId('mob_spawner');
+            if (spawnerId !== -1) {
+                _solid[spawnerId] = true;
+                _opaque[spawnerId] = true;
+                _fullBlock[spawnerId] = true;
+            }
+
+            // Enchanting table — not full block
+            var enchantId = _resolveBlockId('enchanting_table');
+            if (enchantId !== -1) _fullBlock[enchantId] = false;
+
+            // Cake — not full block, replaceable
+            var cakeId = _resolveBlockId('cake');
+            if (cakeId !== -1) {
+                _transparent[cakeId] = true;
+                _replaceable[cakeId] = true;
+                _fullBlock[cakeId] = false;
+            }
+
+            // Beacon — full block
+            var beaconId = _resolveBlockId('beacon');
+            if (beaconId !== -1) {
+                _solid[beaconId] = true;
+                _opaque[beaconId] = true;
+                _fullBlock[beaconId] = true;
+            }
+
+            // Anvil — not full block
+            var anvilId = _resolveBlockId('anvil');
+            if (anvilId !== -1) _fullBlock[anvilId] = false;
+        }
+
+        // Run initialization
+        _initLookups();
 
         // ============================================================
         // Public API
@@ -302,6 +445,7 @@
          * @returns {number} Light opacity (0 = fully transparent, 15 = fully opaque).
          */
         function getLightOpacity(id) {
+            if (!Donkeycraft.BlockRegistry) return 0;
             var block = Donkeycraft.BlockRegistry.getBlockById(id);
             return block !== null ? block.lightOpacity : 0;
         }

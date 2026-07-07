@@ -150,13 +150,13 @@ src/                # Sauce
   game/
     animals.js            # Animal breeding logic
     biome.js              # Biome classification
-    block-colors.js       # Block color and alpha lookup system (procedural color from block names)
-    block.js              # Block definitions (257 blocks)
-    block-action.js       # Block breaking with tool multipliers
-    block-models.js       # Face/texture models with AO
-    block-placement.js    # Block placement with collision checks
-    block-state.js        # Block state variants (direction, color)
-    block-types.js        # Block classification (solid, transparent, liquid)
+     block-colors.js       # Block color and alpha lookup system — procedural RGB/alpha from block names via BlockRegistry, supports wool/concrete/glass families with HSL fallback hashing
+     block.js              # Block definitions — 300+ vanilla blocks with ID, name, hardness, blast resistance, drop metadata, transparency, emissive flags, light levels, and light opacity values
+     block-action.js       # Block breaking mechanics — hardness timer system, tool material speed multipliers (7 tiers), break progress events with debounced visual stages (~6 per block), chunk-aware state cleanup, O(1) chunk index for break state management, block re-verification on completion to prevent double-drops
+     block-models.js       # Baked 3D block models — face definitions (up/down/north/south/east/west), ambient occlusion data with 4 AO weight presets (full/edge/corner/deep), UV coordinate mapping from BlockRegistry via 16×16 atlas grid, texture name resolution for special blocks (grass faces, logs, quartz pillars), exported FACE_* constants
+     block-placement.js    # Block placement system — face normal handling, grid snapping, AABB player collision validation, raycast-based placement using hit position + face normal, world bounds enforcement, 'blockPlaced' event emission
+     block-state.js        # Block state variant system — property key-value maps (axis, color, facing, power), serialization/deserialization, BlockStateRegistry with wool colors, log axis variants, redstone power levels, lever orientations, slab/stair/door/bed states
+     block-types.js        # Block type classification — pre-computed lookup tables for solid, transparent, opaque, liquid, lava-only, replaceable, full-block queries; includes collidable and light-opacity checks with explicit edge-case overrides for glass, plants, slabs, stairs, fences, deepslate, terracotta, lanterns, trapdoors
     boss-mobs.js          # Ender Dragon, Wither
     chunk.js              # 16×256×16 chunk volume
     chunk-manager.js      # Chunk loading/unloading

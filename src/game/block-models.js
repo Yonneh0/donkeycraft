@@ -20,47 +20,87 @@
     // ============================================================
 
     /**
-     * Face direction indices.
+     * Face direction index: Up (positive Y axis).
      * @constant {number}
      */
     var FACE_UP = 0;
 
     /**
-     * Face direction indices.
+     * Face direction index: Down (negative Y axis).
      * @constant {number}
      */
     var FACE_DOWN = 1;
 
     /**
-     * Face direction indices.
+     * Face direction index: North (negative Z axis).
      * @constant {number}
      */
     var FACE_NORTH = 2;
 
     /**
-     * Face direction indices.
+     * Face direction index: South (positive Z axis).
      * @constant {number}
      */
     var FACE_SOUTH = 3;
 
     /**
-     * Face direction indices.
+     * Face direction index: East (positive X axis).
      * @constant {number}
      */
     var FACE_EAST = 4;
 
     /**
-     * Face direction indices.
+     * Face direction index: West (negative X axis).
      * @constant {number}
      */
     var FACE_WEST = 5;
+
+    // ============================================================
+    // Export face constants for external use (outside BlockModelRegistry)
+    // ============================================================
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_UP = FACE_UP;
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_DOWN = FACE_DOWN;
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_NORTH = FACE_NORTH;
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_SOUTH = FACE_SOUTH;
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_EAST = FACE_EAST;
+
+    /**
+     * Face direction indices — exported for external access.
+     * @constant {number}
+     */
+    Donkeycraft.FACE_WEST = FACE_WEST;
 
     // ============================================================
     // Face normal vectors
     // ============================================================
 
     /**
-     * Normal vectors for each face direction.
+     * Normal vectors for each face direction [up, down, north, south, east, west].
      * @type {{x: number, y: number, z: number}[]}
      */
     var FACE_NORMALS = [
@@ -167,7 +207,6 @@
 
     /**
      * Get the texture name for a specific face.
-     *
      * @param {string} faceName — Face name: "up", "down", "north", "south", "east", "west".
      * @returns {string} Texture/block name for this face.
      */
@@ -177,7 +216,6 @@
 
     /**
      * Check if this model uses ambient occlusion.
-     *
      * @returns {boolean} True if AO is enabled.
      */
     Donkeycraft.BlockModel.prototype.hasAO = function () {
@@ -186,9 +224,8 @@
 
     /**
      * Get the AO weights for a face.
-     *
      * @param {string} faceName — Face name.
-     * @returns {number[]} Array of 4 AO weight values (one per corner).
+     * @returns {number[]} Array of 4 AO weight values (one per corner), or full weights if not found.
      */
     Donkeycraft.BlockModel.prototype.getAOWeights = function (faceName) {
         return this.aoWeights[faceName] || AO_WEIGHTS.full;
@@ -215,7 +252,6 @@
         var _models = {};
 
         // ---- Register models for all blocks from BlockRegistry ----
-        // Single-pass registration eliminates duplicate model creation.
 
         /**
          * Helper to register a block model with given options.
@@ -238,6 +274,7 @@
          * @returns {boolean}
          */
         function _shouldUseAO(block) {
+            if (!block) return false;
             // Skip air and transparent/decorative blocks
             if (block.name === 'air') return false;
             // Full solid blocks: opaque, no light transparency, with hardness
@@ -254,6 +291,7 @@
          * @returns {Object.<string, string>} Face name → texture name map.
          */
         function _getFaceOverrides(block) {
+            if (!block || !block.name) return {};
             var name = block.name;
             var overrides = {};
 
@@ -346,24 +384,26 @@
         }
 
         // Build models for all blocks in a single pass
-        var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
-        for (var i = 0; i < blocks.length; i++) {
-            var block = blocks[i];
-            var id = block.id;
-            var options = {};
+        if (Donkeycraft.BlockRegistry) {
+            var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
+            for (var i = 0; i < blocks.length; i++) {
+                var block = blocks[i];
+                var id = block.id;
+                var options = {};
 
-            // Determine AO usage
-            if (_shouldUseAO(block)) {
-                options.useAO = true;
+                // Determine AO usage
+                if (_shouldUseAO(block)) {
+                    options.useAO = true;
+                }
+
+                // Apply face texture overrides for special blocks
+                var faceOverrides = _getFaceOverrides(block);
+                if (Object.keys(faceOverrides).length > 0) {
+                    options.faces = faceOverrides;
+                }
+
+                _register(id, options);
             }
-
-            // Apply face texture overrides for special blocks
-            var faceOverrides = _getFaceOverrides(block);
-            if (Object.keys(faceOverrides).length > 0) {
-                options.faces = faceOverrides;
-            }
-
-            _register(id, options);
         }
 
         // ============================================================
@@ -372,6 +412,7 @@
 
         /**
          * Get the baked model for a block ID.
+         * Returns a default cube model if no registered model exists.
          *
          * @param {number} blockId - Block ID.
          * @returns {Donkeycraft.BlockModel} The block model, or default cube if none found.
@@ -382,7 +423,6 @@
 
         /**
          * Get the default cube model (no special faces).
-         *
          * @param {number} blockId - Block ID.
          * @returns {Donkeycraft.BlockModel}
          */
@@ -401,15 +441,22 @@
          * @param {number} blockId - Block ID.
          * @param {string} faceName — Face name: "up", "down", "north", "south", "east", "west".
          * @returns {{blockId: number, faceName: string, textureName: string, u: number, v: number, uSize: number, vSize: number}|null}
-         *   UV coords from atlas (UV normalized 0-1), or null if block not found.
+         *   UV coords from atlas (UV normalized 0-1), or null if BlockRegistry unavailable.
          */
         function getFaceUV(blockId, faceName) {
-            var model = _models[blockId];
-            if (!model) return null;
-
             // Look up the texture name for this face
-            var textureName = model.getFaceTexture(faceName);
-            var textureBlock = Donkeycraft.BlockRegistry.getBlockByName(textureName);
+            var model = _models[blockId];
+            var textureName;
+            if (model) {
+                textureName = model.getFaceTexture(faceName);
+            } else {
+                // Fallback: use blockId as texture name lookup
+                var fallbackBlock = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockById(blockId) : null;
+                textureName = fallbackBlock ? fallbackBlock.name : 'stone';
+            }
+
+            // Look up the texture's block ID from BlockRegistry
+            var textureBlock = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getBlockByName(textureName) : null;
             var lookupId = textureBlock ? textureBlock.id : blockId;
 
             // Clamp to atlas bounds — IDs >= 256 overflow the atlas
@@ -434,7 +481,6 @@
 
         /**
          * Check whether a block uses ambient occlusion.
-         *
          * @param {number} blockId - Block ID.
          * @returns {boolean}
          */
@@ -445,7 +491,6 @@
 
         /**
          * Register a custom model for a block, overriding any existing registration.
-         *
          * @param {number} blockId - Block ID.
          * @param {Donkeycraft.BlockModel} model — Custom model instance.
          */
@@ -455,7 +500,6 @@
 
         /**
          * Get all registered models as an array.
-         *
          * @returns {Donkeycraft.BlockModel[]}
          */
         function getAllModels() {
@@ -470,7 +514,6 @@
 
         /**
          * Get the number of registered models.
-         *
          * @returns {number}
          */
         function getModelCount() {

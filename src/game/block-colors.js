@@ -9,56 +9,142 @@
 
     /**
      * Map of block ID → RGB color array [r, g, b] (0-1 range).
-     * @type {Object<number, number[]>}
+     * @type {Object.<number, number[]>}
      * @private
      */
     var _blockColors = {};
 
     /**
      * Map of block ID → alpha value (0-1).
-     * @type {Object<number, number>}
+     * @type {Object.<number, number>}
      * @private
      */
     var _blockAlphas = {};
 
     /**
-     * Initialize the block color lookup tables from BlockRegistry.
-     * Must be called once after BlockRegistry is populated.
+     * Flag indicating whether colors have been initialized.
+     * @type {boolean}
+     * @private
+     */
+    var _initialized = false;
+
+    // ============================================================
+    // Public API
+    // ============================================================
+
+    /**
+     * BlockColors — procedural color and alpha lookup for blocks.
+     * Must call init() after BlockRegistry is populated.
+     * @namespace
      */
     Donkeycraft.BlockColors = {
+        /**
+         * Initialize the block color lookup tables from BlockRegistry.
+         * Must be called once after BlockRegistry is populated.
+         * Safe to call multiple times — clears previous state if re-initializing.
+         *
+         * Populates _blockColors (id → RGB array) and _blockAlphas (id → alpha value)
+         * using procedural color generation based on block names. Air gets null color
+         * and 0.0 alpha; transparent blocks get reduced alpha values for terrain visibility.
+         */
         init: initBlockColors,
-        getColor: function (bid) { return _blockColors[bid]; },
-        getAlpha: function (bid) { return _blockAlphas[bid] || 1.0; },
-        getAllColors: function () { return _blockColors; },
-        getAllAlphas: function () { return _blockAlphas; }
+
+        /**
+         * Get the RGB color for a block ID.
+         * @param {number} bid - Block ID.
+         * @returns {number[]|null} RGB array [r, g, b] in 0-1 range, or null if not found/air.
+         */
+        getColor: function (bid) {
+            if (!_initialized) return null;
+            return _blockColors[bid] || null;
+        },
+
+        /**
+         * Get the alpha value for a block ID.
+         * @param {number} bid - Block ID.
+         * @returns {number} Alpha value in 0-1 range (defaults to 1.0).
+         */
+        getAlpha: function (bid) {
+            if (!_initialized) return 1.0;
+            return _blockAlphas[bid] !== undefined ? _blockAlphas[bid] : 1.0;
+        },
+
+        /**
+         * Get all color mappings.
+         * @returns {Object.<number, number[]>}
+         */
+        getAllColors: function () {
+            return _blockColors;
+        },
+
+        /**
+         * Get all alpha mappings.
+         * @returns {Object.<number, number>}
+         */
+        getAllAlphas: function () {
+            return _blockAlphas;
+        },
+
+        /**
+         * Check whether colors have been initialized.
+         * @returns {boolean}
+         */
+        isInitialized: function () {
+            return _initialized;
+        }
     };
 
+    /**
+     * Initialize the block color lookup tables from BlockRegistry.
+     * Safe to call multiple times — clears previous state if re-initializing.
+     *
+     * Populates _blockColors (id → RGB array) and _blockAlphas (id → alpha value)
+     * using procedural color generation based on block names. Air gets null color
+     * and 0.0 alpha; transparent blocks get reduced alpha values for terrain visibility.
+     */
     function initBlockColors() {
-        var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
-        for (var bi = 0; bi < blocks.length; bi++) {
-            var b = blocks[bi];
-            if (b.name === 'air') {
-                _blockColors[b.id] = null;
-                _blockAlphas[b.id] = 0.0;
-                continue;
+        try {
+            // Clear previous state if re-initializing
+            _blockColors = {};
+            _blockAlphas = {};
+
+            if (!Donkeycraft.BlockRegistry || typeof Donkeycraft.BlockRegistry.getAllBlocks !== 'function') {
+                // BlockRegistry not available — mark as initialized but empty
+                _initialized = true;
+                return;
             }
 
-            // Determine color procedurally from block name
-            var color = _getColorFromName(b.name);
-            _blockColors[b.id] = color;
+            var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
+            for (var bi = 0; bi < blocks.length; bi++) {
+                var b = blocks[bi];
+                if (b.name === 'air') {
+                    _blockColors[b.id] = null;
+                    _blockAlphas[b.id] = 0.0;
+                    continue;
+                }
 
-            // Determine alpha from block properties
-            var alpha = 0.90; // default solid block (semi-transparent for better terrain visibility)
-            if (b.transparent) {
-                if (b.name === 'water' || b.name === 'lava') alpha = 0.55;
-                else if (b.name === 'glass' || b.name.indexOf('stained_glass') >= 0) alpha = 0.3;
-                else if (b.name === 'ice' || b.name === 'blue_ice') alpha = 0.7;
-                else if (b.name === 'snow_layer' || b.name === 'glass_pane') alpha = 0.6;
-                else if (b.name === 'lily_pad') alpha = 0.4;
-                else if (b.name === 'nether_portal' || b.name === 'end_portal') alpha = 0.5;
-                else alpha = 0.85; // leaves, doors, etc.
+                // Determine color procedurally from block name
+                var color = _getColorFromName(b.name);
+                _blockColors[b.id] = color;
+
+                // Determine alpha from block properties
+                var alpha = 0.90; // default solid block (semi-transparent for better terrain visibility)
+                if (b.transparent) {
+                    if (b.name === 'water' || b.name === 'lava') alpha = 0.55;
+                    else if (b.name === 'glass' || b.name.indexOf('stained_glass') >= 0) alpha = 0.3;
+                    else if (b.name === 'ice' || b.name === 'blue_ice') alpha = 0.7;
+                    else if (b.name === 'snow_layer' || b.name === 'glass_pane') alpha = 0.6;
+                    else if (b.name === 'lily_pad') alpha = 0.4;
+                    else if (b.name === 'nether_portal' || b.name === 'end_portal') alpha = 0.5;
+                    else alpha = 0.85; // leaves, doors, etc.
+                }
+                _blockAlphas[b.id] = alpha;
             }
-            _blockAlphas[b.id] = alpha;
+
+            _initialized = true;
+        } catch (e) {
+            // Graceful degradation — colors won't be available but game continues
+            _initialized = true;
         }
     }
 
@@ -69,6 +155,8 @@
      * @private
      */
     function _getColorFromName(name) {
+        if (!name || typeof name !== 'string') return [0.5, 0.5, 0.5];
+
         var n = name.toLowerCase();
 
         // Direct matches from block registry names

@@ -11,7 +11,8 @@
 
     /**
      * Tool material speed multipliers for block breaking.
-     * @type {{wood: number, stone: number, iron: number, gold: number, diamond: number, netherite: number}}
+     * Higher values = faster breaking.
+     * @type {{wood: number, stone: number, iron: number, gold: number, diamond: number, netherite: number, naked: number}}
      */
     var TOOL_MULTIPLIERS = {
         wood: 2.0,
@@ -35,25 +36,38 @@
      * from 0→1 over time based on block hardness and tool tier. Emits progress
      * events when visual crack stage changes (~6 events per block).
      *
+     * Events emitted:
+     * - {type: 'progress', x, y, z, progress, stage} — progress update (0-9 stages)
+     * - {type: 'broken', x, y, z, blockId, drops} — block fully broken
+     *
      * @namespace
      */
     Donkeycraft.BlockAction = (function () {
-        // Current break states: Map of "x,y,z" → BreakState
+        /**
+         * Current break states: Map of "x,y,z" → BreakState.
+         * @type {Object.<string, Object>}
+         * @private
+         */
         var _breakStates = {};
 
-        // Secondary index for O(1) chunk-based cleanup: Map<chunkKey, Array<breakStateKey>>
+        /**
+         * Secondary index for O(1) chunk-based cleanup: Map<chunkKey, Array<breakStateKey>>.
+         * @type {Object.<string, string[]>}
+         * @private
+         */
         var _chunkBreakIndices = {};
 
         /**
          * Optional ChunkManager reference for block re-verification.
          * Set via setChunkManager() during game initialization.
          * @type {Object|null}
+         * @private
          */
         var _chunkManager = null;
 
         /**
          * Set the chunk manager for block re-verification during break completion.
-         * @param {Donkeycraft.ChunkManager} chunkManager - The chunk manager instance.
+         * @param {Object} chunkManager - The chunk manager instance (Donkeycraft.ChunkManager).
          */
         function setChunkManager(chunkManager) {
             _chunkManager = chunkManager;
@@ -72,16 +86,16 @@
             if (!_chunkManager) return 0;
 
             // Out of world bounds
-            if (globalY < 0 || globalY >= Donkeycraft.Config.WORLD_HEIGHT) return 0;
+            if (globalY < 0 || globalY >= (Donkeycraft.Config ? Donkeycraft.Config.WORLD_HEIGHT : 256)) return 0;
 
-            var chunkX = Donkeycraft.Chunk.chunkCoordX(globalX);
-            var chunkZ = Donkeycraft.Chunk.chunkCoordZ(globalZ);
+            var chunkX = Math.floor(globalX / 16);
+            var chunkZ = Math.floor(globalZ / 16);
 
             var chunk = _chunkManager.getChunkIfExists(chunkX, chunkZ);
             if (!chunk) return 0;
 
-            var localX = Donkeycraft.Chunk.localCoordX(globalX);
-            var localZ = Donkeycraft.Chunk.localCoordZ(globalZ);
+            var localX = ((globalX % 16) + 16) % 16;
+            var localZ = ((globalZ % 16) + 16) % 16;
 
             return chunk.getBlock(localX, globalY, localZ);
         }
@@ -94,8 +108,8 @@
          * @private
          */
         function _chunkKey(globalX, globalZ) {
-            var chunkX = Donkeycraft.Chunk.chunkCoordX(globalX);
-            var chunkZ = Donkeycraft.Chunk.chunkCoordZ(globalZ);
+            var chunkX = Math.floor(globalX / 16);
+            var chunkZ = Math.floor(globalZ / 16);
             return chunkX + ',' + chunkZ;
         }
 
@@ -127,6 +141,7 @@
         function getBlockHardness(blockId) {
             // Air always has zero hardness (unbreakable / instant break)
             if (blockId === 0) return 0;
+
             // Try to read from Donkeycraft.BlockRegistry (Phase 3)
             if (Donkeycraft.BlockRegistry && typeof Donkeycraft.BlockRegistry.getBlockById === 'function') {
                 var blockDef = Donkeycraft.BlockRegistry.getBlockById(blockId);
@@ -134,6 +149,7 @@
                     return blockDef.hardness;
                 }
             }
+
             // Fallback: default hardness for unknown blocks
             return 1.0;
         }
@@ -152,7 +168,7 @@
          * Calculate the time in seconds needed to break a block with a given tool tier.
          * @param {number} blockId - Block ID.
          * @param {string} [toolTier='naked'] - Tool material tier.
-         * @returns {number} Break time in seconds.
+         * @returns {number} Break time in seconds (Infinity for unbreakable).
          */
         function calculateBreakTime(blockId, toolTier) {
             toolTier = toolTier || 'naked';
@@ -173,6 +189,10 @@
          * @param {string} [toolTier='naked'] - Tool material tier.
          */
         function startBreaking(x, y, z, blockId, drops, toolTier) {
+            // Validate inputs
+            if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return;
+            if (typeof blockId !== 'number' || blockId < 0) return;
+
             toolTier = toolTier || 'naked';
 
             // Ensure integer coordinates for consistent key generation
@@ -184,6 +204,7 @@
             // If already breaking this block, reset progress
             if (_breakStates[key]) {
                 _breakStates[key].progress = 0;
+                _breakStates[key].lastEmitStage = -1;
             } else {
                 // Cache breakTime in state to avoid recalculating every tick
                 var cachedBreakTime = calculateBreakTime(blockId, toolTier);
@@ -219,11 +240,14 @@
          * Pauses accumulation when the player's chunk is not loaded to prevent
          * drift during tab-backgrounding or render distance changes.
          * @param {number} deltaTime - Time since last tick in seconds.
-         * @returns {Array} Array of events: {type, x, y, z, progress}.
+         * @returns {Array} Array of events: {type, x, y, z, progress, ...}.
          */
         function tickBreakProgress(deltaTime) {
             var events = [];
             var keysToRemove = [];
+
+            // Validate delta time
+            if (typeof deltaTime !== 'number' || deltaTime <= 0) return events;
 
             // Snapshot keys before iteration to avoid mutation issues
             var stateKeys = Object.keys(_breakStates);
@@ -309,12 +333,23 @@
          * @param {number} z - Global Z coordinate.
          */
         function cancelBreaking(x, y, z) {
-            // CRITICAL: Floor coordinates to match startBreaking key generation
+            // Ensure valid coordinates
+            if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return;
+
+            // Floor coordinates to match startBreaking key generation
             var ix = Math.floor(x);
             var iy = Math.floor(y);
             var iz = Math.floor(z);
             var key = ix + ',' + iy + ',' + iz;
             if (_breakStates[key]) {
+                // Remove from chunk index
+                var cKey = _chunkKey(ix, iz);
+                if (_chunkBreakIndices[cKey]) {
+                    var idx = _chunkBreakIndices[cKey].indexOf(key);
+                    if (idx !== -1) {
+                        _chunkBreakIndices[cKey].splice(idx, 1);
+                    }
+                }
                 delete _breakStates[key];
             }
         }
@@ -328,18 +363,21 @@
          * @returns {number} Progress value [0-1], or 0 if not breaking.
          */
         function getBreakProgress(x, y, z) {
-            // CRITICAL: Floor coordinates to match startBreaking key generation
+            // Ensure valid coordinates
+            if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return 0;
+
+            // Floor coordinates to match startBreaking key generation
             var ix = Math.floor(x);
             var iy = Math.floor(y);
             var iz = Math.floor(z);
             var key = ix + ',' + iy + ',' + iz;
             var state = _breakStates[key];
-            return state ? Math.min(state.progress, 1.0) : 0;
+            return state ? Math.min(Math.max(state.progress, 0), 1.0) : 0;
         }
 
         /**
          * Get all active break states.
-         * @returns {Object} Map of key → break state.
+         * @returns {Object.<string, Object>} Map of key → break state.
          */
         function getActiveBreakStates() {
             var result = {};
@@ -353,7 +391,6 @@
 
         /**
          * Clear all break states and chunk indices.
-         * Must also clear _chunkBreakIndices to prevent memory leaks.
          */
         function clearAll() {
             _breakStates = {};
@@ -394,18 +431,106 @@
             };
         }
 
+        /**
+         * Get the number of active break states.
+         * @returns {number}
+         */
+        function getActiveBreakCount() {
+            return Object.keys(_breakStates).length;
+        }
+
         return {
+            /**
+             * Start breaking a block at the given global coordinates.
+             * @param {number} x - Global X coordinate.
+             * @param {number} y - Global Y coordinate.
+             * @param {number} z - Global Z coordinate.
+             * @param {number} blockId - Block ID being broken.
+             * @param {Array} drops - Items dropped on break.
+             * @param {string} [toolTier='naked'] - Tool material tier.
+             */
             startBreaking: startBreaking,
+
+            /**
+             * Tick the break progress for all actively breaking blocks.
+             * @param {number} deltaTime - Time since last tick in seconds.
+             * @returns {Array} Array of events: {type, x, y, z, progress, ...}.
+             */
             tickBreakProgress: tickBreakProgress,
+
+            /**
+             * Cancel breaking a block at the given coordinates.
+             * @param {number} x - Global X coordinate.
+             * @param {number} y - Global Y coordinate.
+             * @param {number} z - Global Z coordinate.
+             */
             cancelBreaking: cancelBreaking,
+
+            /**
+             * Get the current break progress for a block.
+             * @param {number} x - Global X coordinate.
+             * @param {number} y - Global Y coordinate.
+             * @param {number} z - Global Z coordinate.
+             * @returns {number} Progress value [0-1], or 0 if not breaking.
+             */
             getBreakProgress: getBreakProgress,
+
+            /**
+             * Calculate the time in seconds needed to break a block with a given tool tier.
+             * @param {number} blockId - Block ID.
+             * @param {string} [toolTier='naked'] - Tool material tier.
+             * @returns {number} Break time in seconds (Infinity for unbreakable).
+             */
             calculateBreakTime: calculateBreakTime,
+
+            /**
+             * Get all active break states.
+             * @returns {Object.<string, Object>} Map of key → break state.
+             */
             getActiveBreakStates: getActiveBreakStates,
+
+            /**
+             * Get the number of active break states.
+             * @returns {number}
+             */
+            getActiveBreakCount: getActiveBreakCount,
+
+            /**
+             * Clear all break states and chunk indices.
+             */
             clearAll: clearAll,
+
+            /**
+             * Clear break states for a specific chunk using the secondary index.
+             * @param {number} chunkX - Chunk X coordinate.
+             * @param {number} chunkZ - Chunk Z coordinate.
+             */
             clearChunkBreakStates: clearChunkBreakStates,
+
+            /**
+             * Set the chunk manager for block re-verification during break completion.
+             * @param {Object} chunkManager - The chunk manager instance (Donkeycraft.ChunkManager).
+             */
             setChunkManager: setChunkManager,
+
+            /**
+             * Get the hardness value for a block ID (exported).
+             * @param {number} blockId - Block ID.
+             * @returns {number} Hardness value.
+             */
             getHardness: getHardness,
+
+            /**
+             * Get the tool multiplier for a material tier.
+             * @param {string} tier - Tool material tier (e.g., 'wood', 'stone', 'iron').
+             * @returns {number} Speed multiplier.
+             */
             getToolMultiplier: getToolMultiplier,
+
+            /**
+             * Get all tool tiers and their multipliers (exported).
+             * @returns {{wood: number, stone: number, iron: number, gold: number, diamond: number, netherite: number, naked: number}}
+             */
             getAllToolMultipliers: getAllToolMultipliers
         };
     })();
