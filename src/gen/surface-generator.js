@@ -316,7 +316,8 @@
                 height += _clampNoise(microNoise) * params.heightVariation * 0.1;
 
                 // Apply shore/beach transitions for smooth coastlines
-                var distFromShore = _calculateShoreDistance(continentalNoise, params);
+                // Pass all noise values to match the exact height calculation formula
+                var distFromShore = _calculateShoreDistance(continentalNoise, terrainNoise, detailNoise, ridgeNoise, microNoise, params);
                 if (distFromShore > 0) {
                     // Smooth transition between land and water
                     height = height + distFromShore * (seaLevel - height) * 0.3;
@@ -346,24 +347,42 @@
     /**
      * Generate an empty heightmap filled with sea level.
      * Used as fallback for invalid inputs.
-     * @returns {number[]} Empty heightmap array.
+     * @returns {number[]} Empty heightmap array filled with grass biome sea level (63).
      * @private
      */
     function _createEmptyHeightmap() {
         var defaultParams = BIOME_PARAMETERS.grass;
+        var seaLevel = isFinite(defaultParams.seaLevel) ? defaultParams.seaLevel : 63;
         var result = new Array(CHUNK_SIZE * CHUNK_SIZE);
         for (var i = 0; i < result.length; i++) {
-            result[i] = defaultParams.seaLevel;
+            result[i] = seaLevel;
         }
         return result;
     }
 
     /**
+     * Check if biome parameters are valid (all required numeric fields are finite).
+     * @param {Object} params - Biome terrain parameters object.
+     * @returns {boolean} True if all required parameters are valid.
+     * @private
+     */
+    function _validateBiomeParams(params) {
+        if (!params || typeof params !== 'object') return false;
+        var required = ['continentalScale', 'terrainScale', 'detailScale', 'ridgeScale', 'microScale',
+            'baseHeight', 'heightVariation', 'seaLevel', 'lakeBasinMin'];
+        for (var i = 0; i < required.length; i++) {
+            if (!isFinite(params[required[i]])) return false;
+        }
+        return true;
+    }
+
+    /**
      * Safely call fBm noise, catching errors and returning 0 on failure.
+     * Delegates to Donkeycraft._gen._fbm when available.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
-     * @param {number} octaves - Number of octaves.
+     * @param {number} octaves - Number of octaves (default 3).
      * @returns {number} Noise value, clamped to [-1, 1].
      * @private
      */
@@ -385,13 +404,14 @@
 
     /**
      * Safely call ridged multifractal noise, catching errors and returning 0 on failure.
+     * Delegates to Donkeycraft._gen._ridgedMultifractal when available.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
-     * @param {number} octaves - Number of octaves.
-     * @param {number} amplitude - Amplitude.
-     * @param {number} frequency - Frequency.
-     * @param {number} gain - Gain.
+     * @param {number} octaves - Number of octaves (default 3).
+     * @param {number} amplitude - Amplitude/persistence per octave.
+     * @param {number} frequency - Lacunarity/frequency multiplier.
+     * @param {number} gain - Ridge sharpness gain.
      * @returns {number} Noise value, clamped to [-1, 1].
      * @private
      */
@@ -413,11 +433,12 @@
 
     /**
      * Safely call valley noise, catching errors and returning 0 on failure.
+     * Delegates to Donkeycraft._gen._valleyNoise when available.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
-     * @param {number} octaves - Number of octaves.
-     * @returns {number} Valley strength [0, 1].
+     * @param {number} octaves - Number of octaves (default 3).
+     * @returns {number} Valley strength [0, 1] (0 = flat/high, 1 = deep valley).
      * @private
      */
     function _safeValleyNoise(x, y, z, octaves) {
@@ -438,8 +459,8 @@
 
     /**
      * Clamp a noise value to [-1, 1] to prevent NaN/Infinity propagation.
-     * @param {number} val - Noise value.
-     * @returns {number} Clamped value.
+     * @param {number} val - Raw noise value.
+     * @returns {number} Clamped value in range [-1, 1].
      * @private
      */
     function _clampNoise(val) {
@@ -450,16 +471,28 @@
     /**
      * Calculate shore distance factor for coastline smoothing.
      * Uses terrain height relative to sea level to determine if we're in a shore zone.
-     * Returns a value between 0 (deep water/far from shore) and 1 (at shore transition).
-     * @param {number} continentalNoise - Continental noise value [-1, 1] (used to estimate terrain height).
+     * The estimated height matches the exact height calculation formula used in generateHeightmap
+     * to ensure consistent beach transitions between land and water.
+     * Shore transition occurs when estimated height is between shoreLevelMin and shoreLevelMax,
+     * creating smooth gradients that prevent harsh cliff-like coastlines.
+     * @param {number} continentalNoise - Continental noise value [-1, 1].
+     * @param {number} terrainNoise - Terrain shaping noise value [-1, 1].
+     * @param {number} detailNoise - Detail noise value [-1, 1].
+     * @param {number} ridgeNoise - Ridged multifractal noise value [-1, 1].
+     * @param {number} microNoise - Micro-detail noise value [-1, 1].
      * @param {Object} params - Biome terrain parameters.
-     * @returns {number} Shore distance factor [0, 1].
+     * @returns {number} Shore distance factor [0, 1] (0 = no transition, 1 = full shore).
      * @private
      */
-    function _calculateShoreDistance(continentalNoise, params) {
-        // Estimate terrain height from continental noise
-        // Continental noise ranges [-1, 1], map to approximate height range
-        var estimatedHeight = params.baseHeight + continentalNoise * params.heightVariation * 0.3;
+    function _calculateShoreDistance(continentalNoise, terrainNoise, detailNoise, ridgeNoise, microNoise, params) {
+        // Estimate terrain height using the EXACT same combination formula as generateHeightmap
+        // This ensures shore transitions match actual terrain height
+        var estimatedHeight = params.baseHeight
+            + _clampNoise(continentalNoise) * params.heightVariation * 0.3   // Continental (30%)
+            + _clampNoise(terrainNoise) * params.heightVariation * 0.25     // Terrain (25%)
+            + _clampNoise(detailNoise) * params.heightVariation * 0.15      // Detail (15%)
+            + _clampNoise(ridgeNoise) * params.heightVariation * 0.2        // Ridge (20%)
+            + _clampNoise(microNoise) * params.heightVariation * 0.1;       // Micro (10%)
 
         // Shore zone: terrain is between shoreLevelMin and shoreLevelMax
         if (estimatedHeight < params.shoreLevelMin) {
@@ -486,25 +519,38 @@
 
     /**
      * Get biome parameters by name.
+     * Validates that all required numeric fields are finite before returning.
      * @param {string} biomeName - Biome name ('grass', 'arctic', 'desert', 'forest').
-     * @returns {Object|null} Biome terrain parameters, or null if not found.
+     * @returns {Object|null} Validated biome terrain parameters, or null if not found/invalid.
      */
     function getBiomeParameters(biomeName) {
-        return BIOME_PARAMETERS[biomeName] || null;
+        if (!biomeName || typeof biomeName !== 'string') return null;
+        var params = BIOME_PARAMETERS[biomeName];
+        if (!params) return null;
+        // Validate params are complete and numeric
+        if (_validateBiomeParams(params)) {
+            return params;
+        }
+        if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[SurfaceGenerator] Biome "' + biomeName + '" has invalid parameters, skipping');
+        }
+        return null;
     }
 
     /**
      * Get all available biome names.
-     * @returns {string[]} Array of biome names.
+     * @returns {string[]} Array of valid biome names ('grass', 'arctic', 'desert', 'forest').
      */
     function getAvailableBiomes() {
         var names = [];
         for (var key in BIOME_PARAMETERS) {
             if (BIOME_PARAMETERS.hasOwnProperty(key)) {
-                names.push(BIOME_PARAMETERS[key].name);
+                if (_validateBiomeParams(BIOME_PARAMETERS[key])) {
+                    names.push(BIOME_PARAMETERS[key].name);
+                }
             }
         }
-        return names;
+        return names.length > 0 ? names : ['grass', 'arctic', 'desert', 'forest'];
     }
 
     // ============================================================
@@ -569,6 +615,7 @@
 
     /**
      * Donkeycraft.SurfaceGenerator — Fractal surface heightmap generator.
+     * Uses 5-pass fBm + ridged multifractal noise for natural terrain with biome-specific parameters.
      * @namespace
      */
     Donkeycraft.SurfaceGenerator = {
@@ -576,11 +623,11 @@
         generateHeightmap: generateHeightmap,
         getHeightAt: getHeightAt,
 
-        // Biome parameters
+        // Biome parameters (validated)
         getBiomeParameters: getBiomeParameters,
         getAvailableBiomes: getAvailableBiomes,
 
-        // Constants access
+        // Constants access (read-only reference for external consumers)
         BIOME_PARAMETERS: BIOME_PARAMETERS
     };
 

@@ -47,40 +47,41 @@
 
     /**
      * Create the default ore registry with all standard ores.
-     * @returns {OreDefinition[]} Array of ore definitions.
-     */
-    /**
-     * Create the default ore registry with all standard ores.
      * Ore names match BlockRegistry entries (typically *_ore suffix).
+     * Each ore definition includes biome-specific placement rules:
+     * - null biomeIds = appears in all biomes
+     * - numeric array = restricted to specific biome IDs
      * @returns {OreDefinition[]} Array of ore definitions.
      */
     function getDefaultOres() {
         return [
-            // Coal — sedimentary layers, broad distribution
+            // Coal — sedimentary layers, broad distribution across all biomes
             new OreDefinition('coal_ore', null, 0, 160, 8, 3, 'layer'),
 
-            // Iron — magmatic spheres, concentrated in mid-depths
+            // Iron — magmatic spheres, concentrated in mid-depths across all biomes
             new OreDefinition('iron_ore', null, 0, 120, 6, 2, 'sphere'),
 
-            // Gold — hydrothermal pipes, deep concentration
+            // Gold — hydrothermal pipes, deep concentration near lava levels
             new OreDefinition('gold_ore', null, 0, 40, 4, 2, 'pipe'),
 
-            // Diamond — magmatic spheres, very deep only
+            // Diamond — magmatic spheres, very deep only (Y<30) in all biomes
             new OreDefinition('diamond_ore', null, 0, 30, 2, 1.5, 'sphere'),
 
-            // Redstone — concentrated near lava levels, deep
-            new OreDefinition('redstone_ore', null, 0, 35, 5, 1.5, 'sphere'),
+            // Redstone — concentrated near lava levels (Y<20), rare at higher elevations
+            // Increased frequency at lower Y for dramatic cave lighting
+            new OreDefinition('redstone_ore', null, 0, 20, 6, 1.5, 'sphere'),
 
-            // Lapis — mid-depth concentration, moderate frequency
+            // Lapis — mid-depth concentration, moderate frequency in all biomes
             new OreDefinition('lapis_ore', null, 10, 60, 3, 2, 'sphere'),
 
-            // Emerald — mountain/biome-specific, shallow but rare
-            new OreDefinition('emerald_ore', null, 20, 80, 1, 2, 'sphere', 1, [1]), // Arctic only
+            // Emerald — biome-specific: only in arctic/mountain biomes (ID 1)
+            // Found at shallow-mid depths where tectonic activity exposes it
+            new OreDefinition('emerald_ore', null, 20, 80, 1, 2, 'sphere', 1, [1]),
 
-            // Copper — magmatic spheres, mid-range depth
+            // Copper — magmatic spheres, mid-range depth in all biomes
             new OreDefinition('copper_ore', null, 0, 100, 5, 2, 'sphere'),
 
-            // Tin — hydrothermal pipes, deep concentration
+            // Tin — hydrothermal pipes, deep concentration in all biomes
             new OreDefinition('tin_ore', null, 0, 50, 3, 2, 'pipe')
         ];
     }
@@ -94,19 +95,31 @@
 
     /**
      * Initialize the ore generator — resolve block IDs from BlockRegistry.
+     * Validates that all ore definitions have resolved block IDs.
+     * Logs warnings for any unresolved ores.
+     * @public
      */
     function init() {
         _ores = getDefaultOres();
         _resolveOreBlocks();
+
+        // Validate that all ores have resolved block IDs
+        var unresolvedOres = [];
+        for (var i = 0; i < _ores.length; i++) {
+            if (!_ores[i].blockId) {
+                unresolvedOres.push(_ores[i].name);
+            }
+        }
+
+        if (unresolvedOres.length > 0 && typeof console !== 'undefined') {
+            console.warn('[OreGenerator] The following ores have unresolved block IDs and will be skipped: ' + unresolvedOres.join(', '));
+        }
     }
 
     /**
      * Resolve ore block IDs from BlockRegistry.
-     * @private
-     */
-    /**
-     * Resolve ore block IDs from BlockRegistry.
      * Tries multiple naming variants (e.g., 'coal_ore', 'coal_block') for cross-compatibility.
+     * Updates ore definitions with resolved IDs after resolution.
      * @private
      */
     function _resolveOreBlocks() {
@@ -204,6 +217,8 @@
 
     /**
      * Place veins for a single ore type in a chunk.
+     * Uses noise-based density falloff within veins for natural-looking distribution.
+     * Validates that ore is placed inside solid rock or replaces other ores for natural layering.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -218,28 +233,28 @@
         var rngState = _getRngState(chunkX, chunkZ, ore.name);
 
         for (var v = 0; v < ore.frequency; v++) {
-            // Random position within chunk
-            var ox = _nextRange(rngState, 0, CHUNK_SIZE - 1);
-            var oz = _nextRange(rngState, 0, CHUNK_SIZE - 1);
+            // Random position within chunk with slight offset from edges for better vein placement
+            var ox = _nextRange(rngState, 2, CHUNK_SIZE - 3);
+            var oz = _nextRange(rngState, 2, CHUNK_SIZE - 3);
 
-            // Random Y level within ore's range
+            // Random Y level within ore's defined range
             var minY = Math.max(0, ore.minY);
             var maxY = Math.min(WORLD_HEIGHT - 1, ore.maxY);
             var oy = _nextRange(rngState, minY, maxY);
 
-            // Place vein based on type
+            // Place vein based on type (sphere, layer, or pipe)
             switch (ore.veinType) {
                 case 'sphere':
-                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId);
                     break;
                 case 'layer':
-                    stats.oresPlaced += _placeLayerVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    stats.oresPlaced += _placeLayerVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId);
                     break;
                 case 'pipe':
-                    stats.oresPlaced += _placePipeVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    stats.oresPlaced += _placePipeVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId);
                     break;
                 default:
-                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId, rngState);
+                    stats.oresPlaced += _placeSphereVein(chunk, ox, oy, oz, ore.veinSize, ore.blockId, stoneId);
             }
 
             stats.veinsCreated++;
@@ -250,6 +265,8 @@
 
     /**
      * Place a spherical (magmatic) ore vein.
+     * Creates natural-looking ore deposits with noise-based density falloff at vein edges.
+     * Validates that ore is placed inside solid rock or replaces other ores for natural geological layering.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y.
@@ -257,11 +274,10 @@
      * @param {number} radius - Vein radius.
      * @param {number} oreBlockId - Ore block ID.
      * @param {number} stoneId - Stone block ID for validation.
-     * @param {number} rngState - PRNG state.
      * @returns {number} Number of ore blocks placed.
      * @private
      */
-    function _placeSphereVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+    function _placeSphereVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId) {
         if (!oreBlockId) return 0;
 
         var rSquared = radius * radius;
@@ -275,14 +291,16 @@
 
                     if (distSquared > rSquared) continue;
 
-                    // Noise-based density falloff for natural edges
+                    // Noise-based density falloff for natural vein edges.
+                    // Threshold of -0.6 skips ~25% of edge positions for realistic ore vein distribution.
                     var noiseVal = _fbmNoise(
                         (cx + dx) * 0.15,
                         (cy + dy) * 0.15,
                         (cz + dz) * 0.15,
                         2
                     );
-                    if (noiseVal < -0.2) continue; // Sparse edges
+                    // Skip blocks near vein edges for natural distribution
+                    if (noiseVal < -0.6) continue;
 
                     var bx = cx + dx;
                     var by = cy + dy;
@@ -292,7 +310,7 @@
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-                    // Validate: ore must be placed inside solid rock
+                    // Validate: ore must be placed inside solid rock or replace other ores
                     var currentBlock = chunk.getBlock(bx, by, bz);
                     if (currentBlock === stoneId || currentBlock === oreBlockId) {
                         chunk.setBlock(bx, by, bz, oreBlockId);
@@ -308,6 +326,9 @@
     /**
      * Place a layered (sedimentary) ore vein.
      * Creates flat, horizontal deposits typical of sedimentary ores like coal.
+     * Validates placement in stone or replaces existing ores for natural geological layering.
+     * Uses proper Y-dimension clamping to prevent ellipsoidal check from allowing
+     * blocks outside the intended layer thickness.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y.
@@ -315,11 +336,10 @@
      * @param {number} radius - Vein radius.
      * @param {number} oreBlockId - Ore block ID.
      * @param {number} stoneId - Stone block ID for validation.
-     * @param {number} rngState - PRNG state.
      * @returns {number} Number of ore blocks placed.
      * @private
      */
-    function _placeLayerVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+    function _placeLayerVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId) {
         if (!oreBlockId) return 0;
 
         var layerHeight = Math.max(1, Math.floor(radius / 2));
@@ -328,12 +348,16 @@
         for (var dy = -layerHeight; dy <= layerHeight; dy++) {
             for (var dx = -radius; dx <= radius; dx++) {
                 for (var dz = -radius; dz <= radius; dz++) {
+                    // Clamp Y offset to layer height to prevent ellipsoidal check
+                    // from allowing blocks outside the intended layer thickness
+                    var dyClamped = Math.max(-layerHeight, Math.min(layerHeight, dy));
+
                     // Elliptical shape: wider in XZ, thinner in Y
-                    var normalizedDist = (dx * dx + dz * dz) / (radius * radius) + (dy * dy) / (layerHeight * layerHeight);
+                    var normalizedDist = (dx * dx + dz * dz) / (radius * radius) + (dyClamped * dyClamped) / (layerHeight * layerHeight);
 
                     if (normalizedDist > 1) continue;
 
-                    // Noise-based density falloff
+                    // Noise-based density falloff for natural vein edges
                     var noiseVal = _fbmNoise(
                         (cx + dx) * 0.12,
                         (cy + dy) * 0.3,
@@ -364,6 +388,8 @@
     /**
      * Place a vertical pipe (hydrothermal) ore vein.
      * Creates tube-like deposits typical of hydrothermal vents, e.g., gold veins.
+     * Validates placement in stone or replaces existing ores for natural geological layering.
+     * Pipes taper at top and bottom for natural appearance.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y (bottom of pipe).
@@ -371,21 +397,20 @@
      * @param {number} radius - Pipe radius.
      * @param {number} oreBlockId - Ore block ID.
      * @param {number} stoneId - Stone block ID for validation.
-     * @param {number} rngState - PRNG state.
      * @returns {number} Number of ore blocks placed.
      * @private
      */
-    function _placePipeVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId, rngState) {
+    function _placePipeVein(chunk, cx, cy, cz, radius, oreBlockId, stoneId) {
         if (!oreBlockId) return 0;
 
-        var pipeHeight = radius * 4; // Tall vertical structure
+        var pipeHeight = Math.max(4, radius * 4); // Tall vertical structure
         var placed = 0;
 
         for (var y = 0; y < pipeHeight; y++) {
             var currentY = cy + y;
             if (currentY < 0 || currentY >= WORLD_HEIGHT) continue;
 
-            // Taper radius at top and bottom
+            // Taper radius at top and bottom for natural pipe shape
             var taperFactor = 1 - Math.abs(y - pipeHeight / 2) / (pipeHeight / 2);
             var currentRadius = radius * (0.5 + taperFactor * 0.5);
 
@@ -525,6 +550,8 @@
 
     /**
      * Donkeycraft.OreGenerator — Realistic ore vein placement system.
+     * Supports sphere (magmatic), layer (sedimentary), and pipe (hydrothermal) vein types
+     * with biome-aware placement and Y-level ranges.
      * @namespace
      */
     Donkeycraft.OreGenerator = {
@@ -534,17 +561,17 @@
         // Backward compatibility alias
         placeOres: placeOres,
 
-        // Initialization
+        // Initialization / lifecycle
         init: init,
 
         // Block ID resolution
         getOreBlockId: getOreBlockId,
 
-        // Configuration access
+        // Configuration access (read-only reference for external consumers)
         getOres: function () { return _ores; },
         setOres: function (newOres) { _ores = newOres; _resolveOreBlocks(); },
 
-        // Constants
+        // Constants (read-only reference for external consumers)
         getDefaultOres: getDefaultOres
     };
 

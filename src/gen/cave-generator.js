@@ -26,6 +26,7 @@
     /**
      * Default cave threshold for main network carving.
      * Lower values = fewer caves (more solid terrain).
+     * Valid range: -0.5 to 0.5. Negative values = more caves.
      * @type {number}
      */
     var CAVE_THRESHOLD_MAIN = -0.1;
@@ -33,6 +34,7 @@
     /**
      * Default cave threshold for small cave branches.
      * Higher threshold = more sparse small caves.
+     * Valid range: -0.5 to 1.0. Negative values = more caves.
      * @type {number}
      */
     var CAVE_THRESHOLD_SMALL = 0.05;
@@ -40,18 +42,21 @@
     /**
      * Default Y level for lava caves.
      * Lava appears below this level.
+     * Valid range: 0 to WORLD_HEIGHT/2. Lower values = deeper lava.
      * @type {number}
      */
     var LAVA_CAVE_Y_LEVEL = 10;
 
     /**
      * Maximum radius of cave tunnels (in blocks).
+     * Valid range: 1-10. Higher values = larger caves.
      * @type {number}
      */
     var MAX_CAVE_RADIUS = 4;
 
     /**
      * Minimum radius of small cave tunnels.
+     * Valid range: 0.5-5. Higher values = thicker small caves.
      * @type {number}
      */
     var MIN_CAVE_RADIUS = 1.5;
@@ -100,8 +105,9 @@
 
         // Step through Y with adaptive spacing for connected networks
         var yStep = 2;
-        // Generate caves in deep underground layer: from middle of world down to minimum Y
-        var startY = Math.floor(WORLD_HEIGHT * 0.4);
+        // Generate caves in deep underground layer: from Y=153 down to minimum Y
+        // Using 60% of world height for realistic deep cave systems (was 40% = Y=102, too high)
+        var startY = Math.floor(WORLD_HEIGHT * 0.6); // Y=153 for deep caves
         var endY = 2;
 
         for (var y = startY; y >= endY; y -= yStep) {
@@ -258,10 +264,16 @@
     /**
      * Generate deep caves below a threshold Y level with lava filling.
      * Creates dramatic underground lava lakes and glowing caverns.
+     * Lava caves generate in the deep underground layer (Y=lavaYLevel to Y=5).
+     * Lava floats on water at the water table, creating realistic lava pools.
+     * Logs a warning if lava block ID cannot be resolved.
      * @param {Donkeycraft.Chunk} chunk - The chunk to generate lava caves in.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {Object} [options] - Generation options.
+     * @param {number} [options.threshold] - Noise threshold for cave carving [-1, 1].
+     * @param {number} [options.noiseScale] - Noise scale factor.
+     * @param {number} [options.yLevel] - Y level for lava water table.
      * @returns {Object} Generation stats: {lavaCavesCarved, lavaBlocksPlaced}.
      */
     function pass4LavaCaves(chunk, chunkX, chunkZ, options) {
@@ -274,11 +286,19 @@
         var lavaYLevel = (options && options.yLevel !== undefined) ? options.yLevel : LAVA_CAVE_Y_LEVEL;
 
         var lavaBlockId = _getLavaBlockId();
-        if (!lavaBlockId) return result;
+        if (!lavaBlockId) {
+            // Log warning if lava block not resolved, but continue generating cave spaces
+            // Lava caves will be generated as air-only passages without lava filling
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn('[CaveGenerator] Lava block not resolved — generating air caves only (Pass 4)');
+            }
+        }
 
-        // Only generate in the lower portion of the world
-        var startY = WORLD_HEIGHT - 5;
-        var endY = Math.max(1, lavaYLevel - 10);
+        // Generate lava caves in the deep underground layer.
+        // startY: upper bound for lava cave generation (below main cave systems)
+        // endY: lower bound (just above bedrock)
+        var startY = Math.min(WORLD_HEIGHT - 30, lavaYLevel + 80); // Start above lava level
+        var endY = Math.max(5, lavaYLevel - 5); // End just above bedrock
 
         for (var y = startY; y >= endY; y--) {
             for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -286,17 +306,17 @@
                     var worldX = chunkX * CHUNK_SIZE + x;
                     var worldZ = chunkZ * CHUNK_SIZE + z;
 
-                    // Get lava-specific noise (different seed offset)
+                    // Get lava-specific noise (different seed offset for independence from other cave systems)
                     var noiseValue = _fbmNoise(worldX * lavaNoiseScale + 5000, y * lavaNoiseScale * 0.6 + 3000, worldZ * lavaNoiseScale + 5000, 3);
 
-                    // Carve cave space where noise is below threshold
+                    // Carve cave space where noise is below threshold (more porous deep underground)
                     if (noiseValue < lavaThreshold) {
                         var radius = 2 + _fbmNoise(worldX * 0.12, y * 0.12, worldZ * 0.12, 2) * 1;
 
-                        // First carve air
+                        // First carve air to create cave space
                         _carveCave(chunk, x, y, z, Math.max(1, radius), _getAirId());
 
-                        // Then fill with lava at or below the water table
+                        // Then fill with lava at or below the lava level (lava floats on water)
                         if (y <= lavaYLevel + 2) {
                             result.lavaBlocksPlaced += _fillCaveWithLava(chunk, x, y, z, Math.max(1, radius), lavaBlockId);
                         }
@@ -388,6 +408,9 @@
         // Validate parameters: radius must be >= 1, blockId can be 0 (air) or any valid block ID
         if (radius < 1 || blockId === null || blockId === undefined) return 0;
 
+        // Clamp radius to prevent excessive carving
+        var clampedRadius = Math.min(radius, MAX_CAVE_RADIUS * 2);
+
         var rSquared = radius * radius;
         var count = 0;
         var rInt = Math.ceil(radius);
@@ -398,6 +421,12 @@
                     var distSquared = dx * dx + dy * dy + dz * dz;
 
                     if (distSquared > rSquared) continue;
+
+                    // Apply smooth noise-based radius variation for natural cave shapes
+                    var worldX = cx + dx, worldY = cy + dy, worldZ = cz + dz;
+                    var shapeNoise = _fbmNoise(worldX * 0.2, worldY * 0.2, worldZ * 0.2, 2);
+                    var effectiveRadius = clampedRadius + shapeNoise * 0.5;
+                    if (distSquared > effectiveRadius * effectiveRadius) continue;
 
                     var bx = cx + dx;
                     var by = cy + dy;
@@ -424,9 +453,12 @@
 
     /**
      * Fill a cave area with lava up to a certain level.
+     * Replaces air and water blocks with lava for realistic underground lava lakes.
+     * Creates hemispherical lava pools by iterating the full sphere radius
+     * but only placing lava at or below the center Y level (lava floats on water table).
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
-     * @param {number} cy - Center Y (lava level).
+     * @param {number} cy - Center Y (lava lake surface level).
      * @param {number} cz - Center Z.
      * @param {number} radius - Cave radius.
      * @param {number} lavaBlockId - Lava block ID.
@@ -440,8 +472,10 @@
         var count = 0;
         var rInt = Math.ceil(radius);
 
+        // Iterate full sphere but only place lava at or below center Y level.
+        // This creates realistic lava lakes that fill from the bottom up to the surface level.
         for (var dx = -rInt; dx <= rInt; dx++) {
-            for (var dy = -rInt; dy <= 0; dy++) { // Only below center Y
+            for (var dy = -rInt; dy <= rInt; dy++) {
                 for (var dz = -rInt; dz <= rInt; dz++) {
                     var distSquared = dx * dx + dy * dy + dz * dz;
 
@@ -454,8 +488,13 @@
                     if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                     if (by < 0) continue;
 
+                    // Only place lava at or below the center Y level (lava lake surface).
+                    // Lava floats on water, so it accumulates at the water table level.
+                    if (by > cy) continue;
+
                     var currentBlock = chunk.getBlock(bx, by, bz);
-                    if (currentBlock === 0) { // Only fill air
+                    // Fill air and water blocks with lava for realistic lava lake behavior
+                    if (currentBlock === 0 || currentBlock === _getWaterBlockId()) {
                         chunk.setBlock(bx, by, bz, lavaBlockId);
                         count++;
                     }
@@ -468,6 +507,8 @@
 
     /**
      * Place crystal formations on cave walls/ceilings.
+     * Places glowstone crystals at random positions around the cave perimeter
+     * to create visually striking underground formations.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} cx - Center X.
      * @param {number} cy - Center Y.
@@ -527,6 +568,22 @@
      */
     function _getLavaBlockId() {
         return _getBlockId('lava') || _getBlockId('lava_still') || 0;
+    }
+
+    /**
+     * Resolve the water block ID from BlockRegistry or WaterGenerator.
+     * Used by lava filling to avoid replacing water blocks unnecessarily.
+     * @returns {number} Water block ID, or 0 if not found.
+     * @private
+     */
+    function _getWaterBlockId() {
+        // Try WaterGenerator first (already initialized)
+        if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.getWaterBlockId === 'function') {
+            var waterId = Donkeycraft.WaterGenerator.getWaterBlockId();
+            if (waterId > 0) return waterId;
+        }
+        // Resolve from BlockRegistry as fallback
+        return _getBlockId('water') || _getBlockId('water_still') || _getBlockId('flowing_water') || 0;
     }
 
     // ============================================================
@@ -630,6 +687,8 @@
 
     /**
      * Donkeycraft.CaveGenerator — Multi-pass cave generation system.
+     * 5-pass system: main network, small branches, entrance carving, lava caves, decoration caves.
+     * Creates realistic underground networks with natural entrances and lava features.
      * @namespace
      */
     Donkeycraft.CaveGenerator = {
@@ -643,7 +702,7 @@
         pass4LavaCaves: pass4LavaCaves,
         pass5DecorationCaves: pass5DecorationCaves,
 
-        // Configuration constants
+        // Configuration constants (read-only reference for external consumers)
         CAVE_THRESHOLD_MAIN: CAVE_THRESHOLD_MAIN,
         CAVE_THRESHOLD_SMALL: CAVE_THRESHOLD_SMALL,
         LAVA_CAVE_Y_LEVEL: LAVA_CAVE_Y_LEVEL,

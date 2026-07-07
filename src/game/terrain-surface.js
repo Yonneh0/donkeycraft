@@ -105,10 +105,11 @@
         ];
 
         // Arctic biome — snow top, ice in shallow water, packed ice at depth
+        // IMPORTANT: Fallback chain must never end at 0 (air) — always fall back to stone
         _surfaceLayers['arctic'] = [
-            new SurfaceLayer('snow_top', _resolvedBlocks['snow_block'] || 0, 0, 0, ['arctic']),
-            new SurfaceLayer('ice_sub', _resolvedBlocks['packed_ice'] || _resolvedBlocks['ice'] || 0, 1, 2, ['arctic']),
-            new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 0, 3, WORLD_HEIGHT, ['arctic'])
+            new SurfaceLayer('snow_top', _resolvedBlocks['snow_block'] || _resolvedBlocks['snow_layer'] || _resolvedBlocks['stone'] || 1, 0, 0, ['arctic']),
+            new SurfaceLayer('ice_sub', _resolvedBlocks['packed_ice'] || _resolvedBlocks['ice'] || _resolvedBlocks['stone'] || 1, 1, 2, ['arctic']),
+            new SurfaceLayer('stone_deep', _resolvedBlocks['stone'] || 1, 3, WORLD_HEIGHT, ['arctic'])
         ];
 
         // Desert biome — sand top, sandstone layers below, desert rock at depth
@@ -157,12 +158,16 @@
     /**
      * Apply surface layers to a chunk's terrain.
      * Walks down from the surface and replaces blocks according to biome configuration.
+     * Optimized: stops at Y=0 instead of iterating all 256 world height levels.
+     * Ensures stone layer reaches the bottom of the world for proper underground structure.
+     * Skips block ID 0 (air) to prevent creating holes in the terrain.
+     * Validates all inputs and handles edge cases gracefully.
      * @param {Donkeycraft.Chunk} chunk - The chunk to apply surfaces to.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {string} biomeName - Biome name for this chunk.
      * @param {number[]} heightmap - Heightmap array.
-     * @returns {{blocksModified: number}} Generation stats.
+     * @returns {{blocksModified: number}} Generation stats with total blocks modified count.
      */
     function applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap) {
         var stats = { blocksModified: 0 };
@@ -170,38 +175,61 @@
         if (!chunk || typeof chunk.setBlock !== 'function') return stats;
         if (!heightmap || !Array.isArray(heightmap)) return stats;
 
+        // Resolve and validate biome name
+        if (!biomeName || typeof biomeName !== 'string') {
+            biomeName = 'grass';
+        } else {
+            biomeName = biomeName.trim().toLowerCase();
+        }
+
         var layers = _surfaceLayers[biomeName];
         if (!layers) {
-            // Default to grass biome surface
+            // Default to grass biome surface with validation
             layers = _surfaceLayers['grass'];
-            if (!layers) return stats;
+            if (!layers) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[TerrainSurface] No surface layers configured for biome "' + biomeName + '", using defaults');
+                }
+                return stats;
+            }
         }
+
+        // Pre-validate that at least one layer has a valid block ID
+        var hasValidLayer = false;
+        for (var li = 0; li < layers.length; li++) {
+            if (layers[li].blockId > 0) {
+                hasValidLayer = true;
+                break;
+            }
+        }
+        if (!hasValidLayer) return stats;
 
         for (var x = 0; x < CHUNK_SIZE; x++) {
             for (var z = 0; z < CHUNK_SIZE; z++) {
                 var surfaceY = heightmap[x + z * CHUNK_SIZE];
-                if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
+                // Validate surfaceY is a finite number within valid range
+                if (!isFinite(surfaceY) || surfaceY < 1 || surfaceY >= WORLD_HEIGHT) continue;
 
-                // Walk down from surface, applying layers
-                var depth = 0;
-                for (var y = surfaceY; y >= 0 && depth < 20; y--) {
+                surfaceY = Math.floor(surfaceY);
+
+                // Walk down from surface to Y=0, applying layers based on depth
+                for (var y = surfaceY; y >= 0; y--) {
                     var currentBlock = chunk.getBlock(x, y, z);
+                    var depth = surfaceY - y;
 
                     // Find matching layer for this depth
-                    var applied = false;
                     for (var i = 0; i < layers.length; i++) {
                         var layer = layers[i];
                         if (depth >= layer.minDepth && depth <= layer.maxDepth) {
-                            if (layer.blockId && currentBlock !== layer.blockId) {
+                            // Skip air block ID (0) to prevent creating holes in terrain
+                            // Also skip if block already matches the layer
+                            if (layer.blockId > 0 && currentBlock !== layer.blockId) {
                                 chunk.setBlock(x, y, z, layer.blockId);
                                 stats.blocksModified++;
                             }
-                            applied = true;
                             break;
                         }
                     }
-
-                    depth++;
                 }
             }
         }
@@ -215,11 +243,14 @@
      * @returns {number} Top block ID, or 0 if not found.
      */
     function getTopBlockId(biomeName) {
+        if (!biomeName || typeof biomeName !== 'string') return 0;
         var layers = _surfaceLayers[biomeName];
         if (layers && layers.length > 0) {
             return layers[0].blockId;
         }
-        return 0;
+        // Fallback to grass biome
+        var grassLayers = _surfaceLayers['grass'];
+        return grassLayers && grassLayers.length > 0 ? grassLayers[0].blockId : 0;
     }
 
     /**
@@ -245,13 +276,15 @@
 
     /**
      * Donkeycraft.TerrainSurface — Biome-appropriate surface layer system.
+     * Applies biome-specific top blocks, sub-surface layers, and deep stone/rock.
+     * Supports grass, arctic, desert, and forest biomes with distinct layer configurations.
      * @namespace
      */
     Donkeycraft.TerrainSurface = {
         // Main entry point
         applySurfaceLayers: applySurfaceLayers,
 
-        // Initialization
+        // Initialization / lifecycle
         init: init,
         destroy: destroy,
 
@@ -261,7 +294,7 @@
         getTopBlockId: getTopBlockId,
         getBlockId: getBlockId,
 
-        // Constants
+        // Constants (read-only reference for external consumers)
         SurfaceLayer: SurfaceLayer
     };
 

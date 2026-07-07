@@ -74,17 +74,19 @@
     /**
      * Generate a cache key from chunk coordinates and generation parameters.
      * Validates all inputs are finite numbers before constructing the key.
+     * Invalid inputs return a sentinel key that skips caching rather than
+     * polluting the cache with unique timestamps.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
      * @param {number} biomeId - Biome ID.
      * @param {number} seed - World seed.
-     * @returns {string} Unique cache key string.
+     * @returns {string} Unique cache key string, or 'terrain__invalid' for bad inputs.
      * @private
      */
     function _makeCacheKey(chunkX, chunkZ, biomeId, seed) {
-        // Validate inputs are finite numbers
+        // Validate inputs are finite numbers — return sentinel key for invalid inputs
         if (!isFinite(chunkX) || !isFinite(chunkZ) || !isFinite(biomeId) || !isFinite(seed)) {
-            return 'terrain_invalid_' + Date.now();
+            return 'terrain__invalid';
         }
         return 'terrain_' + Math.floor(seed) + '_' + Math.floor(chunkX) + '_' + Math.floor(chunkZ) + '_b' + Math.floor(biomeId || 0);
     }
@@ -318,35 +320,26 @@
 
     /**
      * Resolve a biome ID to its name string for SurfaceGenerator.
+     * Uses a single canonical ID-to-name mapping to ensure consistent results
+     * regardless of how setBiome was called (number, string, or Biome object).
      * @param {number} biomeId - Biome ID.
      * @returns {string} Biome name ('grass', 'arctic', 'desert', 'forest').
      * @private
      */
     function _resolveBiomeName(biomeId) {
-        // First check if we have a tracked biome name from setBiome
-        if (_currentBiomeName) {
-            return _currentBiomeName;
-        }
-
-        // Map biome IDs to names based on BiomeID constants
-        if (Donkeycraft.BiomeID) {
-            switch (biomeId) {
-                case Donkeycraft.BiomeID.GRASS: return 'grass';
-                case Donkeycraft.BiomeID.ARCTIC: return 'arctic';
-                case Donkeycraft.BiomeID.DESERT: return 'desert';
-                case Donkeycraft.BiomeID.FOREST: return 'forest';
-            }
-        }
-
-        // Direct ID-to-name mapping as fallback
-        switch (biomeId) {
+        // Validate and clamp biome ID to valid range
+        var id = Math.max(0, Math.min(3, Math.floor(biomeId)));
+        
+        // Single canonical mapping — always use direct ID-to-name
+        // This eliminates inconsistent results from multiple fallback paths
+        switch (id) {
             case 0: return 'grass';
             case 1: return 'arctic';
             case 2: return 'desert';
             case 3: return 'forest';
         }
 
-        return 'grass'; // Default
+        return 'grass'; // Default fallback
     }
 
     /**

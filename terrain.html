@@ -836,6 +836,33 @@
             var skyBuffersCreated = false;
             var skyPosBuf = null, skyColBuf = null;
 
+            /**
+             * Check that all required terrain generation modules are loaded and functional.
+             * Logs warnings for any missing modules and provides a visual indicator if critical ones are absent.
+             * @returns {{success: boolean, missing: string[]}}
+             * @private
+             */
+            function _checkRequiredModules() {
+                var missing = [];
+                var critical = ['TerrainCore', 'SurfaceGenerator', 'TerrainSurface', 'OreGenerator', 'CaveGenerator', 'WaterGenerator', 'StructureGenerator'];
+
+                for (var i = 0; i < critical.length; i++) {
+                    var modName = critical[i];
+                    if (!Donkeycraft[modName]) {
+                        missing.push(modName);
+                    }
+                }
+
+                // Log warnings for missing modules
+                if (missing.length > 0) {
+                    if (typeof console !== 'undefined' && console.warn) {
+                        console.warn('[Terrain] Missing terrain generation modules:', missing.join(', ') + '. Some features will be unavailable.');
+                    }
+                }
+
+                return { success: missing.length === 0, missing: missing };
+            }
+
             // ============================================================
             // Initialization — integrates TerrainCore, ChunkGrid, and Storage
             // ============================================================
@@ -872,19 +899,41 @@
                 skyLocs.uView = gl.getUniformLocation(skyProgram, 'uView');
                 skyLocs.uModel = gl.getUniformLocation(skyProgram, 'uModel');
 
-                setupUI();
+                // Check required modules before setting up UI
+                var moduleCheck = _checkRequiredModules();
+
+                setupUI(moduleCheck);
 
                 // Initialize TerrainCore (which initializes Storage and Noise internally)
                 if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.init === 'function') {
                     Donkeycraft.TerrainCore.init().then(function () {
+                        // Initialize sub-modules that need block ID resolution
+                        if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.init === 'function') {
+                            try { Donkeycraft.SurfaceGenerator.init(); } catch (e) { /* ignore */ }
+                        }
+                        if (Donkeycraft.TerrainSurface && typeof Donkeycraft.TerrainSurface.init === 'function') {
+                            try { Donkeycraft.TerrainSurface.init(); } catch (e) { /* ignore */ }
+                        }
+                        if (Donkeycraft.OreGenerator && typeof Donkeycraft.OreGenerator.init === 'function') {
+                            try { Donkeycraft.OreGenerator.init(); } catch (e) { /* ignore */ }
+                        }
+                        if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.init === 'function') {
+                            try { Donkeycraft.WaterGenerator.init(); } catch (e) { /* ignore */ }
+                        }
+                        if (Donkeycraft.StructureGenerator && typeof Donkeycraft.StructureGenerator.init === 'function') {
+                            try { Donkeycraft.StructureGenerator.init(); } catch (e) { /* ignore */ }
+                        }
+
                         // Set seed and biome via TerrainCore
                         Donkeycraft.TerrainCore.setSeed(worldSeed);
                         Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
 
                         // Initialize ChunkGrid with center at current position
                         if (Donkeycraft.ChunkGrid) {
-                            Donkeycraft.ChunkGrid.setCenter(currentChunkX, currentChunkZ);
-                            Donkeycraft.ChunkGrid.setRadii({ n: chunkRadiusN, s: chunkRadiusS, e: chunkRadiusE, w: chunkRadiusW });
+                            try {
+                                Donkeycraft.ChunkGrid.setCenter(currentChunkX, currentChunkZ);
+                                Donkeycraft.ChunkGrid.setRadii({ n: chunkRadiusN, s: chunkRadiusS, e: chunkRadiusE, w: chunkRadiusW });
+                            } catch (e) { /* ignore */ }
                         }
 
                         regenerateTerrain();

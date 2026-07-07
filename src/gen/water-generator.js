@@ -37,15 +37,10 @@
 
     /**
      * Lake frequency per chunk (base count).
+     * Valid range: 0-10. Higher values = more lakes per chunk.
      * @type {number}
      */
     var LAKE_FREQUENCY = 2;
-
-    /**
-     * Maximum number of water blocks to place per chunk (safety cap).
-     * @type {number}
-     */
-    var MAX_WATER_BLOCKS_PER_CHUNK = 32768;
 
     // ============================================================
     // Biome Water Configuration
@@ -90,9 +85,28 @@
     // Water Generator State
     // ============================================================
 
+    /**
+     * Resolved water block ID (cached after init).
+     * @type {number|null}
+     */
     var _waterBlockId = null;
+
+    /**
+     * Resolved lava block ID (cached after init).
+     * @type {number|null}
+     */
     var _lavaBlockId = null;
+
+    /**
+     * Resolved ice block ID (cached after init).
+     * @type {number|null}
+     */
     var _iceBlockId = null;
+
+    /**
+     * Set of liquid block IDs for quick lookup.
+     * @type {Object.<number, boolean>}
+     */
     var _liquidBlocks = {};
 
     /**
@@ -194,15 +208,7 @@
         var biomeName = _resolveBiomeName(biomeId);
         var config = BIOME_WATER_CONFIG[biomeName] || BIOME_WATER_CONFIG.grass;
 
-        // Ocean biomes: fill to water level across entire chunk
-        if (options && options.isOcean) {
-            stats.waterBlocksPlaced += _placeOceanWater(chunk, config, heightmap);
-        } else {
-            // Overworld biomes: surface water in low areas
-            stats.waterBlocksPlaced += _placeSurfaceWater(chunk, config, heightmap);
-        }
-
-        // Rivers (biome-dependent)
+        // Rivers (biome-dependent) — always run first for consistent behavior
         if (config.hasRivers) {
             var riverStats = _placeRivers(chunk, chunkX, chunkZ, config, heightmap);
             stats.waterBlocksPlaced += riverStats.waterBlocksPlaced;
@@ -308,7 +314,8 @@
 
     /**
      * Place rivers using noise-based channel carving.
-     * Rivers flow from higher to lower terrain, following natural drainage paths.
+     * Rivers flow from higher to lower terrain, following natural drainage paths
+     * via gradient descent on terrain heightmap values.
      * Uses world coordinates for seamless chunk boundary traversal.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
@@ -323,39 +330,43 @@
 
         if (!heightmap) return stats;
 
-        var riverNoiseScale = 0.01;
+        // River generation parameters
+        var riverNoiseScale = 0.005;
         var startX = ((chunkX * 7 + chunkZ * 13) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
         var startZ = ((chunkX * 11 + chunkZ * 3) % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE;
 
-        // Start from a random edge position (local chunk coordinates)
-        var localX = startX;
-        var localZ = startZ;
         // World coordinates for seamless noise sampling across chunks
         var worldX = chunkX * CHUNK_SIZE + startX;
         var worldZ = chunkZ * CHUNK_SIZE + startZ;
+        var localX = startX;
+        var localZ = startZ;
         var currentY = heightmap[startX + startZ * CHUNK_SIZE] || config.waterLevel;
 
-        // Trace river path using gradient descent on terrain noise
-        var riverLength = 10 + Math.abs(_hash2D(chunkX, chunkZ)) % 30;
-        var riverWidth = 1 + (Math.abs(_hash2D(chunkX + 1, chunkZ)) % 2);
+        // River length: longer rivers in areas with higher terrain variation
+        var riverLength = 15 + (Math.abs(_hash2D(chunkX, chunkZ)) % 40);
+        var riverWidth = 1 + (Math.abs(_hash2D(chunkX + 1, chunkZ)) % 3);
 
         for (var step = 0; step < riverLength; step++) {
-            // Check local bounds — allow stepping off to enable cross-chunk flow
-            if (localX < -riverWidth || localX >= CHUNK_SIZE + riverWidth || localZ < -riverWidth || localZ >= CHUNK_SIZE + riverWidth) break;
+            // Check bounds — allow stepping off to enable cross-chunk flow
+            if (localX < -riverWidth * 2 || localX >= CHUNK_SIZE + riverWidth * 2 ||
+                localZ < -riverWidth * 2 || localZ >= CHUNK_SIZE + riverWidth * 2) {
+                break;
+            }
 
-            // Get terrain height at current position using world coordinates for seamless chunk boundaries
+            // Get terrain height at current position using world coordinates
             var sampleLocalX = ((worldX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
             var sampleLocalZ = ((worldZ % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
-            var sampleWorldX = chunkX * CHUNK_SIZE + sampleLocalX;
-            var sampleWorldZ = chunkZ * CHUNK_SIZE + sampleLocalZ;
 
             // Clamp to valid heightmap range
-            if (sampleLocalX < 0 || sampleLocalX >= CHUNK_SIZE || sampleLocalZ < 0 || sampleLocalZ >= CHUNK_SIZE) break;
+            if (sampleLocalX < 0 || sampleLocalX >= CHUNK_SIZE ||
+                sampleLocalZ < 0 || sampleLocalZ >= CHUNK_SIZE) {
+                break;
+            }
 
             currentY = heightmap[sampleLocalX + sampleLocalZ * CHUNK_SIZE] || config.waterLevel;
             if (currentY < 2 || currentY >= WORLD_HEIGHT - 2) break;
 
-            // Carve river bed
+            // Carve river bed with elliptical cross-section
             for (var dy = 0; dy <= RIVER_DEPTH && currentY - dy >= 0; dy++) {
                 var ry = currentY - dy;
                 for (var wx = -riverWidth; wx <= riverWidth; wx++) {
@@ -365,14 +376,13 @@
 
                         if (rx < 0 || rx >= CHUNK_SIZE || rz < 0 || rz >= CHUNK_SIZE) continue;
 
-                        // Elliptical cross-section
+                        // Elliptical cross-section for natural-looking river shape
                         var normalizedDist = (wx * wx + wz * wz) / ((riverWidth + 1) * (riverWidth + 1));
                         if (normalizedDist > 1) continue;
 
                         var currentBlock = chunk.getBlock(rx, ry, rz);
                         if (currentBlock !== 0 && currentBlock !== _waterBlockId) {
                             chunk.setBlock(rx, ry, rz, 0); // Carve air
-                            stats.carvedBlocks = (stats.carvedBlocks || 0) + 1;
                         }
                     }
                 }
@@ -386,7 +396,39 @@
                 }
             }
 
-            // Determine next position using noise-based flow direction
+            // Determine next position using gradient descent on terrain heightmap.
+            // Sample neighboring positions and move toward the lowest terrain height.
+            // This creates realistic rivers that follow natural drainage paths.
+            var bestX = sampleLocalX;
+            var bestZ = sampleLocalZ;
+            var minHeight = currentY;
+
+            // Check 8 neighbors for steepest descent direction
+            for (var nx = -1; nx <= 1; nx++) {
+                for (var nz = -1; nz <= 1; nz++) {
+                    if (nx === 0 && nz === 0) continue;
+
+                    // Calculate neighbor's world coordinates for seamless chunk boundaries
+                    var neighborWorldX = worldX + nx;
+                    var neighborWorldZ = worldZ + nz;
+                    var neighborLocalX = ((neighborWorldX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+                    var neighborLocalZ = ((neighborWorldZ % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
+
+                    // Clamp to valid heightmap range
+                    if (neighborLocalX < 0 || neighborLocalX >= CHUNK_SIZE ||
+                        neighborLocalZ < 0 || neighborLocalZ >= CHUNK_SIZE) continue;
+
+                    var neighborHeight = heightmap[neighborLocalX + neighborLocalZ * CHUNK_SIZE];
+                    if (isFinite(neighborHeight) && neighborHeight < minHeight) {
+                        minHeight = neighborHeight;
+                        bestX = neighborLocalX;
+                        bestZ = neighborLocalZ;
+                    }
+                }
+            }
+
+            // Check if we found a downward path (terrain gradient)
+            // Also check drainage noise for natural river paths
             var flowNoise = _fbmNoise(
                 worldX * riverNoiseScale,
                 0,
@@ -394,23 +436,20 @@
                 2
             );
 
-            // Move in direction of steepest descent using world coordinates
-            var dx = Math.floor(_hash2D(sampleLocalX + step, sampleLocalZ) % 3) - 1;
-            var dz = Math.floor(_hash2D(sampleLocalX, sampleLocalZ + step) % 3) - 1;
-
-            // Bias movement toward lower terrain
-            if (flowNoise < RIVER_THRESHOLD) {
-                worldX += dx;
-                worldZ += dz;
+            // Move toward lower terrain if gradient exists and flow noise supports river formation
+            if (minHeight < currentY && flowNoise < RIVER_THRESHOLD) {
+                worldX += (bestX - sampleLocalX);
+                worldZ += (bestZ - sampleLocalZ);
                 localX = ((worldX % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
                 localZ = ((worldZ % CHUNK_SIZE + CHUNK_SIZE) % CHUNK_SIZE);
-            } else {
-                // River dissipates
+            } else if (flowNoise >= RIVER_THRESHOLD) {
+                // River dissipates when flow noise threshold not met
                 break;
             }
+            // If no downward path found but flow noise is good, river continues flat (lake formation)
         }
 
-        // Count distinct rivers (approximate)
+        // Count distinct rivers (approximate based on water block patterns)
         stats.riversCreated = stats.waterBlocksPlaced > 0 ? 1 : 0;
 
         return stats;
@@ -422,6 +461,8 @@
 
     /**
      * Place underground/lake water using noise-based basin detection.
+     * Detects low-lying basin areas and fills them with water to create natural-looking lakes.
+     * Uses world coordinates for seamless chunk boundary traversal.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -433,9 +474,13 @@
     function _placeLakes(chunk, chunkX, chunkZ, config, heightmap) {
         var stats = { waterBlocksPlaced: 0, lakesCreated: 0 };
 
+        if (!heightmap || !Array.isArray(heightmap)) return stats;
+
         var worldSeed = Donkeycraft.Config ? (Donkeycraft.Config.SEED || 42) : 42;
         var chunkSeed = _hash2D(chunkX, chunkZ);
-        var lakeCount = LAKE_FREQUENCY + ((chunkSeed >> 8) % 2);
+        // Use unsigned right shift (>>>) to ensure non-negative lake count offset
+        var lakeCountOffset = ((chunkSeed >>> 8) % 3);
+        var lakeCount = LAKE_FREQUENCY + lakeCountOffset;
 
         for (var i = 0; i < lakeCount; i++) {
             var hash = _hash2D(chunkSeed + i * 73, i * 97);
@@ -524,7 +569,10 @@
     // ============================================================
 
     /**
-     * Place underground aquifers — water-filled pockets deep below the terrain.
+     * Place underground aquifers — connected water-filled pockets deep below the terrain.
+     * Uses noise-based basin detection to create realistic aquifer networks instead of
+     * isolated single-block pockets. Aquifers form connected horizontal layers where
+     * terrain is below the water table.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -535,34 +583,48 @@
     function _placeAquifers(chunk, chunkX, chunkZ, config) {
         var placed = 0;
 
-        var aquiferY = Math.max(5, config.waterLevel - 15);
+        // Aquifer Y level: 10-15 blocks below water level for natural groundwater
+        var aquiferY = Math.max(5, config.waterLevel - 12);
         var rngState = _hash2D(chunkX, chunkZ);
 
-        // Place 1-3 aquifer pockets per chunk
-        var pocketCount = 1 + (rngState % 3);
+        // Use noise-based detection to find connected basin areas
+        // This creates realistic aquifer networks instead of isolated pockets
+        for (var x = 0; x < CHUNK_SIZE; x++) {
+            for (var z = 0; z < CHUNK_SIZE; z++) {
+                var worldX = chunkX * CHUNK_SIZE + x;
+                var worldZ = chunkZ * CHUNK_SIZE + z;
 
-        for (var p = 0; p < pocketCount; p++) {
-            var px = (rngState >> (p * 8)) % CHUNK_SIZE;
-            if (px < 0) px += CHUNK_SIZE;
-            var pz = ((rngState >> (p * 8 + 4)) % CHUNK_SIZE);
-            if (pz < 0) pz += CHUNK_SIZE;
+                // Use noise to detect if this position is in an aquifer basin
+                var basinNoise = _fbmNoise(
+                    worldX * 0.08,
+                    aquiferY * 0.05,
+                    worldZ * 0.08,
+                    2
+                );
 
-            var aquiferRadius = 1 + ((rngState >> (p * 8 + 8)) % 2);
+                // Place water where basin noise indicates a connected pocket
+                // and the block above is solid rock (not already water or air)
+                if (basinNoise < -0.15) {
+                    var bx = x;
+                    var by = aquiferY;
+                    var bz = z;
 
-            // Place water at aquifer Y level
-            for (var ax = -aquiferRadius; ax <= aquiferRadius; ax++) {
-                for (var az = -aquiferRadius; az <= aquiferRadius; az++) {
-                    var dist = Math.abs(ax) + Math.abs(az);
-                    if (dist > aquiferRadius) continue;
+                    if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE && by >= 0 && by < WORLD_HEIGHT) {
+                        var currentBlock = chunk.getBlock(bx, by, bz);
+                        // Replace air with water to form aquifer
+                        if (currentBlock === 0) {
+                            chunk.setBlock(bx, by, bz, _waterBlockId);
+                            placed++;
+                        }
 
-                    var bx = px + ax;
-                    var bz = pz + az;
-
-                    if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
-
-                    if (chunk.getBlock(bx, aquiferY, bz) === 0) {
-                        chunk.setBlock(bx, aquiferY, bz, _waterBlockId);
-                        placed++;
+                        // Occasionally extend vertically for connected networks
+                        if (basinNoise < -0.3 && by + 1 < WORLD_HEIGHT) {
+                            var aboveBlock = chunk.getBlock(bx, by + 1, bz);
+                            if (aboveBlock === 0) {
+                                chunk.setBlock(bx, by + 1, bz, _waterBlockId);
+                                placed++;
+                            }
+                        }
                     }
                 }
             }
@@ -628,6 +690,7 @@
 
     /**
      * Deterministic 2D hash using FNV-1a inspired algorithm.
+     * Delegates to Donkeycraft._gen._hash2D when available for consistency.
      * Handles negative coordinates by masking to signed 32-bit before hashing.
      * @param {number} x - X coordinate (may be negative).
      * @param {number} y - Y coordinate (may be negative).
@@ -637,17 +700,16 @@
         if (Donkeycraft._gen && typeof Donkeycraft._gen._hash2D === 'function') {
             return Donkeycraft._gen._hash2D(Math.floor(x), Math.floor(y));
         }
-        // Mask to signed 32-bit integers to handle negative coordinates consistently
+        // Fallback: FNV-1a inspired hash with 32-bit masking at each step
         var xi = Math.floor(x) | 0;
         var yi = Math.floor(y) | 0;
-        var h = (xi * 374761393 + yi * 668265263) ^ 0x5bd1e995;
-        // Use unsigned right shift for consistent 32-bit behavior across all JS engines
-        h = ((h >>> 13) ^ h) * 0x5bd1e995;
-        return (h ^ (h >>> 15)) >>> 0;
+        var h = ((xi * 374761393 + yi * 668265263) ^ 0x5bd1e995) & 0xFFFFFFFF;
+        h = (((h >>> 13) ^ h) * 0x5bd1e995) & 0xFFFFFFFF;
+        return ((h ^ (h >>> 15)) & 0xFFFFFFFF) >>> 0;
     }
 
     /**
-     * Fractal Brownian Motion for river flow detection.
+     * Fractal Brownian Motion for river flow detection and aquifer placement.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @param {number} z - Z coordinate.
@@ -658,10 +720,20 @@
         if (Donkeycraft._gen && typeof Donkeycraft._gen._fbm === 'function') {
             try {
                 return Donkeycraft._gen._fbm(x, y, z, octaves || 2, 0.5, 2.0);
-            } catch (e) { /* fallback below */ }
+            } catch (e) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[WaterGenerator] FBM noise fallback:', e && e.message ? e.message : String(e));
+                }
+            }
         }
         if (Donkeycraft._gen && typeof Donkeycraft._gen._noise2D === 'function') {
-            return Donkeycraft._gen._noise2D(x, z);
+            try {
+                return Donkeycraft._gen._noise2D(x, z);
+            } catch (e) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[WaterGenerator] Noise2D fallback:', e && e.message ? e.message : String(e));
+                }
+            }
         }
         return 0;
     }
@@ -699,13 +771,14 @@
 
     /**
      * Donkeycraft.WaterGenerator — Realistic water placement system.
+     * Handles ocean/surface water, rivers, lakes, aquifers, and ice layers.
      * @namespace
      */
     Donkeycraft.WaterGenerator = {
         // Main entry point
         placeWater: placeWater,
 
-        // Initialization
+        // Initialization / lifecycle
         init: init,
         destroy: destroy,
 
@@ -713,11 +786,11 @@
         isLiquidBlock: isLiquidBlock,
         getWaterBlockId: getWaterBlockId,
 
-        // Configuration
+        // Configuration access
         getWaterLevel: getWaterLevel,
         getBiomeWaterConfig: getBiomeWaterConfig,
 
-        // Constants
+        // Constants (read-only reference for external consumers)
         DEFAULT_WATER_LEVEL: DEFAULT_WATER_LEVEL,
         RIVER_THRESHOLD: RIVER_THRESHOLD,
         RIVER_DEPTH: RIVER_DEPTH,

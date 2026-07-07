@@ -44,33 +44,56 @@
     var _resolvedBlocks = {};
 
     /**
-     * Initialize the decoration registry — resolve block IDs.
+     * Initialize the decoration registry — resolve block IDs and build configurations.
+     * Must be called after WaterGenerator.init() to ensure proper water block caching.
+     * @public
      */
     function init() {
         _resolveDecorationBlocks();
         _buildDecorationConfigurations();
+        // Pre-resolve water block ID for leaf placement checks
+        _cachedWaterBlockId = 0; // Reset cache — will be resolved on first _getWaterBlockId() call
+        _getWaterBlockId(); // Force resolution
     }
 
     /**
      * Resolve decoration-related block IDs from BlockRegistry.
+     * Tries multiple naming variants for cross-compatibility with different block registries.
+     * Includes primary names and fallback variants for each decoration block type.
      * @private
      */
     function _resolveDecorationBlocks() {
         if (!Donkeycraft.BlockRegistry) return;
 
-        var blockNames = [
-            'oak_log', 'oak_leaves', 'birch_log', 'birch_leaves',
-            'dead_tree_log', 'dead_leaves', 'snow_layer',
-            'ice_formation', 'cactus_block', 'dead_bush',
-            'flower_yellow', 'flower_red', 'tall_grass',
-            'mushroom_brown', 'mushroom_red', 'pumpkin',
-            'melon_block'
+        // Define primary names and fallback variants for each decoration block type
+        var blockVariants = [
+            { key: 'oak_log', variants: ['oak_log', 'oak', 'log'] },
+            { key: 'oak_leaves', variants: ['oak_leaves', 'leaves'] },
+            { key: 'birch_log', variants: ['birch_log', 'birch'] },
+            { key: 'birch_leaves', variants: ['birch_leaves'] },
+            { key: 'dead_tree_log', variants: ['dead_tree_log', 'dead_log'] },
+            { key: 'dead_leaves', variants: ['dead_leaves'] },
+            { key: 'snow_layer', variants: ['snow_layer', 'snow'] },
+            { key: 'ice_formation', variants: ['ice_formation', 'ice', 'packed_ice'] },
+            { key: 'cactus_block', variants: ['cactus_block', 'cactus'] },
+            { key: 'dead_bush', variants: ['dead_bush', 'dead_bush_block'] },
+            { key: 'flower_yellow', variants: ['flower_yellow', 'yellow_flower'] },
+            { key: 'flower_red', variants: ['flower_red', 'red_flower'] },
+            { key: 'tall_grass', variants: ['tall_grass', 'tallgrass'] },
+            { key: 'mushroom_brown', variants: ['mushroom_brown', 'brown_mushroom'] },
+            { key: 'mushroom_red', variants: ['mushroom_red', 'red_mushroom'] },
+            { key: 'pumpkin', variants: ['pumpkin', 'pumpkin_block'] },
+            { key: 'melon_block', variants: ['melon_block', 'melon'] }
         ];
 
-        for (var i = 0; i < blockNames.length; i++) {
-            var block = Donkeycraft.BlockRegistry.getBlockByName(blockNames[i]);
-            if (block) {
-                _resolvedBlocks[blockNames[i]] = block.id;
+        for (var i = 0; i < blockVariants.length; i++) {
+            var entry = blockVariants[i];
+            for (var j = 0; j < entry.variants.length; j++) {
+                var block = Donkeycraft.BlockRegistry.getBlockByName(entry.variants[j]);
+                if (block && block.id) {
+                    _resolvedBlocks[entry.key] = block.id;
+                    break;
+                }
             }
         }
     }
@@ -219,6 +242,9 @@
 
     /**
      * Place a tree decoration.
+     * Foliage replaces air, water, snow layers, and snow blocks to prevent trees from
+     * partially embedding in snow/grass layers that may be on top of terrain in arctic biomes.
+     * Trees are spaced with minimum distance from chunk edges for natural placement.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -238,11 +264,11 @@
         var rngSeed = _hash2D(chunkX, chunkZ);
 
         for (var t = 0; t < treeCount; t++) {
-            // Random position within chunk
-            var tx = (rngSeed + t * 7) % CHUNK_SIZE;
-            if (tx < 0) tx += CHUNK_SIZE;
-            var tz = ((rngSeed >> 8) + t * 13) % CHUNK_SIZE;
-            if (tz < 0) tz += CHUNK_SIZE;
+            // Random position within chunk with minimum distance from edges for natural spacing
+            var tx = (rngSeed + t * 7) % (CHUNK_SIZE - 4) + 2;
+            if (tx < 2) tx += 2;
+            var tz = ((rngSeed >> 8) + t * 13) % (CHUNK_SIZE - 4) + 2;
+            if (tz < 2) tz += 2;
 
             // Get surface height
             var surfaceY = heightmap[tx + tz * CHUNK_SIZE];
@@ -252,7 +278,7 @@
             var aboveBlock = chunk.getBlock(tx, surfaceY + 1, tz);
             if (aboveBlock !== 0 && aboveBlock !== _getWaterBlockId()) continue;
 
-            // Place trunk
+            // Place trunk with height variation
             var trunkHeight = dec.options.heightMin + ((rngSeed >> (t * 4 + 2)) % (dec.options.heightMax - dec.options.heightMin + 1));
             var trunkRadius = dec.options.trunkRadius || 1;
 
@@ -280,9 +306,19 @@
                         if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE) continue;
                         if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-                        // Only place leaf in air or water
+                        // Only place leaf in air, water, snow layers, or snow blocks
+                        // This prevents trees from partially embedding in snow layers in arctic biomes
                         var currentBlock = chunk.getBlock(bx, by, bz);
-                        if (currentBlock === 0 || currentBlock === _getWaterBlockId()) {
+                        var waterId = _getWaterBlockId();
+                        var snowLayerId = _resolvedBlocks['snow_layer'] || 0;
+                        var snowBlockId = _resolvedBlocks['snow_block'] || 0;
+
+                        var isReplaceable = currentBlock === 0 || // air
+                                           currentBlock === waterId || // water
+                                           currentBlock === snowLayerId || // snow layer
+                                           currentBlock === snowBlockId; // snow block
+
+                        if (isReplaceable) {
                             chunk.setBlock(bx, by, bz, leafBlock);
                             placed++;
                         }
@@ -296,6 +332,7 @@
 
     /**
      * Place a cactus decoration.
+     * Cacti are spaced with minimum distance from each other and chunk edges for natural desert placement.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -314,10 +351,11 @@
         var rngSeed = _hash2D(chunkX + 100, chunkZ);
 
         for (var i = 0; i < count; i++) {
-            var cx = (rngSeed + i * 11) % CHUNK_SIZE;
-            if (cx < 0) cx += CHUNK_SIZE;
-            var cz = ((rngSeed >> 6) + i * 17) % CHUNK_SIZE;
-            if (cz < 0) cz += CHUNK_SIZE;
+            // Random position with minimum distance from edges for natural spacing
+            var cx = (rngSeed + i * 11) % (CHUNK_SIZE - 4) + 2;
+            if (cx < 2) cx += 2;
+            var cz = ((rngSeed >> 6) + i * 17) % (CHUNK_SIZE - 4) + 2;
+            if (cz < 2) cz += 2;
 
             var surfaceY = heightmap[cx + cz * CHUNK_SIZE];
             if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 5) continue;
@@ -326,7 +364,7 @@
             var aboveBlockC = chunk.getBlock(cx, surfaceY + 1, cz);
             if (aboveBlockC !== 0 && aboveBlockC !== _getWaterBlockId()) continue;
 
-            // Place cactus
+            // Place cactus with height variation
             var height = dec.options.heightMin + ((rngSeed >> (i * 3)) % (dec.options.heightMax - dec.options.heightMin + 1));
 
             for (var cy = 0; cy < height; cy++) {
@@ -342,6 +380,7 @@
 
     /**
      * Place a mushroom decoration — alternates between brown and red types.
+     * Mushrooms are placed with minimum spacing from chunk edges for natural forest floor placement.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -361,10 +400,11 @@
         var rngSeed = _hash2D(chunkX + (dec.name.charCodeAt(0) << 4), chunkZ);
 
         for (var i = 0; i < count; i++) {
-            var dx = (rngSeed + i * 7) % CHUNK_SIZE;
-            if (dx < 0) dx += CHUNK_SIZE;
-            var dz = ((rngSeed >> 6) + i * 13) % CHUNK_SIZE;
-            if (dz < 0) dz += CHUNK_SIZE;
+            // Random position with minimum distance from edges for natural spacing
+            var dx = (rngSeed + i * 7) % (CHUNK_SIZE - 4) + 2;
+            if (dx < 2) dx += 2;
+            var dz = ((rngSeed >> 6) + i * 13) % (CHUNK_SIZE - 4) + 2;
+            if (dz < 2) dz += 2;
 
             var surfaceY = heightmap[dx + dz * CHUNK_SIZE];
             if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - 1) continue;
@@ -386,6 +426,7 @@
 
     /**
      * Place a simple (single-block) decoration.
+     * Handles flowers, tall grass, dead bushes, and snow layers with natural spacing.
      * @param {Donkeycraft.Chunk} chunk - The chunk.
      * @param {number} chunkX - Chunk X coordinate.
      * @param {number} chunkZ - Chunk Z coordinate.
@@ -403,11 +444,36 @@
         var count = dec.frequency;
         var rngSeed = _hash2D(chunkX + (dec.name.charCodeAt(0) << 4), chunkZ);
 
+        // Special handling for snow layers (multi-block thickness)
+        if (dec.name === 'snow_layer' && dec.options.layerThickness) {
+            var thickness = dec.options.layerThickness;
+            for (var x = 0; x < CHUNK_SIZE; x += 2) {
+                for (var z = 0; z < CHUNK_SIZE; z += 2) {
+                    var surfaceY = heightmap[x + z * CHUNK_SIZE];
+                    if (surfaceY < 1 || surfaceY >= WORLD_HEIGHT - thickness) continue;
+
+                    // Check if there's air above the surface
+                    var aboveBlockS = chunk.getBlock(x, surfaceY + 1, z);
+                    if (aboveBlockS !== 0 && aboveBlockS !== _getWaterBlockId()) continue;
+
+                    // Place snow layer with variable thickness
+                    for (var sy = 0; sy < thickness; sy++) {
+                        var by = surfaceY + 1 + sy;
+                        if (by < 0 || by >= WORLD_HEIGHT) continue;
+                        chunk.setBlock(x, by, z, blockId);
+                        placed++;
+                    }
+                }
+            }
+            return placed;
+        }
+
+        // Standard single-block decoration placement
         for (var i = 0; i < count; i++) {
-            var dx = (rngSeed + i * 7) % CHUNK_SIZE;
-            if (dx < 0) dx += CHUNK_SIZE;
-            var dz = ((rngSeed >> 6) + i * 13) % CHUNK_SIZE;
-            if (dz < 0) dz += CHUNK_SIZE;
+            var dx = (rngSeed + i * 7) % (CHUNK_SIZE - 2) + 1;
+            if (dx < 1) dx += 1;
+            var dz = ((rngSeed >> 6) + i * 13) % (CHUNK_SIZE - 2) + 1;
+            if (dz < 1) dz += 1;
 
             var surfaceY = heightmap[dx + dz * CHUNK_SIZE];
             if (surfaceY < 0 || surfaceY >= WORLD_HEIGHT - 1) continue;
@@ -428,24 +494,42 @@
     // ============================================================
 
     /**
-     * Get the water block ID from WaterGenerator or resolve from BlockRegistry.
+     * Cached water block ID — resolved once during init() for performance.
+     * @type {number}
+     */
+    var _cachedWaterBlockId = 0;
+
+    /**
+     * Get the cached water block ID. Resolves and caches on first call if not yet set.
      * Returns 0 if no water block is resolved — leaf placement checks for this
      * to skip liquid block replacement when water is unavailable.
      * @returns {number} Water block ID, or 0 if not resolved.
      */
     function _getWaterBlockId() {
+        // Return cached value if already resolved
+        if (_cachedWaterBlockId > 0) return _cachedWaterBlockId;
+
+        // Try WaterGenerator first (already initialized)
         if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.getWaterBlockId === 'function') {
             var waterId = Donkeycraft.WaterGenerator.getWaterBlockId();
-            if (waterId > 0) return waterId;
+            if (waterId > 0) {
+                _cachedWaterBlockId = waterId;
+                return waterId;
+            }
         }
+
         // Resolve from BlockRegistry as fallback
         if (Donkeycraft.BlockRegistry) {
             var waterNames = ['water', 'water_still', 'flowing_water'];
             for (var i = 0; i < waterNames.length; i++) {
                 var block = Donkeycraft.BlockRegistry.getBlockByName(waterNames[i]);
-                if (block && block.id > 0) return block.id;
+                if (block && block.id > 0) {
+                    _cachedWaterBlockId = block.id;
+                    return block.id;
+                }
             }
         }
+
         return 0; // No water block available — leaf placement will skip liquid replacement
     }
 
@@ -477,10 +561,12 @@
 
     /**
      * Destroy the decoration registry and free resources.
+     * Resets all cached block IDs and clears decoration configurations.
      */
     function destroy() {
         _decorators = {};
         _resolvedBlocks = {};
+        _cachedWaterBlockId = 0;
     }
 
     // ============================================================
@@ -631,6 +717,7 @@
 
     /**
      * Donkeycraft.StructureGenerator — Biome-specific surface decoration placement and full chunk generation pipeline.
+     * Handles trees, flowers, grass, cacti, mushrooms, and other biome-appropriate decorations.
      * @namespace
      */
     Donkeycraft.StructureGenerator = {
@@ -640,7 +727,7 @@
         // Decoration placement
         placeDecorations: placeDecorations,
 
-        // Initialization
+        // Initialization / lifecycle
         init: init,
         destroy: destroy,
 
@@ -649,7 +736,7 @@
         getBiomesWithDecorations: getBiomesWithDecorations,
         getBlockId: getBlockId,
 
-        // Constants
+        // Constants (read-only reference for external consumers)
         Decorator: Decorator
     };
 

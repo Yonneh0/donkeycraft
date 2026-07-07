@@ -30,7 +30,45 @@
     // ============================================================
 
     /**
+     * Biome type flags — populated after BiomeID is initialized.
+     * @type {Object.<number, {isDesert: boolean, isArctic: boolean, isForest: boolean}>}
+     * @private
+     */
+    var _biomeTypeFlags = {};
+
+    /**
+     * Initialize biome type flags from BiomeID constants.
+     * Uses deferred lookup to handle module load order variations.
+     * Falls back to direct ID comparison if BiomeID is not yet available.
+     * @private
+     */
+    function _initBiomeTypeFlags() {
+        if (!Donkeycraft.BiomeID) {
+            // BiomeID not yet available — use direct ID comparison fallback
+            for (var i = 0; i < _allBiomesInternal.length; i++) {
+                var b = _allBiomesInternal[i];
+                _biomeTypeFlags[b.id] = {
+                    isDesert: b.id === 2,
+                    isArctic: b.id === 1,
+                    isForest: b.id === 3
+                };
+            }
+            return;
+        }
+        for (var i = 0; i < _allBiomesInternal.length; i++) {
+            var b = _allBiomesInternal[i];
+            _biomeTypeFlags[b.id] = {
+                isDesert: b.id === Donkeycraft.BiomeID.DESERT,
+                isArctic: b.id === Donkeycraft.BiomeID.ARCTIC,
+                isForest: b.id === Donkeycraft.BiomeID.FOREST
+            };
+        }
+    }
+
+    /**
      * Biome — defines a biome's visual and terrain properties.
+     * Uses deferred type checking via getters to avoid load order issues
+     * with Donkeycraft.BiomeID initialization.
      * @param {number} id - Biome ID.
      * @param {string} name - Biome name.
      * @param {number} temperature - Biome temperature [0, 1].
@@ -107,21 +145,31 @@
 
         /**
          * Whether this biome is a desert.
+         * Uses deferred lookup via _biomeTypeFlags to avoid load order issues.
          * @type {boolean}
          */
-        this.isDesert = (id === Donkeycraft.BiomeID.DESERT);
+        var self = this;
+        Object.defineProperty(this, 'isDesert', {
+            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isDesert : (id === 2); }
+        });
 
         /**
          * Whether this biome is arctic.
+         * Uses deferred lookup via _biomeTypeFlags to avoid load order issues.
          * @type {boolean}
          */
-        this.isArctic = (id === Donkeycraft.BiomeID.ARCTIC);
+        Object.defineProperty(this, 'isArctic', {
+            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isArctic : (id === 1); }
+        });
 
         /**
          * Whether this biome is a forest.
+         * Uses deferred lookup via _biomeTypeFlags to avoid load order issues.
          * @type {boolean}
          */
-        this.isForest = (id === Donkeycraft.BiomeID.FOREST);
+        Object.defineProperty(this, 'isForest', {
+            get: function() { return _biomeTypeFlags[id] ? _biomeTypeFlags[id].isForest : (id === 3); }
+        });
 
         /**
          * Mob spawn rates: {passive, hostile, aqua}.
@@ -135,6 +183,7 @@
 
         /**
          * Surface decoration: trees, flowers, grass counts per chunk.
+         * These values are baseline estimates — StructureGenerator handles actual placement.
          * @type {{trees: number, flowers: number, grass: number, cacti: number}}
          */
         this.decoration = decoration || { trees: 2, flowers: 0, grass: 4, cacti: 0 };
@@ -145,19 +194,32 @@
     // ============================================================
 
     /**
-     * BiomeRegistry — central registry for the 4 simplified biomes.
-     * Provides lookup by ID, name, and terrain parameter access.
+     * Internal array of biomes for type flag initialization.
+     * @type {Donkeycraft.Biome[]}
+     * @private
+     */
+    var _allBiomesInternal = [];
+
+    /**
+     * BiomeRegistry — central registry for the 4 simplified biomes (grass, arctic, desert, forest).
+     * Provides lookup by ID, name, and terrain parameter access via SurfaceGenerator.
+     * Safely handles module load order variations by deferring BiomeID-dependent operations.
+     * @namespace
      */
     Donkeycraft.BiomeRegistry = (function () {
         var _biomes = {};         // Map: id → Biome
         var _byName = {};         // Map: name → Biome
         var _allBiomes = [];      // Array of all Biome instances
+        var _initialized = false; // Track whether init has been called
 
         /**
          * Initialize the biome registry with the 4 simplified biomes.
+         * Safe to call multiple times — only initializes once.
          * @private
          */
         function init() {
+            if (_initialized) return; // Prevent re-initialization
+            _initialized = true;
             // Grass biome — moderate terrain, mixed elevation
             var grassBiome = new Donkeycraft.Biome(
                 Donkeycraft.BiomeID.GRASS,
@@ -228,12 +290,16 @@
             _biomes[Donkeycraft.BiomeID.FOREST] = forestBiome;
 
             _allBiomes.push(grassBiome, arcticBiome, desertBiome, forestBiome);
+            _allBiomesInternal.push(grassBiome, arcticBiome, desertBiome, forestBiome);
 
             // Build reverse lookup maps
             for (var i = 0; i < _allBiomes.length; i++) {
                 var b = _allBiomes[i];
                 _byName[b.name] = b;
             }
+
+            // Initialize biome type flags after BiomeID is defined
+            _initBiomeTypeFlags();
         }
 
         /**
@@ -242,7 +308,8 @@
          * @returns {Donkeycraft.Biome|null} The biome instance, or null if not found.
          */
         function getBiomeById(id) {
-            return _biomes[id] || null;
+            if (!isFinite(id)) return null;
+            return _biomes[Math.floor(id)] || null;
         }
 
         /**
@@ -251,7 +318,8 @@
          * @returns {Donkeycraft.Biome|null} The biome instance, or null if not found.
          */
         function getBiomeByName(name) {
-            return _byName[name] || null;
+            if (!name || typeof name !== 'string') return null;
+            return _byName[name.trim().toLowerCase()] || null;
         }
 
         /**
@@ -285,6 +353,8 @@
          * @returns {Object|null} Terrain parameters object, or null if not found.
          */
         function getTerrainParameters(biomeId) {
+            if (!biomeId && biomeId !== 0) return null;
+
             // Resolve biome name from ID if needed
             var biomeName = biomeId;
             if (typeof biomeId === 'number') {
@@ -299,7 +369,13 @@
 
             // Delegate to SurfaceGenerator for terrain parameters
             if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.getBiomeParameters === 'function') {
-                return Donkeycraft.SurfaceGenerator.getBiomeParameters(biomeName);
+                try {
+                    return Donkeycraft.SurfaceGenerator.getBiomeParameters(biomeName);
+                } catch (e) {
+                    if (typeof console !== 'undefined' && console.warn) {
+                        console.warn('[BiomeRegistry] Error getting terrain parameters for "' + biomeName + '":', e && e.message ? e.message : String(e));
+                    }
+                }
             }
             return null;
         }
@@ -309,12 +385,31 @@
          * @returns {Donkeycraft.Biome} A random biome instance.
          */
         function getRandomBiome() {
+            if (_allBiomes.length === 0) {
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[BiomeRegistry] No biomes registered, cannot return random biome');
+                }
+                return null;
+            }
             return _allBiomes[Math.floor(Math.random() * _allBiomes.length)];
         }
 
-        // Initialize on load
-        init();
+        // Initialize on load (deferred to ensure all modules are loaded)
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            // Use requestAnimationFrame to defer initialization to next frame
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(init);
+            } else {
+                setTimeout(init, 0);
+            }
+        }
 
+        /**
+         * Donkeycraft.BiomeRegistry — central registry for the 4 simplified biomes.
+         * @namespace
+         */
         return {
             getBiomeById: getBiomeById,
             getBiomeByName: getBiomeByName,
@@ -322,7 +417,8 @@
             getBiomeCount: getBiomeCount,
             hasBiome: hasBiome,
             getRandomBiome: getRandomBiome,
-            getTerrainParameters: getTerrainParameters
+            getTerrainParameters: getTerrainParameters,
+            isReady: function() { return _initialized; }
         };
     })();
 

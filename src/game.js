@@ -427,6 +427,28 @@
                 Donkeycraft.OreGenerator.init();
             }
 
+            // Initialize terrain generation modules — block ID resolution and configuration
+            // These must be initialized before any chunk generation occurs.
+            try {
+                if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.init === 'function') {
+                    Donkeycraft.SurfaceGenerator.init();
+                }
+                if (Donkeycraft.TerrainSurface && typeof Donkeycraft.TerrainSurface.init === 'function') {
+                    Donkeycraft.TerrainSurface.init();
+                }
+                if (Donkeycraft.CaveGenerator && typeof Donkeycraft.CaveGenerator.init === 'function') {
+                    // CaveGenerator doesn't have init, but ensure it's ready
+                }
+                if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.init === 'function') {
+                    Donkeycraft.WaterGenerator.init();
+                }
+                if (Donkeycraft.StructureGenerator && typeof Donkeycraft.StructureGenerator.init === 'function') {
+                    Donkeycraft.StructureGenerator.init();
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Terrain module initialization had errors: ' + (e && e.message ? e.message : String(e)));
+            }
+
             // Initialize portal system with chunk manager reference and dimension type
             if (Donkeycraft.Portal && Donkeycraft.Portal.init) {
                 var currentDim = Donkeycraft.Dimensions ? Donkeycraft.Dimensions.getCurrentDimension() : 0;
