@@ -804,6 +804,9 @@
             // Generation timing tracking
             var generationStartTime = 0, generationElapsedMs = 0;
 
+            // Delta time tracking for frame-rate-independent movement
+            var lastFrameTime = 0;
+
             // Speed levels: walk, jog, sprint
             var SPEED_LEVELS = [4, 8, 16];
             var SPEED_NAMES = ['Walk', 'Jog', 'Sprint'];
@@ -1152,8 +1155,9 @@
 
             // ============================================================
             // UI Setup
+            // moduleCheck: Result from _checkRequiredModules (currently unused but preserved for future use)
             // ============================================================
-            function setupUI() {
+            function setupUI(moduleCheck) {
                 document.getElementById('ui-biome').addEventListener('change', function () {
                     selectedBiomeId = parseInt(this.value);
                     regenerateTerrain();
@@ -1236,6 +1240,12 @@
                     }
                     if (!foundBiome && biomeSel.options.length > 0) biomeSel.selectedIndex = 0;
                 }
+
+                // Bug 5 fix: Initialize lastCameraChunkPos to prevent false chunk boundary crossings
+                // after loading saved state
+                lastCameraChunkPos.x = Math.floor(camera.x / Donkeycraft.Config.CHUNK_SIZE);
+                lastCameraChunkPos.z = Math.floor(camera.z / Donkeycraft.Config.CHUNK_SIZE);
+                lastCameraChunkPos._initialized = true;
 
                 // Auto-regenerate if we had a saved state with different chunk/params
                 if (hasState) {
@@ -1364,30 +1374,6 @@
             // ============================================================
 
             /**
-             * Compute projected depth of a world-space point along the camera viewing direction.
-             * Larger = farther away from camera along view axis.
-             * @param {number} px - World X
-             * @param {number} py - World Y
-             * @param {number} pz - World Z
-             * @returns {number} Projected depth (farther = larger value)
-             * @private
-             */
-            function _projectedDepth(px, py, pz) {
-                var cosYaw = Math.cos(camera.yaw);
-                var sinYaw = Math.sin(camera.yaw);
-                var cosPitch = Math.cos(camera.pitch);
-                // Camera forward direction (points from camera into scene)
-                var fwdX = -sinYaw * cosPitch;
-                var fwdY = -Math.sin(camera.pitch);
-                var fwdZ = -cosYaw * cosPitch;
-                // Vector from camera to point
-                var dx = px - camera.x;
-                var dy = py - camera.y;
-                var dz = pz - camera.z;
-                return dx * fwdX + dy * fwdY + dz * fwdZ;
-            }
-
-            /**
              * Queue a chunk for asynchronous generation when the viewer approaches it.
              * Respects MAX_PENDING_CHUNKS limit and skips already-loaded or already-pending chunks.
              * @param {number} cx - Chunk X coordinate
@@ -1430,16 +1416,23 @@
                 var cx = Math.floor(camera.x / cs);
                 var cz = Math.floor(camera.z / cs);
 
-                // Initialize last position tracking
-                if (lastCameraChunkPos.x === 0 && lastCameraChunkPos.z === 0) {
+                // Initialize last position tracking on first call.
+                if (!lastCameraChunkPos._initialized) {
                     lastCameraChunkPos.x = cx;
                     lastCameraChunkPos.z = cz;
+                    lastCameraChunkPos._initialized = true;
                     return;
                 }
 
                 // Detect which direction the player moved
                 var dx = cx - lastCameraChunkPos.x;
                 var dz = cz - lastCameraChunkPos.z;
+
+                // Compute grid bounds once — needed in BOTH branches (Bug 3 fix)
+                var queueGridMinX = currentChunkX - chunkRadiusW;
+                var queueGridMaxX = currentChunkX + chunkRadiusE;
+                var queueGridMinZ = currentChunkZ - chunkRadiusN;
+                var queueGridMaxZ = currentChunkZ + chunkRadiusS;
 
                 // Only process when player crosses at least one chunk boundary
                 if (Math.abs(dx) >= 1 || Math.abs(dz) >= 1) {
@@ -1453,14 +1446,8 @@
                             var targetCz = cz + ddZ;
 
                             // Only queue if this chunk is outside the current grid bounds
-                            var gridMinX = currentChunkX - chunkRadiusW;
-                            var gridMaxX = currentChunkX + chunkRadiusE;
-                            var gridMinZ = currentChunkZ - chunkRadiusN;
-                            var gridMaxZ = currentChunkZ + chunkRadiusS;
-
-                            // If outside grid bounds, queue it
-                            if (targetCx < gridMinX || targetCx > gridMaxX ||
-                                targetCz < gridMinZ || targetCz > gridMaxZ) {
+                            if (targetCx < queueGridMinX || targetCx > queueGridMaxX ||
+                                targetCz < queueGridMinZ || targetCz > queueGridMaxZ) {
                                 chunksToQueue.push({ cx: targetCx, cz: targetCz });
                             }
                         }
@@ -1485,12 +1472,12 @@
                     var nearBoundaryX = false;
                     var nearBoundaryZ = false;
 
-                    // Check if near east/west boundary
-                    if (cx - gridMinX <= 1) nearBoundaryX = true;
-                    if (gridMaxX - cx <= 1) nearBoundaryX = true;
+                    // Check if near east/west boundary (grid bounds now computed above)
+                    if (cx - queueGridMinX <= 1) nearBoundaryX = true;
+                    if (queueGridMaxX - cx <= 1) nearBoundaryX = true;
                     // Check if near north/south boundary
-                    if (cz - gridMinZ <= 1) nearBoundaryZ = true;
-                    if (gridMaxZ - cz <= 1) nearBoundaryZ = true;
+                    if (cz - queueGridMinZ <= 1) nearBoundaryZ = true;
+                    if (queueGridMaxZ - cz <= 1) nearBoundaryZ = true;
 
                     if (nearBoundaryX || nearBoundaryZ) {
                         // Determine which direction to queue next
@@ -1539,8 +1526,6 @@
                 var promise = null;
 
                 if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.generateChunk === 'function') {
-                    Donkeycraft.TerrainCore.setSeed(worldSeed);
-                    Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
                     promise = Donkeycraft.TerrainCore.generateChunk(entry.cx, entry.cz).then(
                         function (result) {
                             var key = entry.cx + ',' + entry.cz;
@@ -1698,6 +1683,9 @@
                 _clearMeshBuffers();
                 dirtyChunks.clear();
 
+                // Bug 4 fix: Clear pending chunk queue to prevent stale promises from previous generation cycle
+                pendingChunkQueue.clear();
+
                 // Start generation timing (mesh buffers cleared, so all chunks will rebuild)
                 _startGenerationTiming();
 
@@ -1723,6 +1711,14 @@
                     };
                 }
 
+                // Set seed and biome once before generating all chunks (avoid redundant calls)
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.setSeed === 'function') {
+                    Donkeycraft.TerrainCore.setSeed(worldSeed);
+                }
+                if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.setBiome === 'function') {
+                    Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
+                }
+
                 // Create all chunks and collect generation promises
                 var pendingChunks = [];
 
@@ -1735,9 +1731,6 @@
 
                         // Use TerrainCore to generate heightmap with proper global coordinates
                         if (Donkeycraft.TerrainCore && typeof Donkeycraft.TerrainCore.generateChunk === 'function') {
-                            Donkeycraft.TerrainCore.setSeed(worldSeed);
-                            Donkeycraft.TerrainCore.setBiome(selectedBiomeId);
-
                             // Store chunk in pending list — DO NOT add to chunks map yet
                             pendingChunks.push({
                                 key: key,
@@ -1772,15 +1765,15 @@
                                 chunks.set(pc.key, pc.chunk);
                                 dirtyChunks.add(pc.key);
                             }).catch(function (e) {
-                            // Generation failed — use fallback
-                            if (typeof console !== 'undefined' && console.warn) {
-                                console.warn('[Terrain] Generation failed for chunk (' + pc.cx + ',' + pc.cz + '):', e && e.message ? e.message : String(e));
-                            }
-                            // Still add the chunk so it renders (empty terrain)
-                            chunks.set(pc.key, pc.chunk);
-                            dirtyChunks.add(pc.key);
-                        });
-                        generationPromises.push(promise);
+                                // Generation failed — use fallback
+                                if (typeof console !== 'undefined' && console.warn) {
+                                    console.warn('[Terrain] Generation failed for chunk (' + pc.cx + ',' + pc.cz + '):', e && e.message ? e.message : String(e));
+                                }
+                                // Still add the chunk so it renders (empty terrain)
+                                chunks.set(pc.key, pc.chunk);
+                                dirtyChunks.add(pc.key);
+                            });
+                            generationPromises.push(promise);
                         })(pendingChunks[i]);
                     }
 
@@ -1839,11 +1832,7 @@
                     var biome = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
                     if (biome && biome.name) biomeType = biome.name.toLowerCase();
                 }
-
-                console.log('[Terrain] _fillChunkFromHeightmap: biomeId=' + biomeId + ', resolved biomeType=' + biomeType);
-
                 var surfaceBlockId, subSurfaceBlockId, subSubBlockId, iceBlockId, snowBlockId, sandId, sandstoneId;
-
                 switch (biomeType) {
                     case 'arctic':
                         snowBlockId = getBlockId('snow_block', 80);
@@ -1851,7 +1840,6 @@
                         subSubBlockId = getBlockId('packed_ice', 162);
                         surfaceBlockId = snowBlockId;
                         subSurfaceBlockId = iceBlockId;
-                        console.log('[Terrain] Arctic blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
                         break;
                     case 'desert':
                         sandId = getBlockId('sand', 12);
@@ -1859,21 +1847,18 @@
                         surfaceBlockId = sandId;
                         subSurfaceBlockId = sandstoneId;
                         subSubBlockId = sandstoneId;
-                        console.log('[Terrain] Desert blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
                         break;
                     case 'forest':
                         grassBlockId = getBlockId('grass_block', 8);
                         surfaceBlockId = grassBlockId;
                         subSurfaceBlockId = dirtId; // rich dirt (same block for now)
                         subSubBlockId = stoneId;
-                        console.log('[Terrain] Forest blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
                         break;
                     default: // grass
                         grassBlockId = getBlockId('grass_block', 8);
                         surfaceBlockId = grassBlockId;
                         subSurfaceBlockId = dirtId;
                         subSubBlockId = stoneId;
-                        console.log('[Terrain] Grass blocks: surface=' + surfaceBlockId + ', sub=' + subSurfaceBlockId + ', subsub=' + subSubBlockId);
                         break;
                 }
 
@@ -1885,7 +1870,6 @@
                         if (heightmap[hi] > hMax) hMax = heightmap[hi];
                     }
                 }
-                console.log('[Terrain] Heightmap range: min=' + hMin + ', max=' + hMax + ', length=' + heightmap.length);
 
                 // Place bedrock at Y=0
                 for (var x = 0; x < cs; x++) {
@@ -1902,12 +1886,10 @@
                         h = Math.floor(h);
 
                         for (var y2 = 1; y2 < h; y2++) {
-                            if (y2 < h - 4) {
+                            if (y2 < h - 3) {
                                 chunk.setBlock(x2, y2, z2, subSubBlockId);
-                            } else if (y2 < h - 1) {
-                                chunk.setBlock(x2, y2, z2, subSurfaceBlockId);
                             } else {
-                                // Top layer (just below surface)
+                                // Top layers (just below surface)
                                 chunk.setBlock(x2, y2, z2, subSurfaceBlockId);
                             }
                         }
@@ -1990,7 +1972,7 @@
                 // Water placement: use full signature with chunk coordinates for proper biome resolution
                 if (options.water && Donkeycraft.WaterGenerator && heightmap) {
                     try {
-                        var waterOpts = { caves: options.caves, ores: options.ores, water: true, surface: options.surface, decorations: options.decorations };
+                        var waterOpts = { caves: options.caves, ores: options.ores, water: true, surface: options.surface };
                         Donkeycraft.WaterGenerator.placeWater(chunk, cx !== undefined ? cx : chunk.chunkX, cz !== undefined ? cz : chunk.chunkZ, biomeId, heightmap, waterOpts);
                     } catch (e) {
                         if (typeof console !== 'undefined' && console.warn) console.warn('[Terrain] Water generation failed:', e && e.message ? e.message : String(e));
@@ -2077,11 +2059,14 @@
                 }
 
                 // No blocks found — return full range
-                if (minY < 0 || maxY < 0) return { minY: 0, maxY: 0 };
+                if (minY < 0 || maxY < 0) return { minY: 0, maxY: ws - 1 };
 
-                // Add 1 block padding for neighbor face culling
-                if (minY > 0) minY--;
-                if (maxY < ws - 1) maxY++;
+                // Add 2 blocks padding for neighbor face culling.
+                // Padding ensures blocks at the edge of the computed range can properly
+                // check their neighbors in adjacent chunks for correct face rendering.
+                // Using 2 blocks to handle both intra-chunk and inter-chunk boundary cases.
+                if (minY > 1) minY -= 2; else minY = 0;
+                if (maxY < ws - 2) maxY += 2; else maxY = ws - 1;
                 return { minY: Math.max(0, minY), maxY: Math.min(ws - 1, maxY) };
             }
 
@@ -2127,43 +2112,100 @@
                                     nid = getBlockAt(ngx, ngy, ngz);
                                 }
 
-                                // Show face if neighbor is air OR a different block type.
-                                // Only cull faces between identical adjacent blocks within the SAME chunk.
-                                // All transitions between different block types must be visible, including
-                                // transitions to air (when viewing outward from inside terrain).
-                                if (nid === 0 || nid !== bid) {
-                                    // ---- Chunk boundary deduplication ----
-                                    // When two adjacent LOADED chunks share a boundary, we skip +X/+Z
-                                    // faces to prevent z-fighting at the shared border. This ensures
-                                    // each internal boundary face is only rendered once (from the -X/-Z
-                                    // side). When neighbor chunk is NOT loaded (unloaded = air), we MUST
-                                    // render the face to show the block→air/void transition at chunk edges.
-                                    var chunkBoundaryX = (nx >= cs || nx < 0);
-                                    var chunkBoundaryZ = (nz >= cs || nz < 0);
+                                // ============================================================
+                                // Face visibility test: show face if neighbor is air or different block
+                                // CRITICAL: NEVER cull faces based on chunk boundaries alone.
+                                // Only cull when two adjacent blocks are truly identical AND
+                                // both belong to the SAME chunk (intra-chunk optimization).
+                                // ============================================================
+                                var faceVisible = (nid === 0 || nid !== bid);
 
-                                    // Check if the neighbor chunk is loaded
+                                if (faceVisible) {
+                                    // ---- Block type reflection at outside chunk edges ----
+                                    // When neighbor chunk is NOT loaded, reflect the block type back
+                                    // instead of treating it as air. This creates a seamless continuation
+                                    // effect when viewing from inside terrain toward chunk edges.
+                                    var isChunkBoundaryX = (nx >= cs || nx < 0);
+                                    var isChunkBoundaryZ = (nz >= cs || nz < 0);
+
+                                    if ((isChunkBoundaryX || isChunkBoundaryZ) && nid === 0) {
+                                        // Neighbor is in an unloaded chunk — reflect block type back.
+                                        // CRITICAL FIX: Only reflect when the reflected block is DIFFERENT
+                                        // from the current block. If it's the same, leave nid as 0 (air)
+                                        // so the face renders — culling identical blocks across a boundary
+                                        // where one side is "unloaded" would incorrectly hide surfaces.
+                                        var reflectDx = face.d[0], reflectDz = face.d[2];
+                                        var reflectedWorldX, reflectedWorldZ;
+
+                                        if (isChunkBoundaryX) {
+                                            if (reflectDx === 1) {
+                                                reflectedWorldX = chunk.chunkX * cs - 1;
+                                            } else {
+                                                reflectedWorldX = (chunk.chunkX + 1) * cs;
+                                            }
+                                        } else {
+                                            reflectedWorldX = chunk.chunkX * cs + nx;
+                                        }
+
+                                        if (isChunkBoundaryZ) {
+                                            if (reflectDz === 1) {
+                                                reflectedWorldZ = chunk.chunkZ * cs - 1;
+                                            } else {
+                                                reflectedWorldZ = (chunk.chunkZ + 1) * cs;
+                                            }
+                                        } else {
+                                            reflectedWorldZ = chunk.chunkZ * cs + nz;
+                                        }
+
+                                        var reflectedChunkX = Math.floor(reflectedWorldX / cs);
+                                        var reflectedChunkZ = Math.floor(reflectedWorldZ / cs);
+                                        var reflectedLocalX = ((reflectedWorldX % cs) + cs) % cs;
+                                        var reflectedLocalZ = ((reflectedWorldZ % cs) + cs) % cs;
+
+                                        reflectedChunkX = Math.max(-1000, Math.min(1000, reflectedChunkX));
+                                        reflectedChunkZ = Math.max(-1000, Math.min(1000, reflectedChunkZ));
+
+                                        var reflectedChunk = chunks.get(reflectedChunkX + ',' + reflectedChunkZ);
+                                        if (reflectedChunk) {
+                                            var reflectedBlock = reflectedChunk.getBlock(reflectedLocalX, ny, reflectedLocalZ);
+                                            // Only use reflected block if it differs from current block
+                                            if (reflectedBlock !== 0 && reflectedBlock !== bid) {
+                                                nid = reflectedBlock;
+                                            }
+                                            // If same block or empty, leave nid=0 so face renders as air transition
+                                        } else {
+                                            // No reflected chunk — leave nid=0 for air transition
+                                        }
+                                    }
+
+                                    // ---- Chunk boundary deduplication (STRICT) ----
+                                    // ONLY skip +X/+Z faces at chunk boundaries when ALL of:
+                                    // 1. Neighbor chunk IS loaded
+                                    // 2. Both blocks are IDENTICAL (nid === bid)
+                                    // 3. Both blocks are SOLID (alpha >= 0.99)
+                                    // 4. Face direction is +X or +Z (not top/bottom/side faces)
+                                    var shouldSkipBoundary = false;
                                     var neighborChunkLoaded = false;
-                                    if (chunkBoundaryX || chunkBoundaryZ) {
+
+                                    if (isChunkBoundaryX || isChunkBoundaryZ) {
                                         var ngxWorld = chunk.chunkX * cs + nx;
                                         var ngzWorld = chunk.chunkZ * cs + nz;
                                         var ngxChunk = Math.floor(ngxWorld / cs);
                                         var ngzChunk = Math.floor(ngzWorld / cs);
-                                        // Clamp to valid range
                                         ngxChunk = Math.max(-1000, Math.min(1000, ngxChunk));
                                         ngzChunk = Math.max(-1000, Math.min(1000, ngzChunk));
                                         neighborChunkLoaded = chunks.has(ngxChunk + ',' + ngzChunk);
                                     }
 
-                                    // Chunk boundary deduplication: always skip +X/+Z faces at chunk
-                                    // boundaries when the neighbor chunk is loaded.
-                                    // This prevents z-fighting at shared borders regardless of block types.
-                                    // The standard approach: always "see through" to the chunk on the
-                                    // -X/-Z side of each boundary. When neighbor is unloaded, we MUST
-                                    // render the face to show the block→air/void transition.
-                                    var shouldSkipBoundary = false;
-                                    if (neighborChunkLoaded) {
-                                        if (face.d[0] === 1 && nx >= cs) shouldSkipBoundary = true;
-                                        if (face.d[2] === 1 && nz >= cs) shouldSkipBoundary = true;
+                                    if (neighborChunkLoaded && nid === bid) {
+                                        var thisBlockTransparent = (BLOCK_ALPHAS[bid] !== undefined && BLOCK_ALPHAS[bid] < 0.99);
+                                        var neighborBlockTransparent = (nid > 0 && BLOCK_ALPHAS[nid] !== undefined && BLOCK_ALPHAS[nid] < 0.99);
+                                        if (!thisBlockTransparent && !neighborBlockTransparent) {
+                                            // Only skip +X and +Z faces at chunk boundaries
+                                            if ((face.d[0] === 1 && nx >= cs) || (face.d[2] === 1 && nz >= cs)) {
+                                                shouldSkipBoundary = true;
+                                            }
+                                        }
                                     }
 
                                     if (shouldSkipBoundary) {
@@ -2306,6 +2348,14 @@
             // ============================================================
             function renderLoop(ts) {
                 frameCount++;
+
+                // Delta time calculation for frame-rate-independent movement (Bug 1 fix)
+                var dt = 1; // Default to 1 frame if first frame
+                if (lastFrameTime > 0) {
+                    dt = (ts - lastFrameTime) / 16.667; // Normalize to ~60fps baseline
+                }
+                lastFrameTime = ts;
+
                 if (!lastFpsTime) lastFpsTime = ts;
                 if (ts - lastFpsTime >= 1000) {
                     currentFps = frameCount; frameCount = 0; lastFpsTime = ts;
@@ -2331,15 +2381,15 @@
                     viewerSeedEl.textContent = 'Seed: ' + worldSeed;
                 }
 
-                // Camera rotation
-                var sens = Donkeycraft.Config ? Donkeycraft.Config.MOUSE_SENSITIVITY || 0.15 : 0.15;
+                // Camera rotation — use proper default for mouse sensitivity (Bug 2 fix)
+                var sens = (Donkeycraft.Config && Donkeycraft.Config.MOUSE_SENSITIVITY) ? Donkeycraft.Config.MOUSE_SENSITIVITY : 0.15;
                 camera.yaw -= mouseDX * sens;
                 camera.pitch -= mouseDY * sens;
                 camera.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, camera.pitch));
                 mouseDX = 0; mouseDY = 0;
 
-                // Movement — Q cycles through speed levels
-                var spd = SPEED_LEVELS[speedLevel] * 0.016;
+                // Movement — Q cycles through speed levels (Bug 1 fix: frame-rate independent)
+                var spd = SPEED_LEVELS[speedLevel] * dt;
                 var fwd = [-Math.sin(camera.yaw), 0, -Math.cos(camera.yaw)];
                 var rgt = [Math.cos(camera.yaw), 0, -Math.sin(camera.yaw)];
 
@@ -2378,10 +2428,11 @@
                 renderSky(proj, view);
 
                 // ---- Pass 2: Terrain rendering with alpha blending ----
-                // Build meshes for dirty chunks only (first frame: mark all dirty)
-                if (meshBuffers._firstFrame) {
+                // Build meshes for dirty chunks only. On first frame, mark all loaded chunks dirty
+                // so their meshes are built before rendering.
+                if (!meshBuffers._firstFrameBuilt) {
+                    meshBuffers._firstFrameBuilt = true;
                     chunks.forEach(function (ch) { dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ); });
-                    meshBuffers._firstFrame = false;
                 }
                 chunks.forEach(function (ch) { buildChunkMesh(ch); });
 
@@ -2395,13 +2446,25 @@
                 // Sort chunks by projected depth along viewing direction for correct transparent blending.
                 // Uses view-angle-aware dot product instead of simple distance so that
                 // block type boundaries render consistently from all viewing angles.
+                // Uses actual terrain height (not Y=0) for accurate depth projection.
                 var chunkList = [];
                 var cs2 = Donkeycraft.Config.CHUNK_SIZE;
                 chunks.forEach(function (ch) {
-                    // Use chunk center for depth projection
+                    // Use chunk center at terrain surface height for depth projection
                     var cx2 = ch.chunkX * cs2 + cs2 / 2;
                     var cz2 = ch.chunkZ * cs2 + cs2 / 2;
-                    var depth = _projectedDepth(cx2, 0, cz2);
+                    // Project using the chunk's cached heightmap if available, otherwise estimate from Y bounds
+                    var surfaceY = 64; // default fallback
+                    if (ch._cachedHeightmap) {
+                        // Sample center of chunk from heightmap
+                        var hmCenter = ch._cachedHeightmap[Math.floor(cs2 / 2) + Math.floor(cs2 / 2) * cs2];
+                        if (isFinite(hmCenter)) surfaceY = hmCenter;
+                    } else {
+                        // Estimate from Y bounds
+                        var yB = _computeChunkYBounds(ch);
+                        surfaceY = yB.maxY;
+                    }
+                    var depth = _projectedDepth(cx2, surfaceY, cz2);
                     chunkList.push({ chunk: ch, depth: depth });
                 });
                 // Sort far-to-near (larger depth = farther along view direction)
@@ -2547,6 +2610,10 @@
                 var distanceToTarget = Math.sqrt(
                     Math.pow(targetX - camera.x, 2) + Math.pow(targetZ - camera.z, 2)
                 );
+                // Bug 10 fix: Guard against NaN when distance is zero or very small
+                if (!isFinite(distanceToTarget) || distanceToTarget < 0.001) {
+                    distanceToTarget = 0.001;
+                }
                 camera.pitch = -Math.atan2(heightToAngle, distanceToTarget) * 0.8;
             }
 
