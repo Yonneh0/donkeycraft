@@ -1767,19 +1767,16 @@
                                 }
 
                                 // Show face if neighbor is air OR a different block type.
-                                // Only cull faces between identical adjacent blocks (like-block borders).
-                                // All transitions between different block types must be visible.
+                                // Only cull faces between identical adjacent blocks within the SAME chunk.
+                                // All transitions between different block types must be visible, including
+                                // transitions to air (when viewing outward from inside terrain).
                                 if (nid === 0 || nid !== bid) {
-                                    // ---- Chunk boundary deduplication (conditional) ----
-                                    // When two adjacent LOADED chunks have different block types at their
-                                    // shared border, both would render a face at the exact same world
-                                    // position, causing z-fighting. To prevent this, we only render the
-                                    // "western" or "southern" side of each internal boundary.
-                                    //
-                                    // CRITICAL: We ONLY skip when the neighbor chunk is LOADED and has the
-                                    // SAME block type (like-block border). If the neighbor chunk is NOT
-                                    // loaded (unloaded = air), we MUST render the face to show the
-                                    // transition from terrain block to air/void.
+                                    // ---- Chunk boundary deduplication ----
+                                    // When two adjacent LOADED chunks share a boundary, we skip +X/+Z
+                                    // faces to prevent z-fighting at the shared border. This ensures
+                                    // each internal boundary face is only rendered once (from the -X/-Z
+                                    // side). When neighbor chunk is NOT loaded (unloaded = air), we MUST
+                                    // render the face to show the block→air/void transition at chunk edges.
                                     var chunkBoundaryX = (nx >= cs || nx < 0);
                                     var chunkBoundaryZ = (nz >= cs || nz < 0);
 
@@ -1796,12 +1793,14 @@
                                         neighborChunkLoaded = chunks.has(ngxChunk + ',' + ngzChunk);
                                     }
 
-                                    // Only skip +X/+Z faces at chunk boundaries when the neighbor chunk
-                                    // is loaded AND has the same block type (like-block border).
-                                    // When neighbor is unloaded (nid === 0) or different block type,
-                                    // we MUST render the face.
+                                    // Chunk boundary deduplication: always skip +X/+Z faces at chunk
+                                    // boundaries when the neighbor chunk is loaded.
+                                    // This prevents z-fighting at shared borders regardless of block types.
+                                    // The standard approach: always "see through" to the chunk on the
+                                    // -X/-Z side of each boundary. When neighbor is unloaded, we MUST
+                                    // render the face to show the block→air/void transition.
                                     var shouldSkipBoundary = false;
-                                    if (neighborChunkLoaded && nid === bid) {
+                                    if (neighborChunkLoaded) {
                                         if (face.d[0] === 1 && nx >= cs) shouldSkipBoundary = true;
                                         if (face.d[2] === 1 && nz >= cs) shouldSkipBoundary = true;
                                     }
@@ -2034,7 +2033,9 @@
                 gl.uniform1f(terrainLocs.uFogDensity, 0.006);
                 gl.uniform1f(terrainLocs.uLightFactor, 1.0);
 
-                // Sort chunks far-to-near for correct transparent rendering
+                // Sort chunks far-to-near for correct transparent rendering.
+                // Secondary sort key (chunk coordinates) ensures deterministic ordering
+                // for chunks at the same distance, preventing random flickering.
                 var chunkList = [];
                 chunks.forEach(function (ch) {
                     var dx = ch.chunkX - Math.floor(ex / Donkeycraft.Config.CHUNK_SIZE);
@@ -2042,7 +2043,12 @@
                     var dist = dx * dx + dz * dz;
                     chunkList.push({ chunk: ch, dist: dist });
                 });
-                chunkList.sort(function (a, b) { return b.dist - a.dist; });
+                chunkList.sort(function (a, b) {
+                    if (b.dist !== a.dist) return b.dist - a.dist;
+                    // Deterministic tiebreaker: sort by X first, then Z
+                    if (a.chunk.chunkX !== b.chunk.chunkX) return a.chunk.chunkX - b.chunk.chunkX;
+                    return a.chunk.chunkZ - b.chunk.chunkZ;
+                });
 
                 // Enable blending for transparent rendering with depthMask(false).
                 // Depth testing prevents rendering behind geometry, but no new depth
