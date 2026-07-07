@@ -905,6 +905,37 @@
             var meshBuffers = {};
             var dirtyChunks = new Set();
 
+            // ============================================================
+            // Face-level depth sorting for view-angle-correct rendering
+            // ============================================================
+            var allFacesFlat = null;   // Flat arrays: [depth, px, py, pz, cr, cg, cb, a, nx, ny, nz] per vertex
+            var allFacesCount = 0;
+            var faceBuildCounter = 0;   // Frame counter for throttling
+
+            /**
+             * Compute projected depth of a world-space point along the camera viewing direction.
+             * Larger = farther away from camera along view axis.
+             * @param {number} px - World X
+             * @param {number} py - World Y
+             * @param {number} pz - World Z
+             * @returns {number} Projected depth (farther = larger value)
+             * @private
+             */
+            function _projectedDepth(px, py, pz) {
+                var cosYaw = Math.cos(camera.yaw);
+                var sinYaw = Math.sin(camera.yaw);
+                var cosPitch = Math.cos(camera.pitch);
+                // Camera forward direction (points from camera into scene)
+                var fwdX = -sinYaw * cosPitch;
+                var fwdY = -Math.sin(camera.pitch);
+                var fwdZ = -cosYaw * cosPitch;
+                // Vector from camera to point
+                var dx = px - camera.x;
+                var dy = py - camera.y;
+                var dz = pz - camera.z;
+                return dx * fwdX + dy * fwdY + dz * fwdZ;
+            }
+
             /**
              * Clear mesh buffers and properly delete WebGL buffers to prevent memory leaks.
              * Called during terrain regeneration to free old GPU resources.
@@ -1329,8 +1360,32 @@
             }
 
             // ============================================================
-            // Dynamic chunk loading — core functions
+            // View-angle-aware chunk sorting for correct transparent rendering
             // ============================================================
+
+            /**
+             * Compute projected depth of a world-space point along the camera viewing direction.
+             * Larger = farther away from camera along view axis.
+             * @param {number} px - World X
+             * @param {number} py - World Y
+             * @param {number} pz - World Z
+             * @returns {number} Projected depth (farther = larger value)
+             * @private
+             */
+            function _projectedDepth(px, py, pz) {
+                var cosYaw = Math.cos(camera.yaw);
+                var sinYaw = Math.sin(camera.yaw);
+                var cosPitch = Math.cos(camera.pitch);
+                // Camera forward direction (points from camera into scene)
+                var fwdX = -sinYaw * cosPitch;
+                var fwdY = -Math.sin(camera.pitch);
+                var fwdZ = -cosYaw * cosPitch;
+                // Vector from camera to point
+                var dx = px - camera.x;
+                var dy = py - camera.y;
+                var dz = pz - camera.z;
+                return dx * fwdX + dy * fwdY + dz * fwdZ;
+            }
 
             /**
              * Queue a chunk for asynchronous generation when the viewer approaches it.
@@ -1643,7 +1698,7 @@
                 _clearMeshBuffers();
                 dirtyChunks.clear();
 
-                // Start generation timing
+                // Start generation timing (mesh buffers cleared, so all chunks will rebuild)
                 _startGenerationTiming();
 
                 // Determine the grid bounds from ChunkGrid or legacy radii
@@ -2322,19 +2377,13 @@
                 // ---- Pass 1: Sky (behind everything, render inside-out) ----
                 renderSky(proj, view);
 
-                // Mark all chunks dirty on first frame
+                // ---- Pass 2: Terrain rendering with alpha blending ----
+                // Build meshes for dirty chunks only (first frame: mark all dirty)
                 if (meshBuffers._firstFrame) {
                     chunks.forEach(function (ch) { dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ); });
                     meshBuffers._firstFrame = false;
                 }
-
-                // Build meshes for dirty chunks only
                 chunks.forEach(function (ch) { buildChunkMesh(ch); });
-
-                // ---- Pass 2: Terrain rendering with alpha blending ----
-                // Single pass with depthMask(false): depth testing prevents rendering behind
-                // geometry, but no new depth values are written, allowing proper far-to-near
-                // transparent blending for semi-transparent blocks.
 
                 gl.useProgram(terrainProgram);
                 gl.uniformMatrix4fv(terrainLocs.uProjection, false, proj);
@@ -2343,22 +2392,20 @@
                 gl.uniform1f(terrainLocs.uFogDensity, 0.006);
                 gl.uniform1f(terrainLocs.uLightFactor, 1.0);
 
-                // Sort chunks far-to-near for correct transparent rendering.
-                // Secondary sort key (chunk coordinates) ensures deterministic ordering
-                // for chunks at the same distance, preventing random flickering.
+                // Sort chunks by projected depth along viewing direction for correct transparent blending.
+                // Uses view-angle-aware dot product instead of simple distance so that
+                // block type boundaries render consistently from all viewing angles.
                 var chunkList = [];
+                var cs2 = Donkeycraft.Config.CHUNK_SIZE;
                 chunks.forEach(function (ch) {
-                    var dx = ch.chunkX - Math.floor(ex / Donkeycraft.Config.CHUNK_SIZE);
-                    var dz = ch.chunkZ - Math.floor(ez / Donkeycraft.Config.CHUNK_SIZE);
-                    var dist = dx * dx + dz * dz;
-                    chunkList.push({ chunk: ch, dist: dist });
+                    // Use chunk center for depth projection
+                    var cx2 = ch.chunkX * cs2 + cs2 / 2;
+                    var cz2 = ch.chunkZ * cs2 + cs2 / 2;
+                    var depth = _projectedDepth(cx2, 0, cz2);
+                    chunkList.push({ chunk: ch, depth: depth });
                 });
-                chunkList.sort(function (a, b) {
-                    if (b.dist !== a.dist) return b.dist - a.dist;
-                    // Deterministic tiebreaker: sort by X first, then Z
-                    if (a.chunk.chunkX !== b.chunk.chunkX) return a.chunk.chunkX - b.chunk.chunkX;
-                    return a.chunk.chunkZ - b.chunk.chunkZ;
-                });
+                // Sort far-to-near (larger depth = farther along view direction)
+                chunkList.sort(function (a, b) { return b.depth - a.depth; });
 
                 // Enable blending for transparent rendering with depthMask(false).
                 // Depth testing prevents rendering behind geometry, but no new depth
@@ -2371,14 +2418,14 @@
                 gl.disable(gl.CULL_FACE);
 
                 for (var i = 0; i < chunkList.length; i++) {
-                    var ch = chunkList[i].chunk;
-                    var buf = meshBuffers[ch.chunkX + ',' + ch.chunkZ];
+                    var ch2 = chunkList[i].chunk;
+                    var buf = meshBuffers[ch2.chunkX + ',' + ch2.chunkZ];
                     if (!buf || buf.count === 0) continue;
 
                     var cm = mat4Create();
                     mat4Identity(cm);
-                    cm[12] = ch.chunkX * Donkeycraft.Config.CHUNK_SIZE;
-                    cm[14] = ch.chunkZ * Donkeycraft.Config.CHUNK_SIZE;
+                    cm[12] = ch2.chunkX * cs2;
+                    cm[14] = ch2.chunkZ * cs2;
                     gl.uniformMatrix4fv(terrainLocs.uModel, false, cm);
 
                     gl.enableVertexAttribArray(terrainLocs.aPosition);
