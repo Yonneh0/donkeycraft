@@ -20,6 +20,12 @@
      */
     Donkeycraft.WorldTime = function (totalTicks) {
         this._totalTicks = (totalTicks && typeof totalTicks === 'number' && totalTicks > 0) ? totalTicks : 0;
+        /**
+         * Frozen time-of-day override [0, 1). When set, getTimeOfDay() returns this value
+         * instead of computing from tick count. Used by creative mode time dial.
+         * @type {number|null}
+         */
+        this._frozenTime = null;
     };
 
     /**
@@ -71,11 +77,34 @@
 
     /**
      * Get the time of day as a normalized value in [0, 1).
+     * If time is frozen (via setFrozenTime), returns the frozen value.
      * 0.0 = sunrise, 0.25 = noon (~6000 ticks), 0.5 = sunset (~12000 ticks), 0.75 = midnight (~18000 ticks).
      * @returns {number} Time of day in [0, 1).
      */
     Donkeycraft.WorldTime.prototype.getTimeOfDay = function () {
+        if (this._frozenTime !== null) return this._frozenTime;
         return this.getTicksInDay() / Donkeycraft.WORLD_TIME_TICKS_PER_DAY;
+    };
+
+    /**
+     * Set a frozen time of day value. When set, getTimeOfDay() returns this value
+     * instead of computing from tick count. Used by creative mode time dial.
+     * @param {number|null} tod - Time of day in [0, 1) to freeze at, or null to resume natural flow.
+     */
+    Donkeycraft.WorldTime.prototype.setFrozenTime = function (tod) {
+        if (tod === null) {
+            this._frozenTime = null;
+        } else if (typeof tod === 'number' && !isNaN(tod)) {
+            this._frozenTime = ((tod % 1) + 1) % 1;
+        }
+    };
+
+    /**
+     * Check if time is currently frozen.
+     * @returns {boolean} True if time is frozen.
+     */
+    Donkeycraft.WorldTime.prototype.isTimeFrozen = function () {
+        return this._frozenTime !== null;
     };
 
     /**
@@ -229,10 +258,11 @@
 
     /**
      * Destroy the WorldTime instance and free resources.
-     * Resets totalTicks to 0.
+     * Resets totalTicks to 0 and clears any frozen time override.
      */
     Donkeycraft.WorldTime.prototype.destroy = function () {
         this._totalTicks = 0;
+        this._frozenTime = null;
     };
 
 })();

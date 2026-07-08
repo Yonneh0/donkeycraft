@@ -19,8 +19,8 @@
         this._renderDistance = options.renderDistance || Config.RENDER_DISTANCE;
         this._gameMode = options.gameMode || 'survival';
 
-        // Time-of-day state for creative mode freezing
-        this._frozenTimeOfDay = null;
+        // WorldTime instance for time-of-day calculations (including freeze support)
+        this._worldTime = new Donkeycraft.WorldTime(0);
 
         // Core WebGL systems
         this._canvas = null;
@@ -166,7 +166,7 @@
             // Create shader manager
             this._shaderManager = new Donkeycraft.ShaderManager(this._gl);
 
-            // Compile shader programs from embedded script tags
+            // Compile shader programs from embedded script tags using ShaderManager
             this._compileShaderPrograms();
 
             // Initialize canvas size to window dimensions before creating other systems
@@ -1309,248 +1309,75 @@
     // ============================================================
 
     /**
-     * Extract raw text content from a script tag.
+     * Get the current time of day [0, 1) from WorldTime instance.
+     * Uses frozen time if set, otherwise computes from tick count.
      * @private
-     * @param {string} sourceId - The id attribute of the script tag.
-     * @returns {string|null} Raw text content or null.
+     * @returns {number} Time of day in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
      */
-    Donkeycraft.Game.prototype._loadShaderSource = function (sourceId) {
-        var script = document.getElementById(sourceId);
-        if (!script) return null;
-        return script.textContent || script.innerText || '';
+    Donkeycraft.Game.prototype._getTimeOfDay = function () {
+        return this._worldTime.getTimeOfDay();
     };
 
     /**
-     * Extract a JavaScript template literal variable from source text.
-     * Matches: var NAME = `...content...`;
-     * @private
-     * @param {string} source - Full script tag content.
-     * @param {string} varName - Variable name to extract (e.g., 'TERRAIN_VERTEX_SHADER').
-     * @returns {string|null} The GLSL shader body (without backticks), or null.
+     * Set a frozen time of day value. When set, the game will display this time
+     * instead of advancing naturally. Used by the creative mode time dial slider.
+     * @param {number|null} frozenTimeOfDay - Time of day in [0, 1) to freeze at, or null to resume natural flow.
      */
-    Donkeycraft.Game.prototype._extractVariable = function (source, varName) {
-        if (!source) return null;
-        // Match: var NAME = ` ... `;
-        // Use non-greedy match for template literal content
-        var regex = new RegExp('var\\s+' + this._escapeRegex(varName) + '\\s*=\\s*`([\\s\\S]*?)`\\s*;');
-        var match = source.match(regex);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
-        return null;
+    Donkeycraft.Game.prototype.setFrozenTime = function (frozenTimeOfDay) {
+        this._worldTime.setFrozenTime(frozenTimeOfDay);
     };
 
     /**
-     * Escape special regex characters in a string.
-     * @private
-     * @param {string} str - String to escape.
-     * @returns {string} Escaped string.
+     * Get whether the time is currently frozen.
+     * @returns {boolean} True if time is frozen.
      */
-    Donkeycraft.Game.prototype._escapeRegex = function (str) {
-        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    Donkeycraft.Game.prototype.isTimeFrozen = function () {
+        return this._worldTime.isTimeFrozen();
+    };
+
+    /**
+     * Get the block ID at world coordinates using ChunkManager.getBlockId().
+     * @private
+     * @param {number} wx - World X coordinate.
+     * @param {number} wy - World Y coordinate.
+     * @param {number} wz - World Z coordinate.
+     * @returns {number} Block ID at the given position.
+     */
+    Donkeycraft.Game.prototype._getBlockAt = function (wx, wy, wz) {
+        return this._chunkManager.getBlockId(wx, wy, wz);
     };
 
     /**
      * Compile shader programs from embedded script tag sources.
-     * Parses JavaScript variable declarations: var NAME = `GLSL...`;
+     * Uses ShaderManager.createProgramsFromDOM() which reads <script> tags and parses
+     * JavaScript template literal variables (e.g., var TERRAIN_VERTEX_SHADER = `...`;).
+     * Falls back to ShaderManager.compileFallbackShaders() if sources unavailable.
      * @private
      */
     Donkeycraft.Game.prototype._compileShaderPrograms = function () {
-        var vertSrc = this._loadShaderSource('dk-vertex-shaders');
-        var fragSrc = this._loadShaderSource('dk-fragment-shaders');
+        var programs = null;
 
-        if (!vertSrc || !fragSrc) {
-            Donkeycraft.Logger.warn('Game', 'Shader sources not found — using fallback compilation');
-            this._compileFallbackShaders();
-            return;
+        // Try loading from DOM script tags first
+        try {
+            programs = this._shaderManager.createProgramsFromDOM();
+        } catch (e) {
+            Donkeycraft.Logger.warn('Game', 'createProgramsFromDOM threw: ' + e.message);
         }
 
-        // Extract and compile individual shader programs with error handling
-        var self2 = this;
-        var _compileShaderPair = function (name, vertName, fragName) {
-            var vertSrc2 = self2._extractVariable(vertSrc, vertName);
-            var fragSrc2 = self2._extractVariable(fragSrc, fragName);
-
-            // Log extraction results for debugging
-            if (!vertSrc2 || !fragSrc2) {
-                Donkeycraft.Logger.warn('Game',
-                    'Extraction failed for "' + name + '" program — vert: ' + (vertSrc2 ? 'OK (' + vertSrc2.length + ' chars)' : 'NULL') +
-                    ', frag: ' + (fragSrc2 ? 'OK (' + fragSrc2.length + ' chars)' : 'NULL'));
-            }
-
-            if (vertSrc2 && fragSrc2) {
-                try {
-                    self2._shaderManager.createProgram(name, vertSrc2, fragSrc2);
-                } catch (e) {
-                    Donkeycraft.Logger.error('Game', 'Failed to compile "' + name + '" shader: ' + e.message);
+        // Fall back to pre-compiled fallback shaders if DOM loading failed
+        if (!programs) {
+            Donkeycraft.Logger.warn('Game', 'Shader sources not found — using fallback compilation');
+            var fallback = Donkeycraft.ShaderManager.compileFallbackShaders(this._gl);
+            if (fallback) {
+                // Register fallback programs by name so renderer can find them
+                var self = this;
+                for (var key in fallback) {
+                    if (fallback.hasOwnProperty(key)) {
+                        self._shaderManager._programs[key] = fallback[key];
+                    }
                 }
-            } else {
-                Donkeycraft.Logger.warn('Game', 'Missing shader sources for "' + name + '" program — will use fallback');
             }
-        };
-
-        _compileShaderPair('terrain', 'TERRAIN_VERTEX_SHADER', 'TERRAIN_FRAGMENT_SHADER');
-        _compileShaderPair('break', 'BREAK_VERTEX_SHADER', 'PARTICLE_FRAGMENT_SHADER');
-        _compileShaderPair('gui', 'GUI_VERTEX_SHADER', 'GUI_FRAGMENT_SHADER');
-        _compileShaderPair('sky', 'SKY_VERTEX_SHADER', 'SKY_FRAGMENT_SHADER');
-        _compileShaderPair('hand', 'HAND_VERTEX_SHADER', 'HAND_FRAGMENT_SHADER');
-        _compileShaderPair('water', 'WATER_VERTEX_SHADER', 'WATER_FRAGMENT_SHADER');
-        _compileShaderPair('entity', 'ENTITY_VERTEX_SHADER', 'ENTITY_FRAGMENT_SHADER');
-
-    };
-
-    /**
-     * Compile fallback shaders when embedded sources are not available.
-     * Includes ALL required uniforms to prevent missing uniform warnings.
-     * @private
-     */
-    Donkeycraft.Game.prototype._compileFallbackShaders = function () {
-        // Minimal terrain shader with fog uniforms
-        this._shaderManager.createProgram('terrain',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec2 aUV;\n' +
-            'attribute vec3 aNormal;\n' +
-            'attribute float aLight;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'uniform mat4 uModel;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec3 vNormal;\n' +
-            'varying float vLight;\n' +
-            'varying float vDepth;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vUV = aUV;\n' +
-            '  vNormal = aNormal;\n' +
-            '  vLight = aLight;\n' +
-            '  vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vDepth = -viewPos.z;\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec3 vNormal;\n' +
-            'varying float vLight;\n' +
-            'varying float vDepth;\n' +
-            'uniform sampler2D uTexture;\n' +
-            'uniform vec3 uFogColor;\n' +
-            'uniform float uFogDensity;\n' +
-            'uniform float uLightFactor;\n' +
-            'void main() {\n' +
-            '  vec4 texColor = texture2D(uTexture, vUV);\n' +
-            '  if (texColor.a < 0.5) discard;\n' +
-            '  vec3 finalColor = texColor.rgb * vLight * uLightFactor;\n' +
-            '  float fogFactor = 1.0 - exp(-vDepth * uFogDensity);\n' +
-            '  fogFactor = clamp(fogFactor, 0.0, 1.0);\n' +
-            '  finalColor = mix(finalColor, uFogColor, fogFactor);\n' +
-            '  gl_FragColor = vec4(finalColor, texColor.a);\n' +
-            '}\n'
-        );
-
-        // Minimal break shader
-        this._shaderManager.createProgram('break',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec2 aUV;\n' +
-            'attribute vec4 aColor;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * vec4(aPosition, 1.0);\n' +
-            '  vUV = aUV;\n' +
-            '  vColor = aColor;\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'uniform sampler2D uTexture;\n' +
-            'void main() {\n' +
-            '  gl_FragColor = texture2D(uTexture, vUV) * vColor;\n' +
-            '}\n'
-        );
-
-        // Minimal GUI shader
-        this._shaderManager.createProgram('gui',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec2 aUV;\n' +
-            'attribute vec4 aColor;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'uniform mat4 uModel;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vUV = aUV;\n' +
-            '  vColor = aColor;\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'uniform sampler2D uTexture;\n' +
-            'uniform int uHasTexture;\n' +
-            'void main() {\n' +
-            '  vec4 color = vColor;\n' +
-            '  if (uHasTexture == 1) { color = texture2D(uTexture, vUV) * color; }\n' +
-            '  if (color.a < 0.1) discard;\n' +
-            '  gl_FragColor = color;\n' +
-            '}\n'
-        );
-
-        // Minimal sky shader WITH all required uniforms (uTopColor, uBottomColor, uHorizon, uModel)
-        this._shaderManager.createProgram('sky',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec2 aUV;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'uniform mat4 uModel;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec3 vWorldPos;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vUV = aUV;\n' +
-            '  vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec3 vWorldPos;\n' +
-            'uniform vec3 uTopColor;\n' +
-            'uniform vec3 uBottomColor;\n' +
-            'uniform float uHorizon;\n' +
-            'void main() {\n' +
-            '  float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);\n' +
-            '  gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);\n' +
-            '}\n'
-        );
-
-        // Minimal hand shader
-        this._shaderManager.createProgram('hand',
-            'attribute vec3 aPosition;\n' +
-            'attribute vec2 aUV;\n' +
-            'attribute vec3 aNormal;\n' +
-            'attribute float aLight;\n' +
-            'uniform mat4 uProjection;\n' +
-            'uniform mat4 uView;\n' +
-            'uniform mat4 uModel;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'void main() {\n' +
-            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
-            '  vUV = aUV;\n' +
-            '  vColor = vec4(aLight, aLight, aLight, 1.0);\n' +
-            '}\n',
-            'precision mediump float;\n' +
-            'varying vec2 vUV;\n' +
-            'varying vec4 vColor;\n' +
-            'uniform sampler2D uTexture;\n' +
-            'void main() {\n' +
-            '  vec4 texColor = texture2D(uTexture, vUV);\n' +
-            '  if (texColor.a < 0.1) discard;\n' +
-            '  gl_FragColor = vec4(texColor.rgb * vColor.rgb, texColor.a * vColor.a);\n' +
-            '}\n'
-        );
-
-        Donkeycraft.Logger.warn('Game', 'Using fallback shaders — embedded sources not found');
+        }
     };
 
     /**
@@ -1573,77 +1400,6 @@
                 this._camera.updateProjection();
             }
         }
-    };
-
-    /**
-     * Get the current time of day [0, 1) from world time.
-     * Uses Config.WORLD_TIME_SCALE (ticks per second) to derive a smooth 0-1 value.
-     * @private
-     * @returns {number} Time of day in [0, 1). 0.25 = sunrise, 0.5 = noon, 0.75 = sunset.
-     */
-    Donkeycraft.Game.prototype._getTimeOfDay = function () {
-        // Check for frozen time first (set via creative mode time dial)
-        if (this._frozenTimeOfDay !== null && typeof this._frozenTimeOfDay === 'number') {
-            return this._frozenTimeOfDay;
-        }
-        var tickCount = this.getTickCount();
-        var ticksPerDay = Config.WORLD_TIME_SCALE * 60; // 60-second full day cycle
-        return ((tickCount % ticksPerDay) + ticksPerDay) % ticksPerDay / ticksPerDay;
-    };
-
-    /**
-     * Set a frozen time of day value. When set, the game will display this time
-     * instead of advancing naturally. Used by the creative mode time dial slider.
-     * @param {number|null} frozenTimeOfDay - Time of day in [0, 1) to freeze at, or null to resume natural flow.
-     */
-    Donkeycraft.Game.prototype.setFrozenTime = function (frozenTimeOfDay) {
-        if (frozenTimeOfDay === null) {
-            this._frozenTimeOfDay = null;
-        } else if (typeof frozenTimeOfDay === 'number' && !isNaN(frozenTimeOfDay)) {
-            this._frozenTimeOfDay = ((frozenTimeOfDay % 1) + 1) % 1;
-        }
-    };
-
-    /**
-     * Get whether the time is currently frozen.
-     * @returns {boolean} True if time is frozen.
-     */
-    Donkeycraft.Game.prototype.isTimeFrozen = function () {
-        return this._frozenTimeOfDay !== null;
-    };
-
-    /**
-     * Get the block ID at world coordinates.
-     * @private
-     * @param {number} wx - World X coordinate.
-     * @param {number} wy - World Y coordinate.
-     * @param {number} wz - World Z coordinate.
-     * @returns {number} Block ID at the given position.
-     */
-    Donkeycraft.Game.prototype._getBlockAt = function (wx, wy, wz) {
-        // Check world bounds
-        if (wy < 0 || wy >= Config.WORLD_HEIGHT) return 0;
-
-        // Get chunk and local coordinates
-        var chunkX = Math.floor(wx / Config.CHUNK_SIZE);
-        var chunkZ = Math.floor(wz / Config.CHUNK_SIZE);
-        var localX = ((wx % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
-        var localZ = ((wz % Config.CHUNK_SIZE) + Config.CHUNK_SIZE) % Config.CHUNK_SIZE;
-
-        // Get chunk from manager — use getChunk to auto-create chunks that haven't been
-        // generated yet. The onChunkLoad callback (wired in dimension.js) triggers
-        // synchronous terrain generation, so block data is always available after this call.
-        var chunk = this._chunkManager.getChunk(chunkX, chunkZ);
-        if (!chunk) return 0;
-
-        // If the chunk exists but hasn't been generated yet (e.g., onChunkLoad failed),
-        // try to generate terrain now. This handles cases where dependencies were
-        // missing during initial chunk creation.
-        if (!chunk.generated && this._chunkManager.generateChunkTerrain) {
-            this._chunkManager.generateChunkTerrain(chunkX, chunkZ);
-        }
-
-        return chunk.getBlock(localX, wy, localZ);
     };
 
     /**

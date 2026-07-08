@@ -562,6 +562,337 @@
         };
     };
 
+    // ============================================================
+    // Static Shader Source Extraction Utilities
+    // ============================================================
+
+    /**
+     * Extract raw text content from a script tag by its ID.
+     * Used to load GLSL shader sources embedded in HTML as <script type="text/plain"> tags.
+     * @param {string} sourceId - The id attribute of the script tag.
+     * @returns {string|null} Raw text content or null if not found.
+     * @static
+     */
+    Donkeycraft.ShaderManager.loadShaderSource = function (sourceId) {
+        var script = document.getElementById(sourceId);
+        if (!script) return null;
+        return script.textContent || script.innerText || '';
+    };
+
+    /**
+     * Escape special regex characters in a string.
+     * @param {string} str - String to escape.
+     * @returns {string} Escaped string.
+     * @static
+     */
+    Donkeycraft.ShaderManager.escapeRegex = function (str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    /**
+     * Extract a JavaScript template literal variable from source text.
+     * Matches: var NAME = `...content...`;
+     * @param {string} source - Full script tag content.
+     * @param {string} varName - Variable name to extract (e.g., 'TERRAIN_VERTEX_SHADER').
+     * @returns {string|null} The GLSL shader body (without backticks), or null.
+     * @static
+     */
+    Donkeycraft.ShaderManager.extractVariable = function (source, varName) {
+        if (!source) return null;
+        // Build regex: var NAME = `...content...`;
+        // In a string passed to RegExp(), \\s produces \s (whitespace match)
+        var pattern = 'var\\s+' + Donkeycraft.ShaderManager.escapeRegex(varName) + '\\s*=\\s*`([\\s\\S]*?)`\\s*;';
+        var regex = new RegExp(pattern);
+        var match = source.match(regex);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+        return null;
+    };
+
+    /**
+     * Compile fallback shaders when embedded sources are not available.
+     * Creates minimal shader programs for all rendering paths with ALL required uniforms.
+     * @param {WebGLRenderingContext} gl - The WebGL context.
+     * @returns {Object|null} Object with keys {terrain, break, gui, sky, hand, water, entity}
+     *    mapping to WebGLProgram references, or null on failure.
+     * @static
+     */
+    Donkeycraft.ShaderManager.compileFallbackShaders = function (gl) {
+        if (!gl) return null;
+
+        var createProgram = function (vertSrc, fragSrc) {
+            var vert = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vert, vertSrc);
+            gl.compileShader(vert);
+            if (!gl.getShaderParameter(vert, gl.COMPILE_STATUS)) {
+                gl.deleteShader(vert);
+                return null;
+            }
+
+            var frag = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(frag, fragSrc);
+            gl.compileShader(frag);
+            if (!gl.getShaderParameter(frag, gl.COMPILE_STATUS)) {
+                gl.deleteShader(vert);
+                gl.deleteShader(frag);
+                return null;
+            }
+
+            var prog = gl.createProgram();
+            gl.attachShader(prog, vert);
+            gl.attachShader(prog, frag);
+            gl.linkProgram(prog);
+            var linked = gl.getProgramParameter(prog, gl.LINK_STATUS);
+            gl.deleteShader(vert);
+            gl.deleteShader(frag);
+            if (!linked) {
+                gl.deleteProgram(prog);
+                return null;
+            }
+            return prog;
+        };
+
+        var terrainVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'attribute vec3 aNormal;\n' +
+            'attribute float aLight;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying float vLight;\n' +
+            'varying float vDepth;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vNormal = aNormal;\n' +
+            '  vLight = aLight;\n' +
+            '  vec4 viewPos = uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vDepth = -viewPos.z;\n' +
+            '}';
+
+        var terrainFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying float vLight;\n' +
+            'varying float vDepth;\n' +
+            'uniform sampler2D uTexture;\n' +
+            'uniform vec3 uFogColor;\n' +
+            'uniform float uFogDensity;\n' +
+            'uniform float uLightFactor;\n' +
+            'void main() {\n' +
+            '  vec4 texColor = texture2D(uTexture, vUV);\n' +
+            '  if (texColor.a < 0.5) discard;\n' +
+            '  vec3 finalColor = texColor.rgb * vLight * uLightFactor;\n' +
+            '  float fogFactor = 1.0 - exp(-vDepth * uFogDensity);\n' +
+            '  fogFactor = clamp(fogFactor, 0.0, 1.0);\n' +
+            '  finalColor = mix(finalColor, uFogColor, fogFactor);\n' +
+            '  gl_FragColor = vec4(finalColor, texColor.a);\n' +
+            '}';
+
+        var breakVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'attribute vec4 aColor;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vColor = aColor;\n' +
+            '}';
+
+        var particleFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'uniform sampler2D uTexture;\n' +
+            'void main() {\n' +
+            '  gl_FragColor = texture2D(uTexture, vUV) * vColor;\n' +
+            '}';
+
+        var guiVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'attribute vec4 aColor;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vColor = aColor;\n' +
+            '}';
+
+        var guiFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'uniform sampler2D uTexture;\n' +
+            'uniform int uHasTexture;\n' +
+            'void main() {\n' +
+            '  vec4 color = vColor;\n' +
+            '  if (uHasTexture == 1) { color = texture2D(uTexture, vUV) * color; }\n' +
+            '  if (color.a < 0.1) discard;\n' +
+            '  gl_FragColor = color;\n' +
+            '}';
+
+        var skyVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vWorldPos;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n' +
+            '}';
+
+        var skyFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vWorldPos;\n' +
+            'uniform vec3 uTopColor;\n' +
+            'uniform vec3 uBottomColor;\n' +
+            'uniform float uHorizon;\n' +
+            'void main() {\n' +
+            '  float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);\n' +
+            '  gl_FragColor = vec4(mix(uBottomColor, uTopColor, t), 1.0);\n' +
+            '}';
+
+        var handVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'attribute vec3 aNormal;\n' +
+            'attribute float aLight;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vColor = vec4(aLight, aLight, aLight, 1.0);\n' +
+            '}';
+
+        var handFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec4 vColor;\n' +
+            'uniform sampler2D uTexture;\n' +
+            'void main() {\n' +
+            '  vec4 texColor = texture2D(uTexture, vUV);\n' +
+            '  if (texColor.a < 0.1) discard;\n' +
+            '  gl_FragColor = vec4(texColor.rgb * vColor.rgb, texColor.a * vColor.a);\n' +
+            '}';
+
+        var waterVert =
+            'precision mediump int;\n' +
+            'attribute vec3 aPosition;\n' +
+            'attribute vec2 aUV;\n' +
+            'attribute vec3 aNormal;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying vec3 vWorldPos;\n' +
+            'varying float vDepth;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vUV = aUV;\n' +
+            '  vNormal = aNormal;\n' +
+            '  vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n' +
+            '  vDepth = -((uView * uModel * vec4(aPosition, 1.0)).z);\n' +
+            '}';
+
+        var waterFrag =
+            'precision mediump float;\n' +
+            'varying vec2 vUV;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying vec3 vWorldPos;\n' +
+            'varying float vDepth;\n' +
+            'uniform sampler2D uTexture;\n' +
+            'uniform vec3 uFogColor;\n' +
+            'uniform float uFogDensity;\n' +
+            'uniform float uLightFactor;\n' +
+            'void main() {\n' +
+            '  vec4 texColor = texture2D(uTexture, vUV);\n' +
+            '  vec3 finalColor = texColor.rgb * vLight * uLightFactor;\n' +
+            '  float fogFactor = 1.0 - exp(-vDepth * uFogDensity);\n' +
+            '  fogFactor = clamp(fogFactor, 0.0, 1.0);\n' +
+            '  finalColor = mix(finalColor, uFogColor, fogFactor);\n' +
+            '  gl_FragColor = vec4(finalColor, texColor.a);\n' +
+            '}';
+
+        var entityVert =
+            'attribute vec3 aPosition;\n' +
+            'attribute vec3 aNormal;\n' +
+            'uniform mat4 uProjection;\n' +
+            'uniform mat4 uView;\n' +
+            'uniform mat4 uModel;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying float vDepth;\n' +
+            'void main() {\n' +
+            '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
+            '  vNormal = aNormal;\n' +
+            '  vDepth = -(uView * uModel * vec4(aPosition, 1.0)).z;\n' +
+            '}';
+
+        var entityFrag =
+            'precision mediump float;\n' +
+            'varying vec3 vNormal;\n' +
+            'varying float vDepth;\n' +
+            'uniform vec3 uColor;\n' +
+            'uniform vec3 uFogColor;\n' +
+            'uniform float uFogDensity;\n' +
+            'void main() {\n' +
+            '  vec3 finalColor = uColor;\n' +
+            '  vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));\n' +
+            '  float diff = max(dot(normalize(vNormal), lightDir), 0.25);\n' +
+            '  finalColor *= diff;\n' +
+            '  float fogFactor = 1.0 - exp(-vDepth * uFogDensity);\n' +
+            '  fogFactor = clamp(fogFactor, 0.0, 1.0);\n' +
+            '  finalColor = mix(finalColor, uFogColor, fogFactor);\n' +
+            '  gl_FragColor = vec4(finalColor, 1.0);\n' +
+            '}';
+
+        var result = {};
+        result.terrain = createProgram(terrainVert, terrainFrag);
+        result.break_ = createProgram(breakVert, particleFrag);
+        result.gui = createProgram(guiVert, guiFrag);
+        result.sky = createProgram(skyVert, skyFrag);
+        result.hand = createProgram(handVert, handFrag);
+        result.water = createProgram(waterVert, waterFrag);
+        result.entity = createProgram(entityVert, entityFrag);
+
+        // Check all programs were created
+        for (var key in result) {
+            if (result.hasOwnProperty(key) && !result[key]) {
+                // Clean up any successfully created programs
+                for (var k2 in result) {
+                    if (result.hasOwnProperty(k2) && result[k2]) {
+                        gl.deleteProgram(result[k2]);
+                    }
+                }
+                return null;
+            }
+        }
+        return result;
+    };
+
     /**
      * Destroy all programs, clear caches, and free GPU resources.
      * Resets all internal counters, state, and the active program reference.
