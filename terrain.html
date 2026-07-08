@@ -77,6 +77,7 @@
     <script src="src/gen/water-generator.js"></script>
     <script src="src/game/terrain-surface.js"></script>
     <script src="src/render/debug-shaders.js"></script>
+    <script src="src/terrain.js"></script>
     <script src="src/render/debug-render.js"></script>
     <script src="src/ui/terrain-debug-ui.js"></script>
 
@@ -108,24 +109,20 @@
                 ui.init();
 
                 // Set initial parameters from saved state or defaults
-                var savedState = renderer._loadState ? renderer._loadState() : false;
-
-                if (savedState) {
-                    // Apply saved biome
-                    if (renderer.setBiome) renderer.setBiome(renderer._selectedBiomeId);
-                    // Apply saved seed
-                    if (renderer.setSeed) renderer.setSeed(renderer._worldSeed);
-                    // Apply saved options
-                    if (renderer.setOptions) renderer.setOptions(renderer._options);
+                var controller = renderer.getController();
+                if (controller) {
+                    controller.loadState();
                     // Apply saved camera position
-                    if (renderer.setCameraPosition) {
-                        renderer.setCameraPosition(
-                            renderer._camera.x,
-                            renderer._camera.y,
-                            renderer._camera.z
-                        );
+                    if (controller.getCameraPosition) {
+                        var camPos = controller.getCameraPosition();
+                        renderer.setCameraPosition(camPos.x, camPos.y, camPos.z);
                     }
                 }
+
+                // Apply biome, seed, and options
+                if (renderer.setBiome) renderer.setBiome(renderer._selectedBiomeId || 1);
+                if (renderer.setSeed) renderer.setSeed(renderer._worldSeed || 42);
+                if (renderer.setOptions) renderer.setOptions(renderer._options || { caves: true, ores: true, water: true, surface: true });
 
                 // Regenerate terrain with initial parameters
                 if (renderer.regenerateTerrain) {
