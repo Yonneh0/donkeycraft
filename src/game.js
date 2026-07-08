@@ -88,6 +88,9 @@
         this._unsubscribeTick = null;
         this._unsubscribeRender = null;
 
+        // Frame-level dirty tracking — prevents per-frame mesh rebuilds
+        this._dirtyChunksClearedThisFrame = false;
+
         // Overlay DOM element (for pointer lock)
         this._overlay = null;
 
@@ -290,13 +293,70 @@
                 gameMode: this._gameMode
             });
 
-            // Create chunk manager via the dimension system so terrain generation
-            // callbacks (onChunkLoad) are wired up automatically.  This ensures
-            // overworld chunks get heightmap/ore/cave/water/surface terrain and
-            // nether/end chunks get their own generators.
-            this._chunkManager = Donkeycraft.Dimensions.getCurrentChunkManager({
-                renderDistance: this._renderDistance
-            });
+        // Create chunk manager via the dimension system so terrain generation
+        // callbacks (onChunkLoad) are wired up automatically.  This ensures
+        // overworld chunks get heightmap/ore/cave/water/surface terrain and
+        // nether/end chunks get their own generators.
+        this._chunkManager = Donkeycraft.Dimensions.getCurrentChunkManager({
+            renderDistance: this._renderDistance
+        });
+
+        // ============================================================
+        // CRITICAL: Wire TerrainCore as the central terrain engine.
+        // TerrainCore provides unified seed/biome management, chunk caching
+        // via Storage (IndexedDB), and coordination across all generators.
+        // This replaces the fragmented individual generator calls.
+        // ============================================================
+        this._terrainCore = null;
+        if (Donkeycraft.TerrainCore) {
+            try {
+                this._terrainCore = Donkeycraft.TerrainCore;
+                // Initialize TerrainCore (sets seed, initializes storage)
+                var terrainInitPromise = this._terrainCore.init();
+                // Set initial biome from config or default to grass
+                if (Config && Config.BIOME) {
+                    this._terrainCore.setBiome(Config.BIOME);
+                } else {
+                    this._terrainCore.setBiome(0); // Default: grass
+                }
+                Donkeycraft.Logger.info('Game', 'TerrainCore initialized — unified caching enabled');
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'TerrainCore init failed: ' + (e && e.message ? e.message : String(e)));
+            }
+        }
+
+        // ============================================================
+        // Wire ChunkGrid for coordinated chunk management.
+        // ChunkGrid tracks which chunks are loaded and manages expansion/contraction.
+        // ============================================================
+        this._chunkGrid = null;
+        if (Donkeycraft.ChunkGrid) {
+            try {
+                this._chunkGrid = Donkeycraft.ChunkGrid;
+                // Set initial center based on player spawn position
+                this._chunkGrid.setCenter(0, 0);
+                // Wire grid change listener to update render distance
+                var gameForGrid = this;
+                this._chunkGrid.onGridChange(function (event) {
+                    if (event.type === 'gridExpanded' || event.type === 'gridContracted' || event.type === 'gridResized') {
+                        // Update chunk manager render distance when grid changes
+                        if (gameForGrid._chunkManager && gameForGrid._chunkManager.setRenderDistance) {
+                            var bounds = gameForGrid._chunkGrid.getBounds();
+                            var radius = Math.max(
+                                bounds.maxX - (gameForGrid._chunkGrid.getCenter().x || 0),
+                                (gameForGrid._chunkGrid.getCenter().x || 0) - bounds.minX,
+                                bounds.maxZ - (gameForGrid._chunkGrid.getCenter().z || 0),
+                                (gameForGrid._chunkGrid.getCenter().z || 0) - bounds.minZ
+                            );
+                            gameForGrid._chunkManager.setRenderDistance(Math.max(2, Math.min(16, radius * 2 + 2)));
+                        }
+                    }
+                });
+                Donkeycraft.Logger.info('Game', 'ChunkGrid wired — chunk management coordinated');
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'ChunkGrid init failed: ' + (e && e.message ? e.message : String(e)));
+            }
+        }
 
             // Set up world data access for terrain renderer
             var self = this;
@@ -1116,6 +1176,22 @@
     };
 
     /**
+     * Get the TerrainCore instance (central terrain engine).
+     * @returns {Donkeycraft.TerrainCore|null}
+     */
+    Donkeycraft.Game.prototype.getTerrainCore = function () {
+        return this._terrainCore;
+    };
+
+    /**
+     * Get the ChunkGrid instance.
+     * @returns {Donkeycraft.ChunkGrid|null}
+     */
+    Donkeycraft.Game.prototype.getChunkGrid = function () {
+        return this._chunkGrid;
+    };
+
+    /**
      * setOverlay — set the overlay DOM element used for pointer lock target.
      * @param {HTMLElement} overlayEl - The overlay container element.
      */
@@ -1302,6 +1378,22 @@
         if (this._todUI) {
             try { this._todUI.destroy(); } catch (e) { Donkeycraft.Logger.warn('Game', 'TimeOfDayUI destroy error: ' + e.message); }
             this._todUI = null;
+        }
+
+        // Clean up TerrainCore (terrain engine)
+        if (this._terrainCore && typeof this._terrainCore.destroy === 'function') {
+            try { this._terrainCore.destroy(); } catch (e) { Donkeycraft.Logger.warn('Game', 'TerrainCore destroy error: ' + e.message); }
+            this._terrainCore = null;
+        }
+
+        // Clean up ChunkGrid listeners
+        if (this._chunkGrid && typeof this._chunkGrid.getListenerCount === 'function') {
+            try {
+                while (this._chunkGrid.getListenerCount() > 0) {
+                    this._chunkGrid.onGridChange(function () {}); // unsubscribe returns function, but we just clear via listener management
+                }
+            } catch (e) { Donkeycraft.Logger.warn('Game', 'ChunkGrid cleanup error: ' + e.message); }
+            this._chunkGrid = null;
         }
 
         // Clean up auto-save timer
@@ -2025,11 +2117,14 @@
         // The tick path (_updateChunks) handles dirty chunk tracking,
         // but we also need a render-time check for chunks that became
         // dirty between ticks (e.g., from block placement/breaking).
-        // CRITICAL FIX: Clear dirty flags after rendering to prevent per-frame rebuilds.
+        // CRITICAL FIX: Use frame-level flag to prevent per-frame rebuilds.
         if (this._terrainRenderer && this._player) {
             var pos = this._player.getPosition();
             var chunkX = Math.floor(pos.x / Config.CHUNK_SIZE);
             var chunkZ = Math.floor(pos.z / Config.CHUNK_SIZE);
+
+            // Reset frame-level dirty flag at start of render if set
+            this._dirtyChunksClearedThisFrame = false;
 
             // Only update if player is in a new chunk or there are dirty chunks
             var playerChanged = (chunkX !== this._lastPlayerChunkX || chunkZ !== this._lastPlayerChunkZ);
@@ -2038,10 +2133,11 @@
             if (playerChanged || hasDirtyChunks) {
                 this._terrainRenderer.updateChunks(chunkX, chunkZ);
 
-                // CRITICAL: Clear dirty chunk flags after rendering to prevent
+                // Clear dirty chunk flags ONCE per frame to prevent
                 // per-frame mesh rebuilds that cause multi-second freezes.
                 if (hasDirtyChunks && this._chunkManager.clearDirtyChunks) {
                     this._chunkManager.clearDirtyChunks();
+                    this._dirtyChunksClearedThisFrame = true;
                 }
             }
         }
@@ -2076,9 +2172,12 @@
                 var waterChunkX = Math.floor(waterPos.x / Config.CHUNK_SIZE);
                 var waterChunkZ = Math.floor(waterPos.z / Config.CHUNK_SIZE);
 
-                // Update water mesh if player moved chunks or there are dirty chunks
+                // Update water mesh if player moved chunks or there are dirty chunks.
+                // CRITICAL FIX: Check _dirtyChunksClearedThisFrame to avoid stale
+                // getDirtyChunks() calls after terrain renderer already cleared them.
                 var waterPlayerChanged = (waterChunkX !== this._lastWaterChunkX || waterChunkZ !== this._lastWaterChunkZ);
-                var waterHasDirtyChunks = this._chunkManager && this._chunkManager.getDirtyChunks().length > 0;
+                var waterHasDirtyChunks = !this._dirtyChunksClearedThisFrame &&
+                    this._chunkManager && this._chunkManager.getDirtyChunks().length > 0;
 
                 if (waterPlayerChanged || waterHasDirtyChunks) {
                     this._lastWaterChunkX = waterChunkX;

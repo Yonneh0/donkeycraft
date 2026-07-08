@@ -61,6 +61,12 @@
     /** @type {boolean} True once PerlinNoise has been initialized. */
     var _noiseInitDone = false;
 
+    // ============================================================
+    // Self-reassigning functions — eliminate per-call overhead after init
+    // After the first successful initialization, these functions
+    // reassign to optimized versions that skip the init check entirely.
+    // ============================================================
+
     /** @type {Object.<string, number>} Internal storage for per-namespace PRNG states. */
     var _rngStates = {};
 
@@ -120,6 +126,8 @@
      * 2D Perlin noise — delegates to Donkeycraft.PerlinNoise.noise2D.
      * Returns a value in [-1, 1] representing normalized noise at the given coordinates.
      * Automatically initializes PerlinNoise if not already initialized.
+     * After first successful init, this function self-reassigns to _noise2D_fast
+     * which skips all init checks for maximum performance.
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
      * @returns {number} Normalized noise value in [-1, 1].
@@ -129,7 +137,10 @@
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.noise2D === 'function') {
             try {
-                return Donkeycraft.PerlinNoise.noise2D(x, y);
+                var result = Donkeycraft.PerlinNoise.noise2D(x, y);
+                // Successfully initialized — reassign to fast path for all future calls
+                _noise2D = _noise2D_fast;
+                return result;
             } catch (e) {
                 // PerlinNoise threw — fall through to fallback
             }
@@ -147,12 +158,27 @@
     }
 
     /**
+     * Optimized 2D noise path — called after successful initialization.
+     * Skips all init checks and directly calls PerlinNoise.noise2D.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @returns {number} Normalized noise value in [-1, 1].
+     * @private
+     */
+    function _noise2D_fast(x, y) {
+        return Donkeycraft.PerlinNoise.noise2D(x, y);
+    }
+
+    /**
      * Fractal Brownian Motion (fBm) — delegates to Donkeycraft.PerlinNoise.fbm.
      * Sums multiple octaves of Perlin noise with decreasing amplitude and increasing frequency
      * to produce smooth, natural-looking terrain features.
      *
      * The PerlinNoise.fbm signature is: (x, y, z, octaves, persistence, lacunarity).
      * This wrapper maps our parameters correctly: amplitude → persistence, frequency → lacunarity.
+     *
+     * After first successful init, this function self-reassigns to _fbm_fast
+     * which skips all init checks for maximum performance.
      *
      * @param {number} x - X coordinate.
      * @param {number} y - Y coordinate.
@@ -167,12 +193,15 @@
         _ensureNoiseInit();
         if (Donkeycraft.PerlinNoise && typeof Donkeycraft.PerlinNoise.fbm === 'function') {
             try {
-                return Donkeycraft.PerlinNoise.fbm(
+                var result = Donkeycraft.PerlinNoise.fbm(
                     x, y, z || 0,
                     octaves || 4,
                     amplitude !== undefined ? amplitude : 0.5,
                     frequency !== undefined ? frequency : 2.0
                 );
+                // Successfully initialized — reassign to fast path for all future calls
+                _fbm = _fbm_fast;
+                return result;
             } catch (e) {
                 // PerlinNoise threw — fall through to fallback
             }
@@ -191,6 +220,27 @@
             amp *= 0.5; // Fixed persistence decay in fallback
         }
         return maxVal > 0 ? total / maxVal : 0;
+    }
+
+    /**
+     * Optimized fBm path — called after successful initialization.
+     * Skips all init checks and directly calls PerlinNoise.fbm.
+     * @param {number} x - X coordinate.
+     * @param {number} y - Y coordinate.
+     * @param {number} z - Z coordinate for 3D noise (defaults to 0 for 2D).
+     * @param {number} [octaves=4] - Number of noise octaves to sum.
+     * @param {number} [amplitude=0.5] - Persistence: amplitude multiplier per octave.
+     * @param {number} [frequency=2.0] - Lacunarity: frequency multiplier per octave.
+     * @returns {number} Normalized result in [-1, 1].
+     * @private
+     */
+    function _fbm_fast(x, y, z, octaves, amplitude, frequency) {
+        return Donkeycraft.PerlinNoise.fbm(
+            x, y, z || 0,
+            octaves || 4,
+            amplitude !== undefined ? amplitude : 0.5,
+            frequency !== undefined ? frequency : 2.0
+        );
     }
 
     /**
