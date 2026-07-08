@@ -65,6 +65,18 @@
         this._meshBuffers = {};
         this._dirtyChunks = new Set();
 
+        // Camera position tracking for viewer-aware mesh rebuilds
+        this._lastCameraWorldX = 0;
+        this._lastCameraWorldZ = 0;
+        this._lastCameraChunkX = undefined;
+
+        // Camera block position tracking — triggers full mesh rebuild when camera
+        // enters or exits any block (needed for viewer-aware inner-face rendering)
+        this._lastCameraBlockX = Math.floor(this._camera.x);
+        this._lastCameraBlockY = Math.floor(this._camera.y);
+        this._lastCameraBlockZ = Math.floor(this._camera.z);
+        this._cameraBlockChanged = false;
+
         // Dynamic chunk loading
         this._loadedChunkKeys = new Set();
         this._pendingChunkQueue = new Map();
@@ -613,15 +625,37 @@
     };
 
     /**
-     * Build mesh for a single chunk.
-     * @param {Donkeycraft.Chunk} chunk
+     * Build mesh for a single chunk with viewer-aware face culling.
+     *
+     * This method iterates over all visible blocks in the chunk and generates geometry
+     * for faces adjacent to transparent blocks or different block types. Face visibility
+     * is determined by comparing the current block with its neighbor in each face direction.
+     *
+     * Viewer-awareness: When the camera is inside a solid block, the inner faces of that
+     * block become visible (you're looking at the "inside" surface). This is handled by
+     * checking if the camera position is within the block's volume — if so, all six faces
+     * of that block are rendered regardless of neighbor type.
+     *
+     * Mesh rebuild triggers:
+     * - Dirty flag: set when chunk is newly generated or adjacent to a newly loaded chunk
+     * - Camera block change: when camera enters/exits any block (triggers full rebuild)
+     *
+     * @param {Donkeycraft.Chunk} chunk - The chunk to build mesh data for.
      * @returns {{posBuf: WebGLBuffer, colorBuf: WebGLBuffer, alphaBuf: WebGLBuffer, normBuf: WebGLBuffer, count: number}|null}
+     *    Object containing WebGL buffers and vertex count, or {count: 0} if empty.
      * @private
      */
     Donkeycraft.DebugTerrainRenderer.prototype._buildChunkMesh = function (chunk) {
         var key = chunk.chunkX + ',' + chunk.chunkZ;
-        if (!this._dirtyChunks.has(key)) return this._meshBuffers[key];
-        this._dirtyChunks.delete(key);
+
+        // Check if mesh needs rebuilding: dirty flag OR camera entered/exited a block
+        var needsRebuild = this._dirtyChunks.has(key) || this._cameraBlockChanged;
+        if (!needsRebuild) {
+            return this._meshBuffers[key];
+        }
+        if (this._dirtyChunks.has(key)) {
+            this._dirtyChunks.delete(key);
+        }
 
         var cs = Donkeycraft.Config.CHUNK_SIZE, ws = Donkeycraft.Config.WORLD_HEIGHT;
         var yBounds = this._computeChunkYBounds(chunk);
@@ -633,15 +667,20 @@
         var alphas = Donkeycraft.BlockColors.getAllAlphas();
         var self = this;
 
-        // Face definitions: [direction, normal]
+        // Face definitions: [direction, normal, corner positions]
+        // Corners are ordered counter-clockwise when viewed from outside the block.
         var _FACE_DEFS = [
-            { d: [0, 1, 0], n: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]] },
-            { d: [0, -1, 0], n: [0, -1, 0], c: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]] },
-            { d: [0, 0, 1], n: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },
-            { d: [0, 0, -1], n: [0, 0, -1], c: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] },
-            { d: [1, 0, 0], n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },
-            { d: [-1, 0, 0], n: [-1, 0, 0], c: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]] }
+            { d: [0, 1, 0], n: [0, 1, 0], c: [[0, 1, 0], [0, 1, 1], [1, 1, 1], [1, 1, 0]] },   // +Y top
+            { d: [0, -1, 0], n: [0, -1, 0], c: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]] }, // -Y bottom
+            { d: [0, 0, 1], n: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]] },   // +Z south
+            { d: [0, 0, -1], n: [0, 0, -1], c: [[1, 0, 0], [0, 0, 0], [0, 1, 0], [1, 1, 0]] }, // -Z north
+            { d: [1, 0, 0], n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]] },   // +X east
+            { d: [-1, 0, 0], n: [-1, 0, 0], c: [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 1, 0]] }  // -X west
         ];
+
+        // Pre-compute chunk world-space origin for camera-inside-block checks
+        var chunkWorldOX = chunk.chunkX * cs;
+        var chunkWorldOZ = chunk.chunkZ * cs;
 
         for (var x = 0; x < cs; x++) {
             for (var y = startY; y <= endY; y++) {
@@ -652,73 +691,47 @@
                     if (!clr) continue;
                     var alpha = alphas[bid] || 1.0;
 
+                    // Check if camera is inside this block for viewer-aware rendering
+                    var camInsideBlock = (
+                        this._camera.x >= chunkWorldOX + x &&
+                        this._camera.x < chunkWorldOX + x + 1 &&
+                        this._camera.y >= y &&
+                        this._camera.y < y + 1 &&
+                        this._camera.z >= chunkWorldOZ + z &&
+                        this._camera.z < chunkWorldOZ + z + 1
+                    );
+
                     for (var f = 0; f < _FACE_DEFS.length; f++) {
                         var face = _FACE_DEFS[f];
                         var nx = x + face.d[0], ny = y + face.d[1], nz = z + face.d[2];
                         var nid = 0;
 
+                        // Check neighbor block within this chunk
                         if (nx >= 0 && nx < cs && ny >= 0 && ny < ws && nz >= 0 && nz < cs) {
                             nid = chunk.getBlock(nx, ny, nz);
                         } else {
+                            // Check neighbor across chunk boundary — load from adjacent chunk if available
                             var ngx = chunk.chunkX * cs + nx;
                             var ngy = ny, ngz = chunk.chunkZ * cs + nz;
                             nid = self._getBlockAt(ngx, ngy, ngz);
                         }
 
-                        var faceVisible = (nid === 0 || nid !== bid);
+                        // Face visibility logic:
+                        // 1. If camera is inside this block, render all faces (viewer-aware)
+                        // 2. If neighbor is air (0), face is visible (including unloaded chunks)
+                        // 3. If neighbor is a different block type, face is visible
+                        // 4. If neighbor is the same solid block, face is hidden
+                        var faceVisible = false;
+                        if (camInsideBlock) {
+                            faceVisible = true;
+                        } else if (nid === 0) {
+                            faceVisible = true;
+                        } else if (nid !== bid) {
+                            faceVisible = true;
+                        }
 
                         if (faceVisible) {
-                            // Chunk boundary reflection
-                            var isChunkBoundaryX = (nx >= cs || nx < 0);
-                            var isChunkBoundaryZ = (nz >= cs || nz < 0);
-
-                            if ((isChunkBoundaryX || isChunkBoundaryZ) && nid === 0) {
-                                var reflectDx = face.d[0], reflectDz = face.d[2];
-                                var reflectedWorldX, reflectedWorldZ;
-
-                                if (isChunkBoundaryX) {
-                                    reflectedWorldX = reflectDx === 1 ? chunk.chunkX * cs - 1 : (chunk.chunkX + 1) * cs;
-                                } else {
-                                    reflectedWorldX = chunk.chunkX * cs + nx;
-                                }
-                                if (isChunkBoundaryZ) {
-                                    reflectedWorldZ = reflectDz === 1 ? chunk.chunkZ * cs - 1 : (chunk.chunkZ + 1) * cs;
-                                } else {
-                                    reflectedWorldZ = chunk.chunkZ * cs + nz;
-                                }
-
-                                var rCx = Math.max(-1000, Math.min(1000, Math.floor(reflectedWorldX / cs)));
-                                var rCz = Math.max(-1000, Math.min(1000, Math.floor(reflectedWorldZ / cs)));
-                                var rChunk = this._chunks.get(rCx + ',' + rCz);
-                                if (rChunk) {
-                                    var rLx = ((reflectedWorldX % cs) + cs) % cs;
-                                    var rlz = ((reflectedWorldZ % cs) + cs) % cs;
-                                    var refBlock = rChunk.getBlock(rLx, ny, rlz);
-                                    if (refBlock !== 0 && refBlock !== bid) nid = refBlock;
-                                }
-                            }
-
-                            // Chunk boundary deduplication for solid blocks
-                            var neighborChunkLoaded = false;
-                            if (isChunkBoundaryX || isChunkBoundaryZ) {
-                                var ngxW = chunk.chunkX * cs + nx;
-                                var ngzW = chunk.chunkZ * cs + nz;
-                                var ngxC = Math.max(-1000, Math.min(1000, Math.floor(ngxW / cs)));
-                                var ngzC = Math.max(-1000, Math.min(1000, Math.floor(ngzW / cs)));
-                                neighborChunkLoaded = this._chunks.has(ngxC + ',' + ngzC);
-                            }
-
-                            if (neighborChunkLoaded && nid === bid) {
-                                var thisAlpha = alphas[bid] !== undefined ? alphas[bid] : 1.0;
-                                var nidAlpha = nid > 0 && alphas[nid] !== undefined ? alphas[nid] : 1.0;
-                                if (thisAlpha >= 0.99 && nidAlpha >= 0.99) {
-                                    if ((face.d[0] === 1 && nx >= cs) || (face.d[2] === 1 && nz >= cs)) {
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            // 6 vertices per quad
+                            // 6 vertices per quad (2 triangles)
                             var triIndices = [0, 1, 2, 0, 2, 3];
                             for (var ti = 0; ti < 6; ti++) {
                                 var vi = face.c[triIndices[ti]];
@@ -738,24 +751,110 @@
         var vertexCount = pos.length / 3;
         var gl = this._gl;
 
+        // Validate WebGL context before creating buffers
+        if (!gl || gl.isContextLost()) {
+            console.error('[DebugTerrain] WebGL context lost during buffer creation for chunk', key);
+            return null;
+        }
+
         var pb = gl.createBuffer();
+        if (!pb) {
+            console.error('[DebugTerrain] Failed to create position buffer for chunk', key);
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, pb);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
 
         var cb = gl.createBuffer();
+        if (!cb) {
+            console.error('[DebugTerrain] Failed to create color buffer for chunk', key);
+            gl.deleteBuffer(pb);
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, cb);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(col), gl.STATIC_DRAW);
 
         var ab = gl.createBuffer();
+        if (!ab) {
+            console.error('[DebugTerrain] Failed to create alpha buffer for chunk', key);
+            gl.deleteBuffer(pb);
+            gl.deleteBuffer(cb);
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, ab);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(alp), gl.STATIC_DRAW);
 
         var nb = gl.createBuffer();
+        if (!nb) {
+            console.error('[DebugTerrain] Failed to create normal buffer for chunk', key);
+            gl.deleteBuffer(pb);
+            gl.deleteBuffer(cb);
+            gl.deleteBuffer(ab);
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, nb);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(nor), gl.STATIC_DRAW);
 
+        // Update camera position tracking for next frame's rebuild check
+        this._lastCameraChunkX = this._camera.x;
+        this._lastCameraWorldX = this._camera.x;
+        this._lastCameraWorldZ = this._camera.z;
+
         this._meshBuffers[key] = { posBuf: pb, colorBuf: cb, alphaBuf: ab, normBuf: nb, count: vertexCount };
         return this._meshBuffers[key];
+    };
+
+    /**
+     * Check whether the camera has entered or exited any block since the last rebuild.
+     *
+     * Compares the camera's current integer block coordinates with the tracked previous
+     * values. If any differ, sets `_cameraBlockChanged` to true and updates the tracked
+     * positions. This triggers a full mesh rebuild on the next frame so that viewer-aware
+     * inner-face rendering is updated (e.g., when you walk into a dirt block, its inner
+     * faces become visible).
+     *
+     * @returns {boolean} True if the camera block position changed.
+     * @private
+     */
+    Donkeycraft.DebugTerrainRenderer.prototype._checkCameraBlockChange = function () {
+        var bx = Math.floor(this._camera.x);
+        var by = Math.floor(this._camera.y);
+        var bz = Math.floor(this._camera.z);
+
+        if (bx !== this._lastCameraBlockX || by !== this._lastCameraBlockY || bz !== this._lastCameraBlockZ) {
+            this._lastCameraBlockX = bx;
+            this._lastCameraBlockY = by;
+            this._lastCameraBlockZ = bz;
+            this._cameraBlockChanged = true;
+            return true;
+        }
+
+        this._cameraBlockChanged = false;
+        return false;
+    };
+
+    /**
+     * Mark all chunks adjacent to the given chunk as dirty to force mesh rebuild.
+     *
+     * When a new chunk loads, existing neighboring chunks may need to expose or hide
+     * faces at their boundary. This method marks all 8 neighboring chunk positions
+     * (in the XZ plane) as dirty so they will rebuild their meshes on the next frame.
+     *
+     * @param {number} cx - Center chunk X coordinate.
+     * @param {number} cz - Center chunk Z coordinate.
+     * @private
+     */
+    Donkeycraft.DebugTerrainRenderer.prototype._markAdjacentChunksDirty = function (cx, cz) {
+        // Mark all 8 neighboring chunks (3x3 grid centered on cx,cz minus center itself)
+        for (var dx = -1; dx <= 1; dx++) {
+            for (var dz = -1; dz <= 1; dz++) {
+                if (dx === 0 && dz === 0) continue;
+                var nKey = (cx + dx) + ',' + (cz + dz);
+                if (this._chunks.has(nKey)) {
+                    this._dirtyChunks.add(nKey);
+                }
+            }
+        }
     };
 
     /**
@@ -1008,6 +1107,8 @@
         entry.promise = promise;
         entry.promise.then(function () {
             entry.completed = true;
+            // Mark adjacent chunks dirty so they can update their boundary faces
+            self._markAdjacentChunksDirty(entry.cx, entry.cz);
             self._pendingChunkQueue.delete(entryKey);
         }).catch(function () {
             entry.completed = true;
@@ -1173,6 +1274,11 @@
 
     /**
      * Regenerate all terrain within current grid bounds.
+     *
+     * Clears existing chunks and mesh buffers, then re-generates terrain for the full
+     * grid defined by current chunk position and radii. All generated chunks are marked
+     * dirty to trigger immediate mesh rebuild on the next render frame.
+     *
      * @private
      */
     Donkeycraft.DebugTerrainRenderer.prototype._regenerateTerrain = function () {
@@ -1180,6 +1286,15 @@
         this._clearMeshBuffers();
         this._dirtyChunks.clear();
         this._pendingChunkQueue.clear();
+
+        // Reset camera position tracking to force full rebuild on next frame
+        this._lastCameraChunkX = undefined;
+
+        // Reset camera block tracking for fresh viewer-aware rendering
+        this._lastCameraBlockX = Math.floor(this._camera.x);
+        this._lastCameraBlockY = Math.floor(this._camera.y);
+        this._lastCameraBlockZ = Math.floor(this._camera.z);
+        this._cameraBlockChanged = false;
 
         // Start timing
         this._generationStartTime = performance.now();
@@ -1219,6 +1334,8 @@
 
         if (pendingChunks.length > 0) {
             var generationPromises = [];
+            var allPendingCount = pendingChunks.length;
+            var completedCount = 0;
 
             for (var i = 0; i < pendingChunks.length; i++) {
                 (function (pc) {
@@ -1229,21 +1346,45 @@
                         }
                         self._chunks.set(pc.key, pc.chunk);
                         self._dirtyChunks.add(pc.key);
+                        completedCount++;
+
+                        // When the last chunk finishes, mark ALL chunks dirty for final culling
+                        if (completedCount >= allPendingCount) {
+                            self._chunks.forEach(function (ch) {
+                                self._dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ);
+                            });
+                        }
                     }).catch(function (e) {
                         self._chunks.set(pc.key, pc.chunk);
                         self._dirtyChunks.add(pc.key);
+                        completedCount++;
+
+                        if (completedCount >= allPendingCount) {
+                            self._chunks.forEach(function (ch) {
+                                self._dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ);
+                            });
+                        }
                     });
                     generationPromises.push(promise);
                 })(pendingChunks[i]);
             }
 
             Promise.all(generationPromises).then(function () {
+                // After ALL chunks are generated, mark every chunk dirty for a final
+                // boundary-culling pass.  Chunks built while neighbors were still
+                // pending saw air on those sides and over-rendered; now that every
+                // chunk exists in this._chunks we rebuild once more with complete
+                // neighbor data so shared faces are properly culled.
+                self._chunks.forEach(function (ch) {
+                    self._dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ);
+                });
+                self._generationElapsedMs = performance.now() - self._generationStartTime;
                 self._generationStartTime = 0;
-                self._generationElapsedMs = performance.now() - (performance.now() - self._generationElapsedMs);
                 // Notify UI callback if set
                 if (self._onTerrainRegenerated) self._onTerrainRegenerated();
             });
         } else {
+            this._generationElapsedMs = performance.now() - this._generationStartTime;
             this._generationStartTime = 0;
             if (this._onTerrainRegenerated) this._onTerrainRegenerated();
         }
@@ -1262,25 +1403,24 @@
     // ============================================================
 
     /**
-     * Update camera based on input state.
+     * Update camera based on input state and delta time.
+     * @param {number} [dt=1] - Delta time multiplier for frame-rate independent movement (default: 1).
      * @private
      */
-    Donkeycraft.DebugTerrainRenderer.prototype._updateCamera = function () {
+    Donkeycraft.DebugTerrainRenderer.prototype._updateCamera = function (dt) {
+        dt = dt || 1; // Default to 1x if not provided
+
         var sens = (Donkeycraft.Config && Donkeycraft.Config.MOUSE_SENSITIVITY) ?
             Donkeycraft.Config.MOUSE_SENSITIVITY : 0.15;
 
-        // Rotation
+        // Rotation (mouse-based, not time-dependent)
         this._camera.yaw -= this._mouseDX * sens;
         this._camera.pitch -= this._mouseDY * sens;
         this._camera.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this._camera.pitch));
         this._mouseDX = 0;
         this._mouseDY = 0;
 
-        // Movement — frame-rate independent
-        var dt = 1;
-        if (this._lastFrameTime > 0) {
-            // Will be set in render loop
-        }
+        // Movement — frame-rate independent (scaled by delta time)
         var spd = (SPEED_LEVELS[this._speedLevel] || 4) * dt;
         var fwd = [-Math.sin(this._camera.yaw), 0, -Math.cos(this._camera.yaw)];
         var rgt = [Math.cos(this._camera.yaw), 0, -Math.sin(this._camera.yaw)];
@@ -1464,12 +1604,36 @@
     // ============================================================
 
     /**
-     * Main render loop.
-     * @param {number} ts - Timestamp.
+     * Main render loop with WebGL context loss detection and recovery.
+     *
+     * The render loop performs the following each frame:
+     * 1. Update delta time for frame-rate independent camera movement
+     * 2. Track FPS and update UI counter every second
+     * 3. Periodically save state to localStorage (every 2 seconds)
+     * 4. Update camera based on input state
+     * 5. Check for WebGL context loss (graceful degradation)
+     * 6. Resize canvas if window dimensions changed
+     * 7. Clear framebuffer and set up projection/view matrices
+     * 8. Update dynamic chunk loading queue
+     * 9. Render sky dome (pass 1)
+     * 10. Build dirty chunk meshes and render terrain (pass 2)
+     *
+     * @param {number} ts - Current timestamp in milliseconds from requestAnimationFrame.
      * @private
      */
     Donkeycraft.DebugTerrainRenderer.prototype._renderLoop = function (ts) {
         var self = this;
+
+        // Check for WebGL context loss — gracefully pause rendering
+        var gl = this._gl;
+        if (!gl || gl.isContextLost()) {
+            console.warn('[DebugTerrain] WebGL context lost, pausing render loop');
+            // Attempt recovery: try to recreate the context after a short delay
+            if (gl && !gl.isContextLost()) {
+                requestAnimationFrame(self._renderLoop.bind(self));
+            }
+            return;
+        }
 
         // Delta time
         var dt = 1;
@@ -1508,8 +1672,8 @@
             viewerSeedEl.textContent = 'Seed: ' + this._worldSeed;
         }
 
-        // Update camera
-        this._updateCamera();
+        // Update camera with delta time for frame-rate independent movement
+        this._updateCamera(dt);
 
         // Resize check
         if (this._canvas.width !== window.innerWidth || this._canvas.height !== window.innerHeight) {
@@ -1547,8 +1711,17 @@
             this._chunks.forEach(function (ch) { self._dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ); });
         }
 
-        // Build dirty chunk meshes
-        this._chunks.forEach(function (ch) { self._buildChunkMesh(ch); });
+        // Check if camera entered/exited a block — triggers viewer-aware mesh rebuild
+        self._checkCameraBlockChange();
+
+        // Build dirty chunk meshes — skip chunks that returned null from buffer creation failure
+        var validChunkKeys = new Set();
+        this._chunks.forEach(function (ch) {
+            var result = self._buildChunkMesh(ch);
+            if (result && result.count > 0) {
+                validChunkKeys.add(ch.chunkX + ',' + ch.chunkZ);
+            }
+        });
 
         gl.useProgram(this._terrainProgram);
         gl.uniformMatrix4fv(this._terrainLocs.uProjection, false, proj);
@@ -1585,8 +1758,19 @@
 
         for (var i = 0; i < chunkList.length; i++) {
             var ch2 = chunkList[i].chunk;
-            var buf = this._meshBuffers[ch2.chunkX + ',' + ch2.chunkZ];
+            var chunkKey = ch2.chunkX + ',' + ch2.chunkZ;
+
+            // Skip chunks not in valid set (buffer creation failed or empty)
+            if (!validChunkKeys.has(chunkKey)) continue;
+
+            var buf = this._meshBuffers[chunkKey];
             if (!buf || buf.count === 0) continue;
+
+            // Validate buffers before drawing
+            if (!buf.posBuf || !buf.colorBuf || !buf.alphaBuf || !buf.normBuf) {
+                console.error('[DebugTerrain] Missing buffer for chunk', chunkKey);
+                continue;
+            }
 
             var cm = this._mat4Create();
             this._mat4Identity(cm);
@@ -1628,8 +1812,25 @@
     // Speed Level Constants
     // ============================================================
 
+    /**
+     * Speed levels: [walk, jog, sprint] in blocks/sec.
+     * @type {number[]}
+     * @private
+     */
     var SPEED_LEVELS = [4, 8, 16];
+
+    /**
+     * Speed level display names.
+     * @type {string[]}
+     * @private
+     */
     var SPEED_NAMES = ['Walk', 'Jog', 'Sprint'];
+
+    /**
+     * Speed level emoji icons.
+     * @type {string[]}
+     * @private
+     */
     var SPEED_EMOJIS = ['🚶', '🏃', '⚡'];
 
 })();

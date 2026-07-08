@@ -236,10 +236,9 @@
         display.innerHTML = '';
 
         var chunks = this._renderer.getChunks ? this._renderer.getChunks() : null;
-        var currentChunkX = this._renderer.getCamera ? 0 : 0;
-        var currentChunkZ = this._renderer.getCamera ? 0 : 0;
 
         // Get chunk position from renderer if available
+        var currentChunkX = 0, currentChunkZ = 0;
         if (this._renderer._currentChunkX !== undefined) {
             currentChunkX = this._renderer._currentChunkX;
             currentChunkZ = this._renderer._currentChunkZ;
@@ -408,14 +407,18 @@
         // Generation options checkboxes
         var optIds = ['opt-caves', 'opt-ores', 'opt-water', 'opt-surface'];
         for (var k = 0; k < optIds.length; k++) {
-            var optEl = document.getElementById(optIds[k]);
-            if (optEl) {
-                optEl.addEventListener('change', function () {
-                    if (self._renderer && self._renderer.setOptions) {
-                        self._renderer.setOptions(self._getOptions());
-                    }
-                });
-            }
+            (function (optId) {
+                var optEl = document.getElementById(optId);
+                if (optEl) {
+                    optEl.addEventListener('change', function () {
+                        if (self._renderer && self._renderer.setOptions) {
+                            self._renderer.setOptions(self._getOptions());
+                        }
+                        // Persist UI state changes to localStorage
+                        self._saveState();
+                    });
+                }
+            })(optIds[k]);
         }
 
         // Populate biome selector
@@ -506,8 +509,10 @@
             statsEl.textContent = statsText;
         }
 
+        // FPS display — always update when renderer reports a value
         var fpsEl = document.getElementById('ui-fps');
-        if (fpsEl && fps > 0) {
+        if (fpsEl) {
+            var fps = this._renderer.getCurrentFps ? this._renderer.getCurrentFps() : 0;
             fpsEl.textContent = 'FPS: ' + fps;
         }
 

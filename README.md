@@ -126,7 +126,7 @@ No server, no installation, no dependencies.
 
 ```
 index.html          # Entry point — loads all scripts and UI elements
-terrain.html        # Standalone terrain viewer/debugger — lightweight entry point that loads extracted modules
+terrain.html        # Standalone terrain viewer/debugger
 textures.html       # Singlefile Texture Extractor, to create js assets from tile sets
 README.md           # This file
 ref/                # Temporary development references (local)
