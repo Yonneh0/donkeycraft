@@ -108,14 +108,19 @@
                 var ui = new Donkeycraft.TerrainDebugUI(renderer);
                 ui.init();
 
-                // Set initial parameters from saved state or defaults
+                // Load saved state first, then apply to renderer
                 var controller = renderer.getController();
                 if (controller) {
                     controller.loadState();
-                    // Apply saved camera position
-                    if (controller.getCameraPosition) {
+                    // Apply saved camera position to renderer
+                    if (controller.getCameraPosition && renderer.setCameraPosition) {
                         var camPos = controller.getCameraPosition();
                         renderer.setCameraPosition(camPos.x, camPos.y, camPos.z);
+                    }
+                    // Apply saved camera rotation to renderer
+                    if (controller.getCameraRotation && renderer.setCameraRotation) {
+                        var camRot = controller.getCameraRotation();
+                        renderer.setCameraRotation(camRot.yaw, camRot.pitch);
                     }
                 }
 

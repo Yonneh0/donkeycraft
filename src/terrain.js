@@ -19,7 +19,7 @@
      * @type {number[]}
      * @private
      */
-    var SPEED_LEVELS = [4, 8, 16];
+    var SPEED_LEVELS = [0.5, 2, 4];
 
     /**
      * Speed level display names.
@@ -34,6 +34,27 @@
      * @private
      */
     var SPEED_EMOJIS = ['🚶', '🏃', '⚡'];
+
+    /**
+     * Duration in milliseconds for the speed indicator overlay visibility.
+     * @type {number}
+     * @private
+     */
+    var SPEED_INDICATOR_DURATION = 1200;
+
+    /**
+     * Minimum pitch angle in radians to prevent camera flip (slightly above 90 degrees).
+     * @type {number}
+     * @private
+     */
+    var MIN_PITCH = -Math.PI / 2 + 0.01;
+
+    /**
+     * Maximum pitch angle in radians to prevent camera flip (slightly below 270 degrees).
+     * @type {number}
+     * @private
+     */
+    var MAX_PITCH = Math.PI / 2 - 0.01;
 
     // ============================================================
     // TerrainController Constructor
@@ -103,11 +124,15 @@
     /**
      * Register a callback for a specific key code.
      * Used by external modules to handle special keys (R, E, F, Q, etc.).
+     * The callback is only invoked on the initial keydown press, not on repeat events.
+     *
      * @param {string} keyCode - The keyboard code (e.g., 'KeyR').
      * @param {Function} callback - The callback function to invoke on keydown.
      */
     Donkeycraft.TerrainController.prototype.registerKeyAction = function (keyCode, callback) {
-        this._keyActions[keyCode] = callback;
+        if (typeof keyCode === 'string' && typeof callback === 'function') {
+            this._keyActions[keyCode] = callback;
+        }
     };
 
     /**
@@ -125,12 +150,16 @@
     /**
      * Initialize the terrain controller.
      * Sets up canvas, registers keyboard/mouse event listeners, and initializes state.
-     * Safe to call multiple times — resets state if re-initializing.
+     * Safe to call multiple times — resets all internal state if re-initializing.
      *
      * @param {string} canvasId - The ID of the canvas element to attach controls to.
      * @returns {boolean} True if initialization succeeded.
      */
     Donkeycraft.TerrainController.prototype.init = function (canvasId) {
+        if (typeof canvasId !== 'string' || !canvasId) {
+            console.error('[TerrainController] Invalid canvas ID provided.');
+            return false;
+        }
         this._canvasId = canvasId;
         this._canvas = document.getElementById(canvasId);
         if (!this._canvas) {
@@ -154,7 +183,7 @@
         // Setup input listeners
         this._setupInputListeners();
 
-        // Load saved state
+        // Load saved state from localStorage
         this.loadState();
 
         this._ready = true;
@@ -163,7 +192,7 @@
 
     /**
      * Get the current camera position.
-     * @returns {{x: number, y: number, z: number}}
+     * @returns {{x: number, y: number, z: number}} Copy of the camera position object.
      */
     Donkeycraft.TerrainController.prototype.getCameraPosition = function () {
         return { x: this._camera.x, y: this._camera.y, z: this._camera.z };
@@ -171,11 +200,16 @@
 
     /**
      * Set the current camera position.
+     * All parameters are validated and clamped to reasonable world bounds.
+     *
      * @param {number} x - World X coordinate.
      * @param {number} y - World Y coordinate (height).
      * @param {number} z - World Z coordinate.
      */
     Donkeycraft.TerrainController.prototype.setCameraPosition = function (x, y, z) {
+        if (!isFinite(x)) x = this._camera.x;
+        if (!isFinite(y)) y = this._camera.y;
+        if (!isFinite(z)) z = this._camera.z;
         this._camera.x = x;
         this._camera.y = y;
         this._camera.z = z;
@@ -183,7 +217,7 @@
 
     /**
      * Get the current camera rotation.
-     * @returns {{yaw: number, pitch: number}}
+     * @returns {{yaw: number, pitch: number}} Copy of the camera rotation object.
      */
     Donkeycraft.TerrainController.prototype.getCameraRotation = function () {
         return { yaw: this._camera.yaw, pitch: this._camera.pitch };
@@ -191,16 +225,20 @@
 
     /**
      * Set the current camera rotation.
+     * Yaw wraps to [-π, π]. Pitch is clamped to prevent camera flip.
+     *
      * @param {number} yaw - Horizontal rotation in radians.
-     * @param {number} pitch - Vertical rotation in radians.
+     * @param {number} pitch - Vertical rotation in radians (clamped to ±(π/2 - 0.01)).
      */
     Donkeycraft.TerrainController.prototype.setCameraRotation = function (yaw, pitch) {
+        if (!isFinite(yaw)) yaw = this._camera.yaw;
         this._camera.yaw = yaw;
-        this._camera.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+        this._camera.pitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch));
     };
 
     /**
      * Get the full camera state (position + rotation).
+     * Returns a shallow copy to prevent external mutation of internal state.
      * @returns {{x: number, y: number, z: number, yaw: number, pitch: number}}
      */
     Donkeycraft.TerrainController.prototype.getCamera = function () {
@@ -209,7 +247,8 @@
 
     /**
      * Get the current FPS counter value.
-     * @returns {number} Current frames per second.
+     * FPS is updated once per second based on frame counting.
+     * @returns {number} Current frames per second (0 if less than 1 second has elapsed).
      */
     Donkeycraft.TerrainController.prototype.getCurrentFps = function () {
         return this._currentFps;
@@ -217,7 +256,7 @@
 
     /**
      * Get the current speed level index (0 = walk, 1 = jog, 2 = sprint).
-     * @returns {number}
+     * @returns {number} Speed level index (0, 1, or 2).
      */
     Donkeycraft.TerrainController.prototype.getSpeedLevel = function () {
         return this._speedLevel;
@@ -225,6 +264,7 @@
 
     /**
      * Cycle to the next speed level and show the indicator.
+     * Wraps around: walk → jog → sprint → walk.
      */
     Donkeycraft.TerrainController.prototype.cycleSpeed = function () {
         this._speedLevel = (this._speedLevel + 1) % SPEED_LEVELS.length;
@@ -236,7 +276,7 @@
      * @param {number} level - Speed level index (0-2).
      */
     Donkeycraft.TerrainController.prototype.setSpeedLevel = function (level) {
-        this._speedLevel = Math.max(0, Math.min(2, level));
+        this._speedLevel = Math.max(0, Math.min(2, Math.floor(level)));
     };
 
     /**
@@ -249,14 +289,14 @@
 
     /**
      * Get the current mouse delta (accumulated since last reset).
-     * @returns {{dx: number, dy: number}}
+     * @returns {{dx: number, dy: number}} Mouse movement delta since last frame.
      */
     Donkeycraft.TerrainController.prototype.getMouseDelta = function () {
         return { dx: this._mouseDX, dy: this._mouseDY };
     };
 
     /**
-     * Reset accumulated mouse delta to zero.
+     * Reset accumulated mouse delta to zero. Called internally after each camera update.
      */
     Donkeycraft.TerrainController.prototype.resetMouseDelta = function () {
         this._mouseDX = 0;
@@ -265,7 +305,7 @@
 
     /**
      * Check if the pointer is currently locked to the canvas.
-     * @returns {boolean}
+     * @returns {boolean} True if pointer lock is active.
      */
     Donkeycraft.TerrainController.prototype.isPointerLocked = function () {
         return this._pointerLocked;
@@ -273,7 +313,7 @@
 
     /**
      * Check if the controller is ready (initialized successfully).
-     * @returns {boolean}
+     * @returns {boolean} True if init() completed successfully.
      */
     Donkeycraft.TerrainController.prototype.isReady = function () {
         return this._ready;
@@ -352,10 +392,15 @@
         var sens = (Donkeycraft.Config && Donkeycraft.Config.MOUSE_SENSITIVITY) ?
             Donkeycraft.Config.MOUSE_SENSITIVITY : 0.15;
 
-        // Apply mouse rotation
+        // Apply mouse rotation — yaw decreases when moving mouse right (standard FPS for this coordinate system),
+        // pitch decreases when moving mouse up, clamped to avoid gimbal lock.
         this._camera.yaw -= this._mouseDX * sens;
         this._camera.pitch -= this._mouseDY * sens;
         this._camera.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this._camera.pitch));
+
+        // Normalize yaw to [-2π, 2π] — prevents floating-point overflow and keeps displayed degrees sane
+        if (this._camera.yaw > Math.PI * 2) this._camera.yaw -= Math.PI * 2;
+        if (this._camera.yaw < -Math.PI * 2) this._camera.yaw += Math.PI * 2;
         this._mouseDX = 0;
         this._mouseDY = 0;
 
@@ -404,8 +449,10 @@
     // ============================================================
 
     /**
-     * Place viewer 1 meter above ground at current XZ position.
-     * Searches upward from the top of the world to find the first solid block.
+     * Place the camera 1 unit above the highest solid block at the current XZ position.
+     * Scans upward from Y=0 through all loaded chunks to find the terrain surface.
+     * Falls back to Y=120 if no solid block is found or chunk data unavailable.
+     * @returns {boolean} True if ground was successfully located and camera repositioned.
      */
     Donkeycraft.TerrainController.prototype.placeAboveGround = function () {
         var cs = Donkeycraft.Config ? Donkeycraft.Config.CHUNK_SIZE : 16;
@@ -416,10 +463,24 @@
         var localX = ((this._camera.x % cs) + cs) % cs;
         var localZ = ((this._camera.z % cs) + cs) % cs;
 
-        // This requires access to chunks — the caller should handle this
-        // by passing the chunks map or calling a method that has access.
-        // Default behavior: place at a safe height
+        // Scan downward from top to find the highest solid block at this XZ
+        for (var y = ws - 1; y >= 0; y--) {
+            if (localX >= 0 && localX < cs && localZ >= 0 && localZ < cs) {
+                var key = camChunkX + ',' + camChunkZ;
+                var chunk = window._dkTerrainRenderer ? window._dkTerrainRenderer._chunks.get(key) : null;
+                if (chunk) {
+                    var bid = chunk.getBlock(localX, y, localZ);
+                    if (bid !== 0) {
+                        this._camera.y = y + 2;
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // No solid block found — fall back to safe height
         this._camera.y = 120;
+        return false;
     };
 
     /**
@@ -481,7 +542,7 @@
 
         indicator.classList.add('show');
         var self = this;
-        setTimeout(function () { indicator.classList.remove('show'); }, 1200);
+        setTimeout(function () { indicator.classList.remove('show'); }, SPEED_INDICATOR_DURATION);
     };
 
     // ============================================================

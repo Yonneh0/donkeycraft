@@ -150,14 +150,29 @@
             biomeId = Math.max(0, Math.floor(biome.id));
             biomeName = biome.name || null;
             biomeResolved = true;
-        } else if (typeof biome === 'number') {
+    } else if (typeof biome === 'number') {
             if (!isFinite(biome)) {
                 if (typeof console !== 'undefined' && console.warn) {
                     console.warn('[TerrainCore] setBiome: non-finite biome ID, using default ID 0 (grass)');
                 }
             } else {
                 biomeId = Math.max(0, Math.floor(biome));
-                biomeResolved = true;
+                // Resolve numeric ID through BiomeRegistry to get the correct biome name.
+                // This is critical for biome ID 0 (grass), because without resolving
+                // _currentBiomeName, the UI dropdown won't reflect the correct selection
+                // and cache keys will be inconsistent.
+                if (Donkeycraft.BiomeRegistry) {
+                    var resolved = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
+                    if (resolved) {
+                        biomeName = resolved.name;
+                        biomeResolved = true;
+                    }
+                }
+                // Fallback: use canonical name mapping if BiomeRegistry unavailable
+                if (!biomeResolved) {
+                    biomeName = _biomeIdToName(biomeId);
+                    biomeResolved = true;
+                }
             }
         } else if (typeof biome === 'string') {
             // Try resolving as biome name first
@@ -186,6 +201,29 @@
 
         _currentBiomeId = biomeId;
         _currentBiomeName = biomeName;
+
+        // Clear the storage cache when biome changes — otherwise old cached heightmaps
+        // from the previous biome will be returned on regeneration, making biome
+        // selection appear to have no effect.
+        if (Donkeycraft.Storage && Donkeycraft.Storage.clearAllCaches) {
+            try { Donkeycraft.Storage.clearAllCaches(); } catch (e) { /* ignore */ }
+        }
+    }
+
+    /**
+     * Map a biome ID value to its name string.
+     * @param {number} id - Biome ID.
+     * @returns {string|null} Biome name, or null if ID is invalid.
+     * @private
+     */
+    function _biomeIdToName(id) {
+        switch (Math.max(0, Math.min(3, Math.floor(id)))) {
+            case 0: return 'grass';
+            case 1: return 'arctic';
+            case 2: return 'desert';
+            case 3: return 'forest';
+            default: return null;
+        }
     }
 
     /**
