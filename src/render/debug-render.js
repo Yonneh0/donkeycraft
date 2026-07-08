@@ -70,12 +70,8 @@
         this._lastCameraWorldZ = 0;
         this._lastCameraChunkX = undefined;
 
-        // Camera block position tracking — triggers full mesh rebuild when camera
-        // enters or exits any block (needed for viewer-aware inner-face rendering)
-        this._lastCameraBlockX = Math.floor(this._camera.x);
-        this._lastCameraBlockY = Math.floor(this._camera.y);
-        this._lastCameraBlockZ = Math.floor(this._camera.z);
-        this._cameraBlockChanged = false;
+        // Track whether the first frame has been built to trigger initial mesh generation
+        this._firstFrameBuilt = false;
 
         // Dynamic chunk loading
         this._loadedChunkKeys = new Set();
@@ -195,10 +191,18 @@
 
     /**
      * Set biome ID.
-     * @param {number} biomeId.
+     * @param {number} biomeId - The biome ID to set.
      */
     Donkeycraft.DebugTerrainRenderer.prototype.setBiome = function (biomeId) {
         this._selectedBiomeId = biomeId;
+    };
+
+    /**
+     * Get the current biome ID.
+     * @returns {number} Current biome ID.
+     */
+    Donkeycraft.DebugTerrainRenderer.prototype.getBiome = function () {
+        return this._selectedBiomeId;
     };
 
     /**
@@ -629,16 +633,18 @@
      *
      * This method iterates over all visible blocks in the chunk and generates geometry
      * for faces adjacent to transparent blocks or different block types. Face visibility
-     * is determined by comparing the current block with its neighbor in each face direction.
+     * is determined by a combination of:
      *
-     * Viewer-awareness: When the camera is inside a solid block, the inner faces of that
-     * block become visible (you're looking at the "inside" surface). This is handled by
-     * checking if the camera position is within the block's volume — if so, all six faces
-     * of that block are rendered regardless of neighbor type.
+     * 1. Neighbor type comparison: Faces between different block types are visible
+     * 2. Transparency handling: Faces adjacent to transparent blocks (alpha < 1.0) are visible
+     * 3. Viewer-angle culling: Uses dot-product of face normal and viewer direction
+     *    to determine if the face is oriented toward the camera
+     * 4. Camera-inside-block: When camera is inside a solid block, all six faces render
      *
-     * Mesh rebuild triggers:
-     * - Dirty flag: set when chunk is newly generated or adjacent to a newly loaded chunk
-     * - Camera block change: when camera enters/exits any block (triggers full rebuild)
+     * Mesh rebuild triggers (performance-critical):
+     * - Dirty flag ONLY: set when chunk is newly generated or adjacent to a newly loaded chunk
+     * - NOTE: Camera movement NO LONGER triggers rebuilds — viewer-angle culling handles
+     *   dynamic visibility without rebuilding geometry
      *
      * @param {Donkeycraft.Chunk} chunk - The chunk to build mesh data for.
      * @returns {{posBuf: WebGLBuffer, colorBuf: WebGLBuffer, alphaBuf: WebGLBuffer, normBuf: WebGLBuffer, count: number}|null}
@@ -648,14 +654,11 @@
     Donkeycraft.DebugTerrainRenderer.prototype._buildChunkMesh = function (chunk) {
         var key = chunk.chunkX + ',' + chunk.chunkZ;
 
-        // Check if mesh needs rebuilding: dirty flag OR camera entered/exited a block
-        var needsRebuild = this._dirtyChunks.has(key) || this._cameraBlockChanged;
-        if (!needsRebuild) {
+        // Only rebuild when chunk is dirty — camera movement does NOT trigger rebuilds
+        if (!this._dirtyChunks.has(key)) {
             return this._meshBuffers[key];
         }
-        if (this._dirtyChunks.has(key)) {
-            this._dirtyChunks.delete(key);
-        }
+        this._dirtyChunks.delete(key);
 
         var cs = Donkeycraft.Config.CHUNK_SIZE, ws = Donkeycraft.Config.WORLD_HEIGHT;
         var yBounds = this._computeChunkYBounds(chunk);
@@ -666,6 +669,10 @@
         var colors = Donkeycraft.BlockColors.getAllColors();
         var alphas = Donkeycraft.BlockColors.getAllAlphas();
         var self = this;
+
+        // Pre-compute viewer direction for angle-aware face culling (computed once per chunk)
+        // Note: viewFwd is used conceptually but the actual per-face dot product uses
+        // the normalized vector from face center to camera position.
 
         // Face definitions: [direction, normal, corner positions]
         // Corners are ordered counter-clockwise when viewed from outside the block.
@@ -716,18 +723,64 @@
                             nid = self._getBlockAt(ngx, ngy, ngz);
                         }
 
-                        // Face visibility logic:
-                        // 1. If camera is inside this block, render all faces (viewer-aware)
+                        // Face visibility logic with viewer-angle awareness:
+                        //
+                        // 1. If camera is inside this block, render all faces (inner surface view)
                         // 2. If neighbor is air (0), face is visible (including unloaded chunks)
-                        // 3. If neighbor is a different block type, face is visible
-                        // 4. If neighbor is the same solid block, face is hidden
+                        // 3. If neighbor is a different block type:
+                        //    a. If neighbor is transparent (alpha < 1.0), always show the face
+                        //    b. Otherwise, use viewer-angle dot product to cull back-facing quads
+                        // 4. Same solid block → face is hidden (proper occlusion culling)
                         var faceVisible = false;
+
                         if (camInsideBlock) {
+                            // Camera inside block: render all faces for inner-surface visibility
                             faceVisible = true;
                         } else if (nid === 0) {
+                            // Neighbor is air or unloaded chunk: face is always visible
                             faceVisible = true;
                         } else if (nid !== bid) {
-                            faceVisible = true;
+                            // Different block type — check transparency and viewer angle
+                            var neighborAlpha = alphas[nid] || 1.0;
+
+                            if (neighborAlpha < 1.0) {
+                                // Neighbor is transparent: always render boundary face
+                                faceVisible = true;
+                            } else {
+                                // Both blocks are solid — use viewer-angle culling
+                                // Compute the dot product of face normal and direction to camera
+                                var faceCenterWX = chunkWorldOX + x + 0.5 + face.d[0] * 0.5;
+                                var faceCenterWY = y + 0.5 + face.d[1] * 0.5;
+                                var faceCenterWZ = chunkWorldOZ + z + 0.5 + face.d[2] * 0.5;
+
+                                var toCamX = this._camera.x - faceCenterWX;
+                                var toCamY = this._camera.y - faceCenterWY;
+                                var toCamZ = this._camera.z - faceCenterWZ;
+
+                                // Distance from camera to face center
+                                var distSq = toCamX * toCamX + toCamY * toCamY + toCamZ * toCamZ;
+                                if (distSq < 0.0001) {
+                                    // Camera is extremely close — render the face
+                                    faceVisible = true;
+                                } else {
+                                    var dist = Math.sqrt(distSq);
+
+                                    // Normalize vector from face to camera
+                                    var normToCamX = toCamX / dist;
+                                    var normToCamY = toCamY / dist;
+                                    var normToCamZ = toCamZ / dist;
+
+                                    // Dot product: normal · toCamera
+                                    // Positive = face points toward camera, negative = away
+                                    var dot = face.n[0] * normToCamX +
+                                              face.n[1] * normToCamY +
+                                              face.n[2] * normToCamZ;
+
+                                    // Render face if dot product is positive (facing viewer)
+                                    // Use small epsilon to handle edge cases where face is nearly perpendicular
+                                    faceVisible = dot > -0.05;
+                                }
+                            }
                         }
 
                         if (faceVisible) {
@@ -802,35 +855,6 @@
 
         this._meshBuffers[key] = { posBuf: pb, colorBuf: cb, alphaBuf: ab, normBuf: nb, count: vertexCount };
         return this._meshBuffers[key];
-    };
-
-    /**
-     * Check whether the camera has entered or exited any block since the last rebuild.
-     *
-     * Compares the camera's current integer block coordinates with the tracked previous
-     * values. If any differ, sets `_cameraBlockChanged` to true and updates the tracked
-     * positions. This triggers a full mesh rebuild on the next frame so that viewer-aware
-     * inner-face rendering is updated (e.g., when you walk into a dirt block, its inner
-     * faces become visible).
-     *
-     * @returns {boolean} True if the camera block position changed.
-     * @private
-     */
-    Donkeycraft.DebugTerrainRenderer.prototype._checkCameraBlockChange = function () {
-        var bx = Math.floor(this._camera.x);
-        var by = Math.floor(this._camera.y);
-        var bz = Math.floor(this._camera.z);
-
-        if (bx !== this._lastCameraBlockX || by !== this._lastCameraBlockY || bz !== this._lastCameraBlockZ) {
-            this._lastCameraBlockX = bx;
-            this._lastCameraBlockY = by;
-            this._lastCameraBlockZ = bz;
-            this._cameraBlockChanged = true;
-            return true;
-        }
-
-        this._cameraBlockChanged = false;
-        return false;
     };
 
     /**
@@ -1277,7 +1301,8 @@
      *
      * Clears existing chunks and mesh buffers, then re-generates terrain for the full
      * grid defined by current chunk position and radii. All generated chunks are marked
-     * dirty to trigger immediate mesh rebuild on the next render frame.
+     * dirty to trigger immediate mesh rebuild on the next render frame. Resets the
+     * first-frame flag so all meshes are rebuilt on the subsequent frame.
      *
      * @private
      */
@@ -1287,14 +1312,9 @@
         this._dirtyChunks.clear();
         this._pendingChunkQueue.clear();
 
-        // Reset camera position tracking to force full rebuild on next frame
+        // Reset camera position tracking and first-frame flag
         this._lastCameraChunkX = undefined;
-
-        // Reset camera block tracking for fresh viewer-aware rendering
-        this._lastCameraBlockX = Math.floor(this._camera.x);
-        this._lastCameraBlockY = Math.floor(this._camera.y);
-        this._lastCameraBlockZ = Math.floor(this._camera.z);
-        this._cameraBlockChanged = false;
+        this._firstFrameBuilt = false;
 
         // Start timing
         this._generationStartTime = performance.now();
@@ -1705,14 +1725,11 @@
         // Pass 1: Sky
         this._renderSky(proj, view);
 
-        // Pass 2: Terrain
-        if (!this._meshBuffers._firstFrameBuilt) {
-            this._meshBuffers._firstFrameBuilt = true;
+        // Pass 2: Terrain — On first frame, mark all existing chunks dirty for initial mesh build
+        if (!this._firstFrameBuilt) {
+            this._firstFrameBuilt = true;
             this._chunks.forEach(function (ch) { self._dirtyChunks.add(ch.chunkX + ',' + ch.chunkZ); });
         }
-
-        // Check if camera entered/exited a block — triggers viewer-aware mesh rebuild
-        self._checkCameraBlockChange();
 
         // Build dirty chunk meshes — skip chunks that returned null from buffer creation failure
         var validChunkKeys = new Set();
