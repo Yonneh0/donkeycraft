@@ -39,6 +39,43 @@
     };
 
     /**
+     * _emitProgress — emit a progress update event for fine-grained UI feedback.
+     * @private
+     * @param {number} percent - Progress percentage (0-100).
+     * @param {string} [message] - Optional status message to display.
+     */
+    Donkeycraft.InitSequence.prototype._emitProgress = function (percent, message) {
+        if (this._destroyed) return;
+        try {
+            this._eventBus.emit('init:progress', { percent: percent, message: message || '' });
+        } catch (e) {
+            // Silently skip on error
+        }
+    };
+
+    /**
+     * _emitSubPhase — emit a sub-phase event for granular progress within a phase.
+     * @private
+     * @param {string} phase - Parent phase name.
+     * @param {string} subPhase - Sub-phase identifier.
+     * @param {string} message - Display message for this sub-phase.
+     * @param {number} [progress] - Optional progress percentage.
+     */
+    Donkeycraft.InitSequence.prototype._emitSubPhase = function (phase, subPhase, message, progress) {
+        if (this._destroyed) return;
+        try {
+            this._eventBus.emit('init:subphase', {
+                phase: phase,
+                subPhase: subPhase,
+                message: message,
+                progress: progress
+            });
+        } catch (e) {
+            // Silently skip on error
+        }
+    };
+
+    /**
      * _setPhase — update current initialization phase and emit start event.
      * @private
      * @param {string} phase - Phase name identifier.
@@ -111,6 +148,7 @@
     /**
      * _initTextureAtlas — generate all procedural block textures, register them on a TextureAtlas,
      * build the WebGL texture, and return it.
+     * Emits sub-phase progress events for loading screen integration.
      * @private
      * @returns {Promise<Object>} Resolves with { textures, atlas } when ready.
      */
@@ -118,8 +156,14 @@
         var self = this;
         return new Promise(function (resolve, reject) {
             try {
+                // Sub-phase: Terrain textures (sand, snow, ice, lava, bedrock)
+                self._emitSubPhase('texture-atlas', 'terrain-textures', 'Generating terrain textures...', 30);
+
                 if (Donkeycraft.AssetGenerator && typeof Donkeycraft.AssetGenerator.generateAllTextures === 'function') {
                     Donkeycraft.AssetGenerator.generateAllTextures().then(function (textures) {
+                        // Sub-phase: Block textures (ores, metals, concrete/wool, decorative)
+                        self._emitSubPhase('texture-atlas', 'block-textures', 'Generating block textures...', 55);
+
                         // Wire generated textures into AssetManager so game.js can read them via getAllTextures()
                         if (Donkeycraft.AssetManager && typeof Donkeycraft.AssetManager.generateAllBlockTextures === 'function') {
                             try {
@@ -128,6 +172,9 @@
                                 Donkeycraft.Logger.warn('InitSequence', 'Failed to wire textures to AssetManager: ' + e.message);
                             }
                         }
+
+                        // Sub-phase: Building WebGL texture atlas
+                        self._emitSubPhase('texture-atlas', 'atlas-build', 'Building WebGL texture atlas...', 75);
 
                         // Build a WebGL TextureAtlas from the generated textures if WebGL context is available.
                         var atlas = null;
@@ -158,6 +205,9 @@
                             Donkeycraft.Logger.warn('InitSequence', 'Failed to build TextureAtlas: ' + e.message);
                             atlas = null;
                         }
+
+                        // Final progress update for texture-atlas phase
+                        self._emitProgress(90, 'Texture atlas ready');
 
                         resolve({ textures: textures || {}, atlas: atlas });
                     }).catch(function (err) {

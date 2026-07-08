@@ -9,53 +9,74 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.85);
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     z-index: 9999;
-    font-family: sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: #e0e0e0;
 }
 
 /* Title */
 .dk-loading-title {
-    font-size: 2em;
-    margin-bottom: 20px;
-    color: #4CAF50;
+    font-size: 2.5em;
+    margin-bottom: 24px;
+    background: linear-gradient(90deg, #4CAF50, #81C784, #4CAF50);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     font-weight: bold;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
+    animation: titleShimmer 3s ease-in-out infinite;
+    text-shadow: none;
+}
+
+@keyframes titleShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
 }
 
 /* Status message */
 .dk-loading-message {
-    font-size: 1.1em;
-    margin-bottom: 16px;
-    color: #aaa;
-    min-height: 1.4em;
+    font-size: 1.15em;
+    margin-bottom: 20px;
+    color: #b0bec5;
+    min-height: 1.6em;
+    text-align: center;
+    font-weight: 500;
 }
 
 /* Progress bar container — wrapper for the animated fill */
 .dk-loading-progress-container {
-    width: 400px;
-    max-width: 90vw;
-    height: 20px;
-    background: #333;
-    border-radius: 10px;
+    width: 450px;
+    max-width: 85vw;
+    height: 24px;
+    background: #1e1e2f;
+    border-radius: 12px;
     overflow: hidden;
-    margin-bottom: 16px;
-    border: 1px solid #555;
+    margin-bottom: 18px;
+    border: 2px solid #37474f;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 10px rgba(76, 175, 80, 0.1);
 }
 
 /* Progress bar fill — dynamic width set via JS */
 .dk-loading-progress {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #4CAF50, #66BB6A);
-    transition: width 0.3s ease;
-    border-radius: 10px;
+    background: linear-gradient(90deg, #2e7d32, #4CAF50, #66BB6A);
+    background-size: 200% 100%;
+    border-radius: 12px;
     position: relative;
+    transition: width 0.4s ease;
+    animation: progressShimmer 2s linear infinite;
+}
+
+@keyframes progressShimmer {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
 }
 
 .dk-loading-progress::after {
@@ -65,26 +86,27 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 50%, rgba(0, 0, 0, 0.1) 100%);
-    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 40%, rgba(0, 0, 0, 0.15) 100%);
+    border-radius: 12px;
     pointer-events: none;
 }
 
 /* Loading tips */
 .dk-loading-tip {
     font-size: 0.9em;
-    color: #777;
+    color: #78909c;
     font-style: italic;
-    max-width: 400px;
+    max-width: 450px;
     text-align: center;
     padding: 0 20px;
+    min-height: 1.4em;
 }
 
 /* Error display */
 .dk-loading-error {
     display: none;
-    width: 400px;
-    max-width: 90vw;
+    width: 450px;
+    max-width: 85vw;
     padding: 16px;
     background: #3d0a0a;
     border: 1px solid #e74c3c;
@@ -106,22 +128,57 @@
     color: #e74c3c !important;
 }
 
+/* Loading history panel */
 .dk-loading-steps {
-    margin-top: 20px;
-    width: 300px;
+    margin-top: 24px;
+    width: 400px;
+    max-width: 80vw;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    border: 1px solid #2c3e50;
+}
+
+.dk-loading-steps::-webkit-scrollbar {
+    width: 6px;
+}
+
+.dk-loading-steps::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.dk-loading-steps::-webkit-scrollbar-thumb {
+    background: #4CAF50;
+    border-radius: 3px;
 }
 
 .dk-loading-step {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 0;
-    font-size: 12px;
-    color: #888;
+    gap: 10px;
+    padding: 6px 8px;
+    font-size: 13px;
+    color: #78909c;
+    border-radius: 4px;
+    animation: stepFadeIn 0.3s ease-out;
+}
+
+@keyframes stepFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .dk-loading-step.complete {
-    color: #2ecc71;
+    color: #4CAF50;
 }
 
 .dk-loading-step.error {
@@ -129,8 +186,17 @@
 }
 
 .dk-loading-step-icon {
-    width: 16px;
+    width: 20px;
     text-align: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.dk-loading-step-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Loading screen */

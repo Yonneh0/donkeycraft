@@ -1155,17 +1155,24 @@ void main() {
             var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
 
             // Wire loading screen progress updates to init phases
-            // Progress: before config=0%, after config=25%, after texture-atlas=50%, after audio=75%, after indexeddb=100%
+            // Phase milestones: config=25%, texture-atlas=50%, audio=75%, indexeddb=100%
             initSeq.on('init:phase:start', function (data) {
-                loadingScreen.setMessage('Initializing ' + data.phase.replace('-', ' ') + '...');
+                loadingScreen.handlePhaseStart(data);
             });
 
             initSeq.on('init:phase:end', function (data) {
-                var phaseOrder = ['config', 'texture-atlas', 'audio', 'indexeddb'];
-                var idx = phaseOrder.indexOf(data.phase);
-                if (idx >= 0) {
-                    loadingScreen.updateProgress((idx + 1) * 25);
-                }
+                loadingScreen.handlePhaseEnd(data);
+            });
+
+            // Sub-phase events for granular progress within texture-atlas phase
+            // (terrain-textures, block-textures, atlas-build sub-steps)
+            initSeq.on('init:subphase', function (data) {
+                loadingScreen.handleSubPhase(data);
+            });
+
+            // Fine-grained progress updates (e.g., "Texture atlas ready" at 90%)
+            initSeq.on('init:progress', function (data) {
+                loadingScreen.handleProgress(data);
             });
 
             // Set initial progress to 0% before pipeline starts

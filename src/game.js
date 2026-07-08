@@ -330,6 +330,51 @@
             };
 
             // ============================================================
+            // CRITICAL: Initialize world generation subsystems BEFORE chunk generation.
+            // These modules resolve block IDs and configure terrain parameters that
+            // chunk generation depends on. If not initialized first, surface layers
+            // will silently skip (TerrainSurface._initialized check), leaving
+            // biomes as raw stone/dirt.
+            // ============================================================
+            try {
+                // Physics — initializes gravity, liquid flow rules
+                if (Donkeycraft.Physics && Donkeycraft.Physics.init) {
+                    Donkeycraft.Physics.init();
+                }
+                // LightingEngine — block light propagation system
+                if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.init) {
+                    Donkeycraft.LightingEngine.init();
+                }
+                // OreGenerator — ore vein placement per biome/Y-level
+                if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.init) {
+                    Donkeycraft.OreGenerator.init();
+                }
+                // SurfaceGenerator — surface block definitions
+                if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.init === 'function') {
+                    Donkeycraft.SurfaceGenerator.init();
+                }
+                // CRITICAL: TerrainSurface must be initialized BEFORE chunk generation.
+                // Its applySurfaceLayers() function checks _initialized flag and silently
+                // skips if false — causing all biomes to load as raw stone/dirt.
+                if (Donkeycraft.TerrainSurface && typeof Donkeycraft.TerrainSurface.init === 'function') {
+                    Donkeycraft.TerrainSurface.init();
+                    Donkeycraft.Logger.info('Game', 'TerrainSurface initialized — surface layers enabled');
+                } else if (Donkeycraft.TerrainSurface) {
+                    Donkeycraft.Logger.warn('Game', 'TerrainSurface.init() not available — surface layers may not work');
+                }
+                // WaterGenerator — lake detection, surface water flow
+                if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.init === 'function') {
+                    Donkeycraft.WaterGenerator.init();
+                }
+                // StructureGenerator — trees, cacti, surface structures
+                if (Donkeycraft.StructureGenerator && typeof Donkeycraft.StructureGenerator.init === 'function') {
+                    Donkeycraft.StructureGenerator.init();
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'Terrain module initialization had errors: ' + (e && e.message ? e.message : String(e)));
+            }
+
+            // ============================================================
             // Exhaustive land spawn search — always finds valid land position.
             // Uses Player.findLandSpawnPosition() which performs an unlimited
             // spiral search outward from (0, 0) until flat solid ground near
@@ -415,46 +460,6 @@
             // Create event bus and register as global for emitSafe()
             this._eventBus = new Donkeycraft.EventBus();
             Donkeycraft.EventBus.setGlobal(this._eventBus);
-
-            // Initialize world generation subsystems (must happen before first chunk load)
-            if (Donkeycraft.Physics && Donkeycraft.Physics.init) {
-                Donkeycraft.Physics.init();
-            }
-            if (Donkeycraft.LightingEngine && Donkeycraft.LightingEngine.init) {
-                Donkeycraft.LightingEngine.init();
-            }
-            if (Donkeycraft.OreGenerator && Donkeycraft.OreGenerator.init) {
-                Donkeycraft.OreGenerator.init();
-            }
-
-            // Initialize terrain generation modules — block ID resolution and configuration.
-            // These MUST be initialized before any chunk generation occurs, because
-            // chunk generation calls applySurfaceLayers() which checks _initialized flag.
-            try {
-                if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.init === 'function') {
-                    Donkeycraft.SurfaceGenerator.init();
-                }
-                // CRITICAL: TerrainSurface must be initialized BEFORE chunk generation.
-                // Its applySurfaceLayers() function checks _initialized flag and silently
-                // skips if false — causing all biomes to load as raw stone/dirt.
-                if (Donkeycraft.TerrainSurface && typeof Donkeycraft.TerrainSurface.init === 'function') {
-                    Donkeycraft.TerrainSurface.init();
-                    Donkeycraft.Logger.info('Game', 'TerrainSurface initialized — surface layers enabled');
-                } else if (Donkeycraft.TerrainSurface) {
-                    Donkeycraft.Logger.warn('Game', 'TerrainSurface.init() not available — surface layers may not work');
-                }
-                if (Donkeycraft.CaveGenerator && typeof Donkeycraft.CaveGenerator.init === 'function') {
-                    // CaveGenerator doesn't have init, but ensure it's ready
-                }
-                if (Donkeycraft.WaterGenerator && typeof Donkeycraft.WaterGenerator.init === 'function') {
-                    Donkeycraft.WaterGenerator.init();
-                }
-                if (Donkeycraft.StructureGenerator && typeof Donkeycraft.StructureGenerator.init === 'function') {
-                    Donkeycraft.StructureGenerator.init();
-                }
-            } catch (e) {
-                Donkeycraft.Logger.warn('Game', 'Terrain module initialization had errors: ' + (e && e.message ? e.message : String(e)));
-            }
 
             // Initialize portal system with chunk manager reference and dimension type
             if (Donkeycraft.Portal && Donkeycraft.Portal.init) {
