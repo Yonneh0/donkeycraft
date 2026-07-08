@@ -31,7 +31,7 @@
         // Observer states: Map<"x,y,z", { facing: number, lastBlockId: number, lastBlockMeta: number, cooldown: number }}
         var _observerStates = {};
 
-        // Pulse duration in ticks (Minecraft: 1 tick)
+        // Pulse duration in ticks
         var PULSE_DURATION_TICKS = 1;
 
         /**

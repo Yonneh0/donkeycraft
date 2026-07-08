@@ -212,30 +212,21 @@
             // Create and upload the texture atlas from generated textures.
             // The init-sequence already called AssetGenerator.generateAllTextures()
             // and stored results in AssetManager — retrieve them here.
+            // NOTE: Texture atlas generation is now async with requestIdleCallback chunking
+            // to avoid blocking the main thread. See _buildTextureAtlasAsync().
             // ============================================================
             this._textureAtlas = null;
-            try {
-                var generatedTex = Donkeycraft.AssetManager ? Donkeycraft.AssetManager.getAllTextures() : null;
-                if (generatedTex && Object.keys(generatedTex).length > 0) {
-                    // Register each generated texture on the atlas
-                    var atlas = new Donkeycraft.TextureAtlas(this._gl);
-                    var blocks = Donkeycraft.BlockRegistry ? Donkeycraft.BlockRegistry.getAllBlocks() : [];
-                    for (var _i = 0; _i < blocks.length; _i++) {
-                        var _b = blocks[_i];
-                        if (generatedTex[_b.id]) {
-                            atlas.registerBlockTexture(_b.id, generatedTex[_b.id]);
-                        }
-                    }
-                    if (atlas.generate()) {
-                        this._textureAtlas = atlas;
-                    } else {
-                        Donkeycraft.Logger.warn('Game', 'Texture atlas generation failed — will use placeholder');
-                    }
-                } else {
-                    Donkeycraft.Logger.warn('Game', 'No generated textures found in AssetManager — will use placeholder');
-                }
-            } catch (e) {
-                Donkeycraft.Logger.error('Game', 'Texture atlas creation failed: ' + e.message);
+            // Defer texture atlas build to requestIdleCallback so loading screen stays responsive
+            var gameInstance = this;
+            if (typeof requestIdleCallback !== 'undefined') {
+                requestIdleCallback(function () {
+                    gameInstance._buildTextureAtlasAsync();
+                });
+            } else {
+                // Fallback: use setTimeout to avoid blocking
+                setTimeout(function () {
+                    gameInstance._buildTextureAtlasAsync();
+                }, 0);
             }
 
             // Create terrain renderer (pass lighting for dynamic time-of-day)
@@ -1324,6 +1315,88 @@
     // ============================================================
 
     /**
+     * _buildTextureAtlasAsync — asynchronously build the texture atlas using requestIdleCallback.
+     * Chunks texture registration and canvas upload into batches to avoid blocking the main thread.
+     * This prevents multi-second freezes during initialization when hundreds of textures must be
+     * converted from canvas to Image elements and uploaded to WebGL.
+     * @private
+     */
+    Donkeycraft.Game.prototype._buildTextureAtlasAsync = function () {
+        if (!this._gl || !Donkeycraft.AssetManager || !Donkeycraft.BlockRegistry) {
+            Donkeycraft.Logger.warn('Game', 'Texture atlas build skipped — required systems not available');
+            return;
+        }
+
+        var generatedTex = Donkeycraft.AssetManager.getAllTextures();
+        if (!generatedTex || Object.keys(generatedTex).length === 0) {
+            Donkeycraft.Logger.warn('Game', 'No generated textures found in AssetManager');
+            return;
+        }
+
+        // Create atlas and register blocks
+        var atlas = new Donkeycraft.TextureAtlas(this._gl);
+        var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
+
+        // Process blocks in batches to avoid blocking
+        var BATCH_SIZE = 50;
+        var totalBlocks = blocks.length;
+        var processed = 0;
+        var gameInstance = this;
+
+        var processBatch = function () {
+            var end = Math.min(processed + BATCH_SIZE, totalBlocks);
+            for (var i = processed; i < end; i++) {
+                var block = blocks[i];
+                if (generatedTex[block.id]) {
+                    atlas.registerBlockTexture(block.id, generatedTex[block.id]);
+                }
+            }
+            processed = end;
+
+            // Check if more batches needed
+            if (processed < totalBlocks) {
+                // Schedule next batch
+                if (typeof requestIdleCallback !== 'undefined') {
+                    requestIdleCallback(processBatch);
+                } else {
+                    setTimeout(processBatch, 0);
+                }
+            } else {
+                // All blocks processed — generate the atlas
+                try {
+                    if (atlas.generate()) {
+                        gameInstance._textureAtlas = atlas;
+                        Donkeycraft.Logger.info('Game', 'Texture atlas generated successfully with ' + totalBlocks + ' textures');
+
+                        // Persist texture cache to IndexedDB for faster page reloads
+                        if (Donkeycraft.Storage && Donkeycraft.Storage.putTextureAtlas) {
+                            try {
+                                Donkeycraft.Storage.putTextureAtlas(generatedTex).catch(function() { /* ignore */ });
+                            } catch (e) { /* ignore persistence errors */ }
+                        }
+
+                        // Wire atlas onto terrain renderer if not already done
+                        if (gameInstance._textureAtlas && gameInstance._terrainRenderer && gameInstance._terrainRenderer.setTextureAtlas) {
+                            gameInstance._terrainRenderer.setTextureAtlas(gameInstance._textureAtlas);
+                        }
+                    } else {
+                        Donkeycraft.Logger.warn('Game', 'Texture atlas generation failed — will use placeholder');
+                    }
+                } catch (e) {
+                    Donkeycraft.Logger.error('Game', 'Texture atlas creation failed: ' + e.message);
+                }
+            }
+        };
+
+        // Start processing
+        if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(processBatch);
+        } else {
+            setTimeout(processBatch, 0);
+        }
+    };
+
+    /**
      * Get the current time of day [0, 1) from WorldTime instance.
      * Uses frozen time if set, otherwise computes from tick count.
      * @private
@@ -1952,6 +2025,7 @@
         // The tick path (_updateChunks) handles dirty chunk tracking,
         // but we also need a render-time check for chunks that became
         // dirty between ticks (e.g., from block placement/breaking).
+        // CRITICAL FIX: Clear dirty flags after rendering to prevent per-frame rebuilds.
         if (this._terrainRenderer && this._player) {
             var pos = this._player.getPosition();
             var chunkX = Math.floor(pos.x / Config.CHUNK_SIZE);
@@ -1963,6 +2037,12 @@
 
             if (playerChanged || hasDirtyChunks) {
                 this._terrainRenderer.updateChunks(chunkX, chunkZ);
+
+                // CRITICAL: Clear dirty chunk flags after rendering to prevent
+                // per-frame mesh rebuilds that cause multi-second freezes.
+                if (hasDirtyChunks && this._chunkManager.clearDirtyChunks) {
+                    this._chunkManager.clearDirtyChunks();
+                }
             }
         }
 

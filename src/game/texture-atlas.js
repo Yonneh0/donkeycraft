@@ -5,7 +5,7 @@
 // - 16×16 grid of 16×16 pixel textures = 256×256 total atlas size
 // - Block ID maps to grid position: col = id % 16, row = floor(id / 16)
 // - texSubImage2D places the first image row at V=0 (bottom of texture region), so UVs map directly
-// - Nearest-neighbor filtering is used for pixelated Minecraft-style rendering
+// - Nearest-neighbor filtering is used for pixelated rendering
 //
 // @module texture-atlas
 (function () {
@@ -306,7 +306,7 @@
             }
         }
 
-        // Set texture parameters for nearest-neighbor filtering (pixelated Minecraft look)
+        // Set texture parameters for nearest-neighbor filtering (pixelated look)
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);

@@ -151,7 +151,7 @@
     };
 
     /**
-     * ColorValues — 16 Minecraft wool/dye colors.
+     * ColorValues — 16 wool/dye colors.
      * @enum {string}
      */
     Donkeycraft.ColorValues = {

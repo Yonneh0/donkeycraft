@@ -1,5 +1,5 @@
 // Donkeycraft — Block Definitions
-// All 256+ vanilla Minecraft block definitions with IDs, names, hardness, blast resistance, drops, transparency flags.
+// All 256+ block definitions with IDs, names, hardness, blast resistance, drops, transparency flags.
 (function () {
     'use strict';
 
@@ -41,7 +41,7 @@
     // ============================================================
 
     /**
-     * BlockRegistry — central registry of all vanilla Minecraft blocks.
+     * BlockRegistry — central registry of all blocks.
      */
     Donkeycraft.BlockRegistry = (function () {
         var _blocks = {};         // id -> Block

@@ -112,7 +112,7 @@
      */
     Donkeycraft.Lighting.prototype.getSunDirection = function () {
         var sunAngle = (this._timeOfDay - 0.25) * Math.PI * 2;
-        // Fixed: Use flat XZ arc (Y up) for Minecraft-style lighting.
+        // Fixed: Use flat XZ arc (Y up).
         // The sun moves in a horizontal plane so it can be directly overhead
         // at noon (t=0.5 => angle=0 => direction=(1,0,0)).
         return new Donkeycraft.Vector3(

@@ -10,7 +10,7 @@
     // Block IDs
     var TNT = 183;
 
-    // Explosion constants (Minecraft-accurate)
+    // Explosion constants
     var FUSE_TICKS = 40;       // 2 seconds at 20 TPS
     var EXPLOSION_RADIUS = 8;  // TNT blast radius
     var EXPLOSION_DAMAGE = 10; // Maximum entity damage

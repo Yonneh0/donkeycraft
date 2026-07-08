@@ -73,7 +73,7 @@
             SWIM_DOWNSPEED: 0.12,        // Downward velocity when swimming with shift in water (blocks/s)
             JUMP_COOLDOWN: 0.1,          // Cooldown between jumps (seconds)
             FALL_DAMAGE_THRESHOLD: 3,    // Blocks of free fall before damage begins
-            FALL_DAMAGE_MULTIPLIER: 1.0, // HP damage per block beyond threshold (1.0 = vanilla Minecraft behavior)
+            FALL_DAMAGE_MULTIPLIER: 1.0, // HP damage per block beyond threshold
 
             // Lighting (reserved for future use — current implementation uses block lightOpacity/lightLevel properties)
             SKY_LIGHT_DECAY: 1,         // Sky light decay per block (unused)

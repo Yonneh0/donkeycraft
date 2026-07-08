@@ -292,7 +292,7 @@
             });
 
             // Persist state to chunk by setting a metadata-tagged block ID.
-            // In vanilla Minecraft, doors/trapdoors use metadata bits for open/closed state.
+            // doors/trapdoors use metadata bits for open/closed state.
             // Since our Chunk uses Uint8Array (no metadata), we store state in _interactiveStateStore
             // and emit events so downstream systems can handle rendering updates.
             // For persistence across saves, the state store is serialized via world-store.

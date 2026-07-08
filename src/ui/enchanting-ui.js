@@ -494,7 +494,6 @@
             var baseCost = registry.calculateLevelCost ? registry.calculateLevelCost(enchant.id, randomLevel) : randomLevel;
 
             // Apply option position multiplier: first option is cheapest (1x), second is 1.5x, third is 2x
-            // This mirrors vanilla Minecraft's enchanting table behavior where later options cost more
             var positionMultiplier = [1, 1.5, 2][this._enchantOptions.length];
             var cost = Math.ceil(baseCost * positionMultiplier);
 

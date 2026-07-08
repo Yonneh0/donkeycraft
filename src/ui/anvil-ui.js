@@ -180,7 +180,7 @@
     /**
      * _calculateRepairDurability — calculates the repaired durability for an item.
      * Uses average of both current durabilities + 25% of max, capped at max durability.
-     * In Minecraft's anvil, repair combines: (leftDur + rightDur) / 2 + maxDur * 0.25
+     * repair combines: (leftDur + rightDur) / 2 + maxDur * 0.25
      * @param {Donkeycraft.ItemStack} leftStack - Left input stack.
      * @param {Donkeycraft.ItemStack} rightStack - Right input stack.
      * @returns {number} Repaired durability value (0 if inputs are invalid).
@@ -326,7 +326,7 @@
                     if (leftEnchants) {
                         for (var le = 0; le < leftEnchants.length; le++) {
                             if (leftEnchants[le].id === rightEnchId) {
-                                // Upgrade to higher level (Minecraft rule: max of both, no incompatibility upgrade)
+                                // Upgrade to higher level (max of both, no incompatibility upgrade)
                                 if (rightEnchLevel > leftEnchants[le].level) {
                                     // Only upgrade if compatible with existing enchantments
                                     var compatible = true;
@@ -364,7 +364,7 @@
                         if (newCompatible) {
                             combined.addEnchantment(rightEnchId, rightEnchLevel);
                         }
-                        // Incompatible enchantments are silently skipped (Minecraft behavior)
+                        // Incompatible enchantments are silently skipped
                     }
 
                     totalEnchantLevel += rightEnchLevel;

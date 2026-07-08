@@ -102,7 +102,7 @@
         }
 
         /**
-         * registerEffects — registers all vanilla Minecraft status effects.
+         * registerEffects — registers all status effects.
          * @returns {number} Total number of registered effects.
          */
         function registerEffects() {
@@ -132,7 +132,7 @@
         }
 
         /**
-         * registerPotions — registers all vanilla Minecraft potions.
+         * registerPotions — registers all vanilla potions.
          * @returns {number} Total number of registered potions.
          */
         function registerPotions() {

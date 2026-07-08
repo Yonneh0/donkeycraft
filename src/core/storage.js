@@ -13,9 +13,11 @@
     var METADATA_KEY = '__donkeycraft_metadata__';
     var CHUNK_STORE_NAME = 'chunks';
     var META_STORE_NAME = 'metadata';
+    var TEXTURE_STORE_NAME = 'textures';
     var DB_NAME = 'DonkeycraftStorage';
     var DB_VERSION = STORAGE_VERSION;
     var MAX_CHUNK_CACHE_SIZE = 50; // Max chunks to keep in memory (LRU)
+    var MAX_TEXTURE_CACHE_SIZE = 512; // Max textures in memory cache
 
     // ============================================================
     // Runtime State
@@ -139,6 +141,11 @@
                     // Metadata store: stores small metadata (last save time, version, etc.)
                     if (!db.objectStoreNames.contains(META_STORE_NAME)) {
                         db.createObjectStore(META_STORE_NAME, { keyPath: 'key' });
+                    }
+
+                    // Texture atlas store: stores serialized texture data URLs for fast reload
+                    if (!db.objectStoreNames.contains(TEXTURE_STORE_NAME)) {
+                        db.createObjectStore(TEXTURE_STORE_NAME, { keyPath: 'key' });
                     }
                 };
             } catch (e) {
@@ -437,6 +444,135 @@
     }
 
     // ============================================================
+    // Texture Atlas Cache Operations
+    // ============================================================
+
+    /**
+     * Save a texture atlas tile to IndexedDB for cache persistence.
+     * Stores the base64 data URL which can be restored on page reload.
+     * @param {string} key - Texture key (e.g., "block_stone_42").
+     * @param {string} dataUrl - Base64 PNG data URL of the texture.
+     * @returns {Promise<void>} Resolves when saved.
+     */
+    function putTexture(key, dataUrl) {
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
+
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([TEXTURE_STORE_NAME], 'readwrite');
+                var store = tx.objectStore(TEXTURE_STORE_NAME);
+                var request = store.put({ key: key, data: dataUrl, savedAt: Date.now() });
+
+                request.onsuccess = function () { resolve(); };
+                request.onerror = function () { resolve(); }; // Resolve even on error
+            } catch (e) {
+                resolve();
+            }
+        });
+    }
+
+    /**
+     * Save multiple texture atlas tiles in a single batched flush.
+     * @param {Object} textures - Object mapping keys to data URLs.
+     * @returns {Promise<void>} Resolves when all saved.
+     */
+    function putTextureAtlas(textures) {
+        if (!textures || typeof textures !== 'object') return Promise.resolve();
+
+        var promises = [];
+        for (var key in textures) {
+            if (textures.hasOwnProperty(key)) {
+                promises.push(putTexture(key, textures[key]));
+            }
+        }
+        return Promise.all(promises).then(function () {
+            // Force flush to ensure all writes complete
+            return flush();
+        });
+    }
+
+    /**
+     * Get a cached texture from IndexedDB.
+     * @param {string} key - Texture key.
+     * @returns {Promise<string|null>} Resolves to data URL or null.
+     */
+    function getTexture(key) {
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve(null);
+
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([TEXTURE_STORE_NAME], 'readonly');
+                var store = tx.objectStore(TEXTURE_STORE_NAME);
+                var request = store.get(key);
+
+                request.onsuccess = function () {
+                    resolve(request.result && request.result.data !== undefined ? request.result.data : null);
+                };
+
+                request.onerror = function () {
+                    resolve(null);
+                };
+            } catch (e) {
+                resolve(null);
+            }
+        });
+    }
+
+    /**
+     * Load all cached textures from IndexedDB for bulk restoration.
+     * @returns {Promise<Object>} Object mapping keys to data URLs.
+     */
+    function getAllTextures() {
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve({});
+
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([TEXTURE_STORE_NAME], 'readonly');
+                var store = tx.objectStore(TEXTURE_STORE_NAME);
+                var request = store.getAll();
+
+                request.onsuccess = function () {
+                    var result = {};
+                    var entries = request.result || [];
+                    for (var i = 0; i < entries.length; i++) {
+                        if (entries[i] && entries[i].data) {
+                            result[entries[i].key] = entries[i].data;
+                        }
+                    }
+                    resolve(result);
+                };
+
+                request.onerror = function () {
+                    resolve({});
+                };
+            } catch (e) {
+                resolve({});
+            }
+        });
+    }
+
+    /**
+     * Clear the texture cache from IndexedDB.
+     * @returns {Promise<void>} Resolves when cleared.
+     */
+    function clearTextureCache() {
+        if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
+
+        return new Promise(function (resolve) {
+            try {
+                var tx = _db.transaction([TEXTURE_STORE_NAME], 'readwrite');
+                var store = tx.objectStore(TEXTURE_STORE_NAME);
+                var request = store.clear();
+
+                request.onsuccess = function () { resolve(); };
+                request.onerror = function () { resolve(); };
+            } catch (e) {
+                resolve();
+            }
+        });
+    }
+
+    // ============================================================
     // High-Level Cache Operations
     // ============================================================
 
@@ -650,7 +786,14 @@
          * @param {number} seed - World seed.
          * @returns {string} Cache key string.
          */
-        makeKey: _makeKey
+        makeKey: _makeKey,
+
+        // Texture cache operations
+        putTexture: putTexture,
+        putTextureAtlas: putTextureAtlas,
+        getTexture: getTexture,
+        getAllTextures: getAllTextures,
+        clearTextureCache: clearTextureCache
     };
 
 })();

@@ -47,7 +47,7 @@
      * - `name`: Human-readable face name used for UV texture lookup
      *   (`"up"`, `"down"`, `"north"`, `"south"`, `"east"`, `"west"`).
      * - `light`: Baked light intensity factor in range `[0.5, 1.0]`.
-     *   Higher values = brighter face. Based on standard Minecraft-style lighting:
+     *   Higher values = brighter face:
      *   - Top (+Y): brightest (sun-facing)
      *   - South (+Z): bright (direct sunlight exposure)
      *   - East (+X): medium-bright (partial shadow)

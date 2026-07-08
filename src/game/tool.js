@@ -53,7 +53,7 @@
         }
 
         /**
-         * registerMaterials — registers all vanilla Minecraft tool materials.
+         * registerMaterials — registers all tool materials.
          * @returns {number} Total number of registered materials.
          */
         function registerMaterials() {
@@ -389,7 +389,7 @@
 
         /**
          * calculateDurabilityWithUnbreaking — calculates expected durability consumption with the Unbreaking enchantment.
-         * Uses the Minecraft formula: chance of not consuming durability = 1 / (unbreakingLevel + 1).
+         * chance of not consuming durability = 1 / (unbreakingLevel + 1).
          * @param {number} materialId - Tool material ID.
          * @param {number} baseDamage - Base damage to apply (typically 1 per block break).
          * @param {number} unbreakingLevel - Unbreaking enchantment level (0 = no unbreaking).
@@ -401,7 +401,7 @@
 
             if (unbreakingLevel <= 0) return baseDamage;
 
-            // Minecraft formula: expected durability = baseDamage * (unbreakingLevel + 1)
+            // expected durability = baseDamage * (unbreakingLevel + 1)
             // This represents the average number of uses before breaking
             var expectedUses = baseDamage * (unbreakingLevel + 1);
 

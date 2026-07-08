@@ -1270,7 +1270,7 @@
      * Calculate fall damage based on distance fallen.
      * 
      * Formula: max(0, (fallDistance - threshold) × FALL_DAMAGE_MULTIPLIER).
-     * The first 3 blocks of free fall deal no damage (vanilla Minecraft behavior).
+     * The first 3 blocks of free fall deal no damage.
      * Each block beyond the threshold deals `FALL_DAMAGE_MULTIPLIER` HP of damage.
      * 
      * @param {number} [fallDistance=0] - Distance fallen in blocks.

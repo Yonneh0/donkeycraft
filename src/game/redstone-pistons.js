@@ -20,7 +20,7 @@
     var FACING_WEST = 4;
     var FACING_EAST = 5;
 
-    // Maximum push distance (Minecraft: 12 blocks)
+    // Maximum push distance
     var MAX_PUSH_DISTANCE = 12;
 
     // Block IDs that cannot be pushed

@@ -336,9 +336,9 @@
 
         // Validate inputs to prevent rendering artifacts.
         health = Math.max(0, Math.min(maxHealth, health | 0));
-        maxHealth = Math.max(1, (maxHealth | 0) || 20);
+        maxHealth = Math.max(1, (maxHealth | 0) || 100);
 
-        // Clamp health values to valid range (0–20 standard Minecraft health).
+        // Clamp health values to valid range.
         health = Math.max(0, Math.min(health, maxHealth));
         maxHealth = Math.max(1, maxHealth);
 
@@ -458,9 +458,8 @@
 
         // Validate inputs to prevent rendering artifacts.
         food = Math.max(0, Math.min(maxFood, food | 0));
-        maxFood = Math.max(1, (maxFood | 0) || 20);
+        maxFood = Math.max(1, (maxFood | 0) || 50);
 
-        // Clamp food values to valid range (0–20 standard Minecraft hunger).
         food = Math.max(0, Math.min(food, maxFood));
         maxFood = Math.max(1, maxFood);
 

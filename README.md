@@ -1,6 +1,6 @@
 # Donkeycraft
 
-A Minecraft-like voxel game built entirely in HTML, CSS, and JavaScript — no servers, no build tools, no external dependencies. Runs directly from `file:///` in Chrome.
+A voxel game built entirely in HTML, CSS, and JavaScript — no servers, no build tools, no external dependencies. Runs directly from `file:///` in Chrome.
 
 ## Overview
 

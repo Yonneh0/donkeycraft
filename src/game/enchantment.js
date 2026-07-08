@@ -70,7 +70,7 @@
         }
 
         /**
-         * registerEnchantments — registers all vanilla Minecraft enchantments.
+         * registerEnchantments — registers all enchantments.
          * @returns {number} Total number of registered enchantments.
          */
         function registerEnchantments() {
@@ -284,7 +284,7 @@
 
             level = Math.max(1, Math.min(level || 1, enchant.maxLevel));
 
-            // Cost formula: level^2 * weight factor (simplified Minecraft-like)
+            // Cost formula: level^2 * weight factor
             var baseCost = level * level;
             var weightFactor = Math.max(1, Math.floor(10 / enchant.weight));
             return baseCost * weightFactor;

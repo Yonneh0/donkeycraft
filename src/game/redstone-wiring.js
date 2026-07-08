@@ -36,7 +36,7 @@
         // Redstone torch states: Map<"x,y,z", { powered: boolean, tick: number }}
         var _torchStates = {};
 
-        // Maximum signal distance (Minecraft: 15 blocks)
+        // Maximum signal distance
         var MAX_SIGNAL_DISTANCE = 15;
 
         /**

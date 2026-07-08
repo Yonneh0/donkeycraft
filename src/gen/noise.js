@@ -23,8 +23,15 @@
      * @private
      */
     function _ensureNoiseInit() {
+        // Fast path: skip all checks if already initialized
+        if (_noiseInitDone) return;
+
         if (!Donkeycraft.PerlinNoise) return;
-        if (typeof Donkeycraft.PerlinNoise.init !== 'function') return;
+        if (typeof Donkeycraft.PerlinNoise.init !== 'function') {
+            // Can't initialize yet — mark done so we don't retry every call
+            _noiseInitDone = true;
+            return;
+        }
 
         var isInit = false;
         // Check via the public getter method first
@@ -38,14 +45,21 @@
                 Donkeycraft.PerlinNoise.init(seed);
             } catch (e) {
                 // Silently fail — PerlinNoise may not be ready yet
+                return;
             }
         }
+
+        // Mark as initialized so subsequent calls skip all checks
+        _noiseInitDone = true;
     }
 
     // ============================================================
     // Mulberry32 PRNG — fast, deterministic pseudo-random number generator
     // Each generator gets its own isolated PRNG state to avoid cross-contamination.
     // ============================================================
+
+    /** @type {boolean} True once PerlinNoise has been initialized. */
+    var _noiseInitDone = false;
 
     /** @type {Object.<string, number>} Internal storage for per-namespace PRNG states. */
     var _rngStates = {};

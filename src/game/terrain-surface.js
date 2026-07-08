@@ -75,7 +75,6 @@
         if (!Donkeycraft.BlockRegistry) return;
 
         // Define primary names and fallback variants for each surface block type.
-        // Covers both snake_case (Minecraft 1.13+) and camelCase (legacy) naming conventions.
         var blockVariants = [
             { key: 'grass_block', variants: ['grass_block', 'grass_block_top', 'grass_block_side', 'grass', 'grassblock'] },
             { key: 'dirt', variants: ['dirt'] },

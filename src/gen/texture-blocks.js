@@ -94,7 +94,7 @@
 
     /**
      * Generate a blue ice texture — more opaque with deeper blue tones.
-     * Used for packed/blue ice variants in Minecraft.
+     * Used for packed/blue ice variants.
      * @returns {HTMLImageElement|null} Generated 16×16 blue ice texture, or null on failure.
      */
     function generateBlueIce() {
