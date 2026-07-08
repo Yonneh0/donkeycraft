@@ -135,6 +135,9 @@
 
         // Time-of-day dial UI (standalone, separate from map renderer)
         this._todUI = null;
+
+        // Keybindings panel (top-center display)
+        this._keybindingsPanel = null;
     };
 
     /**
@@ -479,6 +482,18 @@
                 }
             });
             this._todUI.init();
+
+            // Initialize keybindings panel — display-only top-center bar with keycap SVGs
+            try {
+                if (Donkeycraft.KeybindingsPanel) {
+                    this._keybindingsPanel = new Donkeycraft.KeybindingsPanel();
+                    this._keybindingsPanel.setGameMode(this._gameMode);
+                    this._keybindingsPanel.startListening(this._timer);
+                    Donkeycraft.Logger.info('Game', 'KeybindingsPanel initialized');
+                }
+            } catch (e) {
+                Donkeycraft.Logger.warn('Game', 'KeybindingsPanel init failed: ' + e.message);
+            }
 
             return true;
 
@@ -1437,6 +1452,10 @@
                     if (toggled) {
                         var isFlying = this._flyingSystem.isFlying();
                         Donkeycraft.Logger.info('Game', 'Fly mode ' + (isFlying ? 'enabled' : 'disabled') + ' for game mode: ' + this._player.getGameMode());
+                        // Update keybindings panel with new flying state
+                        if (this._keybindingsPanel) {
+                            this._keybindingsPanel.setFlyingState(isFlying);
+                        }
                     }
                 } catch (e) {
                     Donkeycraft.Logger.error('Game', 'Fly toggle error: ' + e.message);
@@ -1461,6 +1480,10 @@
                 // Notify TimeOfDayUI of game mode change for interactive dial
                 if (this._todUI) {
                     this._todUI.setGameMode(newMode);
+                }
+                // Update keybindings panel with new game mode
+                if (this._keybindingsPanel) {
+                    this._keybindingsPanel.setGameMode(newMode);
                 }
             } catch (e) {
                 Donkeycraft.Logger.error('Game', 'Game mode cycle error: ' + e.message);
