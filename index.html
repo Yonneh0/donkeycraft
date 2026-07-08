@@ -17,11 +17,9 @@
     <link rel="stylesheet" href="src/ui/item-stack.css">
     <!-- item-stack (Core Game Item: square tile with icon, stack count, durability meter) -->
     <link rel="stylesheet" href="src/ui/hotbar.css"> <!-- hotbar (Belt Items) -->
-    <link rel="stylesheet" href="src/ui/inventory.css"> <!-- inventory (Base Inventory) -->
+    <link rel="stylesheet" href="src/ui/inventory-ui.css"> <!-- inventory-ui (Player Inventory Panel) -->
     <link rel="stylesheet" href="src/ui/crafting-grid.css"> <!-- crafting-grid -->
     <link rel="stylesheet" href="src/ui/anvil-ui.css"> <!-- anvil-ui (Crafting Interface) -->
-    <link rel="stylesheet" href="src/ui/creative-inventory.css">
-    <!-- creative-inventory (Expanded Creative Inventory features) -->
     <link rel="stylesheet" href="src/ui/chest-ui.css"> <!-- chest-ui (External Container UI) -->
     <link rel="stylesheet" href="src/ui/furnace-ui.css"> <!-- furnace-ui (External Container UI) -->
     <link rel="stylesheet" href="src/ui/enchanting-ui.css"> <!-- enchanting-ui (Spellcrafting Interface) -->
@@ -129,6 +127,92 @@
     </div>
     <canvas id="dk-minimap-canvas" width="150" height="150"></canvas>
 
+    <!-- Player Inventory Panel -->
+    <div id="dk-inventory-panel" class="dk-inventory-panel">
+        <!-- Title bar -->
+        <div class="dk-inventory-titlebar">
+            <span class="dk-title-text">Inventory of Player</span>
+            <div class="dk-inventory-close-btn" id="dk-inventory-close-btn">X</div>
+        </div>
+
+        <!-- Main content area -->
+        <div class="dk-inventory-content">
+            <!-- Left pane — Player Paperdoll + Equipment Slots -->
+            <div class="dk-inventory-left-pane">
+                <!-- Equipment layout: left slots | paperdoll | right slots -->
+                <div class="dk-equipment-layout">
+                    <!-- Left column: 4 slots stacked, gap, then 1 slot (aligned with the 2 right columns) -->
+                    <div class="dk-equip-col dk-equip-left">
+                        <div class="dk-equip-slot" data-slot="helm"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-slot" data-slot="chest"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-slot" data-slot="legs"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-slot" data-slot="boots"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-half-space"></div>
+                        <div class="dk-equip-slot" data-slot="shield"><span class="dk-slot-item"></span></div>
+                    </div>
+
+                    <!-- Center: Paperdoll placeholder with smoke effect -->
+                    <div class="dk-equip-center">
+                        <div class="dk-paperdoll-container">
+                            <div class="dk-paperdoll"></div>
+                            <div class="dk-paperdoll-smoke">
+                                <div class="dk-smoke-particle"></div>
+                                <div class="dk-smoke-particle"></div>
+                                <div class="dk-smoke-particle"></div>
+                                <div class="dk-smoke-particle"></div>
+                                <div class="dk-smoke-particle"></div>
+                                <div class="dk-smoke-particle"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right column: 2 columns of 4 slots, gap, then 2 horizontal slots -->
+                    <div class="dk-equip-col dk-equip-right">
+                        <div class="dk-equip-slot-col">
+                            <div class="dk-equip-slot" data-slot="neck"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="offhand"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="belt"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="ring1"><span class="dk-slot-item"></span></div>
+                        </div>
+                        <div class="dk-equip-slot-col">
+                            <div class="dk-equip-slot" data-slot="ring2"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="ring3"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="ring4"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="ring5"><span class="dk-slot-item"></span></div>
+                        </div>
+                        <div class="dk-equip-half-space"></div>
+                        <div class="dk-equip-slot-row">
+                            <div class="dk-equip-slot" data-slot="ring6"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="ring7"><span class="dk-slot-item"></span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Inventory Grid Section (bottom 2/5 of panel) -->
+
+                <div class="dk-inventory-grid-section">
+                    <div class="dk-inventory-grid-wrapper">
+                        <div id="dk-inventory-grid" class="dk-inventory-grid"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right pane — 9 Container slots in vertical stack -->
+            <div class="dk-inventory-right-pane">
+                <div class="dk-container-stack">
+                    <div class="dk-container-slot" data-slot="c1"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c2"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c3"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c4"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c5"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c6"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c7"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c8"><span class="dk-slot-item"></span></div>
+                    <div class="dk-container-slot" data-slot="c9"><span class="dk-slot-item"></span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============================================================
      Load project scripts in dependency order
      ============================================================ -->
@@ -203,11 +287,10 @@
 
     <!-- Inventory & UI -->
     <script src="src/ui/item-stack.js"></script>
-    <script src="src/ui/inventory.js"></script>
     <script src="src/ui/gui-manager.js"></script>
     <script src="src/ui/hotbar.js"></script>
+    <script src="src/ui/inventory-ui.js"></script> <!-- Player Inventory Panel -->
     <script src="src/ui/crafting-grid.js"></script>
-    <script src="src/ui/creative-inventory.js"></script>
     <script src="src/ui/furnace-ui.js"></script>
     <script src="src/ui/chest-ui.js"></script>
     <script src="src/ui/anvil-ui.js"></script>
@@ -1228,6 +1311,26 @@ void main() {
                                     hotbar.setSlots(inv.getHotbarStacks());
                                 }
                             } catch (e) { }
+                        }
+
+                        // --- Wire up Player Inventory UI ---
+                        try {
+                            var inventoryUI = new Donkeycraft.InventoryUI(null, hotbar);
+                            game2._inventoryUI = inventoryUI;
+
+                            // Wire keyboard shortcut (I key) to toggle inventory
+                            document.addEventListener('keydown', function (e2) {
+                                if (e2.code === 'KeyI' && !e2.ctrlKey && !e2.metaKey && !e2.altKey) {
+                                    e2.preventDefault();
+                                    if (game2._inventoryUI) {
+                                        game2._inventoryUI.toggle();
+                                    }
+                                }
+                            });
+
+                            Donkeycraft.Logger.info('Game', 'Player Inventory UI initialized');
+                        } catch (e) {
+                            Donkeycraft.Logger.error('Game', 'InventoryUI error: ' + e.message);
                         }
 
                         // Listen for hotbar selection changes

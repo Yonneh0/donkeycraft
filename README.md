@@ -240,8 +240,6 @@ src/                # Sauce
     chest-ui.js           # Chest GUI
     crafting-grid.css     # Crafting table styles
     crafting-grid.js      # 3×3 crafting table
-    creative-inventory.css# Creative inventory styles
-    creative-inventory.js # Creative item browser
     debug-overlay.css     # Debug screen styles
     debug-overlay.js      # F3 debug screen
     enchanting-ui.css     # Enchanting GUI styles
@@ -261,8 +259,6 @@ src/                # Sauce
     hotbar.js             # Hotbar UI with integrated stamina bar
     hunger-bar.css        # Hunger bar styles
     hunger-bar.js         # Hunger HUD overlay
-    inventory.css         # Inventory panel styles
-    inventory.js          # Multi-slot inventories
     item-stack.css        # Item stack styles
     item-stack.js         # Item stacks with NBT-like tags
     keybindings-panel.css # Keybinds panel styles

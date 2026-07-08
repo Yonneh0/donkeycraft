@@ -139,6 +139,16 @@ body.dk-pointer-locked #dk-canvas-container {
     -webkit-touch-callout: none;
 }
 
+/* Hotbar container — needs pointer-events for button interaction */
+#dk-hotbar-container {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+    z-index: 5;
+}
+
 /* Error screen */
 #dk-error-screen {
     position: fixed;
