@@ -1431,27 +1431,37 @@
             }
         }
 
-        // Water placement if enabled
+        // Water placement if enabled.
+        // Signature: placeWater(chunk, chunkX, chunkZ, biomeId, heightmap, options)
         if (this._options.water && Donkeycraft.WaterGenerator) {
             try {
                 var waterOpts = { caves: this._options.caves, ores: this._options.ores, water: true, surface: this._options.surface };
                 Donkeycraft.WaterGenerator.placeWater(chunk, chunk.chunkX, chunk.chunkZ, biomeId, heightmap, waterOpts);
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                console.warn('[DebugTerrain] Water placement failed: ' + e.message);
+            }
         }
 
-        // Surface layers if enabled
-        if (this._options.surface && Donkeycraft.TerrainSurface) {
+        // Surface layers if enabled.
+        // Signature: applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap)
+        // Requires biome NAME (string), not biome ID (number).
+        if (this._options.surface && Donkeycraft.TerrainSurface && Donkeycraft.TerrainSurface.applySurfaceLayers) {
             try {
                 var biomeName = 'grass';
                 if (Donkeycraft.BiomeRegistry) {
                     var b = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
-                    if (b) biomeName = b.name;
+                    if (b && b.name) biomeName = b.name;
                 }
                 Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, chunk.chunkX, chunk.chunkZ, biomeName, heightmap);
-            } catch (e) { /* ignore */ }
+            } catch (e) {
+                console.warn('[DebugTerrain] Surface layer application failed: ' + e.message);
+            }
         }
 
+        // Mark chunk as dirty so mesh will be rebuilt on next frame.
+        // Also mark as generated to prevent double-generation if regenerateTerrain is called again.
         chunk._dirty = true;
+        chunk.generated = true;
     };
 
     /**
@@ -1523,15 +1533,29 @@
             } catch (e) { /* ignore */ }
         }
 
-        // Water and surface layers
+        // Water and surface layers.
+        // Signature: placeWater(chunk, chunkX, chunkZ, biomeId, heightmap, options)
         if (this._options.water && Donkeycraft.WaterGenerator && heightmap) {
-            try { Donkeycraft.WaterGenerator.placeWater(chunk, cx || chunk.chunkX, cz || chunk.chunkZ, biomeId, heightmap, this._options); } catch (e) { /* ignore */ }
+            try {
+                var waterOpts = { caves: this._options.caves, ores: this._options.ores, water: true, surface: this._options.surface };
+                Donkeycraft.WaterGenerator.placeWater(chunk, cx || chunk.chunkX, cz || chunk.chunkZ, biomeId, heightmap, waterOpts);
+            } catch (e) { /* ignore */ }
         }
-        if (this._options.surface && Donkeycraft.TerrainSurface && heightmap) {
-            try { Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, cx || chunk.chunkX, cz || chunk.chunkZ, 'grass', heightmap); } catch (e) { /* ignore */ }
+        // Signature: applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap)
+        if (this._options.surface && Donkeycraft.TerrainSurface && Donkeycraft.TerrainSurface.applySurfaceLayers && heightmap) {
+            try {
+                var biomeName = 'grass';
+                if (Donkeycraft.BiomeRegistry) {
+                    var b = Donkeycraft.BiomeRegistry.getBiomeById(biomeId);
+                    if (b && b.name) biomeName = b.name;
+                }
+                Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, cx || chunk.chunkX, cz || chunk.chunkZ, biomeName, heightmap);
+            } catch (e) { /* ignore */ }
         }
 
+        // Mark chunk as dirty/generated to prevent double-generation.
         chunk._dirty = true;
+        chunk.generated = true;
     };
 
     /**

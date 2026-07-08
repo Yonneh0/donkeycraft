@@ -515,21 +515,39 @@
             try { Donkeycraft.OreGenerator.placeOres(chunk, chunk.biomeId); } catch (e) { /* skip */ }
         }
 
-        // Apply water placement if available
+        // Apply water placement if available.
+        // Signature: placeWater(chunk, chunkX, chunkZ, biomeId, heightmap, options)
         if (Donkeycraft.WaterGenerator && Donkeycraft.WaterGenerator.placeWater) {
-            try { Donkeycraft.WaterGenerator.placeWater(chunk, chunk.biomeId, heightmap); } catch (e) { /* skip */ }
+            try {
+                var waterOpts = { caves: true, ores: true, water: true, surface: true };
+                Donkeycraft.WaterGenerator.placeWater(chunk, chunkX, chunkZ, chunk.biomeId, heightmap, waterOpts);
+            } catch (e) {
+                Donkeycraft.Logger.warn('ChunkManager', 'Water placement failed for chunk [' + chunkX + ',' + chunkZ + ']: ' + e.message);
+            }
         }
 
-        // Apply surface layer if available
-        if (Donkeycraft.TerrainSurface && Donkeycraft.TerrainSurface.applySurfaceLayer) {
-            try { Donkeycraft.TerrainSurface.applySurfaceLayer(chunk, chunk.biomeId, heightmap); } catch (e) { /* skip */ }
+        // Apply surface layers if available.
+        // Signature: applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap)
+        // Requires biome NAME (string), not biome ID (number).
+        if (Donkeycraft.TerrainSurface && Donkeycraft.TerrainSurface.applySurfaceLayers) {
+            try {
+                var biomeName = 'grass'; // default fallback
+                if (chunk.biomeId != null && Donkeycraft.BiomeRegistry) {
+                    var biomeObj = Donkeycraft.BiomeRegistry.getBiomeById(chunk.biomeId);
+                    if (biomeObj && biomeObj.name) {
+                        biomeName = biomeObj.name;
+                    }
+                }
+                Donkeycraft.TerrainSurface.applySurfaceLayers(chunk, chunkX, chunkZ, biomeName, heightmap);
+            } catch (e) {
+                Donkeycraft.Logger.warn('ChunkManager', 'Surface layer application failed for chunk [' + chunkX + ',' + chunkZ + ']: ' + e.message);
+            }
         }
 
         // Build surface map for map renderer (O(1) block lookup per frame)
         _buildChunkSurfaceMap(chunk);
 
-        // Mark chunk as needing mesh regeneration and mark that surface map is built
-        chunk._dirty = true;
+        // Mark chunk as generated (mesh building happens separately via terrain renderer)
         chunk.generated = true;
     }
 

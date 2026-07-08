@@ -427,14 +427,21 @@
                 Donkeycraft.OreGenerator.init();
             }
 
-            // Initialize terrain generation modules — block ID resolution and configuration
-            // These must be initialized before any chunk generation occurs.
+            // Initialize terrain generation modules — block ID resolution and configuration.
+            // These MUST be initialized before any chunk generation occurs, because
+            // chunk generation calls applySurfaceLayers() which checks _initialized flag.
             try {
                 if (Donkeycraft.SurfaceGenerator && typeof Donkeycraft.SurfaceGenerator.init === 'function') {
                     Donkeycraft.SurfaceGenerator.init();
                 }
+                // CRITICAL: TerrainSurface must be initialized BEFORE chunk generation.
+                // Its applySurfaceLayers() function checks _initialized flag and silently
+                // skips if false — causing all biomes to load as raw stone/dirt.
                 if (Donkeycraft.TerrainSurface && typeof Donkeycraft.TerrainSurface.init === 'function') {
                     Donkeycraft.TerrainSurface.init();
+                    Donkeycraft.Logger.info('Game', 'TerrainSurface initialized — surface layers enabled');
+                } else if (Donkeycraft.TerrainSurface) {
+                    Donkeycraft.Logger.warn('Game', 'TerrainSurface.init() not available — surface layers may not work');
                 }
                 if (Donkeycraft.CaveGenerator && typeof Donkeycraft.CaveGenerator.init === 'function') {
                     // CaveGenerator doesn't have init, but ensure it's ready
