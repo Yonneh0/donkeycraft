@@ -202,10 +202,13 @@
         })();
     </script>
 
+    <!-- Load entity renderer (for paperdoll 3D rendering) -->
+    <script src="src/render/entity-renderer.js"></script>
+
     <!-- Load inventory JS -->
     <script src="src/ui/inventory-ui.js"></script>
 
-    <!-- Initialize InventoryUI -->
+    <!-- Initialize InventoryUI and PaperdollRenderer -->
     <script>
         (function () {
             'use strict';
@@ -241,6 +244,34 @@
 
             // Open the inventory panel
             invUI.open();
+
+            // Initialize the paperdoll 3D entity renderer
+            (function initPaperdoll() {
+                try {
+                    var paperdollContainer = document.querySelector('.dk-paperdoll-container');
+                    if (paperdollContainer) {
+                        var paperdollRenderer = new Donkeycraft.PaperdollRenderer(paperdollContainer);
+                        if (paperdollRenderer.init()) {
+                            // Store reference for cleanup
+                            window._dkPaperdollRenderer = paperdollRenderer;
+
+                            // Sync with inventory open/close state
+                            invUI.onOpen(function () {
+                                if (paperdollRenderer && !paperdollRenderer.isRunning()) {
+                                    paperdollRenderer.init();
+                                }
+                            });
+                            invUI.onClose(function () {
+                                if (paperdollRenderer && paperdollRenderer.isRunning()) {
+                                    paperdollRenderer.destroy();
+                                }
+                            });
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Inventory] Paperdoll renderer init failed:', e.message || e);
+                }
+            })();
 
         })();
     </script>
