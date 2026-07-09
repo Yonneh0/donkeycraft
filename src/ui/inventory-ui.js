@@ -449,6 +449,15 @@
     // ============================================================
 
     /**
+     * PaperdollRenderer configuration constants.
+     * @private
+     */
+    var _HEAD_YAW_LIMIT = 0.52;    // ~30 degrees in radians
+    var _HEAD_PITCH_LIMIT = 0.26;  // ~15 degrees in radians
+    var _CANVAS_SIZE = 128;
+    var _MAGENTA = { r: 1, g: 0, b: 1 }; // Fallback color for invalid hex strings
+
+    /**
      * PaperdollRenderer — Renders a 3D player entity over the inventory paperdoll slot.
      *
      * Features animated entity with random state cycling, mouse hover pause/resume,
@@ -459,11 +468,6 @@
      * @param {HTMLElement} container - The .dk-paperdoll-container element.
      */
     Donkeycraft.PaperdollRenderer = function (container) {
-    // PaperdollRenderer configuration constants
-    this._HEAD_YAW_LIMIT = 0.52;    // ~30 degrees in radians
-    this._HEAD_PITCH_LIMIT = 0.26;  // ~15 degrees in radians
-    this._CANVAS_SIZE = 128;
-
         // DOM and WebGL references
         this._container = container || null;
         this._canvas = null;
@@ -496,7 +500,6 @@
         this._aNormalLoc = -1;
         this._uModel = -1;
         this._uColor = -1;
-        this._uUseColor = -1;
         this._uProjection = -1;
         this._uView = -1;
         this._uFogColor = -1;
@@ -524,7 +527,7 @@
         var gl = this._gl;
         if (!gl) return false;
 
-        // Entity Vertex Shader
+        // Vertex shader: transforms vertices and passes normals/depth to fragment shader.
         var vsSource = [
             'attribute vec3 aPosition;',
             'attribute vec3 aNormal;',
@@ -540,7 +543,7 @@
             '}'
         ].join('\n');
 
-        // Entity Fragment Shader
+        // Fragment shader: flat color with diffuse lighting and distance fog.
         var fsSource = [
             'precision mediump float;',
             'varying vec3 vNormal;',
@@ -578,7 +581,6 @@
         this._aNormalLoc = gl.getAttribLocation(program, 'aNormal');
         this._uModel = gl.getUniformLocation(program, 'uModel');
         this._uColor = gl.getUniformLocation(program, 'uColor');
-        this._uUseColor = gl.getUniformLocation(program, 'uUseColor');
         this._uProjection = gl.getUniformLocation(program, 'uProjection');
         this._uView = gl.getUniformLocation(program, 'uView');
         this._uFogColor = gl.getUniformLocation(program, 'uFogColor');
@@ -659,8 +661,9 @@
     /**
      * _createEntity — Create the player entity object with bone definitions and animation interface.
      *
-     * The returned entity object conforms to the render loop interface:
+     * The returned entity conforms to the render loop interface:
      * `getPosition()`, `getRotation()`, `getDimensions()`, `isAlive()`, `getBones()`, `getBoneTransforms()`.
+     * Position/rotation objects are frozen for immutability.
      *
      * @private
      */
@@ -668,8 +671,8 @@
         var self = this;
         this._entity = {
             type: 'player',
-            _pos: { x: 0, y: 0.9, z: 0 },
-            _rot: { yaw: 0, pitch: 0 },
+            _pos: Object.freeze({ x: 0, y: 0.9, z: 0 }),
+            _rot: Object.freeze({ yaw: 0, pitch: 0 }),
             _width: 0.6,
             _height: 1.8,
 
@@ -770,186 +773,7 @@
         return this._meshCache[key];
     };
 
-    /**
-     * _mat4Identity — Create a 4×4 identity matrix (column-major).
-     *
-     * @returns {Float32Array} 16-element identity matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4Identity = function () {
-        return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
-    };
 
-    /**
-     * _mat4Multiply — Post-multiply two 4×4 column-major matrices (r = a × b).
-     *
-     * @param {Float32Array} a - Left matrix.
-     * @param {Float32Array} b - Right matrix.
-     * @returns {Float32Array} New 16-element result matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4Multiply = function (a, b) {
-        var r = new Float32Array(16);
-        for (var j = 0; j < 4; j++) {
-            r[j] = a[0]*b[j] + a[1]*b[4+j] + a[2]*b[8+j] + a[3]*b[12+j];
-            r[4+j] = a[4]*b[j] + a[5]*b[4+j] + a[6]*b[8+j] + a[7]*b[12+j];
-            r[8+j] = a[8]*b[j] + a[9]*b[4+j] + a[10]*b[8+j] + a[11]*b[12+j];
-            r[12+j] = a[12]*b[j] + a[13]*b[4+j] + a[14]*b[8+j] + a[15]*b[12+j];
-        }
-        return r;
-    };
-
-    /**
-     * _mat4RotateY — Post-multiply rotation around the Y axis (yaw).
-     * Modifies the input matrix in place.
-     *
-     * @param {Float32Array} m - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4RotateY = function (m, rad) {
-        var c = Math.cos(rad), s = Math.sin(rad);
-        var m0=m[0], m1=m[1], m2=m[2], m3=m[3];
-        var m8=m[8], m9=m[9], m10=m[10], m11=m[11];
-        m[0]=m0*c-m8*s; m[1]=m1*c-m9*s; m[2]=m2*c-m10*s; m[3]=m3*c-m11*s;
-        m[8]=m0*s+m8*c; m[9]=m1*s+m9*c; m[10]=m2*s+m10*c; m[11]=m3*s+m11*c;
-        return m;
-    };
-
-    /**
-     * _mat4RotateX — Post-multiply rotation around the X axis (pitch).
-     * Modifies the input matrix in place.
-     *
-     * @param {Float32Array} m - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4RotateX = function (m, rad) {
-        var c = Math.cos(rad), s = Math.sin(rad);
-        var m4=m[4], m5=m[5], m6=m[6], m7=m[7];
-        var m8=m[8], m9=m[9], m10=m[10], m11=m[11];
-        m[4]=m4*c+m8*s; m[5]=m5*c+m9*s; m[6]=m6*c+m10*s; m[7]=m7*c+m11*s;
-        m[8]=-m4*s+m8*c; m[9]=-m5*s+m9*c; m[10]=-m6*s+m10*c; m[11]=-m7*s+m11*c;
-        return m;
-    };
-
-    /**
-     * _mat4RotateZ — Post-multiply rotation around the Z axis (roll).
-     * Modifies the input matrix in place.
-     *
-     * @param {Float32Array} m - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4RotateZ = function (m, rad) {
-        var c = Math.cos(rad), s = Math.sin(rad);
-        var m0=m[0], m1=m[1], m2=m[2], m3=m[3];
-        var m4=m[4], m5=m[5], m6=m[6], m7=m[7];
-        m[0]=m0*c+m4*s; m[1]=m1*c+m5*s; m[2]=m2*c+m6*s; m[3]=m3*c+m7*s;
-        m[4]=-m0*s+m4*c; m[5]=-m1*s+m5*c; m[6]=-m2*s+m6*c; m[7]=-m3*s+m7*c;
-        return m;
-    };
-
-    /**
-     * _mat4Translate — Set the translation components (indices 12-14) of a matrix.
-     * Expects the input matrix to be in a "clean" state where translation components
-     * (indices 12-14) are zero, typically right after creating an identity matrix
-     * and applying rotations. Uses direct assignment for correctness.
-     *
-     * @param {Float32Array} m - Input matrix (modified in place).
-     * @param {number} x - Translation X.
-     * @param {number} y - Translation Y.
-     * @param {number} z - Translation Z.
-     * @returns {Float32Array} The translated matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._mat4Translate = function (m, x, y, z) {
-        m[12] = x; m[13] = y; m[14] = z;
-        return m;
-    };
-
-    /**
-     * _buildModelMatrix — Build a model matrix from position and Euler angle rotations.
-     *
-     * Creates an identity matrix, applies rotations in YXZ order (yaw → pitch → roll),
-     * then sets the translation component.
-     *
-     * @param {number} px - X position.
-     * @param {number} py - Y position.
-     * @param {number} pz - Z position.
-     * @param {number} rx - Rotation around X axis (radians).
-     * @param {number} ry - Rotation around Y axis (radians).
-     * @param {number} rz - Rotation around Z axis (radians).
-     * @returns {Float32Array} New column-major 4×4 model matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz) {
-        var m = this._mat4Identity();
-        if (ry !== 0) this._mat4RotateY(m, ry);
-        if (rx !== 0) this._mat4RotateX(m, rx);
-        if (rz !== 0) this._mat4RotateZ(m, rz);
-        this._mat4Translate(m, px, py, pz);
-        return m;
-    };
-
-    /**
-     * _perspectiveMatrix — Create a perspective projection matrix (frustum).
-     *
-     * Uses the symmetric frustum formula with vertical FOV, aspect ratio,
-     * and near/far clipping planes.
-     *
-     * @param {number} fovDeg - Vertical field of view in degrees.
-     * @param {number} aspect - Width-to-height aspect ratio.
-     * @param {number} near - Near clipping plane distance.
-     * @param {number} far - Far clipping plane distance.
-     * @returns {Float32Array} 16-element perspective projection matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._perspectiveMatrix = function (fovDeg, aspect, near, far) {
-        var fovRad = fovDeg * Math.PI / 180;
-        var f = 1.0 / Math.tan(fovRad / 2);
-        var nf = near / (near - far);
-        return new Float32Array([
-            f/aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far+near)/nf, -1,
-            0, 0, (2*far*near)/nf, 0
-        ]);
-    };
-
-    /**
-     * _lookAtMatrix — Create a look-at view matrix from eye, center, and up vectors.
-     *
-     * Computes an orthonormal basis from the camera position and forward direction,
-     * then constructs the view transformation that maps world space to camera space.
-     *
-     * @param {{x:number,y:number,z:number}} eye - Camera position.
-     * @param {{x:number,y:number,z:number}} center - Look-at target point.
-     * @param {{x:number,y:number,z:number}} up - Up direction vector.
-     * @returns {Float32Array} 16-element column-major view matrix.
-     * @private
-     */
-    Donkeycraft.PaperdollRenderer.prototype._lookAtMatrix = function (eye, center, up) {
-        var zx=eye.x-center.x, zy=eye.y-center.y, zz=eye.z-center.z;
-        var len=Math.sqrt(zx*zx+zy*zy+zz*zz);
-        zx/=len; zy/=len; zz/=len;
-        var xx=up.y*zz-up.z*zy, xy=up.z*zx-up.x*zz, xz=up.x*zy-up.y*zx;
-        len=Math.sqrt(xx*xx+xy*xy+xz*xz);
-        xx/=len; xy/=len; xz/=len;
-        var yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
-        return new Float32Array([
-            xx, yx, zx, 0,
-            xy, yy, zy, 0,
-            xz, yz, zz, 0,
-            -(xx*eye.x+xy*eye.y+xz*eye.z),
-            -(yx*eye.x+yy*eye.y+yz*eye.z),
-            -(zx*eye.x+zy*eye.y+zz*eye.z),
-            1
-        ]);
-    };
 
     /**
      * _drawMesh — Issue an indexed draw call for a cached mesh.
@@ -970,18 +794,21 @@
         gl.useProgram(this._shaderProgram);
         gl.uniformMatrix4fv(this._uModel, false, modelMatrix);
 
-        // Parse hex color
+        // Parse hex color (#RRGGBB or #RGB).
         var hex = color.substring(1);
         var r, g, b;
         if (hex.length === 6) {
             r = parseInt(hex.substr(0,2),16)/255;
             g = parseInt(hex.substr(2,2),16)/255;
             b = parseInt(hex.substr(4,2),16)/255;
+        } else if (hex.length === 3) {
+            r = parseInt(hex.charAt(0)+hex.charAt(0),16)/255;
+            g = parseInt(hex.charAt(1)+hex.charAt(1),16)/255;
+            b = parseInt(hex.charAt(2)+hex.charAt(2),16)/255;
         } else {
-            r = 1; g = 0; b = 1;
+            r = _MAGENTA.r; g = _MAGENTA.g; b = _MAGENTA.b;
         }
         gl.uniform3f(this._uColor, r, g, b);
-        gl.uniform1i(this._uUseColor, 1);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, cache.vbo);
         gl.enableVertexAttribArray(this._aPositionLoc);
@@ -1169,12 +996,16 @@
                 gl.enable(gl.CULL_FACE);
                 gl.cullFace(gl.BACK);
 
-                // Set up projection and view matrices.
-                var proj = this._perspectiveMatrix(this._fov, this._aspect, 0.1, 100);
-                var view = this._lookAtMatrix(this._camPos, this._camTarget, { x: 0, y: 1, z: 0 });
+                // Set up projection and view matrices using Donkeycraft.Matrix4.
+                var proj = Donkeycraft.Matrix4.createPerspective(this._fov * Math.PI / 180, this._aspect, 0.1, 100);
+                var view = Donkeycraft.Matrix4.createLookAt(
+                    new Donkeycraft.Vector3(this._camPos.x, this._camPos.y, this._camPos.z),
+                    new Donkeycraft.Vector3(this._camTarget.x, this._camTarget.y, this._camTarget.z),
+                    new Donkeycraft.Vector3(0, 1, 0)
+                );
 
-                gl.uniformMatrix4fv(this._uProjection, false, proj);
-                gl.uniformMatrix4fv(this._uView, false, view);
+                gl.uniformMatrix4fv(this._uProjection, false, proj.getData());
+                gl.uniformMatrix4fv(this._uView, false, view.getData());
                 gl.uniform3f(this._uFogColor, 0.53, 0.8, 0.97);
                 gl.uniform1f(this._uFogDensity, 0.02);
 
@@ -1199,12 +1030,12 @@
                                 var localZ = offset.x * sinYaw + offset.z * cosYaw;
                                 var localY = offset.y;
 
-                                var modelMatrix = this._buildModelMatrix(
-                                    pos.x + localX,
-                                    pos.y + localY,
-                                    pos.z + localZ,
-                                    transform.rx, transform.ry, transform.rz
-                                );
+                                // Build model matrix using Donkeycraft.Matrix4 (YXZ rotation order).
+                                var modelMatrix = Donkeycraft.Matrix4.createIdentity();
+                                if (transform.ry !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
+                                if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
+                                if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
+                                modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createTranslation(pos.x + localX, pos.y + localY, pos.z + localZ));
 
                                 var meshCache = this._getOrBuildMesh(
                                     bone.dimensions.w || 1,
@@ -1231,17 +1062,24 @@
     /**
      * init — Initialize the paperdoll renderer. Creates canvas, compiles shaders, creates entity.
      *
-     * @returns {boolean} True if initialization succeeded.
+     * Guards against double-initialization: if already running, returns true immediately
+     * without creating duplicate canvases or starting duplicate animation loops.
+     *
+     * @returns {boolean} True if initialization succeeded (or was already initialized).
      */
     Donkeycraft.PaperdollRenderer.prototype.init = function () {
+        // Guard: already running — avoid double-init.
+        if (this._running) return true;
+
+        if (!this._container) return false;
         if (!this._createCanvas()) return false;
         if (!this._createShaderProgram()) return false;
         this._createEntity();
 
-        // Set up mouse hover detection on the panel
+        // Set up mouse hover detection on the panel.
         this._setupHoverDetection();
 
-        // Start render loop
+        // Start render loop.
         this._running = true;
         this._lastFrameTime = 0;
         this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
@@ -1290,9 +1128,9 @@
             // Normalize mouse position to [-1, 1] relative to container center.
             var mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             var my = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-            // Map to head rotation limits.
-            self._headOverride.yaw = mx * self._HEAD_YAW_LIMIT;
-            self._headOverride.pitch = my * self._HEAD_PITCH_LIMIT;
+            // Map to head rotation limits (module-level constants).
+            self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
+            self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
         };
 
         this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: handleMouseMove };
@@ -1326,15 +1164,17 @@
     /**
      * setMouseTrack — Set normalized mouse position for head tracking.
      *
-     * Directly sets the head yaw and pitch override values, mapping [-1, 1]
-     * input to the configured rotation limits.
+     * Clamps input to [-1, 1] before mapping to configured rotation limits.
      *
      * @param {number} x - Normalized X position in [-1, 1] (-1 = left, 1 = right).
      * @param {number} y - Normalized Y position in [-1, 1] (-1 = top, 1 = bottom).
      */
     Donkeycraft.PaperdollRenderer.prototype.setMouseTrack = function (x, y) {
-        this._headOverride.yaw = x * this._HEAD_YAW_LIMIT;
-        this._headOverride.pitch = y * this._HEAD_PITCH_LIMIT;
+        // Clamp input to [-1, 1].
+        var cx = Math.max(-1, Math.min(1, x));
+        var cy = Math.max(-1, Math.min(1, y));
+        this._headOverride.yaw = cx * _HEAD_YAW_LIMIT;
+        this._headOverride.pitch = cy * _HEAD_PITCH_LIMIT;
     };
 
     /**

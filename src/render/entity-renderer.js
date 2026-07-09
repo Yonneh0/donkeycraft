@@ -41,15 +41,6 @@
     var MAX_RENDER_DISTANCE = 64;
 
     /**
-     * Default color for entities with invalid/unparseable color strings.
-     * Magenta (#FF00FF) is used as the standard debug/missing-texture color
-     * in game engines, making configuration errors visually obvious.
-     * @constant {string}
-     * @default "#FF00FF"
-     */
-    var DEFAULT_INVALID_COLOR = '#FF00FF';
-
-    /**
      * Frustum forward-facing check factor — dot product threshold for culling
      * entities that are within range but behind or to the side of the camera view.
      * The dot product of (entityDirection, cameraForward) ranges from -1 (directly behind)
@@ -79,18 +70,12 @@
 
     /**
      * Vertex byte stride — total bytes per vertex including all components.
-     * Computed from position (3) + normal (3) + UV (2) = 8 floats × 4 bytes.
+     * Computed from position (3) + normal (3) = 6 floats × 4 bytes = 24 bytes.
+     * Entity shader uses flat color rendering — no UV attributes.
      * @constant {number}
-     * @default 32
+     * @default 24
      */
-    var VERTEX_BYTE_STRIDE = 8 * BYTES_PER_FLOAT;
-
-    /**
-     * Number of indices per triangle (vertices).
-     * @constant {number}
-     * @default 3
-     */
-    var INDICES_PER_TRIANGLE = 3;
+    var VERTEX_BYTE_STRIDE = 6 * BYTES_PER_FLOAT;
 
     // ============================================================
     // Entity Mesh Builder — Generates simple blocky entity meshes
@@ -372,145 +357,6 @@
         ]
     };
 
-    // ============================================================
-    // Matrix4 Helper — Simple column-major 4x4 matrix utilities
-    // ============================================================
-
-    /**
-     * _createMat4 — Create a new identity 4x4 matrix (column-major Float32Array).
-     * @returns {Float32Array} 16-element identity matrix.
-     * @private
-     */
-    function _createMat4() {
-        var m = new Float32Array(16);
-        m[0] = 1; m[1] = 0; m[2] = 0; m[3] = 0;
-        m[4] = 0; m[5] = 1; m[6] = 0; m[7] = 0;
-        m[8] = 0; m[9] = 0; m[10] = 1; m[11] = 0;
-        m[12] = 0; m[13] = 0; m[14] = 0; m[15] = 1;
-        return m;
-    }
-
-    /**
-     * _translateMat4 — Set the translation components of a 4x4 matrix.
-     * Expects the input matrix to be in a "clean" state where translation components
-     * (indices 12-14) are zero, typically right after creating an identity matrix
-     * and applying rotations. Uses direct assignment for correctness.
-     * @param {Float32Array} mat - Input matrix (modified in place).
-     * @param {number} x - Translation X.
-     * @param {number} y - Translation Y.
-     * @param {number} z - Translation Z.
-     * @returns {Float32Array} The translated matrix.
-     * @private
-     */
-    function _translateMat4(mat, x, y, z) {
-        mat[12] = x;
-        mat[13] = y;
-        mat[14] = z;
-        return mat;
-    }
-
-    /**
-     * _rotateMat4X — Post-multiply a rotation around the X axis.
-     * @param {Float32Array} mat - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    function _rotateMat4X(mat, rad) {
-        var c = Math.cos(rad);
-        var s = Math.sin(rad);
-        // Post-multiply by R_x(θ): column 1 = col1*c + col2*s, column 2 = -col1*s + col2*c.
-        // Also updates row-0 components (indices 4, 8) of columns 1 and 2.
-        var m4 = mat[4] * c + mat[8] * s;
-        var m5 = mat[5] * c + mat[9] * s;
-        var m6 = mat[6] * c + mat[10] * s;
-        var m7 = mat[7] * c + mat[11] * s;
-        var m8 = -mat[4] * s + mat[8] * c;
-        var m9 = -mat[5] * s + mat[9] * c;
-        var m10 = -mat[6] * s + mat[10] * c;
-        var m11 = -mat[7] * s + mat[11] * c;
-        mat[4] = m4; mat[5] = m5; mat[6] = m6; mat[7] = m7;
-        mat[8] = m8; mat[9] = m9; mat[10] = m10; mat[11] = m11;
-        return mat;
-    }
-
-    /**
-     * _rotateMat4Y — Post-multiply a rotation around the Y axis.
-     * @param {Float32Array} mat - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    function _rotateMat4Y(mat, rad) {
-        var c = Math.cos(rad);
-        var s = Math.sin(rad);
-        // Post-multiply by R_y(θ): column 0 = col0*c - col2*s, column 1 = col1*c - col3*s,
-        // column 2 = col0*s + col2*c, column 3 = col1*s + col3*c.
-        var m0 = mat[0] * c - mat[8] * s;
-        var m1 = mat[1] * c - mat[9] * s;
-        var m2 = mat[2] * c - mat[10] * s;
-        var m3 = mat[3] * c - mat[11] * s;
-        var m8 = mat[0] * s + mat[8] * c;
-        var m9 = mat[1] * s + mat[9] * c;
-        var m10 = mat[2] * s + mat[10] * c;
-        var m11 = mat[3] * s + mat[11] * c;
-        mat[0] = m0; mat[1] = m1; mat[2] = m2; mat[3] = m3;
-        mat[8] = m8; mat[9] = m9; mat[10] = m10; mat[11] = m11;
-        return mat;
-    }
-
-    /**
-     * _rotateMat4Z — Post-multiply a rotation around the Z axis.
-     * @param {Float32Array} mat - Input matrix (modified in place).
-     * @param {number} rad - Rotation angle in radians.
-     * @returns {Float32Array} The rotated matrix.
-     * @private
-     */
-    function _rotateMat4Z(mat, rad) {
-        var c = Math.cos(rad);
-        var s = Math.sin(rad);
-        // Post-multiply by R_z(θ): column 0 = col0*c + col1*s, column 1 = -col0*s + col1*c
-        var m0 = mat[0] * c + mat[4] * s;
-        var m1 = mat[1] * c + mat[5] * s;
-        var m2 = mat[2] * c + mat[6] * s;
-        var m3 = mat[3] * c + mat[7] * s;
-        var m4 = -mat[0] * s + mat[4] * c;
-        var m5 = -mat[1] * s + mat[5] * c;
-        var m6 = -mat[2] * s + mat[6] * c;
-        var m7 = -mat[3] * s + mat[7] * c;
-        mat[0] = m0; mat[1] = m1; mat[2] = m2; mat[3] = m3;
-        mat[4] = m4; mat[5] = m5; mat[6] = m6; mat[7] = m7;
-        return mat;
-    }
-
-    /**
-     * _multiplyMat4 — Post-multiply two 4x4 matrices (r = a × b).
-     * @param {Float32Array} a - Left matrix.
-     * @param {Float32Array} b - Right matrix.
-     * @returns {Float32Array} Result matrix (new allocation).
-     * @private
-     */
-    function _multiplyMat4(a, b) {
-        var r = new Float32Array(16);
-        r[0] = a[0] * b[0] + a[1] * b[4] + a[2] * b[8] + a[3] * b[12];
-        r[1] = a[0] * b[1] + a[1] * b[5] + a[2] * b[9] + a[3] * b[13];
-        r[2] = a[0] * b[2] + a[1] * b[6] + a[2] * b[10] + a[3] * b[14];
-        r[3] = a[0] * b[3] + a[1] * b[7] + a[2] * b[11] + a[3] * b[15];
-        r[4] = a[4] * b[0] + a[5] * b[4] + a[6] * b[8] + a[7] * b[12];
-        r[5] = a[4] * b[1] + a[5] * b[5] + a[6] * b[9] + a[7] * b[13];
-        r[6] = a[4] * b[2] + a[5] * b[6] + a[6] * b[10] + a[7] * b[14];
-        r[7] = a[4] * b[3] + a[5] * b[7] + a[6] * b[11] + a[7] * b[15];
-        r[8] = a[8] * b[0] + a[9] * b[4] + a[10] * b[8] + a[11] * b[12];
-        r[9] = a[8] * b[1] + a[9] * b[5] + a[10] * b[9] + a[11] * b[13];
-        r[10] = a[8] * b[2] + a[9] * b[6] + a[10] * b[10] + a[11] * b[14];
-        r[11] = a[8] * b[3] + a[9] * b[7] + a[10] * b[11] + a[11] * b[15];
-        r[12] = a[12] * b[0] + a[13] * b[4] + a[14] * b[8] + a[15] * b[12];
-        r[13] = a[12] * b[1] + a[13] * b[5] + a[14] * b[9] + a[15] * b[13];
-        r[14] = a[12] * b[2] + a[13] * b[6] + a[14] * b[10] + a[15] * b[14];
-        r[15] = a[12] * b[3] + a[13] * b[7] + a[14] * b[11] + a[15] * b[15];
-        return r;
-    }
-
     /**
      * _toArray — Convert an iterable (Array, Set, Map, or other list-like object)
      * to a plain Array. This ensures compatibility with EntityManager implementations
@@ -582,94 +428,18 @@
      * @param {Object} shaderManager - ShaderManager instance with compiled shaders and uniform setters.
      */
     Donkeycraft.EntityRenderer = function (gl, shaderManager) {
-        /**
-         * WebGL rendering context.
-         * @type {WebGLRenderingContext|null}
-         * @private
-         */
         this._gl = gl || null;
-
-        /**
-         * Shader manager instance for uniform setting and program activation.
-         * @type {Object|null}
-         * @private
-         */
         this._shaderManager = shaderManager || null;
-
-        /**
-         * EntityManager reference for awareness queries.
-         * @type {Object|null}
-         * @private
-         */
         this._entityManager = null;
-
-        /**
-         * Camera reference for frustum culling.
-         * @type {Object|null}
-         * @private
-         */
         this._camera = null;
-
-        /**
-         * Mesh cache: normalized key → {vbo, ibo, vertexCount, vertexByteStride}.
-         * Keys are formatted as "meshType:w.h.d" (boxes) or "meshType:r.h" (cylinders).
-         * @type {Object.<string, {vbo: WebGLBuffer, ibo: WebGLBuffer, vertexCount: number, vertexByteStride: number}>}
-         * @private
-         */
         this._meshCache = {};
-
-        /**
-         * Whether the renderer is enabled.
-         * @type {boolean}
-         */
         this.enabled = true;
-
-        /**
-         * Maximum number of entities to render per frame.
-         * @type {number}
-         */
         this.maxRenderEntities = DEFAULT_MAX_RENDER_ENTITIES;
-
-        /**
-         * Render distance in blocks (synced from EntityManager awareness radius).
-         * @type {number}
-         */
         this.renderDistance = DEFAULT_RENDER_DISTANCE;
-
-        /**
-         * Whether to enable alpha blending for transparent rendering.
-         * Set to true if rendering entities with translucent materials.
-         * @type {boolean}
-         */
         this.enableAlphaBlending = false;
 
-        /**
-         * Statistics: total entity instances rendered last frame (updated each render call).
-         * This counts individual entities drawn, not body parts or draw calls.
-         * For complete per-frame statistics including cached mesh count, use getStats().
-         * @type {number}
-         */
-        this.entitiesRendered = 0;
-
-        /**
-         * Statistics: total draw calls last frame (updated each render call).
-         * @type {number}
-         */
-        this.drawCalls = 0;
-
-        /**
-         * Whether the WebGL context has been lost.
-         * @type {boolean}
-         * @private
-         */
-        this._contextLost = false;
-
-        /**
-         * Callback registered with WebGL context loss event.
-         * @type {Function|null}
-         * @private
-         */
-        this._contextLossHandler = null;
+        // Set up WebGL context loss handling immediately after construction.
+        this._setupContextLossListener();
     };
 
     /**
@@ -723,6 +493,49 @@
      */
     Donkeycraft.EntityRenderer.prototype.setRenderDistance = function (distance) {
         this.renderDistance = Math.max(MIN_RENDER_DISTANCE, Math.min(MAX_RENDER_DISTANCE, distance));
+    };
+
+    /**
+     * _buildModelMatrix — Build a 4×4 model matrix from position and rotation.
+     *
+     * Creates an identity matrix, applies rotations in YXZ order (yaw → pitch → roll)
+     * using Donkeycraft.Matrix4, then sets the translation component.
+     *
+     * When a pivot is provided, the translation is adjusted so that rotations occur
+     * around the pivot point rather than the mesh center: T' = P - R × P.
+     *
+     * @param {number} px - World X position.
+     * @param {number} py - World Y position.
+     * @param {number} pz - World Z position.
+     * @param {number} rx - Rotation around X axis in radians.
+     * @param {number} ry - Rotation around Y axis in radians.
+     * @param {number} rz - Rotation around Z axis in radians.
+     * @param {Object} [pivot] - Optional pivot point {x, y, z} for rotation center.
+     * @returns {Float32Array} New column-major 4×4 model matrix (16 elements).
+     */
+    Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz, pivot) {
+        // Build rotation matrix using YXZ order (yaw → pitch → roll).
+        var m = Donkeycraft.Matrix4.createIdentity();
+        if (ry !== 0) m = Donkeycraft.Matrix4.multiply(m, Donkeycraft.Matrix4.createRotation(ry, new Donkeycraft.Vector3(0, 1, 0)));
+        if (rx !== 0) m = Donkeycraft.Matrix4.multiply(m, Donkeycraft.Matrix4.createRotation(rx, new Donkeycraft.Vector3(1, 0, 0)));
+        if (rz !== 0) m = Donkeycraft.Matrix4.multiply(m, Donkeycraft.Matrix4.createRotation(rz, new Donkeycraft.Vector3(0, 0, 1)));
+
+        // Adjust translation for pivot-based rotation: T' = P - R × P.
+        var tx = px, ty = py, tz = pz;
+        if (pivot) {
+            var pxv = pivot.x || 0, pyv = pivot.y || 0, pzv = pivot.z || 0;
+            // R × P for rotation-only matrix (translation components 12-14 are zero).
+            tx = px - (m._data[0] * pxv + m._data[1] * pyv + m._data[2] * pzv);
+            ty = py - (m._data[4] * pxv + m._data[5] * pyv + m._data[6] * pzv);
+            tz = pz - (m._data[8] * pxv + m._data[9] * pyv + m._data[10] * pzv);
+        }
+
+        // Set translation components directly.
+        m._data[12] = tx;
+        m._data[13] = ty;
+        m._data[14] = tz;
+
+        return m._data;
     };
 
     /**
@@ -793,59 +606,6 @@
         this._meshCache[key] = cached;
 
         return cached;
-    };
-
-    /**
-     * _buildModelMatrix — Build a 4x4 model matrix from position and rotation.
-     * Creates an identity matrix, applies rotations in YXZ order (yaw → pitch → roll),
-     * then sets the translation component to the given position.
-     * The resulting matrix transforms vertices as: M × v = R × v + T, where R is the
-     * rotation submatrix and T is the translation vector.
-     *
-     * When a pivot is provided, the translation is adjusted so that rotations occur
-     * around the pivot point rather than the mesh center. The adjustment is:
-     *   T' = P - R × P  (where P is the pivot position)
-     * This ensures the pivot point remains fixed during rotation.
-     *
-     * @private
-     * @param {number} px - World X position.
-     * @param {number} py - World Y position.
-     * @param {number} pz - World Z position.
-     * @param {number} rx - Rotation around X axis in radians.
-     * @param {number} ry - Rotation around Y axis in radians.
-     * @param {number} rz - Rotation around Z axis in radians.
-     * @param {Object} [pivot] - Optional pivot point {x, y, z} for rotation center.
-     * @returns {Float32Array} New column-major 4x4 model matrix (16 elements).
-     */
-    Donkeycraft.EntityRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz, pivot) {
-        var m = _createMat4();
-
-        // Apply rotations (YXZ order — yaw first, then pitch, then roll)
-        if (ry !== 0) _rotateMat4Y(m, ry);
-        if (rx !== 0) _rotateMat4X(m, rx);
-        if (rz !== 0) _rotateMat4Z(m, rz);
-
-        // Adjust translation for pivot-based rotation.
-        // When a pivot is defined, the model matrix must compensate so that
-        // rotations occur around the pivot point: T' = P - R × P.
-        var tx = px, ty = py, tz = pz;
-        if (pivot) {
-            var pxv = pivot.x || 0;
-            var pyv = pivot.y || 0;
-            var pzv = pivot.z || 0;
-            // R × P for rotation-only matrix (only indices 0-10 matter, 12-14 are zero)
-            var rxp = m[0] * pxv + m[1] * pyv + m[2] * pzv;
-            var ryp = m[4] * pxv + m[5] * pyv + m[6] * pzv;
-            var rzp = m[8] * pxv + m[9] * pyv + m[10] * pzv;
-            tx = px - rxp;
-            ty = py - ryp;
-            tz = pz - rzp;
-        }
-
-        // Apply translation
-        _translateMat4(m, tx, ty, tz);
-
-        return m;
     };
 
     /**
@@ -1994,33 +1754,5 @@
             cachedMeshes: Object.keys(this._meshCache).length
         };
     };
-
-    // ============================================================
-    // Initialization — Set up WebGL context loss handling after construction
-    // ============================================================
-
-    (function () {
-        var origConstructor = Donkeycraft.EntityRenderer;
-
-        /**
-         * EntityRenderer — Constructor with automatic WebGL context loss handling setup.
-         * @constructor
-         * @param {WebGLRenderingContext} gl - WebGL 1.0 context.
-         * @param {Object} shaderManager - ShaderManager instance.
-         */
-        Donkeycraft.EntityRenderer = function (gl, shaderManager) {
-            origConstructor.call(this, gl, shaderManager);
-            this._setupContextLossListener();
-        };
-
-        var proto = origConstructor.prototype;
-        for (var key in proto) {
-            if (proto.hasOwnProperty(key)) {
-                Donkeycraft.EntityRenderer.prototype[key] = proto[key];
-            }
-        }
-
-        Donkeycraft.EntityRenderer.prototype.constructor = Donkeycraft.EntityRenderer;
-    })();
 
 })();
