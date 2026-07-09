@@ -657,13 +657,13 @@
                 return [
                     { name: 'body',  meshType: 'box', dimensions: { w: 0.6 * S, h: 0.9 * S, d: 0.3 * S }, color: '#3366CC', offset: { x: 0, y: 0.85 * S, z: 0 } },
                     { name: 'head',  meshType: 'box', dimensions: { w: 0.5 * S, h: 0.5 * S, d: 0.5 * S }, color: '#FFCC99', offset: { x: 0, y: 1.55 * S, z: 0 } },
-                    { name: 'leftEye',  meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.08 * S }, color: '#1a1a2e', offset: { x: -0.12 * S, y: 1.65 * S, z: 0.24 * S }, parent: 'head' },
-                    { name: 'rightEye', meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.08 * S }, color: '#1a1a2e', offset: { x: 0.12 * S, y: 1.65 * S, z: 0.24 * S }, parent: 'head' },
-                    { name: 'hair', meshType: 'box', dimensions: { w: 0.54 * S, h: 0.18 * S, d: 0.52 * S }, color: '#4a3728', offset: { x: 0, y: 1.82 * S, z: -0.02 * S }, parent: 'head' },
-                    { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 1.15 * S, z: 0 }, pivot: { x: -0.42 * S, y: 1.25 * S, z: 0 } },
-                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: 0.42 * S, y: 1.15 * S, z: 0 }, pivot: { x: 0.42 * S, y: 1.25 * S, z: 0 } },
-                    { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: -0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: -0.15 * S, y: 0.45 * S, z: 0 } },
-                    { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: 0.15 * S, y: 0.45 * S, z: 0 } }
+                    { name: 'leftEye',   meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.04 * S }, color: '#1a1a2e', offset: { x: -0.12 * S, y: 1.62 * S, z: 0.27 * S }, parent: 'head' },
+                    { name: 'rightEye',  meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.04 * S }, color: '#1a1a2e', offset: { x: 0.12 * S, y: 1.62 * S, z: 0.27 * S }, parent: 'head' },
+                    { name: 'hair',      meshType: 'box', dimensions: { w: 0.54 * S, h: 0.16 * S, d: 0.52 * S }, color: '#4a3728', offset: { x: 0, y: 1.84 * S, z: -0.01 * S }, parent: 'head' },
+                    { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 0.75 * S, z: 0 }, pivot: { x: -0.42 * S, y: 1.25 * S, z: 0 } },
+                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: 0.42 * S, y: 0.75 * S, z: 0 }, pivot: { x: 0.42 * S, y: 1.25 * S, z: 0 } },
+                    { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: -0.15 * S, y: 0.0 * S, z: 0 }, pivot: { x: -0.15 * S, y: 0.45 * S, z: 0 } },
+                    { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.15 * S, y: 0.0 * S, z: 0 }, pivot: { x: 0.15 * S, y: 0.45 * S, z: 0 } }
                 ];
             },
 
@@ -1250,9 +1250,8 @@
             var my = Math.max(-1, Math.min(1, ((e.clientY - cRect.top) / cRect.height) * 2 - 1));
 
             // Map to head rotation limits: max ~30° yaw, ~15° pitch.
-            // Positive yaw turns LEFT in Y-up coords (counter-clockwise from above).
-            // Mouse RIGHT (positive mx) should make the head turn RIGHT → negate yaw.
-            self._headOverride.yaw = -mx * _HEAD_YAW_LIMIT;
+            // Map mouse X to yaw: positive X → head turns right.
+            self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
             self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
         };
 
@@ -1320,8 +1319,8 @@
     Donkeycraft.PaperdollRenderer.prototype.setMouseTrack = function (x, y) {
         var cx = Math.max(-1, Math.min(1, x));
         var cy = Math.max(-1, Math.min(1, y));
-        // Negate yaw so positive X → head turns right (consistent with mouse tracking).
-        this._headOverride.yaw = -cx * _HEAD_YAW_LIMIT;
+        // Map to head rotation: positive X → head turns right.
+        this._headOverride.yaw = cx * _HEAD_YAW_LIMIT;
         this._headOverride.pitch = cy * _HEAD_PITCH_LIMIT;
     };
 
