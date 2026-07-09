@@ -1,184 +1,198 @@
 // Donkeycraft — Terrain Generator
 // Heightmap generation: Perlin noise layers, biome height variation, shore/beach/cliff.
 (function () {
-    'use strict';
+  'use strict';
 
-    var Donkeycraft = window.Donkeycraft;
-    var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
-    var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
-    var SEED = Donkeycraft.Config.SEED;
+  var Donkeycraft = window.Donkeycraft;
+  var CHUNK_SIZE = Donkeycraft.Config.CHUNK_SIZE;
+  var WORLD_HEIGHT = Donkeycraft.Config.WORLD_HEIGHT;
+  var SEED = Donkeycraft.Config.SEED;
 
-    // ============================================================
-    // TerrainGenerator
-    // ============================================================
+  // ============================================================
+  // TerrainGenerator
+  // ============================================================
+
+  /**
+   * TerrainGenerator — generates heightmaps and terrain for chunks.
+   * This is a module object (IIFE), not a constructor. All methods are static.
+   */
+  Donkeycraft.TerrainGenerator = (function () {
+    /**
+     * Get the module object itself as the "instance".
+     * @returns {object} The TerrainGenerator module.
+     */
+    function getInstance() {
+      return Donkeycraft.TerrainGenerator;
+    }
 
     /**
-     * TerrainGenerator — generates heightmaps and terrain for chunks.
-     * This is a module object (IIFE), not a constructor. All methods are static.
+     * Ensure PerlinNoise is initialized before terrain generation.
+     * Delegates to the centralized _gen._ensureNoiseInit() in noise.js.
+     * @private
      */
-    Donkeycraft.TerrainGenerator = (function () {
+    function _ensureNoiseInit() {
+      if (
+        Donkeycraft._gen &&
+        typeof Donkeycraft._gen._ensureNoiseInit === 'function'
+      ) {
+        Donkeycraft._gen._ensureNoiseInit();
+      }
+    }
 
-        /**
-         * Get the module object itself as the "instance".
-         * @returns {object} The TerrainGenerator module.
-         */
-        function getInstance() {
-            return Donkeycraft.TerrainGenerator;
+    /**
+     * Generate a heightmap for a chunk at the given world coordinates.
+     * Uses multi-octave Perlin noise (fbm) with biome-specific parameters.
+     * @param {number} chunkX - Chunk X coordinate (in chunks).
+     * @param {number} chunkZ - Chunk Z coordinate (in chunks).
+     * @param {Donkeycraft.Biome|number|string} [biome] - Biome for this chunk.
+     *   Accepts a biome object, biome ID number, or biome name string.
+     *   Defaults to plains (ID 1) if not provided or invalid.
+     * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE with height values.
+     */
+    function generateHeightmap(chunkX, chunkZ, biome) {
+      _ensureNoiseInit();
+
+      // Resolve biome from ID/string if needed, or default to plains
+      var resolvedBiome = null;
+      if (biome) {
+        if (typeof biome === 'object' && biome.isOcean !== undefined) {
+          resolvedBiome = biome;
+        } else if (Donkeycraft.BiomeRegistry) {
+          if (typeof biome === 'number') {
+            resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeById(biome);
+          } else if (typeof biome === 'string') {
+            resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
+          }
         }
+      }
+      biome = resolvedBiome || Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
 
-        /**
-         * Ensure PerlinNoise is initialized before terrain generation.
-         * Delegates to the centralized _gen._ensureNoiseInit() in noise.js.
-         * @private
-         */
-        function _ensureNoiseInit() {
-            if (Donkeycraft._gen && typeof Donkeycraft._gen._ensureNoiseInit === 'function') {
-                Donkeycraft._gen._ensureNoiseInit();
-            }
+      // Validate biome has required properties after resolution.
+      // Use local variables to avoid mutating a potentially frozen BlockRegistry object.
+      var isOcean = biome.isOcean === true;
+      var isDesert = biome.isDesert === true;
+      var isExtremeHills = biome.isExtremeHills === true;
+      var hasSnow = biome.hasSnow === true;
+
+      var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
+
+      // Biome-specific noise parameters
+      var baseHeight, heightVariation;
+
+      if (isOcean) {
+        baseHeight = 20;
+        heightVariation = 5;
+      } else if (isDesert) {
+        baseHeight = 60;
+        heightVariation = 10;
+      } else if (isExtremeHills) {
+        baseHeight = 100;
+        heightVariation = 80;
+      } else if (hasSnow) {
+        baseHeight = 70;
+        heightVariation = 30;
+      } else {
+        // Plains, forest, swamp, taiga — moderate terrain
+        baseHeight = 64;
+        heightVariation = 20;
+      }
+
+      // Scale factors for noise sampling
+      var scale = 0.015;
+      var detailScale = 0.05;
+
+      for (var x = 0; x < CHUNK_SIZE; x++) {
+        for (var z = 0; z < CHUNK_SIZE; z++) {
+          // Global world coordinates
+          var worldX = chunkX * CHUNK_SIZE + x;
+          var worldZ = chunkZ * CHUNK_SIZE + z;
+
+          // Base terrain height using large-scale noise via _gen wrapper
+          // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
+          var baseNoise = Donkeycraft._gen._fbm(
+            worldX * scale,
+            0,
+            worldZ * scale,
+            4,
+            0.5,
+            2.0
+          );
+
+          // Detail noise for local variation
+          // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
+          var detailNoise = Donkeycraft._gen._fbm(
+            worldX * detailScale,
+            0,
+            worldZ * detailScale,
+            3,
+            0.5,
+            2.0
+          );
+
+          // Combine noises
+          var height =
+            baseHeight +
+            baseNoise * heightVariation * 0.7 +
+            detailNoise * heightVariation * 0.3;
+
+          // Clamp to valid range
+          height = Donkeycraft.clamp(Math.floor(height), 1, WORLD_HEIGHT - 10);
+
+          // Ocean biomes: lower terrain, more water
+          if (isOcean) {
+            height = Donkeycraft.clamp(height, 5, 30);
+          }
+
+          // Extreme hills: add dramatic peaks via _gen wrapper
+          if (isExtremeHills) {
+            var peakBoost =
+              Math.abs(
+                Donkeycraft._gen._noise2D(worldX * 0.008, worldZ * 0.008)
+              ) * heightVariation;
+            height = Math.min(
+              height + Math.floor(peakBoost),
+              WORLD_HEIGHT - 15
+            );
+          }
+
+          heightmap[x + z * CHUNK_SIZE] = height;
         }
+      }
 
-        /**
-         * Generate a heightmap for a chunk at the given world coordinates.
-         * Uses multi-octave Perlin noise (fbm) with biome-specific parameters.
-         * @param {number} chunkX - Chunk X coordinate (in chunks).
-         * @param {number} chunkZ - Chunk Z coordinate (in chunks).
-         * @param {Donkeycraft.Biome|number|string} [biome] - Biome for this chunk.
-         *   Accepts a biome object, biome ID number, or biome name string.
-         *   Defaults to plains (ID 1) if not provided or invalid.
-         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE with height values.
-         */
-        function generateHeightmap(chunkX, chunkZ, biome) {
-            _ensureNoiseInit();
+      return heightmap;
+    }
 
-            // Resolve biome from ID/string if needed, or default to plains
-            var resolvedBiome = null;
-            if (biome) {
-                if (typeof biome === 'object' && biome.isOcean !== undefined) {
-                    resolvedBiome = biome;
-                } else if (Donkeycraft.BiomeRegistry) {
-                    if (typeof biome === 'number') {
-                        resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeById(biome);
-                    } else if (typeof biome === 'string') {
-                        resolvedBiome = Donkeycraft.BiomeRegistry.getBiomeByName(biome);
-                    }
-                }
-            }
-            biome = resolvedBiome || Donkeycraft.BiomeRegistry.getBiomeById(1); // Default to plains
+    /**
+     * Get the terrain height at a specific world X, Z position within a heightmap.
+     * @param {number} chunkX - Chunk X coordinate (unused, for API compatibility).
+     * @param {number} chunkZ - Chunk Z coordinate (unused, for API compatibility).
+     * @param {number} localX - Local X within chunk [0, 15].
+     * @param {number} localZ - Local Z within chunk [0, 15].
+     * @param {number[]} heightmap - Heightmap array.
+     * @returns {number} Terrain height at this position (64 if not found).
+     */
+    function getHeightAt(chunkX, chunkZ, localX, localZ, heightmap) {
+      return heightmap[localX + localZ * CHUNK_SIZE] || 64;
+    }
 
-            // Validate biome has required properties after resolution.
-            // Use local variables to avoid mutating a potentially frozen BlockRegistry object.
-            var isOcean = biome.isOcean === true;
-            var isDesert = biome.isDesert === true;
-            var isExtremeHills = biome.isExtremeHills === true;
-            var hasSnow = biome.hasSnow === true;
+    /**
+     * Generate a full heightmap and return it (convenience wrapper).
+     * Delegates to generateHeightmap; provided for API consistency with other generator modules.
+     * Note: generateHeightmap already calls _ensureNoiseInit internally, so this is safe.
+     * @param {number} chunkX - Chunk X coordinate.
+     * @param {number} chunkZ - Chunk Z coordinate.
+     * @param {Donkeycraft.Biome|number|string} [biome] - Optional biome for this chunk (plains if omitted).
+     * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
+     */
+    function generate(chunkX, chunkZ, biome) {
+      return generateHeightmap(chunkX, chunkZ, biome);
+    }
 
-            var heightmap = new Array(CHUNK_SIZE * CHUNK_SIZE);
-
-            // Biome-specific noise parameters
-            var baseHeight, heightVariation;
-
-            if (isOcean) {
-                baseHeight = 20;
-                heightVariation = 5;
-            } else if (isDesert) {
-                baseHeight = 60;
-                heightVariation = 10;
-            } else if (isExtremeHills) {
-                baseHeight = 100;
-                heightVariation = 80;
-            } else if (hasSnow) {
-                baseHeight = 70;
-                heightVariation = 30;
-            } else {
-                // Plains, forest, swamp, taiga — moderate terrain
-                baseHeight = 64;
-                heightVariation = 20;
-            }
-
-            // Scale factors for noise sampling
-            var scale = 0.015;
-            var detailScale = 0.05;
-
-            for (var x = 0; x < CHUNK_SIZE; x++) {
-                for (var z = 0; z < CHUNK_SIZE; z++) {
-                    // Global world coordinates
-                    var worldX = chunkX * CHUNK_SIZE + x;
-                    var worldZ = chunkZ * CHUNK_SIZE + z;
-
-                    // Base terrain height using large-scale noise via _gen wrapper
-                    // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
-                    var baseNoise = Donkeycraft._gen._fbm(
-                        worldX * scale, 0, worldZ * scale,
-                        4, 0.5, 2.0
-                    );
-
-                    // Detail noise for local variation
-                    // _fbm signature: (x, y, z, octaves, amplitude/persistence, frequency/lacunarity)
-                    var detailNoise = Donkeycraft._gen._fbm(
-                        worldX * detailScale, 0, worldZ * detailScale,
-                        3, 0.5, 2.0
-                    );
-
-                    // Combine noises
-                    var height = baseHeight +
-                        baseNoise * heightVariation * 0.7 +
-                        detailNoise * heightVariation * 0.3;
-
-                    // Clamp to valid range
-                    height = Donkeycraft.clamp(Math.floor(height), 1, WORLD_HEIGHT - 10);
-
-                    // Ocean biomes: lower terrain, more water
-                    if (isOcean) {
-                        height = Donkeycraft.clamp(height, 5, 30);
-                    }
-
-                    // Extreme hills: add dramatic peaks via _gen wrapper
-                    if (isExtremeHills) {
-                        var peakBoost = Math.abs(Donkeycraft._gen._noise2D(
-                            worldX * 0.008, worldZ * 0.008
-                        )) * heightVariation;
-                        height = Math.min(height + Math.floor(peakBoost), WORLD_HEIGHT - 15);
-                    }
-
-                    heightmap[x + z * CHUNK_SIZE] = height;
-                }
-            }
-
-            return heightmap;
-        }
-
-        /**
-         * Get the terrain height at a specific world X, Z position within a heightmap.
-         * @param {number} chunkX - Chunk X coordinate (unused, for API compatibility).
-         * @param {number} chunkZ - Chunk Z coordinate (unused, for API compatibility).
-         * @param {number} localX - Local X within chunk [0, 15].
-         * @param {number} localZ - Local Z within chunk [0, 15].
-         * @param {number[]} heightmap - Heightmap array.
-         * @returns {number} Terrain height at this position (64 if not found).
-         */
-        function getHeightAt(chunkX, chunkZ, localX, localZ, heightmap) {
-            return heightmap[localX + localZ * CHUNK_SIZE] || 64;
-        }
-
-        /**
-         * Generate a full heightmap and return it (convenience wrapper).
-         * Delegates to generateHeightmap; provided for API consistency with other generator modules.
-         * Note: generateHeightmap already calls _ensureNoiseInit internally, so this is safe.
-         * @param {number} chunkX - Chunk X coordinate.
-         * @param {number} chunkZ - Chunk Z coordinate.
-         * @param {Donkeycraft.Biome|number|string} [biome] - Optional biome for this chunk (plains if omitted).
-         * @returns {number[]} Heightmap array of size CHUNK_SIZE × CHUNK_SIZE.
-         */
-        function generate(chunkX, chunkZ, biome) {
-            return generateHeightmap(chunkX, chunkZ, biome);
-        }
-
-        return {
-            getInstance: getInstance,
-            generateHeightmap: generateHeightmap,
-            getHeightAt: getHeightAt,
-            generate: generate
-        };
-    })();
-
+    return {
+      getInstance: getInstance,
+      generateHeightmap: generateHeightmap,
+      getHeightAt: getHeightAt,
+      generate: generate,
+    };
+  })();
 })();

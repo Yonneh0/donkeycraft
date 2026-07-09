@@ -6,176 +6,191 @@
    Default state is hidden (display: none). Shown via .dk-visible class
    only when the player has earned XP (level > 0 or points > 0). */
 .dk-xp-bar-wrapper {
-    position: absolute;
-    bottom: 95px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 400px;
-    z-index: 25;
-    pointer-events: none;
-    display: none;
-    /* Hidden by default — initial state until XP is added */
+  position: absolute;
+  bottom: 95px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  z-index: 25;
+  pointer-events: none;
+  display: none;
+  /* Hidden by default — initial state until XP is added */
 }
 
 /* Show XP bar when it has content */
 .dk-xp-bar-wrapper.dk-visible {
-    display: block;
+  display: block;
 }
 
 /* Inner container — flexbox centering for bar elements */
 .dk-xp-bar-container {
-    position: relative;
-    width: 100%;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Segmented dark background — 20 segments with 2px gaps */
 .dk-xp-segmented-bg {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    gap: 2px;
-    pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
 }
 
 .dk-xp-segment {
-    flex: 1;
-    background: rgba(30, 30, 30, 0.12);
-    border-radius: 1px;
-    border: 1px solid rgba(60, 60, 60, 0.1);
+  flex: 1;
+  background: rgba(30, 30, 30, 0.12);
+  border-radius: 1px;
+  border: 1px solid rgba(60, 60, 60, 0.1);
 }
 
 /* Animated fill bar — tier color with transition */
 .dk-xp-fill {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #3498db, #2ecc71);
-    border-radius: 3px;
-    transition: width 200ms ease-out, background 300ms ease;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 4px rgba(52, 152, 219, 0.3);
-    pointer-events: none;
-    background: transparent;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  border-radius: 3px;
+  transition:
+    width 200ms ease-out,
+    background 300ms ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 4px rgba(52, 152, 219, 0.3);
+  pointer-events: none;
+  background: transparent;
 }
 
 /* Watermark text — shows progress at fill edge */
 .dk-xp-watermark {
-    position: absolute;
-    font-size: 11px;
-    font-weight: bold;
-    color: #fff;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000, 0 0 4px rgba(0, 0, 0, 0.8);
-    white-space: nowrap;
-    pointer-events: none;
-    opacity: 0;
-    z-index: 2;
+  position: absolute;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000,
+    0 0 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 2;
 }
 
 /* Badge container — centered on bar */
 .dk-xp-badge-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-    z-index: 3;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
 }
 
 /* Badge background circle */
 .dk-xp-badge-bg {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(200, 200, 200, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 500ms ease, width 300ms ease, height 300ms ease;
-    position: relative;
-    /* Prevent transform from affecting parent layout */
-    will-change: transform, opacity;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(200, 200, 200, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 500ms ease,
+    width 300ms ease,
+    height 300ms ease;
+  position: relative;
+  /* Prevent transform from affecting parent layout */
+  will-change: transform, opacity;
 }
 
 /* Badge text — level number or "MAX"/"DONE" */
 .dk-xp-badge-text {
-    font-size: 16px;
-    font-weight: bold;
-    color: #ffffff;
-    text-shadow: 1px 1px 2px #000;
-    transition: color 500ms ease, font-size 300ms ease;
-    user-select: none;
+  font-size: 16px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 1px 1px 2px #000;
+  transition:
+    color 500ms ease,
+    font-size 300ms ease;
+  user-select: none;
 }
 
 /* Badge outer glow ring — positioned relative to badge-container */
 .dk-xp-badge-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    border: 2px solid transparent;
-    pointer-events: none;
-    transition: border-color 500ms ease, width 300ms ease, height 300ms ease;
-    /* Fixed stacking context: z-index 1 ensures glow renders above bar but below badge text */
-    z-index: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid transparent;
+  pointer-events: none;
+  transition:
+    border-color 500ms ease,
+    width 300ms ease,
+    height 300ms ease;
+  /* Fixed stacking context: z-index 1 ensures glow renders above bar but below badge text */
+  z-index: 1;
 }
 
 /* Particle element style */
 .dk-xp-particle {
-    position: absolute;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 4;
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* Level burst ring element */
 .dk-xp-level-burst {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    border-style: solid;
-    pointer-events: none;
-    z-index: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Ambient ring for tier 3 (rotating outer ring) */
 .dk-xp-badge-ambient-ring {
-    position: absolute;
-    top: 0%;
-    left: 0%;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: 2px dashed rgba(150, 50, 255, 0.4);
-    transform: translate(0%, 0%);
-    pointer-events: none;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px dashed rgba(150, 50, 255, 0.4);
+  transform: translate(0%, 0%);
+  pointer-events: none;
 }
 
 /* Spark element for tier 4 */
 .dk-xp-spark {
-    position: absolute;
-    width: 3px;
-    height: 3px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 4;
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* ============================================================
@@ -184,285 +199,302 @@
 
 /* 1. Watermark flash — fade in, scale up, settle at fill edge */
 @keyframes watermark-flash {
-    0% {
-        opacity: 0;
-        transform: translateX(-4px) scale(0.9);
-    }
+  0% {
+    opacity: 0;
+    transform: translateX(-4px) scale(0.9);
+  }
 
-    60% {
-        opacity: 1;
-        transform: translateX(0) scale(1.1);
-    }
+  60% {
+    opacity: 1;
+    transform: translateX(0) scale(1.1);
+  }
 
-    100% {
-        opacity: 0.7;
-        transform: translateX(0) scale(1);
-    }
+  100% {
+    opacity: 0.7;
+    transform: translateX(0) scale(1);
+  }
 }
 
 /* 2. Badge spin morph — Y-axis spin + scale bounce on level change */
 @keyframes badge-spin-scale {
-    0% {
-        transform: rotateY(0deg) scale(1);
-        opacity: 1;
-    }
+  0% {
+    transform: rotateY(0deg) scale(1);
+    opacity: 1;
+  }
 
-    50% {
-        transform: rotateY(180deg) scale(0.7);
-        opacity: 0.5;
-    }
+  50% {
+    transform: rotateY(180deg) scale(0.7);
+    opacity: 0.5;
+  }
 
-    75% {
-        transform: rotateY(270deg) scale(1.1);
-        opacity: 0.8;
-    }
+  75% {
+    transform: rotateY(270deg) scale(1.1);
+    opacity: 0.8;
+  }
 
-    100% {
-        transform: rotateY(360deg) scale(1);
-        opacity: 1;
-    }
+  100% {
+    transform: rotateY(360deg) scale(1);
+    opacity: 1;
+  }
 }
 
 /* 3. Badge pulse glow — aura breathing (tiers 2, 5) */
 @keyframes badge-pulse-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 4px var(--glow-color, rgba(0, 150, 255, 0.8)),
+      0 0 8px var(--glow-color, rgba(0, 150, 255, 0.4));
+  }
 
-    0%,
-    100% {
-        box-shadow: 0 0 4px var(--glow-color, rgba(0, 150, 255, 0.8)), 0 0 8px var(--glow-color, rgba(0, 150, 255, 0.4));
-    }
-
-    50% {
-        box-shadow: 0 0 8px var(--glow-color, rgba(0, 150, 255, 0.9)), 0 0 16px var(--glow-color, rgba(0, 150, 255, 0.6)), 0 0 24px var(--glow-color, rgba(0, 150, 255, 0.3));
-    }
+  50% {
+    box-shadow:
+      0 0 8px var(--glow-color, rgba(0, 150, 255, 0.9)),
+      0 0 16px var(--glow-color, rgba(0, 150, 255, 0.6)),
+      0 0 24px var(--glow-color, rgba(0, 150, 255, 0.3));
+  }
 }
 
 /* 4. Badge ring rotate — outer ring rotation (tier 3) */
 @keyframes badge-ring-rotate {
-    0% {
-        transform: rotate(0deg);
-    }
+  0% {
+    transform: rotate(0deg);
+  }
 
-    100% {
-        transform: rotate(360deg);
-    }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 5. Spark float — sparks orbiting badge (tier 4) */
 @keyframes spark-float {
-    0% {
-        transform: rotate(0deg) translateX(0) rotate(0deg);
-        opacity: 0;
-    }
+  0% {
+    transform: rotate(0deg) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
 
-    20% {
-        opacity: 1;
-    }
+  20% {
+    opacity: 1;
+  }
 
-    80% {
-        opacity: 1;
-    }
+  80% {
+    opacity: 1;
+  }
 
-    100% {
-        transform: rotate(360deg) translateX(var(--spark-radius, 28px)) rotate(-360deg);
-        opacity: 0;
-    }
+  100% {
+    transform: rotate(360deg) translateX(var(--spark-radius, 28px))
+      rotate(-360deg);
+    opacity: 0;
+  }
 }
 
 /* 6. Level burst — expanding ring from badge center */
 @keyframes level-burst {
-    0% {
-        width: 0;
-        height: 0;
-        opacity: 1;
-        border-width: 4px;
-    }
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+    border-width: 4px;
+  }
 
-    100% {
-        width: 200px;
-        height: 200px;
-        opacity: 0;
-        border-width: 1px;
-    }
+  100% {
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+    border-width: 1px;
+  }
 }
 
 /* 7. Screen shake — DOM shake for high-level gains (tiers 5+) */
 @keyframes screen-shake {
-    0% {
-        transform: translate(0, 0);
-    }
+  0% {
+    transform: translate(0, 0);
+  }
 
-    10% {
-        transform: translate(-1.5px, 1px);
-    }
+  10% {
+    transform: translate(-1.5px, 1px);
+  }
 
-    20% {
-        transform: translate(1.5px, -1px);
-    }
+  20% {
+    transform: translate(1.5px, -1px);
+  }
 
-    30% {
-        transform: translate(-1px, 1.5px);
-    }
+  30% {
+    transform: translate(-1px, 1.5px);
+  }
 
-    40% {
-        transform: translate(1px, -1.5px);
-    }
+  40% {
+    transform: translate(1px, -1.5px);
+  }
 
-    50% {
-        transform: translate(-1.5px, -1px);
-    }
+  50% {
+    transform: translate(-1.5px, -1px);
+  }
 
-    60% {
-        transform: translate(1.5px, 1px);
-    }
+  60% {
+    transform: translate(1.5px, 1px);
+  }
 
-    70% {
-        transform: translate(-1px, -1.5px);
-    }
+  70% {
+    transform: translate(-1px, -1.5px);
+  }
 
-    80% {
-        transform: translate(1px, 1.5px);
-    }
+  80% {
+    transform: translate(1px, 1.5px);
+  }
 
-    90% {
-        transform: translate(-1px, -1px);
-    }
+  90% {
+    transform: translate(-1px, -1px);
+  }
 
-    100% {
-        transform: translate(0, 0);
-    }
+  100% {
+    transform: translate(0, 0);
+  }
 }
 
 /* 8. Rainbow shift — continuous hue rotation (tier 6) */
 @keyframes rainbow-shift {
-    0% {
-        filter: hue-rotate(0deg);
-    }
+  0% {
+    filter: hue-rotate(0deg);
+  }
 
-    100% {
-        filter: hue-rotate(360deg);
-    }
+  100% {
+    filter: hue-rotate(360deg);
+  }
 }
 
 /* 9. Particle fall — gravity particle trajectory */
 @keyframes particle-fall {
-    0% {
-        transform: translate(0, 0) scale(1);
-        opacity: 1;
-    }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
 
-    100% {
-        transform: translate(var(--dx, 30px), var(--dy, -60px)) scale(0.2);
-        opacity: 0;
-    }
+  100% {
+    transform: translate(var(--dx, 30px), var(--dy, -60px)) scale(0.2);
+    opacity: 0;
+  }
 }
 
 /* 10. XP color flash — brightness flash on XP change */
 @keyframes xp-color-flash {
-    0% {
-        filter: brightness(2);
-    }
+  0% {
+    filter: brightness(2);
+  }
 
-    100% {
-        filter: brightness(1);
-    }
+  100% {
+    filter: brightness(1);
+  }
 }
 
 /* 11. Badge bounce — scale entrance bounce */
 @keyframes badge-bounce {
-    0% {
-        transform: scale(0);
-    }
+  0% {
+    transform: scale(0);
+  }
 
-    50% {
-        transform: scale(1.2);
-    }
+  50% {
+    transform: scale(1.2);
+  }
 
-    70% {
-        transform: scale(0.9);
-    }
+  70% {
+    transform: scale(0.9);
+  }
 
-    100% {
-        transform: scale(1);
-    }
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 12. Golden spectacle — multi-effect composite (tier 7) */
 @keyframes golden-spectacle {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px rgba(255, 215, 0, 0.8),
+      0 0 20px rgba(255, 215, 0, 0.4),
+      0 0 40px rgba(255, 215, 0, 0.2);
+    filter: hue-rotate(0deg) brightness(1.1);
+  }
 
-    0%,
-    100% {
-        box-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.4), 0 0 40px rgba(255, 215, 0, 0.2);
-        filter: hue-rotate(0deg) brightness(1.1);
-    }
+  33% {
+    box-shadow:
+      0 0 15px rgba(255, 165, 0, 0.9),
+      0 0 30px rgba(255, 165, 0, 0.5),
+      0 0 50px rgba(255, 165, 0, 0.3);
+    filter: hue-rotate(120deg) brightness(1.2);
+  }
 
-    33% {
-        box-shadow: 0 0 15px rgba(255, 165, 0, 0.9), 0 0 30px rgba(255, 165, 0, 0.5), 0 0 50px rgba(255, 165, 0, 0.3);
-        filter: hue-rotate(120deg) brightness(1.2);
-    }
-
-    66% {
-        box-shadow: 0 0 15px rgba(255, 255, 0, 0.9), 0 0 30px rgba(255, 255, 0, 0.5), 0 0 50px rgba(255, 255, 0, 0.3);
-        filter: hue-rotate(240deg) brightness(1.2);
-    }
+  66% {
+    box-shadow:
+      0 0 15px rgba(255, 255, 0, 0.9),
+      0 0 30px rgba(255, 255, 0, 0.5),
+      0 0 50px rgba(255, 255, 0, 0.3);
+    filter: hue-rotate(240deg) brightness(1.2);
+  }
 }
 
 /* 13. Intensified pulse — tier 5 ambient effect */
 @keyframes intensified-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px rgba(255, 80, 0, 0.8),
+      0 0 12px rgba(255, 80, 0, 0.4);
+  }
 
-    0%,
-    100% {
-        box-shadow: 0 0 6px rgba(255, 80, 0, 0.8), 0 0 12px rgba(255, 80, 0, 0.4);
-    }
-
-    50% {
-        box-shadow: 0 0 12px rgba(255, 80, 0, 1), 0 0 24px rgba(255, 80, 0, 0.7), 0 0 36px rgba(255, 80, 0, 0.3);
-        transform: scale(1.05);
-    }
+  50% {
+    box-shadow:
+      0 0 12px rgba(255, 80, 0, 1),
+      0 0 24px rgba(255, 80, 0, 0.7),
+      0 0 36px rgba(255, 80, 0, 0.3);
+    transform: scale(1.05);
+  }
 }
 
 /* 14. Badge shake — subtle scale/rotate shake for level-up on levels 75+ (no translate to avoid layout shift) */
 @keyframes badge-shake {
-    0% {
-        transform: scale(1) rotate(0deg);
-    }
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
 
-    10% {
-        transform: scale(1.08) rotate(-2deg);
-    }
+  10% {
+    transform: scale(1.08) rotate(-2deg);
+  }
 
-    20% {
-        transform: scale(0.95) rotate(2deg);
-    }
+  20% {
+    transform: scale(0.95) rotate(2deg);
+  }
 
-    30% {
-        transform: scale(1.06) rotate(-1deg);
-    }
+  30% {
+    transform: scale(1.06) rotate(-1deg);
+  }
 
-    40% {
-        transform: scale(0.97) rotate(1deg);
-    }
+  40% {
+    transform: scale(0.97) rotate(1deg);
+  }
 
-    50% {
-        transform: scale(1.04) rotate(-1deg);
-    }
+  50% {
+    transform: scale(1.04) rotate(-1deg);
+  }
 
-    60% {
-        transform: scale(0.98) rotate(0.5deg);
-    }
+  60% {
+    transform: scale(0.98) rotate(0.5deg);
+  }
 
-    70% {
-        transform: scale(1.02) rotate(-0.5deg);
-    }
+  70% {
+    transform: scale(1.02) rotate(-0.5deg);
+  }
 
-    80% {
-        transform: scale(0.99) rotate(0.3deg);
-    }
+  80% {
+    transform: scale(0.99) rotate(0.3deg);
+  }
 
-    90% {
-        transform: scale(1.01) rotate(-0.3deg);
-    }
+  90% {
+    transform: scale(1.01) rotate(-0.3deg);
+  }
 
-    100% {
-        transform: scale(1) rotate(0deg);
-    }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
 }

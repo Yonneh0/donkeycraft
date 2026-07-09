@@ -3,286 +3,286 @@
 
 /* Main UI Panel */
 #dk-terrain-ui {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 100;
-    background: rgba(30, 30, 30, 0.92);
-    color: #ddd;
-    padding: 12px 16px;
-    border-radius: 8px;
-    min-width: 240px;
-    max-width: 320px;
-    font-size: 13px;
-    user-select: none;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-    max-height: 95vh;
-    overflow-y: auto;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  background: rgba(30, 30, 30, 0.92);
+  color: #ddd;
+  padding: 12px 16px;
+  border-radius: 8px;
+  min-width: 240px;
+  max-width: 320px;
+  font-size: 13px;
+  user-select: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  max-height: 95vh;
+  overflow-y: auto;
 }
 
 /* Placeholder for chunk grid wrapper — hidden since actual wrapper is created dynamically */
 .chunk-grid-placeholder {
-    display: none;
+  display: none;
 }
 
 #dk-terrain-ui h2 {
-    font-size: 15px;
-    margin: 0 0 8px 0;
-    color: #4fc3f7;
-    border-bottom: 1px solid #444;
-    padding-bottom: 4px;
+  font-size: 15px;
+  margin: 0 0 8px 0;
+  color: #4fc3f7;
+  border-bottom: 1px solid #444;
+  padding-bottom: 4px;
 }
 
 #dk-terrain-ui label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
 }
 
 #dk-terrain-ui select,
-#dk-terrain-ui input[type="number"],
-#dk-terrain-ui input[type="range"] {
-    background: #333;
-    color: #eee;
-    border: 1px solid #555;
-    border-radius: 4px;
-    padding: 3px 6px;
+#dk-terrain-ui input[type='number'],
+#dk-terrain-ui input[type='range'] {
+  background: #333;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 3px 6px;
 }
 
 #dk-terrain-ui select {
-    flex: 1;
-    cursor: pointer;
+  flex: 1;
+  cursor: pointer;
 }
 
-#dk-terrain-ui input[type="number"] {
-    width: 70px;
+#dk-terrain-ui input[type='number'] {
+  width: 70px;
 }
 
-#dk-terrain-ui input[type="range"] {
-    flex: 1;
-    cursor: pointer;
+#dk-terrain-ui input[type='range'] {
+  flex: 1;
+  cursor: pointer;
 }
 
 #dk-terrain-ui button {
-    background: #2196F3;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 14px;
-    margin: 4px 2px;
-    cursor: pointer;
-    font-size: 12px;
+  background: #2196f3;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 14px;
+  margin: 4px 2px;
+  cursor: pointer;
+  font-size: 12px;
 }
 
 #dk-terrain-ui button:hover {
-    background: #42a5f5;
+  background: #42a5f5;
 }
 
 #dk-terrain-ui button.active {
-    background: #ff9800;
+  background: #ff9800;
 }
 
 #dk-terrain-ui .row {
-    display: flex;
-    align-items: center;
-    margin: 4px 0;
-    gap: 6px;
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+  gap: 6px;
 }
 
 #dk-terrain-ui .separator {
-    border-top: 1px solid #444;
-    margin: 8px 0;
+  border-top: 1px solid #444;
+  margin: 8px 0;
 }
 
 #dk-terrain-ui .info-line {
-    font-size: 11px;
-    color: #aaa;
-    margin: 1px 0;
-    font-family: 'Consolas', 'Monaco', monospace;
-    line-height: 1.4;
+  font-size: 11px;
+  color: #aaa;
+  margin: 1px 0;
+  font-family: 'Consolas', 'Monaco', monospace;
+  line-height: 1.4;
 }
 
 #dk-terrain-ui .checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
 }
 
 /* FPS Counter */
 #dk-fps-counter {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    z-index: 100;
-    background: rgba(30, 30, 30, 0.85);
-    color: #0f0;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 12px;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  background: rgba(30, 30, 30, 0.85);
+  color: #0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
 }
 
 /* Instructions */
 #dk-terrain-instructions {
-    position: fixed;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
-    background: rgba(30, 30, 30, 0.85);
-    color: #bbb;
-    padding: 6px 14px;
-    border-radius: 4px;
-    font-size: 11px;
-    text-align: center;
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background: rgba(30, 30, 30, 0.85);
+  color: #bbb;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 11px;
+  text-align: center;
 }
 
 /* Speed Indicator */
 #dk-speed-indicator {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 200;
-    background: rgba(30, 30, 30, 0.9);
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 20px;
-    text-align: center;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.15s ease-out;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 200;
+  background: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 20px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 #dk-speed-indicator.show {
-    opacity: 1;
+  opacity: 1;
 }
 
 #dk-speed-indicator .speed-emoji {
-    font-size: 28px;
+  font-size: 28px;
 }
 
 #dk-speed-indicator .speed-label {
-    display: block;
-    font-size: 13px;
-    color: #4fc3f7;
-    margin-top: 4px;
+  display: block;
+  font-size: 13px;
+  color: #4fc3f7;
+  margin-top: 4px;
 }
 
 /* Chunk grid wrapper — surrounds the grid with directional expand/contract buttons */
 .chunk-grid-wrapper {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    margin: 6px 0;
-    min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 6px 0;
+  min-height: 32px;
 }
 
 /* Ensure chunk grid display is visible and properly spaced */
 .chunk-grid-display {
-    /* Grid template styles are set dynamically via JavaScript */
-    display: grid;
-    gap: 1px;
-    background: #222;
-    border: 1px solid #555;
-    padding: 1px;
-    border-radius: 2px;
+  /* Grid template styles are set dynamically via JavaScript */
+  display: grid;
+  gap: 1px;
+  background: #222;
+  border: 1px solid #555;
+  padding: 1px;
+  border-radius: 2px;
 }
 
 .grid-row-mid {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .grid-dir-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .chunk-grid-cell {
-    width: 16px;
-    height: 16px;
-    display: block;
-    border: 1px solid #111;
-    border-radius: 1px;
+  width: 16px;
+  height: 16px;
+  display: block;
+  border: 1px solid #111;
+  border-radius: 1px;
 }
 
 .expand-btn {
-    background: #4caf50 !important;
-    min-width: 36px;
-    padding: 2px 4px !important;
-    font-size: 11px !important;
+  background: #4caf50 !important;
+  min-width: 36px;
+  padding: 2px 4px !important;
+  font-size: 11px !important;
 }
 
 .expand-btn:hover {
-    background: #66bb6a !important;
+  background: #66bb6a !important;
 }
 
 .contract-btn {
-    background: #ff7043 !important;
-    min-width: 36px;
-    padding: 2px 4px !important;
-    font-size: 11px !important;
+  background: #ff7043 !important;
+  min-width: 36px;
+  padding: 2px 4px !important;
+  font-size: 11px !important;
 }
 
 .contract-btn:hover {
-    background: #ff8a65 !important;
+  background: #ff8a65 !important;
 }
 
 /* Grid directional button positioning */
 .grid-top {
-    flex-direction: column;
-    align-items: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .grid-bottom {
-    flex-direction: column;
-    align-items: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .grid-left {
-    flex-direction: row;
-    align-items: center;
+  flex-direction: row;
+  align-items: center;
 }
 
 .grid-right {
-    flex-direction: row;
-    align-items: center;
+  flex-direction: row;
+  align-items: center;
 }
 
 /* Accessibility: ensure UI panel is visible above other content */
 #dk-terrain-ui:focus {
-    outline: 2px solid #4fc3f7;
-    outline-offset: 2px;
+  outline: 2px solid #4fc3f7;
+  outline-offset: 2px;
 }
 
 /* Responsive: reduce padding on small screens */
 @media (max-width: 480px) {
-    #dk-terrain-ui {
-        min-width: 180px;
-        max-width: 95vw;
-        padding: 8px 12px;
-        font-size: 11px;
-    }
+  #dk-terrain-ui {
+    min-width: 180px;
+    max-width: 95vw;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
 
-    #dk-terrain-ui h2 {
-        font-size: 13px;
-    }
+  #dk-terrain-ui h2 {
+    font-size: 13px;
+  }
 
-    #dk-terrain-ui button {
-        padding: 4px 8px;
-        font-size: 10px;
-    }
+  #dk-terrain-ui button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
 
-    .chunk-grid-cell {
-        width: 12px;
-        height: 12px;
-    }
+  .chunk-grid-cell {
+    width: 12px;
+    height: 12px;
+  }
 }

@@ -3,123 +3,130 @@
    ============================================================ */
 
 .dk-gamemode-badge {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    pointer-events: auto;
-    user-select: none;
-    transition: opacity 200ms ease, transform 200ms ease;
-    cursor: pointer;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+  user-select: none;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+  cursor: pointer;
 }
 
 .dk-gamemode-badge-icon {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    transform: translateY(-50%);
-    font-size: 32px;
-    opacity: 0.12;
-    line-height: 1;
-    pointer-events: none;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 32px;
+  opacity: 0.12;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .dk-gamemode-badge-icon-survival {
-    color: #ff4444;
-    font-size: 36px;
+  color: #ff4444;
+  font-size: 36px;
 }
 
 .dk-gamemode-badge-icon-creative {
-    color: #4fc3f7;
-    font-size: 30px;
-    font-weight: bold;
+  color: #4fc3f7;
+  font-size: 30px;
+  font-weight: bold;
 }
 
 .dk-gamemode-badge-label {
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 12px;
-    font-weight: bold;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    pointer-events: none;
-    white-space: nowrap;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .dk-gamemode-badge:has(.dk-gamemode-badge-icon-survival) {
-    border-color: rgba(255, 68, 68, 0.3);
-    background: rgba(40, 10, 10, 0.6);
+  border-color: rgba(255, 68, 68, 0.3);
+  background: rgba(40, 10, 10, 0.6);
 }
 
-.dk-gamemode-badge:has(.dk-gamemode-badge-icon-survival) .dk-gamemode-badge-label {
-    color: #ff6b6b;
-    text-shadow: 0 0 8px rgba(255, 68, 68, 0.4);
+.dk-gamemode-badge:has(.dk-gamemode-badge-icon-survival)
+  .dk-gamemode-badge-label {
+  color: #ff6b6b;
+  text-shadow: 0 0 8px rgba(255, 68, 68, 0.4);
 }
 
 .dk-gamemode-badge:has(.dk-gamemode-badge-icon-creative) {
-    border-color: rgba(79, 195, 247, 0.3);
-    background: rgba(10, 25, 40, 0.6);
+  border-color: rgba(79, 195, 247, 0.3);
+  background: rgba(10, 25, 40, 0.6);
 }
 
-.dk-gamemode-badge:has(.dk-gamemode-badge-icon-creative) .dk-gamemode-badge-label {
-    color: #81d4fa;
-    text-shadow: 0 0 8px rgba(79, 195, 247, 0.4);
+.dk-gamemode-badge:has(.dk-gamemode-badge-icon-creative)
+  .dk-gamemode-badge-label {
+  color: #81d4fa;
+  text-shadow: 0 0 8px rgba(79, 195, 247, 0.4);
 }
 
 @keyframes badge-spin-swap {
-    0% {
-        transform: rotateY(0deg) scale(1);
-        opacity: 1;
-    }
+  0% {
+    transform: rotateY(0deg) scale(1);
+    opacity: 1;
+  }
 
-    30% {
-        transform: rotateY(90deg) scale(0.85);
-        opacity: 0.6;
-    }
+  30% {
+    transform: rotateY(90deg) scale(0.85);
+    opacity: 0.6;
+  }
 
-    60% {
-        transform: rotateY(180deg) scale(1.05);
-        opacity: 0.8;
-    }
+  60% {
+    transform: rotateY(180deg) scale(1.05);
+    opacity: 0.8;
+  }
 
-    100% {
-        transform: rotateY(360deg) scale(1);
-        opacity: 1;
-    }
+  100% {
+    transform: rotateY(360deg) scale(1);
+    opacity: 1;
+  }
 }
 
 @keyframes badge-color-flash {
-    0% {
-        background: var(--badge-bg-from);
-    }
+  0% {
+    background: var(--badge-bg-from);
+  }
 
-    40% {
-        background: rgba(255, 255, 255, 0.15);
-    }
+  40% {
+    background: rgba(255, 255, 255, 0.15);
+  }
 
-    100% {
-        background: var(--badge-bg-to);
-    }
+  100% {
+    background: var(--badge-bg-to);
+  }
 }
 
 @keyframes badge-click-bounce {
-    0% {
-        transform: scale(1);
-    }
+  0% {
+    transform: scale(1);
+  }
 
-    40% {
-        transform: scale(1.15);
-    }
+  40% {
+    transform: scale(1.15);
+  }
 
-    100% {
-        transform: scale(1);
-    }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .dk-gamemode-badge.dk-swapping {
-    transition: background 350ms ease, border-color 350ms ease, box-shadow 350ms ease !important;
+  transition:
+    background 350ms ease,
+    border-color 350ms ease,
+    box-shadow 350ms ease !important;
 }

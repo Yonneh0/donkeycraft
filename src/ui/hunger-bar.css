@@ -5,62 +5,73 @@
    ============================================================ */
 
 .dk-hunger-bar-wrapper {
-    position: absolute;
-    bottom: 68px;
-    right: calc(50% - 228px);
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    z-index: 24;
-    pointer-events: none;
+  position: absolute;
+  bottom: 68px;
+  right: calc(50% - 228px);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  z-index: 24;
+  pointer-events: none;
 }
 
 .dk-hunger-hydration-bar {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 2px 4px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(0, 0, 0, 0.15);
-    background: linear-gradient(180deg, rgba(32, 32, 30, 0.45) 0%, rgba(16, 18, 20, 0.55) 100%);
-    overflow: visible;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 4px;
+  border-radius: 6px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(32, 32, 30, 0.45) 0%,
+    rgba(16, 18, 20, 0.55) 100%
+  );
+  overflow: visible;
 }
 
 .dk-drumstick-container {
-    width: 18px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: filter 150ms ease, transform 150ms ease;
-    position: relative;
-    border: none;
-    box-shadow: none;
+  width: 18px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+  position: relative;
+  border: none;
+  box-shadow: none;
 }
 
 .dk-drumstick-container svg {
-    width: 18px;
-    height: 20px;
-    display: block;
+  width: 18px;
+  height: 20px;
+  display: block;
 }
 
 .dk-drop-container {
-    width: 18px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: filter 150ms ease, transform 150ms ease;
-    position: relative;
-    border: none;
-    box-shadow: none;
+  width: 18px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+  position: relative;
+  border: none;
+  box-shadow: none;
 }
 
 .dk-drop-container svg {
-    width: 18px;
-    height: 20px;
-    display: block;
+  width: 18px;
+  height: 20px;
+  display: block;
 }
 
 /* ============================================================
@@ -68,11 +79,11 @@
    ============================================================ */
 
 .dk-drumstick-full .dk-drumstick-fill {
-    filter: drop-shadow(0 0 2px rgba(222, 145, 33, 0.5));
+  filter: drop-shadow(0 0 2px rgba(222, 145, 33, 0.5));
 }
 
 .dk-drop-full .dk-drop-fill {
-    filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.5));
+  filter: drop-shadow(0 0 2px rgba(52, 152, 219, 0.5));
 }
 
 /* ============================================================
@@ -80,11 +91,11 @@
    ============================================================ */
 
 .dk-drumstick-partial .dk-drumstick-fill {
-    filter: drop-shadow(0 0 1px rgba(222, 145, 33, 0.3));
+  filter: drop-shadow(0 0 1px rgba(222, 145, 33, 0.3));
 }
 
 .dk-drop-partial .dk-drop-fill {
-    filter: drop-shadow(0 0 1px rgba(52, 152, 219, 0.3));
+  filter: drop-shadow(0 0 1px rgba(52, 152, 219, 0.3));
 }
 
 /* ============================================================
@@ -92,45 +103,45 @@
    ============================================================ */
 
 .dk-drumstick-eat-pulse {
-    animation: drumstick-eat-pulse 400ms ease-out;
+  animation: drumstick-eat-pulse 400ms ease-out;
 }
 
 .dk-drop-drink-pulse {
-    animation: drop-drink-pulse 400ms ease-out;
+  animation: drop-drink-pulse 400ms ease-out;
 }
 
 @keyframes drumstick-eat-pulse {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 
-    50% {
-        transform: scale(1.35);
-        filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
-    }
+  50% {
+    transform: scale(1.35);
+    filter: brightness(1.4) drop-shadow(0 0 4px rgba(222, 145, 33, 0.7));
+  }
 
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 @keyframes drop-drink-pulse {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 
-    50% {
-        transform: scale(1.35);
-        filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
-    }
+  50% {
+    transform: scale(1.35);
+    filter: brightness(1.4) drop-shadow(0 0 4px rgba(52, 152, 219, 0.7));
+  }
 
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
 }
 
 /* ============================================================
@@ -138,45 +149,45 @@
    ============================================================ */
 
 .dk-drumstick-dim {
-    animation: drumstick-dim 300ms ease-out;
+  animation: drumstick-dim 300ms ease-out;
 }
 
 .dk-drop-dim {
-    animation: drop-dim 300ms ease-out;
+  animation: drop-dim 300ms ease-out;
 }
 
 @keyframes drumstick-dim {
-    0% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
+  0% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
 
-    50% {
-        opacity: 0.4;
-        filter: brightness(0.6) saturate(0.3);
-    }
+  50% {
+    opacity: 0.4;
+    filter: brightness(0.6) saturate(0.3);
+  }
 
-    100% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
+  100% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
 }
 
 @keyframes drop-dim {
-    0% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
+  0% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
 
-    50% {
-        opacity: 0.4;
-        filter: brightness(0.6) saturate(0.3);
-    }
+  50% {
+    opacity: 0.4;
+    filter: brightness(0.6) saturate(0.3);
+  }
 
-    100% {
-        opacity: 1;
-        filter: brightness(1) saturate(1);
-    }
+  100% {
+    opacity: 1;
+    filter: brightness(1) saturate(1);
+  }
 }
 
 /* ============================================================
@@ -188,81 +199,78 @@
 
 /* Mild shake: 30-60% remaining */
 @keyframes hunger-shake-mild {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
 
-    0%,
-    100% {
-        transform: translateX(0);
-    }
+  25% {
+    transform: translateX(1.5px);
+  }
 
-    25% {
-        transform: translateX(1.5px);
-    }
+  50% {
+    transform: translateX(-1.5px);
+  }
 
-    50% {
-        transform: translateX(-1.5px);
-    }
-
-    75% {
-        transform: translateX(1.5px);
-    }
+  75% {
+    transform: translateX(1.5px);
+  }
 }
 
 /* Moderate shake: 15-35% remaining */
 @keyframes hunger-shake-moderate {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
 
-    0%,
-    100% {
-        transform: translateX(0);
-    }
+  20% {
+    transform: translateX(2.5px);
+  }
 
-    20% {
-        transform: translateX(2.5px);
-    }
+  40% {
+    transform: translateX(-2.5px);
+  }
 
-    40% {
-        transform: translateX(-2.5px);
-    }
+  60% {
+    transform: translateX(2.5px);
+  }
 
-    60% {
-        transform: translateX(2.5px);
-    }
-
-    80% {
-        transform: translateX(-2.5px);
-    }
+  80% {
+    transform: translateX(-2.5px);
+  }
 }
 
 /* Intense shake: <15% remaining */
 @keyframes hunger-shake-intense {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
 
-    0%,
-    100% {
-        transform: translateX(0);
-    }
+  14% {
+    transform: translateX(4px);
+  }
 
-    14% {
-        transform: translateX(4px);
-    }
+  28% {
+    transform: translateX(-4px);
+  }
 
-    28% {
-        transform: translateX(-4px);
-    }
+  42% {
+    transform: translateX(4px);
+  }
 
-    42% {
-        transform: translateX(4px);
-    }
+  57% {
+    transform: translateX(-4px);
+  }
 
-    57% {
-        transform: translateX(-4px);
-    }
+  71% {
+    transform: translateX(4px);
+  }
 
-    71% {
-        transform: translateX(4px);
-    }
-
-    85% {
-        transform: translateX(-4px);
-    }
+  85% {
+    transform: translateX(-4px);
+  }
 }
 
 /* ============================================================
@@ -270,37 +278,41 @@
    ============================================================ */
 
 .dk-hunger-text {
-    position: absolute;
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    pointer-events: none;
-    animation: float-text-up 800ms ease-out forwards;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
-    z-index: 10;
+  position: absolute;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  pointer-events: none;
+  animation: float-text-up 800ms ease-out forwards;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000;
+  z-index: 10;
 }
 
 .dk-hydration-text {
-    position: absolute;
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    pointer-events: none;
-    animation: float-text-up 800ms ease-out forwards;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
-    z-index: 10;
+  position: absolute;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  pointer-events: none;
+  animation: float-text-up 800ms ease-out forwards;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000;
+  z-index: 10;
 }
 
 @keyframes float-text-up {
-    0% {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 
-    100% {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-    }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
 }
 
 /* ============================================================
@@ -308,27 +320,35 @@
    ============================================================ */
 
 .dk-hunger-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0;
-    transition: opacity 300ms ease;
-    background: radial-gradient(ellipse at center, rgba(160, 100, 0, 0.3) 0%, rgba(100, 60, 0, 0.6) 100%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(160, 100, 0, 0.3) 0%,
+    rgba(100, 60, 0, 0.6) 100%
+  );
 }
 
 .dk-hydration-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 6;
-    opacity: 0;
-    transition: opacity 300ms ease;
-    background: radial-gradient(ellipse at center, rgba(0, 100, 200, 0.3) 0%, rgba(0, 60, 120, 0.6) 100%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 100, 200, 0.3) 0%,
+    rgba(0, 60, 120, 0.6) 100%
+  );
 }

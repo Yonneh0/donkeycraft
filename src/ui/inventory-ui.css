@@ -3,34 +3,38 @@
    ============================================================ */
 
 .dk-inventory-panel {
-    position: fixed;
-    top: 100px;
-    right: 25px;
-    bottom: 25px;
-    background: rgba(30, 30, 30, 0.92);
-    border: 2px solid #555;
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    z-index: 100;
-    opacity: 0;
-    transform: scale(0.3) translateY(80px);
-    pointer-events: none;
-    cursor: default;
-    transition: transform 0.33s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.33s ease;
-    transform-origin: bottom center;
+  position: fixed;
+  top: 100px;
+  right: 25px;
+  bottom: 25px;
+  background: rgba(30, 30, 30, 0.92);
+  border: 2px solid #555;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  opacity: 0;
+  transform: scale(0.3) translateY(80px);
+  pointer-events: none;
+  cursor: default;
+  transition:
+    transform 0.33s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.33s ease;
+  transform-origin: bottom center;
 }
 
 .dk-inventory-panel.open {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-    pointer-events: auto;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
 }
 
 .dk-inventory-panel.closing {
-    opacity: 0;
-    transform: scale(0.85) translateY(0);
-    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+  opacity: 0;
+  transform: scale(0.85) translateY(0);
+  transition:
+    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.5s ease;
 }
 
 /* ============================================================
@@ -38,45 +42,45 @@
    ============================================================ */
 
 .dk-inventory-titlebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0px 8px;
-    background: rgba(50, 50, 50, 0.8);
-    border-bottom: 1px solid #444;
-    border-radius: 6px 6px 0 0;
-    flex-shrink: 0;
-    height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0px 8px;
+  background: rgba(50, 50, 50, 0.8);
+  border-bottom: 1px solid #444;
+  border-radius: 6px 6px 0 0;
+  flex-shrink: 0;
+  height: 36px;
 }
 
 .dk-inventory-titlebar .dk-title-text {
-    font-size: 14px;
-    font-weight: bold;
-    color: #ddd;
-    text-shadow: 1px 1px 2px #000;
-    letter-spacing: 0.5px;
-    align-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #ddd;
+  text-shadow: 1px 1px 2px #000;
+  letter-spacing: 0.5px;
+  align-content: center;
 }
 
 .dk-inventory-close-btn {
-    width: 24px;
-    height: 24px;
-    background: rgba(180, 50, 50, 0.6);
-    border: 1px solid #888;
-    border-radius: 3px;
-    color: #fff;
-    font-size: 14px;
-    font-weight: bold;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s ease;
+  width: 24px;
+  height: 24px;
+  background: rgba(180, 50, 50, 0.6);
+  border: 1px solid #888;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
 }
 
 .dk-inventory-close-btn:hover {
-    background: rgba(220, 60, 60, 0.8);
+  background: rgba(220, 60, 60, 0.8);
 }
 
 /* ============================================================
@@ -84,14 +88,14 @@
    ============================================================ */
 
 .dk-inventory-content {
-    display: flex;
-    flex-direction: row;
-    flex: 2;
-    /* Top 2/5 of panel height */
-    overflow: hidden;
-    padding: 0px;
-    gap: 12px;
-    justify-content: end;
+  display: flex;
+  flex-direction: row;
+  flex: 2;
+  /* Top 2/5 of panel height */
+  overflow: hidden;
+  padding: 0px;
+  gap: 12px;
+  justify-content: end;
 }
 
 /* ============================================================
@@ -99,168 +103,170 @@
    ============================================================ */
 
 .dk-inventory-left-pane {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: center;
-    flex-shrink: 0;
-    margin: 8px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  flex-shrink: 0;
+  margin: 8px 8px;
 }
 
 /* Equipment layout: left slots | paperdoll | right slots */
 .dk-equipment-layout {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    justify-content: space-between;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
 }
 
 /* Left column: 4 slots stacked, gap, then 1 slot */
 .dk-equip-col.dk-equip-left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: start;
-    flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  flex-shrink: 0;
 }
 
 /* Center: Paperdoll placeholder */
 .dk-equip-center {
-    display: flex;
-    align-items: end;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 64px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 64px;
 }
 
 .dk-equip-slot-col {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .dk-equip-half-space {
-    display: flex;
-    height: 26px;
-    /* Half space between groups */
+  display: flex;
+  height: 26px;
+  /* Half space between groups */
 }
 
 .dk-equip-whole-space {
-    display: flex;
-    height: 52px;
-    /* Half space between groups */
+  display: flex;
+  height: 52px;
+  /* Half space between groups */
 }
 
 .dk-equip-slot-row {
-    display: flex;
-    gap: 4px;
+  display: flex;
+  gap: 4px;
 }
 
 /* Paperdoll placeholder with smoke effect */
 .dk-paperdoll-container {
-    position: relative;
-    width: 144px;
-    height: 200px;
-    display: flex;
-    /* Align canvas to bottom of container so entity feet align with bottom edge */
-    align-items: flex-end;
-    justify-content: center;
+  position: relative;
+  width: 144px;
+  height: 200px;
+  display: flex;
+  /* Align canvas to bottom of container so entity feet align with bottom edge */
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .dk-paperdoll {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 36px;
-    height: 100%;
-    background: linear-gradient(180deg,
-            rgba(120, 140, 160, 0.25) 0%,
-            rgba(100, 120, 140, 0.18) 40%,
-            rgba(80, 100, 120, 0.12) 100%);
-    border: 1px solid rgba(150, 170, 190, 0.3);
-    border-radius: 8px 8px 4px 4px;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(120, 140, 160, 0.25) 0%,
+    rgba(100, 120, 140, 0.18) 40%,
+    rgba(80, 100, 120, 0.12) 100%
+  );
+  border: 1px solid rgba(150, 170, 190, 0.3);
+  border-radius: 8px 8px 4px 4px;
 }
 
 /* Rising smoke particles */
 .dk-paperdoll-smoke {
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    overflow: hidden;
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 .dk-smoke-particle {
-    position: absolute;
-    bottom: 20%;
-    width: 4px;
-    height: 4px;
-    background: rgba(180, 190, 200, 0.35);
-    border-radius: 50%;
-    animation: smokeRise 2.5s ease-out infinite;
+  position: absolute;
+  bottom: 20%;
+  width: 4px;
+  height: 4px;
+  background: rgba(180, 190, 200, 0.35);
+  border-radius: 50%;
+  animation: smokeRise 2.5s ease-out infinite;
 }
 
 .dk-smoke-particle:nth-child(1) {
-    left: 25%;
-    animation-delay: 0s;
-    width: 3px;
-    height: 3px;
+  left: 25%;
+  animation-delay: 0s;
+  width: 3px;
+  height: 3px;
 }
 
 .dk-smoke-particle:nth-child(2) {
-    left: 40%;
-    animation-delay: 0.5s;
-    width: 5px;
-    height: 5px;
+  left: 40%;
+  animation-delay: 0.5s;
+  width: 5px;
+  height: 5px;
 }
 
 .dk-smoke-particle:nth-child(3) {
-    left: 55%;
-    animation-delay: 1.0s;
-    width: 3px;
-    height: 3px;
+  left: 55%;
+  animation-delay: 1s;
+  width: 3px;
+  height: 3px;
 }
 
 .dk-smoke-particle:nth-child(4) {
-    left: 70%;
-    animation-delay: 1.5s;
-    width: 4px;
-    height: 4px;
+  left: 70%;
+  animation-delay: 1.5s;
+  width: 4px;
+  height: 4px;
 }
 
 .dk-smoke-particle:nth-child(5) {
-    left: 35%;
-    animation-delay: 2.0s;
-    width: 2px;
-    height: 2px;
+  left: 35%;
+  animation-delay: 2s;
+  width: 2px;
+  height: 2px;
 }
 
 .dk-smoke-particle:nth-child(6) {
-    left: 60%;
-    animation-delay: 0.25s;
-    width: 3px;
-    height: 3px;
+  left: 60%;
+  animation-delay: 0.25s;
+  width: 3px;
+  height: 3px;
 }
 
 @keyframes smokeRise {
-    0% {
-        bottom: 15%;
-        opacity: 0.5;
-        transform: translateX(0) scale(1);
-    }
+  0% {
+    bottom: 15%;
+    opacity: 0.5;
+    transform: translateX(0) scale(1);
+  }
 
-    50% {
-        opacity: 0.25;
-    }
+  50% {
+    opacity: 0.25;
+  }
 
-    100% {
-        bottom: 85%;
-        opacity: 0;
-        transform: translateX(-6px) scale(2);
-    }
+  100% {
+    bottom: 85%;
+    opacity: 0;
+    transform: translateX(-6px) scale(2);
+  }
 }
 
 /* ============================================================
@@ -268,48 +274,48 @@
    ============================================================ */
 
 .dk-inventory-right-pane {
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    width: 64px;
-    align-items: center;
-    margin: 0px 0px;
-    padding: 15px 0px;
-    background: rgba(20, 20, 20, 0.7);
-    border-left: 1px solid #444;
-    justify-content: center;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 64px;
+  align-items: center;
+  margin: 0px 0px;
+  padding: 15px 0px;
+  background: rgba(20, 20, 20, 0.7);
+  border-left: 1px solid #444;
+  justify-content: center;
 }
 
 .dk-container-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
 }
 
 /* Container slots are 15% larger than standard inventory (48px × 1.15 ≈ 55px) */
 .dk-container-slot {
-    width: 55px;
-    height: 55px;
-    background: rgba(70, 70, 80, 0.75);
-    border: 2px solid #666;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: border-color 0.1s ease;
+  width: 55px;
+  height: 55px;
+  background: rgba(70, 70, 80, 0.75);
+  border: 2px solid #666;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.1s ease;
 }
 
 .dk-container-slot:hover {
-    border-color: #999;
-    background: rgba(90, 90, 100, 0.8);
+  border-color: #999;
+  background: rgba(90, 90, 100, 0.8);
 }
 
 .dk-container-slot .dk-slot-item {
-    font-size: 28px;
-    /* 15% larger than standard 24px */
+  font-size: 28px;
+  /* 15% larger than standard 24px */
 }
 
 /* ============================================================
@@ -325,53 +331,55 @@
 .dk-paperdoll-smoke,
 .dk-equipment-layout,
 .dk-inventory-grid-section {
-    cursor: default;
+  cursor: default;
 }
 
 .dk-equip-slot,
 .dk-inv-slot {
-    width: 48px;
-    height: 48px;
-    background: rgba(80, 80, 80, 0.7);
-    border: 2px solid #555;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    cursor: pointer;
-    transition: border-color 0.1s ease;
+  width: 48px;
+  height: 48px;
+  background: rgba(80, 80, 80, 0.7);
+  border: 2px solid #555;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  transition: border-color 0.1s ease;
 }
 
 .dk-equip-slot:hover,
 .dk-inv-slot:hover {
-    border-color: #888;
-    background: rgba(100, 100, 100, 0.75);
+  border-color: #888;
+  background: rgba(100, 100, 100, 0.75);
 }
 
 .dk-slot-item {
-    font-size: 24px;
-    text-align: center;
-    line-height: 1;
+  font-size: 24px;
+  text-align: center;
+  line-height: 1;
 }
 
 .dk-slot-count {
-    position: absolute;
-    bottom: 1px;
-    left: 3px;
-    font-size: 11px;
-    color: #fff;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
+  position: absolute;
+  bottom: 1px;
+  left: 3px;
+  font-size: 11px;
+  color: #fff;
+  font-weight: bold;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000;
 }
 
 .dk-slot-number {
-    position: absolute;
-    top: 1px;
-    left: 3px;
-    font-size: 10px;
-    color: #aaa;
-    text-shadow: 1px 1px 1px #000;
+  position: absolute;
+  top: 1px;
+  left: 3px;
+  font-size: 10px;
+  color: #aaa;
+  text-shadow: 1px 1px 1px #000;
 }
 
 /* ============================================================
@@ -379,27 +387,27 @@
    ============================================================ */
 
 .dk-inventory-grid-section {
-    flex: 3;
-    /* Bottom 3/5 = 2/5 of total height when content is 3 parts */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
+  flex: 3;
+  /* Bottom 3/5 = 2/5 of total height when content is 3 parts */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .dk-inventory-grid-wrapper {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 2px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 2px;
 }
 
 .dk-inventory-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 48px);
-    gap: 2px;
-    width: fit-content;
-    min-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 48px);
+  gap: 2px;
+  width: fit-content;
+  min-width: 100%;
 }
 
 /* ============================================================
@@ -407,34 +415,36 @@
    ============================================================ */
 
 .dk-inventory-toggle-btn {
-    position: absolute;
-    bottom: 6px;
-    left: -56px;
-    /* 48px width + 8px gap from hotbar left edge */
-    width: 48px;
-    height: 48px;
-    background: rgba(80, 80, 80, 0.85);
-    border: 2px solid #555;
-    border-radius: 4px;
-    color: #ddd;
-    font-size: 24px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: border-color 0.15s ease, background 0.15s ease;
-    z-index: 1000;
-    pointer-events: auto;
+  position: absolute;
+  bottom: 6px;
+  left: -56px;
+  /* 48px width + 8px gap from hotbar left edge */
+  width: 48px;
+  height: 48px;
+  background: rgba(80, 80, 80, 0.85);
+  border: 2px solid #555;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+  z-index: 1000;
+  pointer-events: auto;
 }
 
 .dk-inventory-toggle-btn:hover {
-    border-color: #888;
-    background: rgba(100, 100, 100, 0.8);
+  border-color: #888;
+  background: rgba(100, 100, 100, 0.8);
 }
 
 .dk-inventory-toggle-btn.active {
-    border-color: #aaa;
-    background: rgba(60, 80, 120, 0.7);
+  border-color: #aaa;
+  background: rgba(60, 80, 120, 0.7);
 }
 
 /* ============================================================
@@ -442,21 +452,21 @@
    ============================================================ */
 
 .dk-inventory-grid-wrapper::-webkit-scrollbar {
-    width: 8px;
+  width: 8px;
 }
 
 .dk-inventory-grid-wrapper::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
 }
 
 .dk-inventory-grid-wrapper::-webkit-scrollbar-thumb {
-    background: rgba(150, 150, 150, 0.5);
-    border-radius: 4px;
+  background: rgba(150, 150, 150, 0.5);
+  border-radius: 4px;
 }
 
 .dk-inventory-grid-wrapper::-webkit-scrollbar-thumb:hover {
-    background: rgba(180, 180, 180, 0.6);
+  background: rgba(180, 180, 180, 0.6);
 }
 
 /* ============================================================
@@ -464,19 +474,18 @@
    ============================================================ */
 
 @media (max-width: 1200px) {
+  .dk-equip-slot,
+  .dk-inv-slot {
+    width: 40px;
+    height: 40px;
+  }
 
-    .dk-equip-slot,
-    .dk-inv-slot {
-        width: 40px;
-        height: 40px;
-    }
+  .dk-container-slot {
+    width: 46px;
+    height: 46px;
+  }
 
-    .dk-container-slot {
-        width: 46px;
-        height: 46px;
-    }
-
-    .dk-inventory-grid {
-        grid-template-columns: repeat(6, 40px);
-    }
+  .dk-inventory-grid {
+    grid-template-columns: repeat(6, 40px);
+  }
 }

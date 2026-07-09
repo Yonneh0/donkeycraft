@@ -4,261 +4,277 @@
 
 /* Main overlay container */
 .dk-loading-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #e0e0e0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #e0e0e0;
 }
 
 /* Title */
 .dk-loading-title {
-    font-size: 2.5em;
-    margin-bottom: 24px;
-    background: linear-gradient(90deg, #4CAF50, #81C784, #4CAF50);
-    background-size: 200% 100%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: bold;
-    letter-spacing: 3px;
-    animation: titleShimmer 3s ease-in-out infinite;
-    text-shadow: none;
+  font-size: 2.5em;
+  margin-bottom: 24px;
+  background: linear-gradient(90deg, #4caf50, #81c784, #4caf50);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: bold;
+  letter-spacing: 3px;
+  animation: titleShimmer 3s ease-in-out infinite;
+  text-shadow: none;
 }
 
 @keyframes titleShimmer {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 /* Status message */
 .dk-loading-message {
-    font-size: 1.15em;
-    margin-bottom: 20px;
-    color: #b0bec5;
-    min-height: 1.6em;
-    text-align: center;
-    font-weight: 500;
+  font-size: 1.15em;
+  margin-bottom: 20px;
+  color: #b0bec5;
+  min-height: 1.6em;
+  text-align: center;
+  font-weight: 500;
 }
 
 /* Progress bar container — wrapper for the animated fill */
 .dk-loading-progress-container {
-    width: 450px;
-    max-width: 85vw;
-    height: 24px;
-    background: #1e1e2f;
-    border-radius: 12px;
-    overflow: hidden;
-    margin-bottom: 18px;
-    border: 2px solid #37474f;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 10px rgba(76, 175, 80, 0.1);
+  width: 450px;
+  max-width: 85vw;
+  height: 24px;
+  background: #1e1e2f;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  border: 2px solid #37474f;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(76, 175, 80, 0.1);
 }
 
 /* Progress bar fill — dynamic width set via JS */
 .dk-loading-progress {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #2e7d32, #4CAF50, #66BB6A);
-    background-size: 200% 100%;
-    border-radius: 12px;
-    position: relative;
-    transition: width 0.4s ease;
-    animation: progressShimmer 2s linear infinite;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #2e7d32, #4caf50, #66bb6a);
+  background-size: 200% 100%;
+  border-radius: 12px;
+  position: relative;
+  transition: width 0.4s ease;
+  animation: progressShimmer 2s linear infinite;
 }
 
 @keyframes progressShimmer {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
 }
 
 .dk-loading-progress::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 40%, rgba(0, 0, 0, 0.15) 100%);
-    border-radius: 12px;
-    pointer-events: none;
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    transparent 40%,
+    rgba(0, 0, 0, 0.15) 100%
+  );
+  border-radius: 12px;
+  pointer-events: none;
 }
 
 /* Loading tips */
 .dk-loading-tip {
-    font-size: 0.9em;
-    color: #78909c;
-    font-style: italic;
-    max-width: 450px;
-    text-align: center;
-    padding: 0 20px;
-    min-height: 1.4em;
+  font-size: 0.9em;
+  color: #78909c;
+  font-style: italic;
+  max-width: 450px;
+  text-align: center;
+  padding: 0 20px;
+  min-height: 1.4em;
 }
 
 /* Error display */
 .dk-loading-error {
-    display: none;
-    width: 450px;
-    max-width: 85vw;
-    padding: 16px;
-    background: #3d0a0a;
-    border: 1px solid #e74c3c;
-    border-radius: 8px;
-    color: #ff6b6b;
-    font-size: 0.95em;
-    text-align: center;
-    margin-top: 10px;
+  display: none;
+  width: 450px;
+  max-width: 85vw;
+  padding: 16px;
+  background: #3d0a0a;
+  border: 1px solid #e74c3c;
+  border-radius: 8px;
+  color: #ff6b6b;
+  font-size: 0.95em;
+  text-align: center;
+  margin-top: 10px;
 }
 
 /* Error state for progress bar and tip (hidden during error) */
 .dk-loading-progress-container.dk-hidden,
 .dk-loading-tip.dk-hidden {
-    display: none !important;
+  display: none !important;
 }
 
 /* Error state for status message */
 .dk-loading-message-error {
-    color: #e74c3c !important;
+  color: #e74c3c !important;
 }
 
 /* Loading history panel */
 .dk-loading-steps {
-    margin-top: 24px;
-    width: 400px;
-    max-width: 80vw;
-    max-height: 180px;
-    overflow-y: auto;
-    padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 10px;
-    border: 1px solid #2c3e50;
+  margin-top: 24px;
+  width: 400px;
+  max-width: 80vw;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  border: 1px solid #2c3e50;
 }
 
 .dk-loading-steps::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 .dk-loading-steps::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
 }
 
 .dk-loading-steps::-webkit-scrollbar-thumb {
-    background: #4CAF50;
-    border-radius: 3px;
+  background: #4caf50;
+  border-radius: 3px;
 }
 
 .dk-loading-step {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 8px;
-    font-size: 13px;
-    color: #78909c;
-    border-radius: 4px;
-    animation: stepFadeIn 0.3s ease-out;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #78909c;
+  border-radius: 4px;
+  animation: stepFadeIn 0.3s ease-out;
 }
 
 @keyframes stepFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .dk-loading-step.complete {
-    color: #4CAF50;
+  color: #4caf50;
 }
 
 .dk-loading-step.error {
-    color: #e74c3c;
+  color: #e74c3c;
 }
 
 .dk-loading-step-icon {
-    width: 20px;
-    text-align: center;
-    font-size: 14px;
-    flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .dk-loading-step-text {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Loading screen */
 #dk-loading-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: #2c1e0f;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #2c1e0f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
 #dk-loading-screen .dk-loading-title {
-    font-size: 2em;
-    color: #f1c40f;
-    margin-bottom: 20px;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-size: 2em;
+  color: #f1c40f;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 #dk-loading-screen .dk-progress-bar-container {
-    width: 300px;
-    height: 20px;
-    background: #1a1a1a;
-    border: 2px solid #555;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 12px;
+  width: 300px;
+  height: 20px;
+  background: #1a1a1a;
+  border: 2px solid #555;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
 }
 
 #dk-loading-screen .dk-progress-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #2ecc71, #27ae60);
-    transition: width 0.3s ease;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #2ecc71, #27ae60);
+  transition: width 0.3s ease;
 }
 
 #dk-loading-screen .dk-progress-text {
-    font-size: 0.9em;
-    color: #ccc;
-    margin-bottom: 16px;
+  font-size: 0.9em;
+  color: #ccc;
+  margin-bottom: 16px;
 }
 
 #dk-loading-screen .dk-tip {
-    font-size: 0.85em;
-    color: #888;
-    font-style: italic;
-    max-width: 300px;
-    text-align: center;
+  font-size: 0.85em;
+  color: #888;
+  font-style: italic;
+  max-width: 300px;
+  text-align: center;
 }
 
 #dk-loading-screen .dk-error {
-    color: #e74c3c;
-    font-size: 0.9em;
-    margin-top: 12px;
-    display: none;
+  color: #e74c3c;
+  font-size: 0.9em;
+  margin-top: 12px;
+  display: none;
 }
 
 #dk-loading-screen .dk-error.visible {
-    display: block;
+  display: block;
 }

@@ -3,57 +3,57 @@
    ============================================================ */
 
 .dk-chest-ui {
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    background: rgba(40, 35, 30, 0.95);
-    border-radius: 6px;
-    user-select: none;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: rgba(40, 35, 30, 0.95);
+  border-radius: 6px;
+  user-select: none;
 }
 
 .dk-chest-title {
-    font-size: 16px;
-    font-weight: bold;
-    color: #fff;
-    text-align: center;
-    margin-bottom: 12px;
-    pointer-events: none;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 12px;
+  pointer-events: none;
 }
 
 .dk-chest-grid {
-    display: grid;
-    gap: 2px;
-    justify-content: center;
-    margin: 12px auto;
+  display: grid;
+  gap: 2px;
+  justify-content: center;
+  margin: 12px auto;
 }
 
 .dk-chest-slot {
-    width: 48px;
-    height: 48px;
-    background: rgba(100, 90, 70, 0.6);
-    border: 2px solid #776655;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    cursor: pointer;
-    position: relative;
+  width: 48px;
+  height: 48px;
+  background: rgba(100, 90, 70, 0.6);
+  border: 2px solid #776655;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  position: relative;
 }
 
 .dk-slot-item {
-    pointer-events: none;
-    line-height: 1;
+  pointer-events: none;
+  line-height: 1;
 }
 
 .dk-slot-count {
-    position: absolute;
-    bottom: 1px;
-    left: 3px;
-    font-size: 10px;
-    color: #fff;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px #000;
-    pointer-events: none;
-    display: none;
+  position: absolute;
+  bottom: 1px;
+  left: 3px;
+  font-size: 10px;
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px #000;
+  pointer-events: none;
+  display: none;
 }

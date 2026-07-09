@@ -1,0 +1,62 @@
+{
+  "project": "donkeycraft",
+  "root": "..",
+  "input": "index.html",
+  "outputDir": "build",
+  "outputs": {
+    "full": "donkeycraft-full.html",
+    "prod": "donkeycraft-prod.html"
+  },
+  "sources": {
+    "js": ["src/**/*.js"],
+    "css": ["src/**/*.css"]
+  },
+  "tools": {
+    "prettier": {
+      "tabWidth": 2,
+      "semi": true,
+      "singleQuote": true,
+      "trailingComma": "es5",
+      "bracketSpacing": true,
+      "arrowParens": "always",
+      "endOfLine": "crlf"
+    },
+    "eslint": {
+      "failOnWarning": true,
+      "failOnError": true,
+      "env": ["browser"],
+      "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "module"
+      }
+    },
+    "stylelint": {
+      "failOnWarning": true,
+      "failOnError": true,
+      "config": {
+        "extends": ["stylelint-config-standard"],
+        "rules": {
+          "color-hex-length": "long",
+          "declaration-block-trailing-semicolon": null,
+          "no-descending-specificity": null,
+          "property-no-vendor-prefix": null,
+          "value-no-vendor-prefix": null
+        }
+      }
+    },
+    "minifier": {
+      "collapseWhitespace": true,
+      "removeComments": true,
+      "removeRedundantAttributes": true,
+      "minifyCSS": true,
+      "minifyJS": true,
+      "removeEmptyAttributes": true,
+      "collapseBooleanAttributes": false,
+      "sortAttributes": false
+    }
+  },
+  "fuzzyMatch": {
+    "levenshteinThreshold": 2,
+    "jaroWinklerThreshold": 0.85
+  }
+}

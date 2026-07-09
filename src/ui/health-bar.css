@@ -4,78 +4,93 @@
     ============================================================ */
 
 .dk-health-bar-wrapper {
-    position: absolute;
-    bottom: 68px;
-    left: calc(50% - 228px);
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    z-index: 24;
-    pointer-events: none;
+  position: absolute;
+  bottom: 68px;
+  left: calc(50% - 228px);
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  z-index: 24;
+  pointer-events: none;
 }
 
 .dk-health-bar-row {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-    padding: 2px 4px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 2px rgba(0, 0, 0, 0.15);
-    background: linear-gradient(180deg, rgba(40, 30, 25, 0.45) 0%, rgba(20, 15, 12, 0.55) 100%);
-    overflow: visible;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 6px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(
+    180deg,
+    rgba(40, 30, 25, 0.45) 0%,
+    rgba(20, 15, 12, 0.55) 100%
+  );
+  overflow: visible;
 }
 
 .dk-heart-container {
-    width: 18px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: filter 150ms ease, transform 150ms ease;
-    position: relative;
-    border: none;
-    box-shadow: none;
+  width: 18px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+  position: relative;
+  border: none;
+  box-shadow: none;
 }
 
 .dk-heart-container svg {
-    width: 18px;
-    height: 20px;
-    display: block;
+  width: 18px;
+  height: 20px;
+  display: block;
 }
 
 /* Full heart — bright glow */
 .dk-heart-full .dk-heart,
 .dk-heart-full .dk-heart-fill path:last-of-type {
-    filter: drop-shadow(0 0 2px rgba(231, 76, 60, 0.5));
+  filter: drop-shadow(0 0 2px rgba(231, 76, 60, 0.5));
 }
 
 /* Partial heart — subtle glow on filled portion */
 .dk-heart-partial .dk-heart-fill {
-    filter: drop-shadow(0 0 1px rgba(231, 76, 60, 0.3));
+  filter: drop-shadow(0 0 1px rgba(231, 76, 60, 0.3));
 }
 
 /* Flash animations for damage/healing */
 .dk-heart-flash {
-    animation: heart-damage-flash 200ms ease-out;
+  animation: heart-damage-flash 200ms ease-out;
 }
 
 .dk-heart-heal-flash {
-    animation: heart-heal-flash 300ms ease-out;
+  animation: heart-heal-flash 300ms ease-out;
 }
 
 .dk-health-text {
-    position: absolute;
-    font-size: 14px;
-    font-weight: bold;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    pointer-events: none;
-    animation: float-text-up 800ms ease-out forwards;
-    text-shadow: 1px 1px 2px #000, -1px -1px 1px #000;
-    z-index: 30;
+  position: absolute;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  pointer-events: none;
+  animation: float-text-up 800ms ease-out forwards;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000;
+  z-index: 30;
 }
 
 .dk-health-overlay {
-    background: radial-gradient(ellipse at center, rgba(220, 0, 0, 0.3) 0%, rgba(140, 0, 0, 0.6) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(220, 0, 0, 0.3) 0%,
+    rgba(140, 0, 0, 0.6) 100%
+  );
 }
 
 /* ============================================================
@@ -83,109 +98,107 @@
     ============================================================ */
 
 @keyframes heart-damage-flash {
-    0% {
-        filter: brightness(1);
-    }
+  0% {
+    filter: brightness(1);
+  }
 
-    50% {
-        filter: brightness(2) drop-shadow(0 0 6px rgba(231, 76, 60, 0.8));
-    }
+  50% {
+    filter: brightness(2) drop-shadow(0 0 6px rgba(231, 76, 60, 0.8));
+  }
 
-    100% {
-        filter: brightness(1);
-    }
+  100% {
+    filter: brightness(1);
+  }
 }
 
 @keyframes heart-heal-flash {
-    0% {
-        filter: brightness(1);
-    }
+  0% {
+    filter: brightness(1);
+  }
 
-    50% {
-        filter: brightness(1.8) drop-shadow(0 0 6px rgba(46, 204, 113, 0.8));
-    }
+  50% {
+    filter: brightness(1.8) drop-shadow(0 0 6px rgba(46, 204, 113, 0.8));
+  }
 
-    100% {
-        filter: brightness(1);
-    }
+  100% {
+    filter: brightness(1);
+  }
 }
 
 @keyframes health-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
 
-    0%,
-    100% {
-        transform: translateX(0);
-    }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-2px);
+  }
 
-    10%,
-    30%,
-    50%,
-    70%,
-    90% {
-        transform: translateX(-2px);
-    }
-
-    20%,
-    40%,
-    60%,
-    80% {
-        transform: translateX(2px);
-    }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 @keyframes screen-shake-health {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
 
-    0%,
-    100% {
-        transform: translate(0, 0);
-    }
+  10% {
+    transform: translate(-2px, -1px);
+  }
 
-    10% {
-        transform: translate(-2px, -1px);
-    }
+  20% {
+    transform: translate(2px, 1px);
+  }
 
-    20% {
-        transform: translate(2px, 1px);
-    }
+  30% {
+    transform: translate(-1px, 2px);
+  }
 
-    30% {
-        transform: translate(-1px, 2px);
-    }
+  40% {
+    transform: translate(1px, -2px);
+  }
 
-    40% {
-        transform: translate(1px, -2px);
-    }
+  50% {
+    transform: translate(-2px, 1px);
+  }
 
-    50% {
-        transform: translate(-2px, 1px);
-    }
+  60% {
+    transform: translate(2px, -1px);
+  }
 
-    60% {
-        transform: translate(2px, -1px);
-    }
+  70% {
+    transform: translate(-1px, -2px);
+  }
 
-    70% {
-        transform: translate(-1px, -2px);
-    }
+  80% {
+    transform: translate(1px, 2px);
+  }
 
-    80% {
-        transform: translate(1px, 2px);
-    }
-
-    90% {
-        transform: translate(-2px, -2px);
-    }
+  90% {
+    transform: translate(-2px, -2px);
+  }
 }
 
 /* Floating +/- text animation */
 @keyframes float-text-up {
-    0% {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-    }
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 
-    100% {
-        opacity: 0;
-        transform: translateX(-50%) translateY(-20px);
-    }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
 }

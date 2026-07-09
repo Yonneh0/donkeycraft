@@ -1,452 +1,456 @@
 // Donkeycraft — Boss Mobs
 // Ender Dragon and Wither — health, phases, attacks, death rewards.
 (function () {
-    'use strict';
+  'use strict';
 
-    var Donkeycraft = window.Donkeycraft;
-    var Config = Donkeycraft.Config;
+  var Donkeycraft = window.Donkeycraft;
+  var Config = Donkeycraft.Config;
+
+  /**
+   * BossMobStats — boss-specific statistics.
+   */
+  Donkeycraft.BossMobStats = {
+    ender_dragon: {
+      health: 200,
+      height: 8.0,
+      width: 11.4,
+      speed: 3.0,
+      damage: 10,
+      sightRange: 64,
+      phases: ['fly', 'land', 'breath', 'death'],
+      glow: true,
+      immuneToFallDamage: true,
+      floating: true,
+      deathLoot: { item: 'dragon_egg', count: 1 },
+    },
+    wither: {
+      health: 300,
+      height: 2.9,
+      width: 0.95,
+      speed: 1.5,
+      damage: 8,
+      sightRange: 32,
+      phases: ['charge', 'attack', 'death'],
+      glow: true,
+      shootsProjectiles: true,
+      floating: true,
+      deathLoot: { item: 'nether_star', count: 1 },
+    },
+  };
+
+  /**
+   * BossMob — base class for boss entities.
+   * @param {object} config - Boss configuration.
+   * @param {string} config.type - Boss type (ender_dragon, wither).
+   * @param {number} [config.x=0] - Initial X position.
+   * @param {number} [config.y=64] - Initial Y position.
+   * @param {number} [config.z=0] - Initial Z position.
+   */
+  Donkeycraft.BossMob = function (config) {
+    config = config || {};
+
+    var stats = Donkeycraft.BossMobStats[config.type];
+    if (!stats) {
+      stats = Donkeycraft.BossMobStats.ender_dragon; // Default to Ender Dragon
+    }
+
+    // Call base Entity constructor
+    Donkeycraft.Entity.call(this, {
+      type: config.type,
+      x: config.x,
+      y: config.y,
+      z: config.z,
+      height: stats.height,
+      width: stats.width,
+    });
+
+    this.health = stats.health;
+    this.maxHealth = stats.health;
+    this.speed = stats.speed;
+    this.damage = stats.damage;
+    this.sightRange = stats.sightRange;
+    this.glow = stats.glow || false;
+    this.immuneToFallDamage = stats.immuneToFallDamage || false;
+    this.shootsProjectiles = stats.shootsProjectiles || false;
+    this.floating = stats.floating || false;
 
     /**
-     * BossMobStats — boss-specific statistics.
+     * Boss phases.
+     * @type {string[]}
      */
-    Donkeycraft.BossMobStats = {
-        ender_dragon: {
-            health: 200,
-            height: 8.0,
-            width: 11.4,
-            speed: 3.0,
-            damage: 10,
-            sightRange: 64,
-            phases: ['fly', 'land', 'breath', 'death'],
-            glow: true,
-            immuneToFallDamage: true,
-            floating: true,
-            deathLoot: { item: 'dragon_egg', count: 1 }
-        },
-        wither: {
-            health: 300,
-            height: 2.9,
-            width: 0.95,
-            speed: 1.5,
-            damage: 8,
-            sightRange: 32,
-            phases: ['charge', 'attack', 'death'],
-            glow: true,
-            shootsProjectiles: true,
-            floating: true,
-            deathLoot: { item: 'nether_star', count: 1 }
-        }
-    };
+    this.phases = stats.phases.slice();
 
     /**
-     * BossMob — base class for boss entities.
-     * @param {object} config - Boss configuration.
-     * @param {string} config.type - Boss type (ender_dragon, wither).
-     * @param {number} [config.x=0] - Initial X position.
-     * @param {number} [config.y=64] - Initial Y position.
-     * @param {number} [config.z=0] - Initial Z position.
-     */
-    Donkeycraft.BossMob = function (config) {
-        config = config || {};
-
-        var stats = Donkeycraft.BossMobStats[config.type];
-        if (!stats) {
-            stats = Donkeycraft.BossMobStats.ender_dragon; // Default to Ender Dragon
-        }
-
-        // Call base Entity constructor
-        Donkeycraft.Entity.call(this, {
-            type: config.type,
-            x: config.x,
-            y: config.y,
-            z: config.z,
-            height: stats.height,
-            width: stats.width
-        });
-
-        this.health = stats.health;
-        this.maxHealth = stats.health;
-        this.speed = stats.speed;
-        this.damage = stats.damage;
-        this.sightRange = stats.sightRange;
-        this.glow = stats.glow || false;
-        this.immuneToFallDamage = stats.immuneToFallDamage || false;
-        this.shootsProjectiles = stats.shootsProjectiles || false;
-        this.floating = stats.floating || false;
-
-        /**
-         * Boss phases.
-         * @type {string[]}
-         */
-        this.phases = stats.phases.slice();
-
-        /**
-         * Current phase index.
-         * @type {number}
-         * @private
-         */
-        this._phaseIndex = 0;
-
-        /**
-         * Current phase name.
-         * @type {string}
-         */
-        this.currentPhase = stats.phases[0];
-
-        /**
-         * Phase duration timer.
-         * @type {number}
-         * @private
-         */
-        this._phaseTimer = 0;
-
-        /**
-         * Minimum phase duration in seconds.
-         * @type {number}
-         */
-        this.minPhaseDuration = 3;
-
-        /**
-         * Maximum phase duration in seconds.
-         * @type {number}
-         */
-        this.maxPhaseDuration = 8;
-
-        /**
-         * Closest player within sight range.
-         * @type {Donkeycraft.Player|null}
-         * @private
-         */
-        this._targetPlayer = null;
-
-        /**
-         * Attack cooldown timer.
-         * @type {number}
-         * @private
-         */
-        this._attackCooldown = 0;
-
-        /**
-         * Attack interval in seconds.
-         * @type {number}
-         */
-        this.attackInterval = 3;
-
-        /**
-         * Whether the boss is in its final death phase.
-         * @type {boolean}
-         * @private
-         */
-        this._isDying = false;
-
-        /**
-         * Death animation duration.
-         * @type {number}
-         */
-        this.deathDuration = 5;
-
-        /**
-         * Death animation timer.
-         * @type {number}
-         * @private
-         */
-        this._deathTimer = 0;
-
-        /**
-         * Death loot reward (item + count).
-         * @type {{item: string, count: number}|null}
-         */
-        this.deathLoot = stats.deathLoot || null;
-
-        /**
-         * Whether death loot has already been awarded.
-         * @type {boolean}
-         * @private
-         */
-        this._lootAwarded = false;
-    };
-
-    // Inherit from Entity
-    Donkeycraft.BossMob.prototype = Object.create(Donkeycraft.Entity.prototype);
-    Donkeycraft.BossMob.prototype.constructor = Donkeycraft.BossMob;
-
-    /**
-     * Find the closest player within sight range.
-     * @param {Donkeycraft.Player} player - Player to check against.
-     * @returns {boolean} True if a player was found.
-     */
-    Donkeycraft.BossMob.prototype.findTargetPlayer = function (player) {
-        var pos = this._position;
-        var pPos = player.getPosition();
-
-        var dx = pos.x - pPos.x;
-        var dy = pos.y - pPos.y;
-        var dz = pos.z - pPos.z;
-        var distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-        if (distance <= this.sightRange && player.isAlive()) {
-            this._targetPlayer = player;
-            return true;
-        }
-
-        this._targetPlayer = null;
-        return false;
-    };
-
-    /**
-     * Switch to the next phase.
-     */
-    Donkeycraft.BossMob.prototype._nextPhase = function () {
-        // If already in death phase, never switch away
-        if (this.currentPhase === 'death') {
-            return;
-        }
-
-        // Check if should enter death phase (at 25% health or below)
-        if (!this._isDying && this.health < this.maxHealth * 0.25) {
-            this._isDying = true;
-            this.currentPhase = 'death';
-            this._deathTimer = this.deathDuration;
-            return;
-        }
-
-        this._phaseIndex++;
-        if (this._phaseIndex >= this.phases.length) {
-            this._phaseIndex = 0; // Loop back to first phase
-        }
-
-        this.currentPhase = this.phases[this._phaseIndex];
-        this._phaseTimer = this.minPhaseDuration + Math.random() * (this.maxPhaseDuration - this.minPhaseDuration);
-    };
-
-    /**
-     * Attack the target player.
-     */
-    Donkeycraft.BossMob.prototype.attack = function () {
-        if (!this._targetPlayer || !this._targetPlayer.isAlive()) {
-            return;
-        }
-
-        if (this._attackCooldown > 0) {
-            return;
-        }
-
-        this._attackCooldown = this.attackInterval;
-
-        // Deal damage to player — Player is the single source of truth
-        if (typeof this._targetPlayer.takeDamage === 'function') {
-            this._targetPlayer.takeDamage(this.damage, this.type);
-        } else if (this._targetPlayer.health !== undefined) {
-            this._targetPlayer.health = Math.max(0, this._targetPlayer.health - this.damage);
-            if (this._targetPlayer.health <= 0) {
-                this._targetPlayer.setAlive(false);
-            }
-        }
-
-        // Emit damage event via global EventBus
-        if (Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('entity:damage', {
-                    attacker: this,
-                    target: this._targetPlayer,
-                    damage: this.damage,
-                    source: this.type
-                });
-            } catch (e) {
-                // EventBus may not be available in tests
-            }
-        }
-    };
-
-    /**
-     * Emit a breath attack toward the target (dragon fireball/breath).
-     */
-    Donkeycraft.BossMob.prototype.emitBreathAttack = function () {
-        if (!this._targetPlayer) {
-            return;
-        }
-
-        // Emit breath attack event via global EventBus
-        if (Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('boss:breath', {
-                    entity: this,
-                    targetX: this._targetPlayer.getPosition().x,
-                    targetZ: this._targetPlayer.getPosition().z,
-                    type: this.type + '_breath'
-                });
-            } catch (e) {
-                // EventBus may not be available in tests
-            }
-        }
-    };
-
-    /**
-     * Shoot a projectile at the target.
-     */
-    Donkeycraft.BossMob.prototype.shootProjectile = function () {
-        if (!this._targetPlayer) {
-            return;
-        }
-
-        // Emit projectile spawn event via global EventBus
-        if (Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('boss:projectile', {
-                    entity: this,
-                    startX: this._position.x,
-                    startY: this._position.y + this.height * 0.5,
-                    startZ: this._position.z,
-                    targetX: this._targetPlayer.getPosition().x,
-                    targetY: this._targetPlayer.getPosition().y,
-                    targetZ: this._targetPlayer.getPosition().z,
-                    type: this.type + '_projectile'
-                });
-            } catch (e) {
-                // EventBus may not be available in tests
-            }
-        }
-    };
-
-    /**
-     * Called when the boss dies — awards death loot and emits death event.
+     * Current phase index.
+     * @type {number}
      * @private
      */
-    Donkeycraft.BossMob.prototype.onDeath = function () {
-        // Award death loot once
-        if (!this._lootAwarded && this.deathLoot) {
-            this._lootAwarded = true;
-
-            // Emit loot drop event via global EventBus for item system to handle
-            if (Donkeycraft.EventBus) {
-                try {
-                    Donkeycraft.EventBus.emitSafe('boss:loot', {
-                        entity: this,
-                        item: this.deathLoot.item,
-                        count: this.deathLoot.count,
-                        x: this._position.x,
-                        y: this._position.y,
-                        z: this._position.z
-                    });
-                } catch (e) {
-                    // EventBus may not be available in tests
-                }
-            }
-        }
-
-        // Emit death event via global EventBus
-        if (Donkeycraft.EventBus) {
-            try {
-                Donkeycraft.EventBus.emitSafe('boss:death', {
-                    entity: this,
-                    type: this.type
-                });
-            } catch (e) {
-                // EventBus may not be available in tests
-            }
-        }
-    };
+    this._phaseIndex = 0;
 
     /**
-     * Tick method — phase management, chase players, attack.
-     * @param {number} deltaTime - Time since last tick in seconds.
+     * Current phase name.
+     * @type {string}
      */
-    Donkeycraft.BossMob.prototype.tick = function (deltaTime) {
-        if (this._destroyed) return;
-
-        // Call base tick (applies velocity to position)
-        Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
-
-        // Handle death animation
-        if (this.currentPhase === 'death') {
-            this._deathTimer -= deltaTime;
-            if (this._deathTimer <= 0 && !this._isDying) {
-                this.setAlive(false);
-            }
-            return;
-        }
-
-        // Decrease phase timer
-        this._phaseTimer -= deltaTime;
-        if (this._phaseTimer <= 0) {
-            this._nextPhase();
-        }
-
-        // Decrease attack cooldown and attempt attack
-        this._attackCooldown -= deltaTime;
-
-        // Phase-specific behavior
-        switch (this.currentPhase) {
-            case 'fly':
-                // Circle around and dive occasionally
-                this._velocity.y = Math.sin(this._position.x * 0.1) * 2;
-                break;
-
-            case 'land':
-                // Land and melee attack
-                this._velocity.y = -2;
-                if (this._targetPlayer) {
-                    this.attack();
-                }
-                break;
-
-            case 'breath':
-                // Emit breath attack
-                this.emitBreathAttack();
-                break;
-
-            case 'charge':
-                // Charge toward player
-                if (this._targetPlayer) {
-                    var pPos = this._targetPlayer.getPosition();
-                    var dx = pPos.x - this._position.x;
-                    var dz = pPos.z - this._position.z;
-                    var dist = Math.sqrt(dx * dx + dz * dz);
-                    if (dist > 0) {
-                        this._velocity.x = (dx / dist) * this.speed * 2;
-                        this._velocity.z = (dz / dist) * this.speed * 2;
-                    }
-                }
-                break;
-
-            case 'attack':
-                // Shoot projectiles
-                if (this.shootsProjectiles && this._targetPlayer) {
-                    this.shootProjectile();
-                }
-                break;
-
-            default:
-                // Idle — drift
-                this._velocity.x *= 0.95;
-                this._velocity.z *= 0.95;
-        }
-
-        // Gravity (only for non-floating bosses)
-        if (!this.floating) {
-            this._velocity.y -= Config.GRAVITY * deltaTime * 0.1;
-        }
-    };
+    this.currentPhase = stats.phases[0];
 
     /**
-     * Create a boss mob by type.
-     * @param {string} type - Boss type (ender_dragon, wither).
-     * @param {number} x - X position.
-     * @param {number} y - Y position.
-     * @param {number} z - Z position.
-     * @returns {Donkeycraft.BossMob|null}
+     * Phase duration timer.
+     * @type {number}
+     * @private
      */
-    Donkeycraft.BossMob.create = function (type, x, y, z) {
-        if (!Donkeycraft.BossMobStats[type]) {
-            return null; // Unknown type
-        }
+    this._phaseTimer = 0;
 
-        return new Donkeycraft.BossMob({
-            type: type,
-            x: x,
-            y: y,
-            z: z
+    /**
+     * Minimum phase duration in seconds.
+     * @type {number}
+     */
+    this.minPhaseDuration = 3;
+
+    /**
+     * Maximum phase duration in seconds.
+     * @type {number}
+     */
+    this.maxPhaseDuration = 8;
+
+    /**
+     * Closest player within sight range.
+     * @type {Donkeycraft.Player|null}
+     * @private
+     */
+    this._targetPlayer = null;
+
+    /**
+     * Attack cooldown timer.
+     * @type {number}
+     * @private
+     */
+    this._attackCooldown = 0;
+
+    /**
+     * Attack interval in seconds.
+     * @type {number}
+     */
+    this.attackInterval = 3;
+
+    /**
+     * Whether the boss is in its final death phase.
+     * @type {boolean}
+     * @private
+     */
+    this._isDying = false;
+
+    /**
+     * Death animation duration.
+     * @type {number}
+     */
+    this.deathDuration = 5;
+
+    /**
+     * Death animation timer.
+     * @type {number}
+     * @private
+     */
+    this._deathTimer = 0;
+
+    /**
+     * Death loot reward (item + count).
+     * @type {{item: string, count: number}|null}
+     */
+    this.deathLoot = stats.deathLoot || null;
+
+    /**
+     * Whether death loot has already been awarded.
+     * @type {boolean}
+     * @private
+     */
+    this._lootAwarded = false;
+  };
+
+  // Inherit from Entity
+  Donkeycraft.BossMob.prototype = Object.create(Donkeycraft.Entity.prototype);
+  Donkeycraft.BossMob.prototype.constructor = Donkeycraft.BossMob;
+
+  /**
+   * Find the closest player within sight range.
+   * @param {Donkeycraft.Player} player - Player to check against.
+   * @returns {boolean} True if a player was found.
+   */
+  Donkeycraft.BossMob.prototype.findTargetPlayer = function (player) {
+    var pos = this._position;
+    var pPos = player.getPosition();
+
+    var dx = pos.x - pPos.x;
+    var dy = pos.y - pPos.y;
+    var dz = pos.z - pPos.z;
+    var distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    if (distance <= this.sightRange && player.isAlive()) {
+      this._targetPlayer = player;
+      return true;
+    }
+
+    this._targetPlayer = null;
+    return false;
+  };
+
+  /**
+   * Switch to the next phase.
+   */
+  Donkeycraft.BossMob.prototype._nextPhase = function () {
+    // If already in death phase, never switch away
+    if (this.currentPhase === 'death') {
+      return;
+    }
+
+    // Check if should enter death phase (at 25% health or below)
+    if (!this._isDying && this.health < this.maxHealth * 0.25) {
+      this._isDying = true;
+      this.currentPhase = 'death';
+      this._deathTimer = this.deathDuration;
+      return;
+    }
+
+    this._phaseIndex++;
+    if (this._phaseIndex >= this.phases.length) {
+      this._phaseIndex = 0; // Loop back to first phase
+    }
+
+    this.currentPhase = this.phases[this._phaseIndex];
+    this._phaseTimer =
+      this.minPhaseDuration +
+      Math.random() * (this.maxPhaseDuration - this.minPhaseDuration);
+  };
+
+  /**
+   * Attack the target player.
+   */
+  Donkeycraft.BossMob.prototype.attack = function () {
+    if (!this._targetPlayer || !this._targetPlayer.isAlive()) {
+      return;
+    }
+
+    if (this._attackCooldown > 0) {
+      return;
+    }
+
+    this._attackCooldown = this.attackInterval;
+
+    // Deal damage to player — Player is the single source of truth
+    if (typeof this._targetPlayer.takeDamage === 'function') {
+      this._targetPlayer.takeDamage(this.damage, this.type);
+    } else if (this._targetPlayer.health !== undefined) {
+      this._targetPlayer.health = Math.max(
+        0,
+        this._targetPlayer.health - this.damage
+      );
+      if (this._targetPlayer.health <= 0) {
+        this._targetPlayer.setAlive(false);
+      }
+    }
+
+    // Emit damage event via global EventBus
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('entity:damage', {
+          attacker: this,
+          target: this._targetPlayer,
+          damage: this.damage,
+          source: this.type,
         });
-    };
+      } catch (e) {
+        // EventBus may not be available in tests
+      }
+    }
+  };
 
+  /**
+   * Emit a breath attack toward the target (dragon fireball/breath).
+   */
+  Donkeycraft.BossMob.prototype.emitBreathAttack = function () {
+    if (!this._targetPlayer) {
+      return;
+    }
+
+    // Emit breath attack event via global EventBus
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('boss:breath', {
+          entity: this,
+          targetX: this._targetPlayer.getPosition().x,
+          targetZ: this._targetPlayer.getPosition().z,
+          type: this.type + '_breath',
+        });
+      } catch (e) {
+        // EventBus may not be available in tests
+      }
+    }
+  };
+
+  /**
+   * Shoot a projectile at the target.
+   */
+  Donkeycraft.BossMob.prototype.shootProjectile = function () {
+    if (!this._targetPlayer) {
+      return;
+    }
+
+    // Emit projectile spawn event via global EventBus
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('boss:projectile', {
+          entity: this,
+          startX: this._position.x,
+          startY: this._position.y + this.height * 0.5,
+          startZ: this._position.z,
+          targetX: this._targetPlayer.getPosition().x,
+          targetY: this._targetPlayer.getPosition().y,
+          targetZ: this._targetPlayer.getPosition().z,
+          type: this.type + '_projectile',
+        });
+      } catch (e) {
+        // EventBus may not be available in tests
+      }
+    }
+  };
+
+  /**
+   * Called when the boss dies — awards death loot and emits death event.
+   * @private
+   */
+  Donkeycraft.BossMob.prototype.onDeath = function () {
+    // Award death loot once
+    if (!this._lootAwarded && this.deathLoot) {
+      this._lootAwarded = true;
+
+      // Emit loot drop event via global EventBus for item system to handle
+      if (Donkeycraft.EventBus) {
+        try {
+          Donkeycraft.EventBus.emitSafe('boss:loot', {
+            entity: this,
+            item: this.deathLoot.item,
+            count: this.deathLoot.count,
+            x: this._position.x,
+            y: this._position.y,
+            z: this._position.z,
+          });
+        } catch (e) {
+          // EventBus may not be available in tests
+        }
+      }
+    }
+
+    // Emit death event via global EventBus
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('boss:death', {
+          entity: this,
+          type: this.type,
+        });
+      } catch (e) {
+        // EventBus may not be available in tests
+      }
+    }
+  };
+
+  /**
+   * Tick method — phase management, chase players, attack.
+   * @param {number} deltaTime - Time since last tick in seconds.
+   */
+  Donkeycraft.BossMob.prototype.tick = function (deltaTime) {
+    if (this._destroyed) return;
+
+    // Call base tick (applies velocity to position)
+    Donkeycraft.Entity.prototype.tick.call(this, deltaTime);
+
+    // Handle death animation
+    if (this.currentPhase === 'death') {
+      this._deathTimer -= deltaTime;
+      if (this._deathTimer <= 0 && !this._isDying) {
+        this.setAlive(false);
+      }
+      return;
+    }
+
+    // Decrease phase timer
+    this._phaseTimer -= deltaTime;
+    if (this._phaseTimer <= 0) {
+      this._nextPhase();
+    }
+
+    // Decrease attack cooldown and attempt attack
+    this._attackCooldown -= deltaTime;
+
+    // Phase-specific behavior
+    switch (this.currentPhase) {
+      case 'fly':
+        // Circle around and dive occasionally
+        this._velocity.y = Math.sin(this._position.x * 0.1) * 2;
+        break;
+
+      case 'land':
+        // Land and melee attack
+        this._velocity.y = -2;
+        if (this._targetPlayer) {
+          this.attack();
+        }
+        break;
+
+      case 'breath':
+        // Emit breath attack
+        this.emitBreathAttack();
+        break;
+
+      case 'charge':
+        // Charge toward player
+        if (this._targetPlayer) {
+          var pPos = this._targetPlayer.getPosition();
+          var dx = pPos.x - this._position.x;
+          var dz = pPos.z - this._position.z;
+          var dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist > 0) {
+            this._velocity.x = (dx / dist) * this.speed * 2;
+            this._velocity.z = (dz / dist) * this.speed * 2;
+          }
+        }
+        break;
+
+      case 'attack':
+        // Shoot projectiles
+        if (this.shootsProjectiles && this._targetPlayer) {
+          this.shootProjectile();
+        }
+        break;
+
+      default:
+        // Idle — drift
+        this._velocity.x *= 0.95;
+        this._velocity.z *= 0.95;
+    }
+
+    // Gravity (only for non-floating bosses)
+    if (!this.floating) {
+      this._velocity.y -= Config.GRAVITY * deltaTime * 0.1;
+    }
+  };
+
+  /**
+   * Create a boss mob by type.
+   * @param {string} type - Boss type (ender_dragon, wither).
+   * @param {number} x - X position.
+   * @param {number} y - Y position.
+   * @param {number} z - Z position.
+   * @returns {Donkeycraft.BossMob|null}
+   */
+  Donkeycraft.BossMob.create = function (type, x, y, z) {
+    if (!Donkeycraft.BossMobStats[type]) {
+      return null; // Unknown type
+    }
+
+    return new Donkeycraft.BossMob({
+      type: type,
+      x: x,
+      y: y,
+      z: z,
+    });
+  };
 })();

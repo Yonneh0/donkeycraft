@@ -20,28 +20,30 @@
    ============================================================ */
 
 .dk-speed-indicator {
-    display: none;
-    /* Hidden by default — shown via JS for survival/creative */
-    align-items: center;
-    justify-content: center;
-    gap: 0;
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    pointer-events: auto;
-    user-select: none;
-    transition: opacity 200ms ease, transform 200ms ease;
-    position: relative;
-    height: 48px;
-    width: 260px;
-    /* Fixed width for proper stop spacing */
-    min-width: 260px;
-    max-width: 260px;
-    cursor: pointer;
-    box-sizing: border-box;
+  display: none;
+  /* Hidden by default — shown via JS for survival/creative */
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: auto;
+  user-select: none;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+  position: relative;
+  height: 48px;
+  width: 260px;
+  /* Fixed width for proper stop spacing */
+  min-width: 260px;
+  max-width: 260px;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
 /* ============================================================
@@ -49,28 +51,28 @@
    ============================================================ */
 
 .dk-speed-track {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex: 1;
-    height: 100%;
-    padding: 0 4px;
-    min-width: 0;
-    /* Allow flex item to shrink if needed */
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  padding: 0 4px;
+  min-width: 0;
+  /* Allow flex item to shrink if needed */
 }
 
 /* Track line — subtle outline frame */
 .dk-speed-track::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    height: 3px;
-    background: rgba(255, 255, 255, 0.12);
-    border-radius: 2px;
-    pointer-events: none;
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  pointer-events: none;
 }
 
 /* ============================================================
@@ -78,37 +80,49 @@
    ============================================================ */
 
 .dk-speed-thumb {
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: rgba(46, 204, 113, 0.2);
-    border: 2px solid rgba(46, 204, 113, 0.6);
-    box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
-    pointer-events: none;
-    transition: left 150ms ease-out, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
-    z-index: 2;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(46, 204, 113, 0.2);
+  border: 2px solid rgba(46, 204, 113, 0.6);
+  box-shadow:
+    0 0 8px rgba(46, 204, 113, 0.3),
+    inset 0 0 4px rgba(46, 204, 113, 0.1);
+  pointer-events: none;
+  transition:
+    left 150ms ease-out,
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+  z-index: 2;
 }
 
 /* Thumb glow pulse animation */
 .dk-speed-thumb.dk-pulse {
-    animation: dk-speed-thumb-pulse 300ms ease-out;
+  animation: dk-speed-thumb-pulse 300ms ease-out;
 }
 
 @keyframes dk-speed-thumb-pulse {
-    0% {
-        box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
-    }
+  0% {
+    box-shadow:
+      0 0 8px rgba(46, 204, 113, 0.3),
+      inset 0 0 4px rgba(46, 204, 113, 0.1);
+  }
 
-    50% {
-        box-shadow: 0 0 16px rgba(46, 204, 113, 0.5), inset 0 0 8px rgba(46, 204, 113, 0.2);
-    }
+  50% {
+    box-shadow:
+      0 0 16px rgba(46, 204, 113, 0.5),
+      inset 0 0 8px rgba(46, 204, 113, 0.2);
+  }
 
-    100% {
-        box-shadow: 0 0 8px rgba(46, 204, 113, 0.3), inset 0 0 4px rgba(46, 204, 113, 0.1);
-    }
+  100% {
+    box-shadow:
+      0 0 8px rgba(46, 204, 113, 0.3),
+      inset 0 0 4px rgba(46, 204, 113, 0.1);
+  }
 }
 
 /* ============================================================
@@ -116,51 +130,55 @@
    ============================================================ */
 
 .dk-speed-stop {
-    position: absolute;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 4px 6px;
-    min-width: 48px;
-    /* Ensure enough space for icon + label */
-    pointer-events: none;
-    transition: opacity 150ms ease, transform 150ms ease;
-    z-index: 1;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px;
+  min-width: 48px;
+  /* Ensure enough space for icon + label */
+  pointer-events: none;
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease;
+  z-index: 1;
 }
 
 /* Ensure stops are visible and not overlapping */
 .dk-speed-stop-icon {
-    font-size: 18px;
-    line-height: 1;
-    filter: grayscale(0.3);
-    transition: filter 150ms ease, transform 150ms ease;
-    display: block;
+  font-size: 18px;
+  line-height: 1;
+  filter: grayscale(0.3);
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+  display: block;
 }
 
 .dk-speed-stop-label {
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 8px;
-    font-weight: bold;
-    letter-spacing: 0.5px;
-    color: rgba(255, 255, 255, 0.45);
-    text-transform: uppercase;
-    white-space: nowrap;
-    transition: color 150ms ease;
-    display: block;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: color 150ms ease;
+  display: block;
 }
 
 /* Active stop point — when this speed is selected */
 .dk-speed-stop.dk-active .dk-speed-stop-icon {
-    filter: grayscale(0) drop-shadow(0 0 4px rgba(46, 204, 113, 0.5));
-    transform: scale(1.1);
+  filter: grayscale(0) drop-shadow(0 0 4px rgba(46, 204, 113, 0.5));
+  transform: scale(1.1);
 }
 
 .dk-speed-stop.dk-active .dk-speed-stop-label {
-    color: rgba(46, 204, 113, 0.9);
+  color: rgba(46, 204, 113, 0.9);
 }
 
 /* ============================================================
@@ -169,17 +187,19 @@
 
 /* Flying mode thumb color — cyan/blue instead of green */
 .dk-speed-indicator.dk-flying .dk-speed-thumb {
-    background: rgba(52, 152, 219, 0.2);
-    border-color: rgba(52, 152, 219, 0.6);
-    box-shadow: 0 0 8px rgba(52, 152, 219, 0.3), inset 0 0 4px rgba(52, 152, 219, 0.1);
+  background: rgba(52, 152, 219, 0.2);
+  border-color: rgba(52, 152, 219, 0.6);
+  box-shadow:
+    0 0 8px rgba(52, 152, 219, 0.3),
+    inset 0 0 4px rgba(52, 152, 219, 0.1);
 }
 
 .dk-speed-indicator.dk-flying .dk-speed-stop.dk-active .dk-speed-stop-icon {
-    filter: grayscale(0) drop-shadow(0 0 4px rgba(52, 152, 219, 0.5));
+  filter: grayscale(0) drop-shadow(0 0 4px rgba(52, 152, 219, 0.5));
 }
 
 .dk-speed-indicator.dk-flying .dk-speed-stop.dk-active .dk-speed-stop-label {
-    color: rgba(52, 152, 219, 0.9);
+  color: rgba(52, 152, 219, 0.9);
 }
 
 /* ============================================================
@@ -187,14 +207,14 @@
    ============================================================ */
 
 .dk-speed-indicator.dk-dragging {
-    cursor: grabbing;
+  cursor: grabbing;
 }
 
 .dk-speed-indicator.dk-dragging .dk-speed-thumb {
-    transition: none;
-    /* No animation during drag for responsiveness */
-    width: 40px;
-    height: 40px;
+  transition: none;
+  /* No animation during drag for responsiveness */
+  width: 40px;
+  height: 40px;
 }
 
 /* ============================================================
@@ -202,7 +222,7 @@
    ============================================================ */
 
 .dk-speed-track:hover {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 /* ============================================================
@@ -210,26 +230,26 @@
    ============================================================ */
 
 @media (max-width: 600px) {
-    .dk-speed-indicator {
-        padding: 6px 8px;
-        height: 40px;
-    }
+  .dk-speed-indicator {
+    padding: 6px 8px;
+    height: 40px;
+  }
 
-    .dk-speed-stop {
-        min-width: 32px;
-        padding: 2px 4px;
-    }
+  .dk-speed-stop {
+    min-width: 32px;
+    padding: 2px 4px;
+  }
 
-    .dk-speed-stop-icon {
-        font-size: 14px;
-    }
+  .dk-speed-stop-icon {
+    font-size: 14px;
+  }
 
-    .dk-speed-stop-label {
-        font-size: 7px;
-    }
+  .dk-speed-stop-label {
+    font-size: 7px;
+  }
 
-    .dk-speed-thumb {
-        width: 30px;
-        height: 30px;
-    }
+  .dk-speed-thumb {
+    width: 30px;
+    height: 30px;
+  }
 }
