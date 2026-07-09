@@ -205,6 +205,10 @@
 
     /**
      * _cancelClose — cancels an in-progress close animation and re-opens immediately.
+     *
+     * Clears the close timeout, resets internal state, and delegates to `open()`
+     * to handle DOM updates and event emission, reducing code duplication.
+     *
      * @private
      */
     Donkeycraft.InventoryUI.prototype._cancelClose = function () {
@@ -216,24 +220,8 @@
 
         this._closing = false;
 
-        if (this._panelEl) {
-            this._panelEl.classList.remove('closing');
-            // Clear inline styles so CSS class takes effect
-            this._panelEl.style.opacity = '';
-            this._panelEl.style.pointerEvents = '';
-            this._panelEl.classList.add('open');
-        }
-
-        if (this._toggleBtnEl) {
-            this._toggleBtnEl.classList.add('active');
-        }
-
-        // Emit open event
-        if (this._subscriptions.onOpen) {
-            for (var i = 0; i < this._subscriptions.onOpen.length; i++) {
-                try { this._subscriptions.onOpen[i](); } catch (e) { }
-            }
-        }
+        // Delegate to open() for DOM updates and event emission.
+        this.open();
     };
 
     /**
@@ -462,16 +450,26 @@
 
     /**
      * PaperdollRenderer — Renders a 3D player entity over the inventory paperdoll slot.
-     * Features: animated entity with random state cycling, mouse hover pause/resume,
-     * head tracking via mouse position.
+     *
+     * Features animated entity with random state cycling, mouse hover pause/resume,
+     * and head tracking via mouse position. The renderer creates an overlay WebGL canvas
+     * positioned over the CSS-drawn paperdoll silhouette.
      *
      * @constructor
      * @param {HTMLElement} container - The .dk-paperdoll-container element.
      */
     Donkeycraft.PaperdollRenderer = function (container) {
+    // PaperdollRenderer configuration constants
+    this._HEAD_YAW_LIMIT = 0.52;    // ~30 degrees in radians
+    this._HEAD_PITCH_LIMIT = 0.26;  // ~15 degrees in radians
+    this._CANVAS_SIZE = 128;
+
+        // DOM and WebGL references
         this._container = container || null;
         this._canvas = null;
         this._gl = null;
+
+        // Runtime state
         this._running = false;
         this._paused = false;
         this._mouseInside = false;
@@ -482,7 +480,6 @@
         this._stateTimer = 0;
         this._lastTransforms = {};
         this._headOverride = { yaw: 0, pitch: 0 };
-        this._mouseNorm = { x: 0, y: 0 };
 
         // Camera (fixed front-facing view)
         this._camPos = { x: 0, y: 1.2, z: 3.5 };
@@ -493,7 +490,7 @@
         // Entity
         this._entity = null;
 
-        // WebGL resources
+        // WebGL shader resources
         this._shaderProgram = null;
         this._aPositionLoc = -1;
         this._aNormalLoc = -1;
@@ -506,16 +503,21 @@
         this._uFogDensity = -1;
         this._meshCache = {};
 
-        // Animation loop
+        // Animation loop timing
         this._lastFrameTime = 0;
         this._rafId = null;
 
-        // Cleanup callbacks
+        // Hover change subscribers
         this._onHoverChange = [];
     };
 
     /**
-     * _createShaderProgram — Compile the entity shader program from inline sources.
+     * _createShaderProgram — Compile and link the entity shader program.
+     *
+     * Creates vertex and fragment shaders from inline GLSL source, links them into
+     * a program, and caches attribute/uniform locations for fast per-frame access.
+     *
+     * @returns {boolean} True if shader compilation and linking succeeded.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._createShaderProgram = function () {
@@ -586,7 +588,11 @@
     };
 
     /**
-     * _compileShader — Compile a single shader from source string.
+     * _compileShader — Compile a shader from GLSL source string.
+     *
+     * @param {number} type - Shader type (gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
+     * @param {string} source - GLSL shader source code.
+     * @returns {WebGLShader|null} Compiled shader, or null on failure.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._compileShader = function (type, source) {
@@ -601,41 +607,35 @@
     };
 
     /**
-     * _createCanvas — Create and position the WebGL canvas over the paperdoll element.
-     * Canvas is appended directly to the inventory panel (not the container) so it uses
-     * absolute positioning relative to the panel, avoiding layout interaction with children.
+     * _createCanvas — Create and position the WebGL canvas over the paperdoll slot.
+     *
+     * Creates a 128×128 WebGL canvas positioned absolutely within the paperdoll container,
+     * then initializes the WebGL context with alpha blending and antialiasing enabled.
+     *
+     * @returns {boolean} True if canvas creation and WebGL initialization succeeded.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._createCanvas = function () {
         var self = this;
         if (!this._container) return false;
 
-        // Get the inventory panel as the positioning reference
-        var panel = document.querySelector('.dk-inventory-panel');
-        if (!panel) return false;
-
         this._canvas = document.createElement('canvas');
         this._canvas.id = 'dk-paperdoll-canvas';
 
-        // The paperdoll container has CSS width: 128px and min-height: 100%.
-        // Use fixed dimensions to avoid timing issues with CSS transitions.
-        var canvasW = 128;
-        var canvasH = 128;
-
+        // Size the canvas to match the CSS paperdoll container dimensions.
+        var size = this._CANVAS_SIZE;
         this._canvas.style.position = 'absolute';
         this._canvas.style.left = '0px';
         this._canvas.style.top = '0px';
-        this._canvas.style.width = canvasW + 'px';
-        this._canvas.style.height = canvasH + 'px';
+        this._canvas.style.width = size + 'px';
+        this._canvas.style.height = size + 'px';
         this._canvas.style.pointerEvents = 'none';
-        this._canvas.style.zIndex = '1'; // Above paperdoll background, below equipment icons
-this._canvas.style.border = '2px solid red';
+        this._canvas.style.zIndex = '1';
 
-        // Set explicit static dimensions for WebGL rendering
-        this._canvas.width = canvasW;
-        this._canvas.height = canvasH;
+        // Set explicit pixel dimensions for WebGL rendering.
+        this._canvas.width = size;
+        this._canvas.height = size;
 
-        // Append directly to container so canvas uses absolute positioning relative to container
         this._container.appendChild(this._canvas);
 
         try {
@@ -650,9 +650,6 @@ this._canvas.style.border = '2px solid red';
 
         if (!this._gl) return false;
 
-        // Set canvas pixel size for rendering
-        this._canvas.width = canvasW;
-        this._canvas.height = canvasH;
         this._gl.viewport(0, 0, this._canvas.width, this._canvas.height);
         this._aspect = this._canvas.width / this._canvas.height;
 
@@ -660,7 +657,11 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _createEntity — Create the player entity object with bone definitions.
+     * _createEntity — Create the player entity object with bone definitions and animation interface.
+     *
+     * The returned entity object conforms to the render loop interface:
+     * `getPosition()`, `getRotation()`, `getDimensions()`, `isAlive()`, `getBones()`, `getBoneTransforms()`.
+     *
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._createEntity = function () {
@@ -693,7 +694,15 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _createBoxMesh — Generate indexed box mesh geometry.
+     * _createBoxMesh — Generate indexed box mesh with per-face normals and UV coordinates.
+     *
+     * Each face has its own vertices (24 total) so each face can have a distinct normal vector.
+     * Vertex layout: position (3 floats) + normal (3 floats) + UV (2 floats) = 8 floats per vertex.
+     *
+     * @param {number} w - Box width (X axis).
+     * @param {number} h - Box height (Y axis).
+     * @param {number} d - Box depth (Z axis).
+     * @returns {{vertices: Float32Array, indices: Uint16Array}} Mesh geometry data.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._createBoxMesh = function (w, h, d) {
@@ -732,7 +741,16 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _getOrBuildMesh — Get or create a cached mesh for the given dimensions.
+     * _getOrBuildMesh — Retrieve a cached mesh or create and cache a new one.
+     *
+     * Meshes are keyed by normalized dimensions to ensure visual consistency while avoiding
+     * floating-point precision issues in cache lookups. WebGL buffers (VBO + IBO) are created
+     * on first request and cached for reuse.
+     *
+     * @param {number} w - Width.
+     * @param {number} h - Height.
+     * @param {number} d - Depth.
+     * @returns {{vbo: WebGLBuffer, ibo: WebGLBuffer, count: number, stride: number}|null} Mesh cache entry, or null on failure.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._getOrBuildMesh = function (w, h, d) {
@@ -753,7 +771,9 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4Identity — Create identity 4x4 matrix.
+     * _mat4Identity — Create a 4×4 identity matrix (column-major).
+     *
+     * @returns {Float32Array} 16-element identity matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4Identity = function () {
@@ -761,7 +781,11 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4Multiply — Multiply two 4x4 column-major matrices (r = a × b).
+     * _mat4Multiply — Post-multiply two 4×4 column-major matrices (r = a × b).
+     *
+     * @param {Float32Array} a - Left matrix.
+     * @param {Float32Array} b - Right matrix.
+     * @returns {Float32Array} New 16-element result matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4Multiply = function (a, b) {
@@ -776,7 +800,12 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4RotateY — Post-multiply rotation around Y axis.
+     * _mat4RotateY — Post-multiply rotation around the Y axis (yaw).
+     * Modifies the input matrix in place.
+     *
+     * @param {Float32Array} m - Input matrix (modified in place).
+     * @param {number} rad - Rotation angle in radians.
+     * @returns {Float32Array} The rotated matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4RotateY = function (m, rad) {
@@ -789,7 +818,12 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4RotateX — Post-multiply rotation around X axis.
+     * _mat4RotateX — Post-multiply rotation around the X axis (pitch).
+     * Modifies the input matrix in place.
+     *
+     * @param {Float32Array} m - Input matrix (modified in place).
+     * @param {number} rad - Rotation angle in radians.
+     * @returns {Float32Array} The rotated matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4RotateX = function (m, rad) {
@@ -802,7 +836,12 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4RotateZ — Post-multiply rotation around Z axis.
+     * _mat4RotateZ — Post-multiply rotation around the Z axis (roll).
+     * Modifies the input matrix in place.
+     *
+     * @param {Float32Array} m - Input matrix (modified in place).
+     * @param {number} rad - Rotation angle in radians.
+     * @returns {Float32Array} The rotated matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4RotateZ = function (m, rad) {
@@ -815,7 +854,16 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _mat4Translate — Set translation components of a clean identity matrix.
+     * _mat4Translate — Set the translation components (indices 12-14) of a matrix.
+     * Expects the input matrix to be in a "clean" state where translation components
+     * (indices 12-14) are zero, typically right after creating an identity matrix
+     * and applying rotations. Uses direct assignment for correctness.
+     *
+     * @param {Float32Array} m - Input matrix (modified in place).
+     * @param {number} x - Translation X.
+     * @param {number} y - Translation Y.
+     * @param {number} z - Translation Z.
+     * @returns {Float32Array} The translated matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._mat4Translate = function (m, x, y, z) {
@@ -824,7 +872,18 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _buildModelMatrix — Build model matrix from position and rotation.
+     * _buildModelMatrix — Build a model matrix from position and Euler angle rotations.
+     *
+     * Creates an identity matrix, applies rotations in YXZ order (yaw → pitch → roll),
+     * then sets the translation component.
+     *
+     * @param {number} px - X position.
+     * @param {number} py - Y position.
+     * @param {number} pz - Z position.
+     * @param {number} rx - Rotation around X axis (radians).
+     * @param {number} ry - Rotation around Y axis (radians).
+     * @param {number} rz - Rotation around Z axis (radians).
+     * @returns {Float32Array} New column-major 4×4 model matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._buildModelMatrix = function (px, py, pz, rx, ry, rz) {
@@ -837,7 +896,16 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _perspectiveMatrix — Create perspective projection matrix.
+     * _perspectiveMatrix — Create a perspective projection matrix (frustum).
+     *
+     * Uses the symmetric frustum formula with vertical FOV, aspect ratio,
+     * and near/far clipping planes.
+     *
+     * @param {number} fovDeg - Vertical field of view in degrees.
+     * @param {number} aspect - Width-to-height aspect ratio.
+     * @param {number} near - Near clipping plane distance.
+     * @param {number} far - Far clipping plane distance.
+     * @returns {Float32Array} 16-element perspective projection matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._perspectiveMatrix = function (fovDeg, aspect, near, far) {
@@ -853,7 +921,15 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _lookAtMatrix — Create look-at view matrix.
+     * _lookAtMatrix — Create a look-at view matrix from eye, center, and up vectors.
+     *
+     * Computes an orthonormal basis from the camera position and forward direction,
+     * then constructs the view transformation that maps world space to camera space.
+     *
+     * @param {{x:number,y:number,z:number}} eye - Camera position.
+     * @param {{x:number,y:number,z:number}} center - Look-at target point.
+     * @param {{x:number,y:number,z:number}} up - Up direction vector.
+     * @returns {Float32Array} 16-element column-major view matrix.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._lookAtMatrix = function (eye, center, up) {
@@ -876,7 +952,15 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _drawMesh — Issue a draw call for a mesh with model matrix and color.
+     * _drawMesh — Issue an indexed draw call for a cached mesh.
+     *
+     * Sets the shader program, model matrix, flat color (parsed from hex),
+     * binds vertex attributes, and calls `gl.drawElements`.
+     *
+     * @param {{vbo: WebGLBuffer, ibo: WebGLBuffer, count: number, stride: number}} cache - Mesh cache entry.
+     * @param {Float32Array} modelMatrix - 4×4 model matrix.
+     * @param {string} color - Hex color string (e.g., '#3366CC').
+     * @returns {boolean} True if the draw call succeeded.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._drawMesh = function (cache, modelMatrix, color) {
@@ -912,7 +996,14 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _computeBoneTransforms — Compute animated bone transforms based on current state.
+     * _computeBoneTransforms — Compute per-bone rotation transforms based on the current animation state.
+     *
+     * Returns a map of bone name → `{rx, ry, rz}` rotation values. Each animation state
+     * (idle, walk, run, wave) defines unique bone rotations. When the mouse is inside
+     * the panel and not paused, head tracking overrides are applied to the head bone.
+     *
+     * @param {number} dt - Delta time in seconds since last frame.
+     * @returns {Object.<string, {rx:number, ry:number, rz:number}>} Bone rotation map.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._computeBoneTransforms = function (dt) {
@@ -988,7 +1079,12 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _getLastTransforms — Get the last computed bone transforms (for pause resume).
+     * _getLastTransforms — Return the last computed bone transforms.
+     *
+     * Used by the entity's `getBoneTransforms()` method so that when animation is paused,
+     * the renderer continues to output stable transforms instead of zero rotations.
+     *
+     * @returns {Object.<string, {rx:number, ry:number, rz:number}>} Last bone transform map.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._getLastTransforms = function () {
@@ -996,7 +1092,13 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _updateAnimationState — Update animation state machine.
+     * _updateAnimationState — Advance the animation state machine by one tick.
+     *
+     * Increments animation time and checks if the state timer has expired. When expired,
+     * randomly transitions to a new animation state (idle, walk, run, wave) weighted by
+     * predefined probabilities. Skipped when paused.
+     *
+     * @param {number} dt - Delta time in seconds since last frame.
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._updateAnimationState = function (dt) {
@@ -1030,92 +1132,105 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _renderFrame — Render a single frame.
+     * _renderFrame — Render a single animation frame.
+     *
+     * Updates animation state, computes bone transforms, and draws all entity bones.
+     * The animation loop continues via `requestAnimationFrame` at the end of each frame
+     * (within try-finally), even if rendering fails due to missing context or entity data.
+     *
+     * When `_running` is false (e.g., after `destroy()` was called), the render loop
+     * exits immediately without scheduling another frame.
+     *
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._renderFrame = function (timestamp) {
         if (!this._running) return;
 
         var gl = this._gl;
-        if (!gl) return;
 
-        // Calculate delta time
-        if (this._lastFrameTime === 0) this._lastFrameTime = timestamp;
-        var dt = Math.min((timestamp - this._lastFrameTime) / 1000, 0.1);
-        this._lastFrameTime = timestamp;
+        try {
+            // Calculate delta time and advance animation state every frame.
+            if (this._lastFrameTime === 0) this._lastFrameTime = timestamp;
+            var dt = Math.min((timestamp - this._lastFrameTime) / 1000, 0.1);
+            this._lastFrameTime = timestamp;
 
-        // Activate shader program BEFORE any uniform calls
-        gl.useProgram(this._shaderProgram);
+            // Skip rendering if WebGL context is unavailable, but keep animating.
+            if (gl) {
+                gl.useProgram(this._shaderProgram);
 
-        // Update animation
-        this._updateAnimationState(dt);
-        var transforms = this._entity.getBoneTransforms();
+                // Update animation state and compute bone transforms.
+                this._updateAnimationState(dt);
+                var transforms = this._entity ? this._entity.getBoneTransforms() : {};
 
-        // Clear
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
+                // Clear and set up rendering state.
+                gl.clearColor(0, 0, 0, 0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                gl.enable(gl.DEPTH_TEST);
+                gl.enable(gl.CULL_FACE);
+                gl.cullFace(gl.BACK);
 
-        // Set up matrices using pre-cached uniform locations
-        var proj = this._perspectiveMatrix(this._fov, this._aspect, 0.1, 100);
-        var view = this._lookAtMatrix(this._camPos, this._camTarget, { x: 0, y: 1, z: 0 });
+                // Set up projection and view matrices.
+                var proj = this._perspectiveMatrix(this._fov, this._aspect, 0.1, 100);
+                var view = this._lookAtMatrix(this._camPos, this._camTarget, { x: 0, y: 1, z: 0 });
 
-        gl.uniformMatrix4fv(this._uProjection, false, proj);
-        gl.uniformMatrix4fv(this._uView, false, view);
-        gl.uniform3f(this._uFogColor, 0.53, 0.8, 0.97);
-        gl.uniform1f(this._uFogDensity, 0.02);
+                gl.uniformMatrix4fv(this._uProjection, false, proj);
+                gl.uniformMatrix4fv(this._uView, false, view);
+                gl.uniform3f(this._uFogColor, 0.53, 0.8, 0.97);
+                gl.uniform1f(this._uFogDensity, 0.02);
 
-        // Draw each bone — guard against entity not being ready
-        var entity = this._entity;
-        if (!entity) return;
+                // Draw each bone if entity is available.
+                var entity = this._entity;
+                if (entity) {
+                    var pos = entity.getPosition && entity.getPosition();
+                    if (pos) {
+                        var bones = entity.getBones();
+                        if (bones) {
+                            for (var i = 0; i < bones.length; i++) {
+                                var bone = bones[i];
+                                var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
+                                var offset = bone.offset || { x: 0, y: 0, z: 0 };
 
-        // Get position with null safety (cache to avoid repeated calls)
-        var pos = entity.getPosition && entity.getPosition();
-        if (!pos) return;
+                                // Apply entity yaw to offset for correct world positioning.
+                                var rot = entity.getRotation();
+                                var yaw = rot && rot.yaw !== undefined ? rot.yaw : 0;
+                                var cosYaw = Math.cos(yaw);
+                                var sinYaw = Math.sin(yaw);
+                                var localX = offset.x * cosYaw - offset.z * sinYaw;
+                                var localZ = offset.x * sinYaw + offset.z * cosYaw;
+                                var localY = offset.y;
 
-        var bones = entity.getBones();
-        if (bones) {
-            for (var i = 0; i < bones.length; i++) {
-                var bone = bones[i];
-                var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
-                var offset = bone.offset || { x: 0, y: 0, z: 0 };
+                                var modelMatrix = this._buildModelMatrix(
+                                    pos.x + localX,
+                                    pos.y + localY,
+                                    pos.z + localZ,
+                                    transform.rx, transform.ry, transform.rz
+                                );
 
-                // Apply entity yaw to offset for correct world positioning (with null check)
-                var rot = entity.getRotation();
-                var yaw = rot && rot.yaw !== undefined ? rot.yaw : 0;
-                var cosYaw = Math.cos(yaw);
-                var sinYaw = Math.sin(yaw);
-                var localX = offset.x * cosYaw - offset.z * sinYaw;
-                var localZ = offset.x * sinYaw + offset.z * cosYaw;
-                var localY = offset.y;
+                                var meshCache = this._getOrBuildMesh(
+                                    bone.dimensions.w || 1,
+                                    bone.dimensions.h || 1,
+                                    bone.dimensions.d || 1
+                                );
 
-                var modelMatrix = this._buildModelMatrix(
-                    pos.x + localX,
-                    pos.y + localY,
-                    pos.z + localZ,
-                    transform.rx, transform.ry, transform.rz
-                );
-
-                var meshCache = this._getOrBuildMesh(
-                    bone.dimensions.w || 1,
-                    bone.dimensions.h || 1,
-                    bone.dimensions.d || 1
-                );
-
-                if (meshCache) {
-                    this._drawMesh(meshCache, modelMatrix, bone.color || '#FF00FF');
+                                if (meshCache) {
+                                    this._drawMesh(meshCache, modelMatrix, bone.color || '#FF00FF');
+                                }
+                            }
+                        }
+                    }
                 }
             }
+        } catch (e) {
+            // Silently swallow rendering errors to prevent them from breaking the animation loop.
+        } finally {
+            // Always request the next frame — this ensures the render loop never dies.
+            this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
         }
-
-        // Request next frame
-        this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
     };
 
     /**
      * init — Initialize the paperdoll renderer. Creates canvas, compiles shaders, creates entity.
+     *
      * @returns {boolean} True if initialization succeeded.
      */
     Donkeycraft.PaperdollRenderer.prototype.init = function () {
@@ -1135,7 +1250,15 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * _setupHoverDetection — Set up mouse enter/leave listeners on the inventory panel.
+     * _setupHoverDetection — Set up mouse enter/leave/move listeners on the inventory panel.
+     *
+     * On mouse enter, pauses animation updates and notifies subscribers.
+     * On mouse leave, resumes animation and notifies subscribers.
+     * On mouse move within the panel, updates head tracking override for yaw/pitch.
+     *
+     * Handler references are stored in `_hoverHandlers` so they can be removed
+     * during `destroy()` to prevent memory leaks and stale callback invocations.
+     *
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._setupHoverDetection = function () {
@@ -1146,50 +1269,55 @@ this._canvas.style.border = '2px solid red';
 
         var handleEnter = function () {
             self._mouseInside = true;
-            // Smoothly pause: stop animation updates but keep rendering
-            self._paused = true;
+            self.pause();
             for (var i = 0; i < self._onHoverChange.length; i++) {
-                try { self._onHoverChange[i](true); } catch(e) {}
+                try { self._onHoverChange[i](true); } catch (e) { }
             }
         };
 
         var handleLeave = function () {
             self._mouseInside = false;
-            // Gracefully resume: restore last transforms and continue animation
-            self._paused = false;
+            self.resume();
             for (var i = 0; i < self._onHoverChange.length; i++) {
-                try { self._onHoverChange[i](false); } catch(e) {}
+                try { self._onHoverChange[i](false); } catch (e) { }
             }
         };
 
-        panel.addEventListener('mouseenter', handleEnter);
-        panel.addEventListener('mouseleave', handleLeave);
-
-        // Also track mouse move for head tracking
         var handleMouseMove = function (e) {
             if (!self._mouseInside) return;
             var rect = self._container.getBoundingClientRect();
             if (!rect) return;
-            // Normalize mouse position to [-1, 1] relative to container center
+            // Normalize mouse position to [-1, 1] relative to container center.
             var mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
             var my = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-            // Map to head rotation: yaw ±30° (0.52 rad), pitch ±15° (0.26 rad)
-            self._headOverride.yaw = mx * 0.52;
-            self._headOverride.pitch = my * 0.26;
+            // Map to head rotation limits.
+            self._headOverride.yaw = mx * self._HEAD_YAW_LIMIT;
+            self._headOverride.pitch = my * self._HEAD_PITCH_LIMIT;
         };
 
+        this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: handleMouseMove };
+
+        panel.addEventListener('mouseenter', handleEnter);
+        panel.addEventListener('mouseleave', handleLeave);
         panel.addEventListener('mousemove', handleMouseMove);
     };
 
     /**
-     * pause — Pause the animation (called on hover).
+     * pause — Pause the animation loop.
+     *
+     * When paused, bone transforms are no longer updated each frame, but the render
+     * loop continues so the last frame remains visible. Animation state is preserved
+     * so resuming picks up where it left off.
      */
     Donkeycraft.PaperdollRenderer.prototype.pause = function () {
         this._paused = true;
     };
 
     /**
-     * resume — Resume the animation (called on mouse leave).
+     * resume — Resume the animation loop after a pause.
+     *
+     * Restores animation updates using the last computed bone transforms as the
+     * starting point, ensuring smooth continuation without snapping.
      */
     Donkeycraft.PaperdollRenderer.prototype.resume = function () {
         this._paused = false;
@@ -1197,16 +1325,23 @@ this._canvas.style.border = '2px solid red';
 
     /**
      * setMouseTrack — Set normalized mouse position for head tracking.
-     * @param {number} x - Normalized X [-1, 1].
-     * @param {number} y - Normalized Y [-1, 1].
+     *
+     * Directly sets the head yaw and pitch override values, mapping [-1, 1]
+     * input to the configured rotation limits.
+     *
+     * @param {number} x - Normalized X position in [-1, 1] (-1 = left, 1 = right).
+     * @param {number} y - Normalized Y position in [-1, 1] (-1 = top, 1 = bottom).
      */
     Donkeycraft.PaperdollRenderer.prototype.setMouseTrack = function (x, y) {
-        this._headOverride.yaw = x * 0.52;
-        this._headOverride.pitch = y * 0.26;
+        this._headOverride.yaw = x * this._HEAD_YAW_LIMIT;
+        this._headOverride.pitch = y * this._HEAD_PITCH_LIMIT;
     };
 
     /**
-     * clearMouseTrack — Clear head tracking override.
+     * clearMouseTrack — Clear the head tracking override.
+     *
+     * Resets yaw and pitch overrides to zero, returning head rotation
+     * to its default animation state.
      */
     Donkeycraft.PaperdollRenderer.prototype.clearMouseTrack = function () {
         this._headOverride.yaw = 0;
@@ -1214,34 +1349,60 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * isRunning — Check if the renderer is actively rendering.
-     * @returns {boolean}
+     * isRunning — Check if the renderer's animation loop is active.
+     *
+     * Returns `true` if `init()` was called successfully and `destroy()` has not been called.
+     * Note: the render loop may be paused (via `pause()` or hover) but `isRunning` still returns true.
+     *
+     * @returns {boolean} True if the renderer is in its active lifecycle.
      */
     Donkeycraft.PaperdollRenderer.prototype.isRunning = function () {
         return this._running;
     };
 
     /**
-     * destroy — Clean up all resources (WebGL buffers, render loop, DOM).
+     * destroy — Clean up all PaperdollRenderer resources.
+     *
+     * Stops the animation loop, deletes all WebGL buffers from the mesh cache,
+     * removes the canvas from the DOM, and nullifies all references to allow GC.
+     * After calling `destroy()`, the renderer cannot be restarted — create a new instance.
+     *
+     * Also removes all mouse event listeners attached to the inventory panel
+     * to prevent memory leaks and stale callback invocations.
      */
     Donkeycraft.PaperdollRenderer.prototype.destroy = function () {
+        // Signal the render loop to stop at the top of _renderFrame.
         this._running = false;
+
         if (this._rafId) {
             cancelAnimationFrame(this._rafId);
             this._rafId = null;
         }
 
-        // Delete WebGL buffers
-        for (var key in this._meshCache) {
-            if (this._meshCache.hasOwnProperty(key)) {
-                var cache = this._meshCache[key];
-                if (cache.vbo) this._gl.deleteBuffer(cache.vbo);
-                if (cache.ibo) this._gl.deleteBuffer(cache.ibo);
+        // Remove mouse event listeners attached to the inventory panel.
+        if (this._hoverHandlers) {
+            var panel = document.querySelector('.dk-inventory-panel');
+            if (panel) {
+                panel.removeEventListener('mouseenter', this._hoverHandlers.enter);
+                panel.removeEventListener('mouseleave', this._hoverHandlers.leave);
+                panel.removeEventListener('mousemove', this._hoverHandlers.move);
+            }
+            this._hoverHandlers = null;
+        }
+
+        // Delete WebGL buffers from the mesh cache.
+        if (this._gl) {
+            for (var key in this._meshCache) {
+                if (this._meshCache.hasOwnProperty(key)) {
+                    var cache = this._meshCache[key];
+                    if (cache.vbo) this._gl.deleteBuffer(cache.vbo);
+                    if (cache.ibo) this._gl.deleteBuffer(cache.ibo);
+                }
             }
         }
         this._meshCache = {};
 
-        // Remove canvas
+        // Remove canvas from DOM.
         if (this._canvas && this._canvas.parentNode) {
             this._canvas.parentNode.removeChild(this._canvas);
         }
@@ -1253,7 +1414,8 @@ this._canvas.style.border = '2px solid red';
 
     /**
      * onHoverChange — Subscribe to hover state changes.
-     * @param {Function} callback - Called with (isHovered: boolean).
+     *
+     * @param {Function} callback - Called with `(isHovered: boolean)`.
      * @returns {Function} Unsubscribe function.
      */
     Donkeycraft.PaperdollRenderer.prototype.onHoverChange = function (callback) {
@@ -1266,7 +1428,9 @@ this._canvas.style.border = '2px solid red';
     };
 
     /**
-     * destroy — cleans up all DOM elements and event listeners.
+     * destroy — cleans up all DOM elements and event listeners for InventoryUI.
+     *
+     * Note: This is the InventoryUI.destroy(), not PaperdollRenderer.destroy().
      */
     Donkeycraft.InventoryUI.prototype.destroy = function () {
         // Close panel if open

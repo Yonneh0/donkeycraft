@@ -259,22 +259,22 @@ src/                # Sauce
     hotbar.js             # Hotbar UI with integrated stamina bar
     hunger-bar.css        # Hunger bar styles
     hunger-bar.js         # Hunger HUD overlay
-    item-stack.css        # Item stack styles
-    item-stack.js         # Item stacks with NBT-like tags
+    item.css              # Item stack styles
+    item.js               # Item stacks with NBT-like tags
     keybindings-panel.css # Keybinds panel styles
     keybindings-panel.js  # Keybind configuration UI
     loading-screen.css    # Loading screen styles
     loading-screen.js     # Loading screen UI
-     minimap.css           # Minimap styles: circular border, compass ring positioning
-     minimap.js            # Minimap UI module: DOM management, rotating terrain rendering with player-centered rotation, compass ring display
-     map.css               # Full map view styles: panel layout, toggle button, close button, overlay background
-     map.js                # Full map panel UI module: DOM creation, drag-to-pan interaction, mousewheel zoom targeting, auto-zoom calculation, chunk grid and block border rendering
-     tod.css               # Time-of-day dial styles: circular dial background, daylight arc pointer, slider popup, freeze button states
-     tod.js                # Time-of-day dial UI module: DOM creation, time display updates, sun/moon emoji pointer, creative mode time slider with freeze/unfreeze controls
-     speed-indicator.css   # Speed indicator styles
-     speed-indicator.js    # Speed indicator/control (sneak/walk/run/turbo buttons)
-     xp-bar.css            # XP bar styles
-     xp-bar.js             # XP level bar
+    minimap.css           # Minimap styles: circular border, compass ring positioning
+    minimap.js            # Minimap UI module: DOM management, rotating terrain rendering with player-centered rotation, compass ring display
+    map.css               # Full map view styles: panel layout, toggle button, close button, overlay background
+    map.js                # Full map panel UI module: DOM creation, drag-to-pan interaction, mousewheel zoom targeting, auto-zoom calculation, chunk grid and block border rendering
+    tod.css               # Time-of-day dial styles: circular dial background, daylight arc pointer, slider popup, freeze button states
+    tod.js                # Time-of-day dial UI module: DOM creation, time display updates, sun/moon emoji pointer, creative mode time slider with freeze/unfreeze controls
+    speed-indicator.css   # Speed indicator styles
+    speed-indicator.js    # Speed indicator/control (sneak/walk/run/turbo buttons)
+    xp-bar.css            # XP bar styles
+    xp-bar.js             # XP level bar
 
 ```
 
