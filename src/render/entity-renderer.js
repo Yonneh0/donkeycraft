@@ -562,9 +562,8 @@
      * child bone's world transform is computed relative to its parent's world transform.
      * This ensures correct skeletal animation where limb segments rotate around their joints.
      *
-     * For parented bones (e.g., eyes/hair attached to head), the child's offset is computed
-     * relative to its parent bone's world position, and the child inherits the parent's
-     * animation rotation so it stays visually attached.
+     * For parented bones (e.g., eyes/hair attached to head), the child inherits the parent's
+     * final animation rotation so it stays visually attached and does not rotate independently.
      *
      * World transform = entityPos + yawRotation × (offset) for root bones
      * World transform = parentWorld + yawRotation × (childOffset - parentOffset) + parentAnimRot for children
@@ -658,34 +657,35 @@
                 };
             }
 
-            // Child bone: position is parent world + yaw-rotated relative offset.
-            var px = parentWorld.x;
-            var py = parentWorld.y;
-            var pz = parentWorld.z;
+        // Child bone: position is parent world + yaw-rotated relative offset.
+        var px = parentWorld.x;
+        var py = parentWorld.y;
+        var pz = parentWorld.z;
 
-            // Compute relative offset in entity-local space, then apply yaw rotation.
-            var cosYaw2 = Math.cos(entityYaw);
-            var sinYaw2 = Math.sin(entityYaw);
-            var localOffsetX = offset.x * cosYaw2 - offset.z * sinYaw2;
-            var localOffsetZ = offset.x * sinYaw2 + offset.z * cosYaw2;
-            var localOffsetY = offset.y;
+        // Compute relative offset in entity-local space, then apply yaw rotation.
+        var cosYaw2 = Math.cos(entityYaw);
+        var sinYaw2 = Math.sin(entityYaw);
+        var localOffsetX = offset.x * cosYaw2 - offset.z * sinYaw2;
+        var localOffsetZ = offset.x * sinYaw2 + offset.z * cosYaw2;
+        var localOffsetY = offset.y;
 
-            // Apply parent's animation rotation to the relative offset.
-            var parentAnim = parentWorld;
-            var rotated = applyRotToVec(
-                localOffsetX, localOffsetY, localOffsetZ,
-                parentAnim.rx || 0, parentAnim.ry || 0, parentAnim.rz || 0
-            );
+        // Apply parent's animation rotation to the relative offset.
+        var rotated = applyRotToVec(
+            localOffsetX, localOffsetY, localOffsetZ,
+            parentWorld.rx || 0, parentWorld.ry || 0, parentWorld.rz || 0
+        );
 
-            return {
-                x: px + rotated.x,
-                y: py + rotated.y,
-                z: pz + rotated.z,
-                rx: boneAnim.rx != null ? Number(boneAnim.rx) : 0,
-                ry: boneAnim.ry != null ? Number(boneAnim.ry) : 0,
-                rz: boneAnim.rz != null ? Number(boneAnim.rz) : 0,
-                pivot: pivot
-            };
+        // CRITICAL: Child bones inherit their parent's animation rotation exactly.
+        // This ensures eyes/hair stay visually attached to the head and do not rotate independently.
+        return {
+            x: px + rotated.x,
+            y: py + rotated.y,
+            z: pz + rotated.z,
+            rx: parentWorld.rx != null ? Number(parentWorld.rx) : 0,
+            ry: parentWorld.ry != null ? Number(parentWorld.ry) : 0,
+            rz: parentWorld.rz != null ? Number(parentWorld.rz) : 0,
+            pivot: pivot
+        };
         }
 
         // Process root bones first (no parent).

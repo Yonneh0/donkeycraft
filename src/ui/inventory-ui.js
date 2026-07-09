@@ -405,32 +405,6 @@
     var _MAGENTA = { r: 1, g: 0, b: 1 };
 
     /**
-     * EntityShapeDefs — Standardized bone shape definitions for all entity types.
-     * Shared between PaperdollRenderer and EntityRenderer for visual consistency.
-     * All offsets use feet-at-origin convention (Y=0 = ground level).
-     * @private
-     */
-    var _PAPERDOLL_BONES = [
-        // Torso — center of body mass
-        { name: 'body',  meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#3366CC', offset: { x: 0, y: 0.85, z: 0 } },
-        // Head — centered on top of body
-        { name: 'head',  meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
-        // Eyes — small dark boxes on front of head (parented to head bone)
-        { name: 'leftEye',  meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: -0.12, y: 1.65, z: 0.24 }, parent: 'head' },
-        { name: 'rightEye', meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: 0.12, y: 1.65, z: 0.24 }, parent: 'head' },
-        // Hair — box on top/back of head (parented to head bone)
-        { name: 'hair', meshType: 'box', dimensions: { w: 0.54, h: 0.18, d: 0.52 }, color: '#4a3728', offset: { x: 0, y: 1.82, z: -0.02 }, parent: 'head' },
-        // Left arm — pivot at shoulder (top-left of body)
-        { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 1.15, z: 0 }, pivot: { x: -0.42, y: 1.25, z: 0 } },
-        // Right arm — pivot at shoulder (top-right of body)
-        { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: 0.42, y: 1.15, z: 0 }, pivot: { x: 0.42, y: 1.25, z: 0 } },
-        // Left leg — pivot at hip (bottom-left of body)
-        { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: -0.15, y: 0.45, z: 0 } },
-        // Right leg — pivot at hip (bottom-right of body)
-        { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0.15, y: 0.45, z: 0 } }
-    ];
-
-    /**
      * PaperdollRenderer — Renders a 3D player entity over the inventory paperdoll slot.
      *
      * Features animated entity with random state cycling, mouse hover pause/resume,
@@ -655,14 +629,11 @@
     Donkeycraft.PaperdollRenderer.prototype._createEntity = function () {
         var self = this;
 
-        // Position entity so feet sit at Y=0 (bottom of container).
-        // Entity height is 1.5× larger, total height ≈ 2.7.
+        // Entity origin at feet (Y=0), facing +Z toward camera (yaw=0).
         self._pos = { x: 0, y: 0, z: 0 };
-        // yaw = 0: entity faces +Z toward camera. With symmetric box meshes,
-        // yaw=π would swap left/right arms making it look like the back.
         self._rot = { yaw: 0, pitch: 0 };
 
-        // Scale factor for 1.5× larger entity.
+        // Scale factor for 1.5× larger entity (total height ≈ 2.7).
         var S = 1.5;
 
         this._entity = {
@@ -677,30 +648,21 @@
 
             /**
              * getBones — Returns the player entity bone definitions with correct shoulder/hip pivots.
-             *
              * Each bone defines a body part mesh and its attachment point relative to the entity origin.
              * The `pivot` property specifies the rotation center (e.g., shoulders for arms, hips for legs).
-             *
-             * @returns {Array<{name: string, meshType: string, dimensions: Object, color: string, offset: {x:number,y:number,z:number}, pivot: {x:number,y:number,z:number}}>} Bone definitions.
+             * Parented bones (eyes, hair) have `parent: 'head'` so they inherit the head's rotation.
+             * @returns {Array<{name: string, meshType: string, dimensions: Object, color: string, offset: {x:number,y:number,z:number}, pivot?: {x:number,y:number,z:number}, parent?: string}>} Bone definitions.
              */
             getBones: function () {
                 return [
-                    // Torso — center of body mass
                     { name: 'body',  meshType: 'box', dimensions: { w: 0.6 * S, h: 0.9 * S, d: 0.3 * S }, color: '#3366CC', offset: { x: 0, y: 0.85 * S, z: 0 } },
-                    // Head — centered on top of body
                     { name: 'head',  meshType: 'box', dimensions: { w: 0.5 * S, h: 0.5 * S, d: 0.5 * S }, color: '#FFCC99', offset: { x: 0, y: 1.55 * S, z: 0 } },
-                    // Eyes — small dark boxes on front of head (parented to head bone)
                     { name: 'leftEye',  meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.08 * S }, color: '#1a1a2e', offset: { x: -0.12 * S, y: 1.65 * S, z: 0.24 * S }, parent: 'head' },
                     { name: 'rightEye', meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.08 * S }, color: '#1a1a2e', offset: { x: 0.12 * S, y: 1.65 * S, z: 0.24 * S }, parent: 'head' },
-                    // Hair — box on top/back of head (parented to head bone)
                     { name: 'hair', meshType: 'box', dimensions: { w: 0.54 * S, h: 0.18 * S, d: 0.52 * S }, color: '#4a3728', offset: { x: 0, y: 1.82 * S, z: -0.02 * S }, parent: 'head' },
-                    // Left arm — pivot at shoulder (top-left of body)
                     { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 1.15 * S, z: 0 }, pivot: { x: -0.42 * S, y: 1.25 * S, z: 0 } },
-                    // Right arm — pivot at shoulder (top-right of body)
                     { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: 0.42 * S, y: 1.15 * S, z: 0 }, pivot: { x: 0.42 * S, y: 1.25 * S, z: 0 } },
-                    // Left leg — pivot at hip (bottom-left of body)
                     { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: -0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: -0.15 * S, y: 0.45 * S, z: 0 } },
-                    // Right leg — pivot at hip (bottom-right of body)
                     { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: 0.15 * S, y: 0.45 * S, z: 0 } }
                 ];
             },
@@ -868,12 +830,13 @@
     /**
      * _computeBoneTransforms — Compute per-bone rotation transforms based on the current animation state.
      *
-     * Returns a map of bone name → `{rx, ry, rz}` rotation values. Each animation state
-     * (idle, walk, run, wave) defines unique bone rotations. Static feature bones (eyes, hair)
-     * inherit the head's final rotation so they stay attached to the head during all movement.
+     * Returns a map of bone name to {rx, ry, rz} rotation values. Each animation state
+     * (idle, walk, run, wave) defines unique bone rotations for root bones only.
+     * Parented bones (eyes, hair) inherit their parent's final rotation so they stay
+     * visually attached and never rotate independently.
      *
-     * Head tracking override is applied BEFORE propagating to child bones, ensuring eyes and hair
-     * follow the mouse-corrected head rotation rather than the animation's raw rotation.
+     * Head tracking override is applied to the head rotation when the mouse is inside
+     * the inventory panel, allowing the entity to track the cursor.
      *
      * @param {number} dt - Delta time in seconds since last frame.
      * @returns {Object.<string, {rx:number, ry:number, rz:number}>} Bone rotation map.
@@ -883,7 +846,7 @@
         var t = this._animTime;
         var transforms = {};
 
-        // Step 1: Compute base animation rotations for each state.
+        // Compute base animation rotations for each state.
         switch (this._animState) {
             case 'idle': {
                 // Subtle breathing: body oscillates slightly, arms sway gently
@@ -929,18 +892,18 @@
             }
         }
 
-        // Step 2: Apply head tracking override BEFORE propagating to child bones.
-        // This ensures eyes and hair follow the mouse-corrected head rotation.
+        // Apply head tracking override when mouse is inside the inventory panel.
+        // Maps mouse position to head rotation for interactive tracking.
         if (this._mouseInside) {
             transforms.head = {
-                rx: this._headOverride.pitch,  // pitch from mouse Y
-                ry: this._headOverride.yaw,    // yaw from mouse X
+                rx: this._headOverride.pitch,
+                ry: this._headOverride.yaw,
                 rz: 0
             };
         }
 
-        // Step 3: Propagate head rotation to child bones (eyes, hair).
-        // These feature bones stay attached to the head and inherit its final rotation directly.
+        // CRITICAL: Parented bones (eyes, hair) inherit their parent's final rotation exactly.
+        // This ensures they stay visually attached to the head and never rotate independently.
         var headRot = transforms.head || { rx: 0, ry: 0, rz: 0 };
         transforms.leftEye = { rx: headRot.rx, ry: headRot.ry, rz: headRot.rz };
         transforms.rightEye = { rx: headRot.rx, ry: headRot.ry, rz: headRot.rz };
@@ -1064,26 +1027,31 @@
                         var cosYaw = Math.cos(yaw);
                         var sinYaw = Math.sin(yaw);
 
-                        // Step 1: Pre-compute world transforms (position + rotation) for all bones.
+                        // Pre-compute world transforms for all bones in topological order.
                         // All bone offsets are defined in ENTITY-LOCAL space.
                         // World position = entityPos + R_entityYaw × offset
-                        // For parented bones, also apply parent's animation rotation around parent's world position.
                         var boneWorld = {};
 
                         /**
-                         * Apply a rotation matrix (built from rx,ry,rz) to a vector.
-                         * Uses YXZ rotation order matching the render loop.
+                         * Apply YXZ rotation (yaw→pitch→roll) to a vector.
+                         * @param {number} vx - X component.
+                         * @param {number} vy - Y component.
+                         * @param {number} vz - Z component.
+                         * @param {number} rx - Pitch rotation in radians.
+                         * @param {number} ry - Yaw rotation in radians.
+                         * @param {number} rz - Roll rotation in radians.
+                         * @returns {{x: number, y: number, z: number}} Rotated vector.
                          */
                         function applyRotToVec(vx, vy, vz, rx, ry, rz) {
-                            // Y rotation
+                            // Y rotation (yaw)
                             var x1 = vx * Math.cos(ry) - vz * Math.sin(ry);
                             var z1 = vx * Math.sin(ry) + vz * Math.cos(ry);
                             var y1 = vy;
-                            // X rotation
+                            // X rotation (pitch)
                             var y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
                             var z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
                             var x2 = x1;
-                            // Z rotation
+                            // Z rotation (roll)
                             var x3 = x2 * Math.cos(rz) - y2 * Math.sin(rz);
                             var y3 = x2 * Math.sin(rz) + y2 * Math.cos(rz);
                             var z3 = z2;
@@ -1096,16 +1064,12 @@
                             var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
                             var pivot = boneDef.pivot || null;
                             var parentName = boneDef.parent || null;
-
-                            // Get animation transform for this bone (fall back to zero).
                             var anim = animTransform && animTransform[boneDef.name] ? animTransform[boneDef.name] : { rx: 0, ry: 0, rz: 0 };
 
                             var wx, wy, wz;
 
                             if (parentName) {
-                                // Parented bone (e.g., eyes/hair attached to head).
-                                // All offsets are in entity-local space.
-                                // Step A: Find parent's world position and its offset.
+                                // Find parent's world position and offset.
                                 var parentOffset = null;
                                 var parentWorld = null;
                                 for (var k = 0; k < bones.length; k++) {
@@ -1117,7 +1081,7 @@
                                 }
 
                                 if (parentWorld && parentOffset) {
-                                    // Step B: Apply entity yaw to both child and parent offsets.
+                                    // Apply entity yaw to both child and parent offsets.
                                     var childLocalX = offset.x * cosYaw - offset.z * sinYaw;
                                     var childLocalZ = offset.x * sinYaw + offset.z * cosYaw;
                                     var childLocalY = offset.y;
@@ -1126,15 +1090,14 @@
                                     var parentLocalZ = parentOffset.x * sinYaw + parentOffset.z * cosYaw;
                                     var parentLocalY = parentOffset.y;
 
-                                    // Step C: Compute relative offset in entity-local space.
+                                    // Compute relative offset in entity-local space.
                                     var dx = childLocalX - parentLocalX;
                                     var dy = childLocalY - parentLocalY;
                                     var dz = childLocalZ - parentLocalZ;
 
-                                    // Step D: Apply parent's animation rotation to the relative offset.
-                                    var rotated = applyRotToVec(dx, dy, dz, anim.rx, anim.ry, anim.rz);
+                                    // Apply PARENT's animation rotation to the relative offset.
+                                    var rotated = applyRotToVec(dx, dy, dz, parentWorld.rx, parentWorld.ry, parentWorld.rz);
 
-                                    // Step E: World position = parent world + rotated relative offset.
                                     wx = parentWorld.x + rotated.x;
                                     wy = parentWorld.y + rotated.y;
                                     wz = parentWorld.z + rotated.z;
@@ -1159,26 +1122,35 @@
                                 wz = pos.z + (offset.x * sinYaw + offset.z * cosYaw);
                             }
 
-                            // Store world position AND animation rotation for child bone lookups.
-                            boneWorld[boneDef.name] = { x: wx, y: wy, z: wz, rx: anim.rx, ry: anim.ry, rz: anim.rz };
+                            // Parented bones inherit their parent's animation rotation.
+                            var finalRx, finalRy, finalRz;
+                            if (parentName && boneWorld[parentName]) {
+                                var pw = boneWorld[parentName];
+                                finalRx = pw.rx;
+                                finalRy = pw.ry;
+                                finalRz = pw.rz;
+                            } else {
+                                finalRx = anim.rx;
+                                finalRy = anim.ry;
+                                finalRz = anim.rz;
+                            }
+
+                            boneWorld[boneDef.name] = { x: wx, y: wy, z: wz, rx: finalRx, ry: finalRy, rz: finalRz };
                             return boneWorld[boneDef.name];
                         }
 
-                        // Pre-compute all bones in a single pass (topological order ensures parents are computed before children).
+                        // Pre-compute all bones in topological order (parents before children).
                         for (var bi = 0; bi < bones.length; bi++) {
                             computeBoneWorld(bones[bi], transforms);
                         }
 
-                        // Step 2: Render all bones using pre-computed world transforms.
-                        // Build model matrix EXACTLY like EntityRenderer._buildModelMatrix:
-                        // 1) Start with identity, multiply by rotations (Ry × Rx × Rz).
-                        // 2) Then set translation components directly on _data[12-14].
+                        // Render all bones using pre-computed world transforms.
+                        // Build model matrix: identity → rotations (Ry × Rx × Rz) → set translation.
                         for (var i = 0; i < bones.length; i++) {
                             var bone = bones[i];
                             var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
                             var bw = computeBoneWorld(bone);
 
-                            // Build rotation matrix (same as EntityRenderer).
                             var modelMatrix = Donkeycraft.Matrix4.createIdentity();
                             if (transform.ry !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
                             if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
