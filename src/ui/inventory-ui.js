@@ -660,8 +660,8 @@
                     { name: 'leftEye',   meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.04 * S }, color: '#1a1a2e', offset: { x: -0.12 * S, y: 1.62 * S, z: 0.27 * S }, parent: 'head' },
                     { name: 'rightEye',  meshType: 'box', dimensions: { w: 0.08 * S, h: 0.06 * S, d: 0.04 * S }, color: '#1a1a2e', offset: { x: 0.12 * S, y: 1.62 * S, z: 0.27 * S }, parent: 'head' },
                     { name: 'hair',      meshType: 'box', dimensions: { w: 0.54 * S, h: 0.16 * S, d: 0.52 * S }, color: '#4a3728', offset: { x: 0, y: 1.84 * S, z: -0.01 * S }, parent: 'head' },
-                    { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 0.75 * S, z: 0 }, pivot: { x: -0.42 * S, y: 1.25 * S, z: 0 } },
-                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: 0.42 * S, y: 0.75 * S, z: 0 }, pivot: { x: 0.42 * S, y: 1.25 * S, z: 0 } },
+                    { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 0.85 * S, z: 0 }, pivot: { x: -0.42 * S, y: 1.25 * S, z: 0 } },
+                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: 0.42 * S, y: 0.85 * S, z: 0 }, pivot: { x: 0.42 * S, y: 1.25 * S, z: 0 } },
                     { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: -0.15 * S, y: 0.0 * S, z: 0 }, pivot: { x: -0.15 * S, y: 0.45 * S, z: 0 } },
                     { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.15 * S, y: 0.0 * S, z: 0 }, pivot: { x: 0.15 * S, y: 0.45 * S, z: 0 } }
                 ];
@@ -1108,13 +1108,10 @@
                                     wz = pos.z + (offset.x * sinYaw + offset.z * cosYaw);
                                 }
                             } else if (pivot) {
-                                // Pivot bone: position relative to pivot point.
-                                var dx2 = offset.x - pivot.x;
-                                var dy2 = offset.y - pivot.y;
-                                var dz2 = offset.z - pivot.z;
-                                wx = (pivot.x + pos.x) + (dx2 * cosYaw - dz2 * sinYaw);
-                                wy = (pivot.y + pos.y) + dy2;
-                                wz = (pivot.z + pos.z) + (dx2 * sinYaw + dz2 * cosYaw);
+                                // Pivot bone: return the pivot's world position (the rotation center).
+                                wx = (pivot.x * cosYaw - pivot.z * sinYaw) + pos.x;
+                                wy = pivot.y + pos.y;
+                                wz = (pivot.x * sinYaw + pivot.z * cosYaw) + pos.z;
                             } else {
                                 // Simple bone: yaw-rotated offset from entity origin.
                                 wx = pos.x + (offset.x * cosYaw - offset.z * sinYaw);
@@ -1156,10 +1153,18 @@
                             if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
                             if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
 
+                            // For bones with pivot, translate so the pivot point is at the rotation origin.
+                            // This ensures rotation happens around the joint (hip/shoulder), not the mesh center.
+                            if (bone.pivot) {
+                                modelMatrix._data[12] -= ((bone.pivot.x || 0) - (bone.offset.x || 0));
+                                modelMatrix._data[13] -= ((bone.pivot.y || 0) - (bone.offset.y || 0));
+                                modelMatrix._data[14] -= ((bone.pivot.z || 0) - (bone.offset.z || 0));
+                            }
+
                             // Set translation directly on matrix data (matches EntityRenderer behavior).
-                            modelMatrix._data[12] = bw.x;
-                            modelMatrix._data[13] = bw.y;
-                            modelMatrix._data[14] = bw.z;
+                            modelMatrix._data[12] = bw.x + modelMatrix._data[12];
+                            modelMatrix._data[13] = bw.y + modelMatrix._data[13];
+                            modelMatrix._data[14] = bw.z + modelMatrix._data[14];
 
                             var meshCache = this._getOrBuildMesh(
                                 bone.dimensions.w || 1,
