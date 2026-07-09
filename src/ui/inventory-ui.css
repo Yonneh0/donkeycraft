@@ -127,7 +127,7 @@
 /* Center: Paperdoll placeholder */
 .dk-equip-center {
     display: flex;
-    align-items: center;
+    align-items: end;
     justify-content: center;
     flex-shrink: 0;
     width: 64px;
@@ -159,11 +159,11 @@
 /* Paperdoll placeholder with smoke effect */
 .dk-paperdoll-container {
     position: relative;
-    width: 128px;
-    height: 100%;
-    min-height: 100px;
+    width: 144px;
+    height: 200px;
     display: flex;
-    align-items: center;
+    /* Align canvas to bottom of container so entity feet align with bottom edge */
+    align-items: flex-end;
     justify-content: center;
 }
 

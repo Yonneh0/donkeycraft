@@ -8,6 +8,16 @@
     var Donkeycraft = window.Donkeycraft;
     if (!Donkeycraft) return;
 
+    // Logger fallback for standalone usage (e.g., inv.html).
+    if (!Donkeycraft.Logger) {
+        Donkeycraft.Logger = {
+            debug: function () { },
+            info: function () { },
+            warn: function () { },
+            error: function () { }
+        };
+    }
+
     // ============================================================
     // Constants
     // ============================================================
@@ -70,12 +80,13 @@
 
     /**
      * Vertex byte stride — total bytes per vertex including all components.
-     * Computed from position (3) + normal (3) = 6 floats × 4 bytes = 24 bytes.
-     * Entity shader uses flat color rendering — no UV attributes.
+     * Computed from position (3) + normal (3) + UV (2) = 8 floats × 4 bytes = 32 bytes.
+     * Entity shader uses flat color rendering — UV attributes are present in mesh data
+     * but not bound/used by the entity shader program.
      * @constant {number}
-     * @default 24
+     * @default 32
      */
-    var VERTEX_BYTE_STRIDE = 6 * BYTES_PER_FLOAT;
+    var VERTEX_BYTE_STRIDE = 8 * BYTES_PER_FLOAT;
 
     // ============================================================
     // Entity Mesh Builder — Generates simple blocky entity meshes

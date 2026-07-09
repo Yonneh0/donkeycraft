@@ -19,18 +19,18 @@
         this._closing = false;
 
         // Inventory data
-        this._playerInventory = null; // Donkeycraft.Inventory instance
-        this._backpackInventory = null; // Donkeycraft.Inventory instance
+        this._playerInventory = null;
+        this._backpackInventory = null;
 
         // DOM elements
         this._panelEl = null;
-        this._gridEl = null; // The dynamically generated inventory grid
+        this._gridEl = null;
         this._toggleBtnEl = null;
 
         // Event subscriptions
         this._subscriptions = {};
 
-        // Build DOM (find static panel, create toggle button and dynamic grid)
+        // Build DOM
         this._initDOM();
     };
 
@@ -39,21 +39,17 @@
      * @private
      */
     Donkeycraft.InventoryUI.prototype._initDOM = function () {
-        // Find the static panel from index.html
         this._panelEl = document.getElementById('dk-inventory-panel');
 
         if (this._panelEl) {
-            // Wire up close button
             var closeBtn = document.getElementById('dk-inventory-close-btn');
             if (closeBtn) {
                 var self = this;
                 closeBtn.addEventListener('click', function () { self.close(); });
             }
 
-            // Find or create the inventory grid container
             this._gridEl = document.getElementById('dk-inventory-grid');
             if (!this._gridEl) {
-                // Grid container doesn't exist — create it
                 var gridSection = this._panelEl.querySelector('.dk-inventory-grid-section');
                 if (gridSection) {
                     var wrapper = gridSection.querySelector('.dk-inventory-grid-wrapper');
@@ -66,13 +62,11 @@
                 }
             }
 
-            // Generate the dynamic inventory grid (258 slots)
             if (this._gridEl) {
                 this._generateInventoryGrid();
             }
         }
 
-        // Create toggle button
         this._buildToggleButton();
     };
 
@@ -118,12 +112,10 @@
             self.toggle();
         });
 
-        // Append to the actual .dk-hotbar element (centered), not the container
         var hotbarEl = document.querySelector('.dk-hotbar');
         if (hotbarEl) {
             hotbarEl.appendChild(btn);
         } else {
-            // Fallback: append to container if hotbar not yet created
             document.getElementById('dk-hotbar-container').appendChild(btn);
         }
         this._toggleBtnEl = btn;
@@ -134,7 +126,6 @@
      * If currently closing, cancels the close and re-opens immediately.
      */
     Donkeycraft.InventoryUI.prototype.open = function () {
-        // If closing, cancel the close and re-open immediately
         if (this._closing) {
             this._cancelClose();
             return;
@@ -146,7 +137,6 @@
         this._closing = false;
 
         if (this._panelEl) {
-            // Clear inline styles set by close() so CSS classes take effect
             this._panelEl.style.opacity = '';
             this._panelEl.style.pointerEvents = '';
             this._panelEl.classList.remove('closing');
@@ -157,7 +147,6 @@
             this._toggleBtnEl.classList.add('active');
         }
 
-        // Emit open event
         if (this._subscriptions.onOpen) {
             for (var i = 0; i < this._subscriptions.onOpen.length; i++) {
                 try { this._subscriptions.onOpen[i](); } catch (e) { }
@@ -175,11 +164,9 @@
 
         if (this._panelEl) {
             this._panelEl.classList.add('closing');
-            // Remove open class to trigger fade-out transition
             this._panelEl.classList.remove('open');
         }
 
-        // After close animation completes, fully hide panel
         var self = this;
         this._closeTimeout = setTimeout(function () {
             if (self._panelEl) {
@@ -194,33 +181,24 @@
                 self._toggleBtnEl.classList.remove('active');
             }
 
-            // Emit close event
             if (self._subscriptions.onClose) {
                 for (var i = 0; i < self._subscriptions.onClose.length; i++) {
                     try { self._subscriptions.onClose[i](); } catch (e) { }
                 }
             }
-        }, 2000); // Match CSS close transition duration
+        }, 2000);
     };
 
     /**
      * _cancelClose — cancels an in-progress close animation and re-opens immediately.
-     *
-     * Clears the close timeout, resets internal state, and delegates to `open()`
-     * to handle DOM updates and event emission, reducing code duplication.
-     *
      * @private
      */
     Donkeycraft.InventoryUI.prototype._cancelClose = function () {
-        // Clear the close timeout
         if (this._closeTimeout) {
             clearTimeout(this._closeTimeout);
             this._closeTimeout = null;
         }
-
         this._closing = false;
-
-        // Delegate to open() for DOM updates and event emission.
         this.open();
     };
 
@@ -252,7 +230,6 @@
         this._playerInventory = playerInv;
         this._backpackInventory = backpackInv || null;
 
-        // Subscribe to slot change events for auto-updates
         if (this._playerInventory) {
             var self = this;
             this._playerInventory.onSlotChange(function (slotIdx, newStack) {
@@ -267,7 +244,6 @@
             });
         }
 
-        // Initial render
         this._renderAllSlots();
     };
 
@@ -320,7 +296,6 @@
         var countEl = null;
 
         if (type === 'player') {
-            // Find the slot element in the inventory grid
             if (this._gridEl && index < this._gridEl.children.length) {
                 slotEl = this._gridEl.children[index];
             }
@@ -342,7 +317,6 @@
             itemEl.textContent = '';
             if (countEl) countEl.style.display = 'none';
         } else {
-            // Display item as emoji/character
             var itemId = stack.getItemId();
             itemEl.textContent = this._getItemDisplayChar(itemId);
 
@@ -368,40 +342,12 @@
      */
     Donkeycraft.InventoryUI.prototype._getItemDisplayChar = function (itemId) {
         var displayMap = {
-            0: '',
-            1: '🪨',
-            3: '🟫',
-            4: '🟩',
-            5: '🪵',
-            6: '🟨',
-            7: '🟫',
-            10: '⬛',
-            11: '🔴',
-            12: '🟡',
-            14: '🟢',
-            24: '🪵',
-            30: '🪵',
-            45: '🔲',
-            54: '📦',
-            61: '🔥',
-            138: '🪨',
-            184: '📚',
-            187: '📦',
-            191: '🔥',
-            195: '🔨',
-            214: '⚫',
-            218: '💎',
-            219: '🟢',
-            220: '🔵',
-            221: '⚪',
-            222: '🟡',
-            225: '🟡',
-            226: '⚪',
-            227: '💎',
-            229: '🔴',
-            230: '🔴',
-            310: '🥢',
-            312: '🔦'
+            0: '', 1: '🪨', 3: '🟫', 4: '🟩', 5: '🪵', 6: '🟨', 7: '🟫',
+            10: '⬛', 11: '🔴', 12: '🟡', 14: '🟢', 24: '🪵', 30: '🪵',
+            45: '🔲', 54: '📦', 61: '🔥', 138: '🪨', 184: '📚', 187: '📦',
+            191: '🔥', 195: '🔨', 214: '⚫', 218: '💎', 219: '🟢', 220: '🔵',
+            221: '⚪', 222: '🟡', 225: '🟡', 226: '⚪', 227: '💎', 229: '🔴',
+            230: '🔴', 310: '🥢', 312: '🔦'
         };
         return displayMap[itemId] || '▪';
     };
@@ -452,10 +398,11 @@
      * PaperdollRenderer configuration constants.
      * @private
      */
-    var _HEAD_YAW_LIMIT = 0.52;    // ~30 degrees in radians
-    var _HEAD_PITCH_LIMIT = 0.26;  // ~15 degrees in radians
-    var _CANVAS_SIZE = 128;
-    var _MAGENTA = { r: 1, g: 0, b: 1 }; // Fallback color for invalid hex strings
+    var _HEAD_YAW_LIMIT = 0.52;
+    var _HEAD_PITCH_LIMIT = 0.26;
+    var _CANVAS_WIDTH = 128;
+    var _CANVAS_HEIGHT = 180;
+    var _MAGENTA = { r: 1, g: 0, b: 1 };
 
     /**
      * PaperdollRenderer — Renders a 3D player entity over the inventory paperdoll slot.
@@ -485,11 +432,13 @@
         this._lastTransforms = {};
         this._headOverride = { yaw: 0, pitch: 0 };
 
-        // Camera (fixed front-facing view)
-        this._camPos = { x: 0, y: 1.2, z: 3.5 };
-        this._camTarget = { x: 0, y: 0.9, z: 0 };
-        this._fov = 50;
-        this._aspect = 1;
+        // Camera (fixed front-facing view).
+        // Adjusted for 128×180 canvas and 1.5× larger entity (height ≈ 2.7).
+        // Entity center ≈ y=1.35; camera target centered on entity body.
+        this._camPos = { x: 0, y: 1.35, z: 5.0 };
+        this._camTarget = { x: 0, y: 1.2, z: 0 };
+        this._fov = 45;
+        this._aspect = _CANVAS_WIDTH / _CANVAS_HEIGHT;
 
         // Entity
         this._entity = null;
@@ -527,7 +476,6 @@
         var gl = this._gl;
         if (!gl) return false;
 
-        // Vertex shader: transforms vertices and passes normals/depth to fragment shader.
         var vsSource = [
             'attribute vec3 aPosition;',
             'attribute vec3 aNormal;',
@@ -543,7 +491,6 @@
             '}'
         ].join('\n');
 
-        // Fragment shader: flat color with diffuse lighting and distance fog.
         var fsSource = [
             'precision mediump float;',
             'varying vec3 vNormal;',
@@ -573,6 +520,7 @@
         gl.linkProgram(program);
 
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('[PaperdollRenderer] Shader program link failed:', gl.getProgramInfoLog(program));
             return false;
         }
 
@@ -599,12 +547,19 @@
      */
     Donkeycraft.PaperdollRenderer.prototype._compileShader = function (type, source) {
         var gl = this._gl;
+        if (!gl) return null;
+
         var shader = gl.createShader(type);
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
+
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            var typeStr = type === gl.VERTEX_SHADER ? 'vertex' : 'fragment';
+            console.error('[PaperdollRenderer] ' + typeStr + ' shader compilation failed:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
             return null;
         }
+
         return shader;
     };
 
@@ -624,19 +579,20 @@
         this._canvas = document.createElement('canvas');
         this._canvas.id = 'dk-paperdoll-canvas';
 
-        // Size the canvas to match the CSS paperdoll container dimensions.
-        var size = this._CANVAS_SIZE;
+        // Use separate width/height constants for 128×180 canvas.
+        // Position canvas at bottom of container so entity feet (Y=0) align near the bottom.
         this._canvas.style.position = 'absolute';
         this._canvas.style.left = '0px';
-        this._canvas.style.top = '0px';
-        this._canvas.style.width = size + 'px';
-        this._canvas.style.height = size + 'px';
+        this._canvas.style.bottom = '0px';
+        this._canvas.style.top = 'auto';
+        this._canvas.style.width = _CANVAS_WIDTH + 'px';
+        this._canvas.style.height = _CANVAS_HEIGHT + 'px';
         this._canvas.style.pointerEvents = 'none';
         this._canvas.style.zIndex = '1';
 
-        // Set explicit pixel dimensions for WebGL rendering.
-        this._canvas.width = size;
-        this._canvas.height = size;
+        // Set pixel dimensions to match CSS size.
+        this._canvas.width = _CANVAS_WIDTH;
+        this._canvas.height = _CANVAS_HEIGHT;
 
         this._container.appendChild(this._canvas);
 
@@ -647,10 +603,14 @@
                 premultipliedAlpha: false
             });
         } catch (e) {
+            console.error('[PaperdollRenderer] WebGL context creation failed:', e.message || e);
             return false;
         }
 
-        if (!this._gl) return false;
+        if (!this._gl) {
+            console.error('[PaperdollRenderer] WebGL context is null');
+            return false;
+        }
 
         this._gl.viewport(0, 0, this._canvas.width, this._canvas.height);
         this._aspect = this._canvas.width / this._canvas.height;
@@ -663,18 +623,26 @@
      *
      * The returned entity conforms to the render loop interface:
      * `getPosition()`, `getRotation()`, `getDimensions()`, `isAlive()`, `getBones()`, `getBoneTransforms()`.
-     * Position/rotation objects are frozen for immutability.
      *
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._createEntity = function () {
         var self = this;
+
+        // Position entity so feet sit at Y=0 (bottom of container).
+        // Entity height is 1.5× larger, total height ≈ 2.7.
+        self._pos = { x: 0, y: 0, z: 0 };
+        // yaw = 0: entity faces +Z toward camera. With symmetric box meshes,
+        // yaw=π would swap left/right arms making it look like the back.
+        self._rot = { yaw: 0, pitch: 0 };
+
+        // Scale factor for 1.5× larger entity.
+        var S = 1.5;
+
         this._entity = {
             type: 'player',
-            _pos: Object.freeze({ x: 0, y: 0.9, z: 0 }),
-            _rot: Object.freeze({ yaw: 0, pitch: 0 }),
-            _width: 0.6,
-            _height: 1.8,
+            _width: 0.6 * S,   // 0.9
+            _height: 1.8 * S,   // 2.7
 
             getPosition: function () { return self._pos; },
             getRotation: function () { return self._rot; },
@@ -683,12 +651,12 @@
 
             getBones: function () {
                 return [
-                    { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#3366CC', offset: { x: 0, y: 0.85, z: 0 } },
-                    { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
-                    { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#3366CC', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-                    { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
-                    { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#336969', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
+                    { name: 'body',  meshType: 'box', dimensions: { w: 0.6 * S, h: 0.9 * S, d: 0.3 * S }, color: '#3366CC', offset: { x: 0, y: 0.85 * S, z: 0 } },
+                    { name: 'head',  meshType: 'box', dimensions: { w: 0.5 * S, h: 0.5 * S, d: 0.5 * S }, color: '#FFCC99', offset: { x: 0, y: 1.55 * S, z: 0 } },
+                    { name: 'leftArm',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#FFCC99', offset: { x: -0.42 * S, y: 0.9 * S, z: 0 }, pivot: { x: 0, y: 0.4 * S, z: 0 } },
+                    { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.8 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.42 * S, y: 0.9 * S, z: 0 }, pivot: { x: 0, y: 0.4 * S, z: 0 } },
+                    { name: 'leftLeg',  meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: -0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: 0, y: 0.45 * S, z: 0 } },
+                    { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#336969', offset: { x: 0.15 * S, y: 0.45 * S, z: 0 }, pivot: { x: 0, y: 0.45 * S, z: 0 } }
                 ];
             },
 
@@ -712,33 +680,33 @@
         var hw = w / 2, hh = h / 2, hd = d / 2;
         var verts = new Float32Array([
             -hw, -hh, hd, 0, 0, 1, 0, 0,
-             hw, -hh, hd, 0, 0, 1, 1, 0,
-             hw,  hh, hd, 0, 0, 1, 1, 1,
-            -hw,  hh, hd, 0, 0, 1, 0, 1,
-             hw, -hh, -hd, 0, 0,-1, 0, 0,
-            -hw, -hh, -hd, 0, 0,-1, 1, 0,
-            -hw,  hh, -hd, 0, 0,-1, 1, 1,
-             hw,  hh, -hd, 0, 0,-1, 0, 1,
-            -hw,  hh, hd, 0, 1, 0, 0, 0,
-             hw,  hh, hd, 0, 1, 0, 1, 0,
-             hw,  hh, -hd, 0, 1, 0, 1, 1,
-            -hw,  hh, -hd, 0, 1, 0, 0, 1,
-            -hw, -hh, -hd, 0,-1, 0, 0, 0,
-             hw, -hh, -hd, 0,-1, 0, 1, 0,
-             hw, -hh, hd, 0,-1, 0, 1, 1,
-            -hw, -hh, hd, 0,-1, 0, 0, 1,
-             hw, -hh, hd, 1, 0, 0, 0, 0,
-             hw, -hh, -hd, 1, 0, 0, 1, 0,
-             hw,  hh, -hd, 1, 0, 0, 1, 1,
-             hw,  hh, hd, 1, 0, 0, 0, 1,
-            -hw, -hh, -hd,-1, 0, 0, 0, 0,
-            -hw, -hh, hd,-1, 0, 0, 1, 0,
-            -hw,  hh, hd,-1, 0, 0, 1, 1,
-            -hw,  hh, -hd,-1, 0, 0, 0, 1
+            hw, -hh, hd, 0, 0, 1, 1, 0,
+            hw, hh, hd, 0, 0, 1, 1, 1,
+            -hw, hh, hd, 0, 0, 1, 0, 1,
+            hw, -hh, -hd, 0, 0, -1, 0, 0,
+            -hw, -hh, -hd, 0, 0, -1, 1, 0,
+            -hw, hh, -hd, 0, 0, -1, 1, 1,
+            hw, hh, -hd, 0, 0, -1, 0, 1,
+            -hw, hh, hd, 0, 1, 0, 0, 0,
+            hw, hh, hd, 0, 1, 0, 1, 0,
+            hw, hh, -hd, 0, 1, 0, 1, 1,
+            -hw, hh, -hd, 0, 1, 0, 0, 1,
+            -hw, -hh, -hd, 0, -1, 0, 0, 0,
+            hw, -hh, -hd, 0, -1, 0, 1, 0,
+            hw, -hh, hd, 0, -1, 0, 1, 1,
+            -hw, -hh, hd, 0, -1, 0, 0, 1,
+            hw, -hh, hd, 1, 0, 0, 0, 0,
+            hw, -hh, -hd, 1, 0, 0, 1, 0,
+            hw, hh, -hd, 1, 0, 0, 1, 1,
+            hw, hh, hd, 1, 0, 0, 0, 1,
+            -hw, -hh, -hd, -1, 0, 0, 0, 0,
+            -hw, -hh, hd, -1, 0, 0, 1, 0,
+            -hw, hh, hd, -1, 0, 0, 1, 1,
+            -hw, hh, -hd, -1, 0, 0, 0, 1
         ]);
         var idx = new Uint16Array([
-            0,1,2,0,2,3, 4,5,6,4,6,7, 8,9,10,8,10,11,
-            12,13,14,12,14,15, 16,17,18,16,18,19, 20,21,22,20,22,23
+            0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23
         ]);
         return { vertices: verts, indices: idx, count: idx.length };
     };
@@ -757,15 +725,34 @@
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._getOrBuildMesh = function (w, h, d) {
+        if (!this._gl || this._contextLost) return null;
+
         var key = 'box:' + w.toFixed(2) + ':' + h.toFixed(2) + ':' + d.toFixed(2);
         if (this._meshCache[key]) return this._meshCache[key];
 
         var gl = this._gl;
         var mesh = this._createBoxMesh(w, h, d);
+
+        if (!mesh.vertices || mesh.vertices.length === 0 ||
+            !mesh.indices || mesh.indices.length === 0) {
+            console.warn('[PaperdollRenderer] Empty mesh data for key "' + key + '"');
+            return null;
+        }
+
         var vbo = gl.createBuffer();
+        if (!vbo) {
+            console.warn('[PaperdollRenderer] gl.createBuffer() failed — context may be lost');
+            return null;
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
         gl.bufferData(gl.ARRAY_BUFFER, mesh.vertices, gl.STATIC_DRAW);
+
         var ibo = gl.createBuffer();
+        if (!ibo) {
+            console.warn('[PaperdollRenderer] gl.createBuffer() failed for IBO — context may be lost');
+            gl.deleteBuffer(vbo);
+            return null;
+        }
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
 
@@ -773,16 +760,16 @@
         return this._meshCache[key];
     };
 
-
-
     /**
-     * _drawMesh — Issue an indexed draw call for a cached mesh.
+     * _drawMesh — Issue a draw call for a cached mesh with world transform and color.
      *
      * Sets the shader program, model matrix, flat color (parsed from hex),
      * binds vertex attributes, and calls `gl.drawElements`.
      *
+     * Accepts either a raw Float32Array or a Matrix4 object with a `.getData()` method.
+     *
      * @param {{vbo: WebGLBuffer, ibo: WebGLBuffer, count: number, stride: number}} cache - Mesh cache entry.
-     * @param {Float32Array} modelMatrix - 4×4 model matrix.
+     * @param {Float32Array|Object} modelMatrix - 4×4 model matrix (raw Float32Array or Matrix4 object).
      * @param {string} color - Hex color string (e.g., '#3366CC').
      * @returns {boolean} True if the draw call succeeded.
      * @private
@@ -791,20 +778,26 @@
         var gl = this._gl;
         if (!gl || !cache) return false;
 
+        // Extract raw Float32Array from Matrix4 object if needed.
+        var matrixData = modelMatrix;
+        if (modelMatrix && typeof modelMatrix.getData === 'function') {
+            matrixData = modelMatrix.getData();
+        }
+
         gl.useProgram(this._shaderProgram);
-        gl.uniformMatrix4fv(this._uModel, false, modelMatrix);
+        gl.uniformMatrix4fv(this._uModel, false, matrixData);
 
         // Parse hex color (#RRGGBB or #RGB).
         var hex = color.substring(1);
         var r, g, b;
         if (hex.length === 6) {
-            r = parseInt(hex.substr(0,2),16)/255;
-            g = parseInt(hex.substr(2,2),16)/255;
-            b = parseInt(hex.substr(4,2),16)/255;
+            r = parseInt(hex.substr(0, 2), 16) / 255;
+            g = parseInt(hex.substr(2, 2), 16) / 255;
+            b = parseInt(hex.substr(4, 2), 16) / 255;
         } else if (hex.length === 3) {
-            r = parseInt(hex.charAt(0)+hex.charAt(0),16)/255;
-            g = parseInt(hex.charAt(1)+hex.charAt(1),16)/255;
-            b = parseInt(hex.charAt(2)+hex.charAt(2),16)/255;
+            r = parseInt(hex.charAt(0) + hex.charAt(0), 16) / 255;
+            g = parseInt(hex.charAt(1) + hex.charAt(1), 16) / 255;
+            b = parseInt(hex.charAt(2) + hex.charAt(2), 16) / 255;
         } else {
             r = _MAGENTA.r; g = _MAGENTA.g; b = _MAGENTA.b;
         }
@@ -839,38 +832,31 @@
 
         switch (this._animState) {
             case 'idle': {
-                // Subtle breathing: body oscillates slightly
-                transforms.body = { rx: 0, ry: Math.sin(t * 0.8) * 0.05, rz: 0 };
-                // Head sway
-                transforms.head = { rx: Math.sin(t * 0.6) * 0.03, ry: Math.sin(t * 0.5) * 0.08, rz: 0 };
-                // Arms slight sway
-                transforms.leftArm = { rx: 0, ry: Math.sin(t * 0.7) * 0.04, rz: 0 };
-                transforms.rightArm = { rx: 0, ry: Math.sin(t * 0.7 + 1) * 0.04, rz: 0 };
-                // Legs mostly still
-                transforms.leftLeg = { rx: 0, ry: Math.sin(t * 0.5) * 0.03, rz: 0 };
-                transforms.rightLeg = { rx: 0, ry: Math.sin(t * 0.5 + 0.5) * 0.03, rz: 0 };
+                // Subtle breathing: body oscillates slightly, arms sway gently
+                transforms.body = { rx: 0, ry: Math.sin(t * 0.8) * 0.15, rz: 0 };
+                transforms.head = { rx: Math.sin(t * 0.6) * 0.08, ry: Math.sin(t * 0.5) * 0.2, rz: 0 };
+                transforms.leftArm = { rx: Math.sin(t * 0.7) * 0.1, ry: 0, rz: 0 };
+                transforms.rightArm = { rx: Math.sin(t * 0.7 + 1) * 0.1, ry: 0, rz: 0 };
+                transforms.leftLeg = { rx: 0, ry: Math.sin(t * 0.5) * 0.05, rz: 0 };
+                transforms.rightLeg = { rx: 0, ry: Math.sin(t * 0.5 + 0.5) * 0.05, rz: 0 };
                 break;
             }
             case 'walk': {
                 var walkSpeed = 2.5;
-                var swingAmount = 0.4;
-                // Body slight lean
-                transforms.body = { rx: 0.05, ry: Math.sin(t * walkSpeed) * 0.05, rz: 0 };
-                // Head stable
-                transforms.head = { rx: 0, ry: Math.sin(t * walkSpeed) * 0.03, rz: 0 };
-                // Arms swing opposite to legs
+                var swingAmount = 0.6;
+                transforms.body = { rx: 0.05, ry: Math.sin(t * walkSpeed) * 0.1, rz: 0 };
+                transforms.head = { rx: 0, ry: Math.sin(t * walkSpeed) * 0.08, rz: 0 };
                 transforms.leftArm = { rx: -Math.sin(t * walkSpeed) * swingAmount, ry: 0, rz: 0 };
                 transforms.rightArm = { rx: Math.sin(t * walkSpeed) * swingAmount, ry: 0, rz: 0 };
-                // Legs swing
                 transforms.leftLeg = { rx: Math.sin(t * walkSpeed) * swingAmount, ry: 0, rz: 0 };
                 transforms.rightLeg = { rx: -Math.sin(t * walkSpeed) * swingAmount, ry: 0, rz: 0 };
                 break;
             }
             case 'run': {
                 var runSpeed = 4.5;
-                var runSwing = 0.7;
-                transforms.body = { rx: 0.15, ry: Math.sin(t * runSpeed) * 0.08, rz: 0 };
-                transforms.head = { rx: -0.1, ry: Math.sin(t * runSpeed) * 0.06, rz: 0 };
+                var runSwing = 1.0;
+                transforms.body = { rx: 0.2, ry: Math.sin(t * runSpeed) * 0.15, rz: 0 };
+                transforms.head = { rx: -0.15, ry: Math.sin(t * runSpeed) * 0.1, rz: 0 };
                 transforms.leftArm = { rx: -Math.sin(t * runSpeed) * runSwing, ry: 0, rz: 0 };
                 transforms.rightArm = { rx: Math.sin(t * runSpeed) * runSwing, ry: 0, rz: 0 };
                 transforms.leftLeg = { rx: Math.sin(t * runSpeed) * runSwing, ry: 0, rz: 0 };
@@ -882,7 +868,6 @@
                 transforms.body = { rx: 0, ry: -0.15, rz: 0 };
                 transforms.head = { rx: 0, ry: 0.1, rz: 0 };
                 transforms.leftArm = { rx: 0, ry: 0, rz: 0 };
-                // Right arm waves
                 transforms.rightArm = { rx: -2.5 + waveCycle * 0.3, ry: 0.5 + waveCycle * 0.4, rz: 0.3 };
                 transforms.leftLeg = { rx: 0, ry: 0, rz: 0 };
                 transforms.rightLeg = { rx: 0, ry: 0, rz: 0 };
@@ -890,17 +875,17 @@
             }
         }
 
-        // Apply head tracking override when mouse is inside panel
-        if (this._mouseInside && !this._paused) {
-            var headBase = transforms.head || { rx: 0, ry: 0, rz: 0 };
+        // Apply head tracking override when mouse is inside container.
+        // Head tracking REPLACES the animation's yaw/pitch — the head should
+        // point toward the mouse, not spin on top of the idle animation.
+        if (this._mouseInside) {
             transforms.head = {
-                rx: headBase.rx + this._headOverride.pitch,
-                ry: headBase.ry + this._headOverride.yaw,
-                rz: headBase.rz
+                rx: this._headOverride.pitch,  // pitch from mouse Y
+                ry: this._headOverride.yaw,    // yaw from mouse X
+                rz: 0
             };
         }
 
-        // Store last transforms for pause/resume
         this._lastTransforms = transforms;
         return transforms;
     };
@@ -935,7 +920,6 @@
         this._stateTimer -= dt;
 
         if (this._stateTimer <= 0) {
-            // Random state transition
             var states = ['idle', 'walk', 'run', 'wave'];
             var weights = [0.4, 0.25, 0.15, 0.2];
             var r = Math.random();
@@ -948,13 +932,8 @@
                     break;
                 }
             }
-            if (newState !== this._animState) {
-                this._animState = newState;
-                this._stateTimer = 2 + Math.random() * 3; // 2-5 seconds per state
-            } else {
-                // Stay in same state, just reset timer
-                this._stateTimer = 2 + Math.random() * 3;
-            }
+            this._animState = newState;
+            this._stateTimer = 2 + Math.random() * 3;
         }
     };
 
@@ -962,9 +941,6 @@
      * _renderFrame — Render a single animation frame.
      *
      * Updates animation state, computes bone transforms, and draws all entity bones.
-     * The animation loop continues via `requestAnimationFrame` at the end of each frame
-     * (within try-finally), even if rendering fails due to missing context or entity data.
-     *
      * When `_running` is false (e.g., after `destroy()` was called), the render loop
      * exits immediately without scheduling another frame.
      *
@@ -975,88 +951,94 @@
 
         var gl = this._gl;
 
+        // Calculate delta time and advance animation state every frame.
+        if (this._lastFrameTime === 0) this._lastFrameTime = timestamp;
+        var dt = Math.min((timestamp - this._lastFrameTime) / 1000, 0.1);
+        this._lastFrameTime = timestamp;
+
+        // Always compute bone transforms (even when paused, for stable render).
+        this._updateAnimationState(dt);
+        var transforms = this._computeBoneTransforms(dt);
+
+        if (!gl || !this._shaderProgram) {
+            // Context lost or shader not ready — keep animating without rendering.
+            this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
+            return;
+        }
+
         try {
-            // Calculate delta time and advance animation state every frame.
-            if (this._lastFrameTime === 0) this._lastFrameTime = timestamp;
-            var dt = Math.min((timestamp - this._lastFrameTime) / 1000, 0.1);
-            this._lastFrameTime = timestamp;
+            gl.useProgram(this._shaderProgram);
 
-            // Skip rendering if WebGL context is unavailable, but keep animating.
-            if (gl) {
-                gl.useProgram(this._shaderProgram);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
+            gl.enable(gl.CULL_FACE);
+            gl.cullFace(gl.BACK);
 
-                // Update animation state and compute bone transforms.
-                this._updateAnimationState(dt);
-                var transforms = this._entity ? this._entity.getBoneTransforms() : {};
+            // Set up projection and view matrices using Donkeycraft.Matrix4.
+            if (!Donkeycraft.Matrix4 || !Donkeycraft.Vector3) {
+                throw new Error('Donkeycraft.Matrix4 or Vector3 not available');
+            }
 
-                // Clear and set up rendering state.
-                gl.clearColor(0, 0, 0, 0);
-                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-                gl.enable(gl.DEPTH_TEST);
-                gl.enable(gl.CULL_FACE);
-                gl.cullFace(gl.BACK);
+            var proj = Donkeycraft.Matrix4.createPerspective(this._fov * Math.PI / 180, this._aspect, 0.1, 100);
+            var view = Donkeycraft.Matrix4.createLookAt(
+                new Donkeycraft.Vector3(this._camPos.x, this._camPos.y, this._camPos.z),
+                new Donkeycraft.Vector3(this._camTarget.x, this._camTarget.y, this._camTarget.z),
+                new Donkeycraft.Vector3(0, 1, 0)
+            );
 
-                // Set up projection and view matrices using Donkeycraft.Matrix4.
-                var proj = Donkeycraft.Matrix4.createPerspective(this._fov * Math.PI / 180, this._aspect, 0.1, 100);
-                var view = Donkeycraft.Matrix4.createLookAt(
-                    new Donkeycraft.Vector3(this._camPos.x, this._camPos.y, this._camPos.z),
-                    new Donkeycraft.Vector3(this._camTarget.x, this._camTarget.y, this._camTarget.z),
-                    new Donkeycraft.Vector3(0, 1, 0)
-                );
+            gl.uniformMatrix4fv(this._uProjection, false, proj.getData());
+            gl.uniformMatrix4fv(this._uView, false, view.getData());
+            gl.uniform3f(this._uFogColor, 0.53, 0.8, 0.97);
+            gl.uniform1f(this._uFogDensity, 0.02);
 
-                gl.uniformMatrix4fv(this._uProjection, false, proj.getData());
-                gl.uniformMatrix4fv(this._uView, false, view.getData());
-                gl.uniform3f(this._uFogColor, 0.53, 0.8, 0.97);
-                gl.uniform1f(this._uFogDensity, 0.02);
+            // Draw each bone if entity is available.
+            var entity = this._entity;
+            if (entity) {
+                var pos = entity.getPosition && entity.getPosition();
+                if (pos) {
+                    var bones = entity.getBones();
+                    if (bones) {
+                        for (var i = 0; i < bones.length; i++) {
+                            var bone = bones[i];
 
-                // Draw each bone if entity is available.
-                var entity = this._entity;
-                if (entity) {
-                    var pos = entity.getPosition && entity.getPosition();
-                    if (pos) {
-                        var bones = entity.getBones();
-                        if (bones) {
-                            for (var i = 0; i < bones.length; i++) {
-                                var bone = bones[i];
-                                var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
-                                var offset = bone.offset || { x: 0, y: 0, z: 0 };
+                            // Always have a transform — use computed or default.
+                            var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
+                            var offset = bone.offset || { x: 0, y: 0, z: 0 };
 
-                                // Apply entity yaw to offset for correct world positioning.
-                                var rot = entity.getRotation();
-                                var yaw = rot && rot.yaw !== undefined ? rot.yaw : 0;
-                                var cosYaw = Math.cos(yaw);
-                                var sinYaw = Math.sin(yaw);
-                                var localX = offset.x * cosYaw - offset.z * sinYaw;
-                                var localZ = offset.x * sinYaw + offset.z * cosYaw;
-                                var localY = offset.y;
+                            var rot = entity.getRotation();
+                            var yaw = rot && rot.yaw !== undefined ? rot.yaw : 0;
+                            var cosYaw = Math.cos(yaw);
+                            var sinYaw = Math.sin(yaw);
+                            var localX = offset.x * cosYaw - offset.z * sinYaw;
+                            var localZ = offset.x * sinYaw + offset.z * cosYaw;
+                            var localY = offset.y;
 
-                                // Build model matrix using Donkeycraft.Matrix4 (YXZ rotation order).
-                                var modelMatrix = Donkeycraft.Matrix4.createIdentity();
-                                if (transform.ry !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
-                                if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
-                                if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
-                                modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createTranslation(pos.x + localX, pos.y + localY, pos.z + localZ));
+                            var modelMatrix = Donkeycraft.Matrix4.createIdentity();
+                            if (transform.ry !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
+                            if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
+                            if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
+                            modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createTranslation(pos.x + localX, pos.y + localY, pos.z + localZ));
 
-                                var meshCache = this._getOrBuildMesh(
-                                    bone.dimensions.w || 1,
-                                    bone.dimensions.h || 1,
-                                    bone.dimensions.d || 1
-                                );
+                            var meshCache = this._getOrBuildMesh(
+                                bone.dimensions.w || 1,
+                                bone.dimensions.h || 1,
+                                bone.dimensions.d || 1
+                            );
 
-                                if (meshCache) {
-                                    this._drawMesh(meshCache, modelMatrix, bone.color || '#FF00FF');
-                                }
+                            if (meshCache) {
+                                this._drawMesh(meshCache, modelMatrix, bone.color || '#FF00FF');
                             }
                         }
                     }
                 }
             }
         } catch (e) {
-            // Silently swallow rendering errors to prevent them from breaking the animation loop.
-        } finally {
-            // Always request the next frame — this ensures the render loop never dies.
-            this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
+            console.error('[PaperdollRenderer] Render error:', e.message || e);
         }
+
+        // Request next frame.
+        this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
     };
 
     /**
@@ -1068,18 +1050,26 @@
      * @returns {boolean} True if initialization succeeded (or was already initialized).
      */
     Donkeycraft.PaperdollRenderer.prototype.init = function () {
-        // Guard: already running — avoid double-init.
         if (this._running) return true;
 
-        if (!this._container) return false;
-        if (!this._createCanvas()) return false;
-        if (!this._createShaderProgram()) return false;
-        this._createEntity();
+        if (!this._container) {
+            console.error('[PaperdollRenderer] No container element provided');
+            return false;
+        }
 
-        // Set up mouse hover detection on the panel.
+        if (!this._createCanvas()) {
+            console.error('[PaperdollRenderer] Canvas creation failed');
+            return false;
+        }
+
+        if (!this._createShaderProgram()) {
+            console.error('[PaperdollRenderer] Shader program creation failed');
+            return false;
+        }
+
+        this._createEntity();
         this._setupHoverDetection();
 
-        // Start render loop.
         this._running = true;
         this._lastFrameTime = 0;
         this._rafId = requestAnimationFrame(this._renderFrame.bind(this));
@@ -1094,20 +1084,41 @@
      * On mouse leave, resumes animation and notifies subscribers.
      * On mouse move within the panel, updates head tracking override for yaw/pitch.
      *
-     * Handler references are stored in `_hoverHandlers` so they can be removed
-     * during `destroy()` to prevent memory leaks and stale callback invocations.
-     *
      * @private
      */
     Donkeycraft.PaperdollRenderer.prototype._setupHoverDetection = function () {
-        var panel = document.querySelector('.dk-inventory-panel');
-        if (!panel) return;
-
         var self = this;
+
+        // Find the inventory panel and paperdoll container.
+        var panel = document.querySelector('.dk-inventory-panel');
+        var container = this._container;
+        if (!panel || !container) return;
+
+        // Head tracking: map mouse position within the paperdoll container to head rotation.
+        // The _HEAD_YAW_LIMIT (0.52 rad ≈ 30°) and _HEAD_PITCH_LIMIT (0.26 rad ≈ 15°) define
+        // the maximum head rotation. Mouse X maps to yaw (left/right), mouse Y maps to pitch (up/down).
+        var globalMouseMove = function (e) {
+            if (!self._mouseInside) return;
+            var cRect = container.getBoundingClientRect();
+            if (!cRect) return;
+
+            // Normalize mouse position relative to the container.
+            // Clamp to [-1, 1] so that even when the mouse is at the panel edges
+            // (outside the container), the head rotation stays within the configured limits.
+            var mx = Math.max(-1, Math.min(1, ((e.clientX - cRect.left) / cRect.width) * 2 - 1));
+            var my = Math.max(-1, Math.min(1, ((e.clientY - cRect.top) / cRect.height) * 2 - 1));
+
+            // Map to head rotation limits: max ~30° yaw, ~15° pitch.
+            self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
+            self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
+        };
 
         var handleEnter = function () {
             self._mouseInside = true;
+            // Pause animation state updates (but keep rendering).
             self.pause();
+            // Start listening to global mouse move for head tracking.
+            document.addEventListener('mousemove', globalMouseMove);
             for (var i = 0; i < self._onHoverChange.length; i++) {
                 try { self._onHoverChange[i](true); } catch (e) { }
             }
@@ -1116,28 +1127,22 @@
         var handleLeave = function () {
             self._mouseInside = false;
             self.resume();
+            // Stop listening to global mouse move.
+            document.removeEventListener('mousemove', globalMouseMove);
+            // Clear head override so head returns to neutral.
+            self._headOverride.yaw = 0;
+            self._headOverride.pitch = 0;
             for (var i = 0; i < self._onHoverChange.length; i++) {
                 try { self._onHoverChange[i](false); } catch (e) { }
             }
         };
 
-        var handleMouseMove = function (e) {
-            if (!self._mouseInside) return;
-            var rect = self._container.getBoundingClientRect();
-            if (!rect) return;
-            // Normalize mouse position to [-1, 1] relative to container center.
-            var mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            var my = ((e.clientY - rect.top) / rect.height) * 2 - 1;
-            // Map to head rotation limits (module-level constants).
-            self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
-            self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
-        };
+        this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: globalMouseMove };
 
-        this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: handleMouseMove };
-
+        // Attach enter/leave to the inventory panel so head tracking works
+        // whenever the mouse is anywhere over the panel, not just the canvas.
         panel.addEventListener('mouseenter', handleEnter);
         panel.addEventListener('mouseleave', handleLeave);
-        panel.addEventListener('mousemove', handleMouseMove);
     };
 
     /**
@@ -1170,7 +1175,6 @@
      * @param {number} y - Normalized Y position in [-1, 1] (-1 = top, 1 = bottom).
      */
     Donkeycraft.PaperdollRenderer.prototype.setMouseTrack = function (x, y) {
-        // Clamp input to [-1, 1].
         var cx = Math.max(-1, Math.min(1, x));
         var cy = Math.max(-1, Math.min(1, y));
         this._headOverride.yaw = cx * _HEAD_YAW_LIMIT;
@@ -1211,7 +1215,6 @@
      * to prevent memory leaks and stale callback invocations.
      */
     Donkeycraft.PaperdollRenderer.prototype.destroy = function () {
-        // Signal the render loop to stop at the top of _renderFrame.
         this._running = false;
 
         if (this._rafId) {
@@ -1273,22 +1276,18 @@
      * Note: This is the InventoryUI.destroy(), not PaperdollRenderer.destroy().
      */
     Donkeycraft.InventoryUI.prototype.destroy = function () {
-        // Close panel if open
         if (this._open) {
             this.close();
         }
 
-        // Remove panel from DOM
         if (this._panelEl && this._panelEl.parentNode) {
             this._panelEl.parentNode.removeChild(this._panelEl);
         }
 
-        // Remove toggle button
         if (this._toggleBtnEl && this._toggleBtnEl.parentNode) {
             this._toggleBtnEl.parentNode.removeChild(this._toggleBtnEl);
         }
 
-        // Clear subscriptions
         this._subscriptions = {};
         this._playerInventory = null;
         this._backpackInventory = null;
