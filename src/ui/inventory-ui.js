@@ -1153,18 +1153,24 @@
                             if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
                             if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
 
-                            // For bones with pivot, translate so the pivot point is at the rotation origin.
+                            // For bones with pivot, compute effective translation: bw - R * pivotOffset
                             // This ensures rotation happens around the joint (hip/shoulder), not the mesh center.
                             if (bone.pivot) {
-                                modelMatrix._data[12] -= ((bone.pivot.x || 0) - (bone.offset.x || 0));
-                                modelMatrix._data[13] -= ((bone.pivot.y || 0) - (bone.offset.y || 0));
-                                modelMatrix._data[14] -= ((bone.pivot.z || 0) - (bone.offset.z || 0));
+                                var px = (bone.pivot.x || 0) - (bone.offset.x || 0);
+                                var py = (bone.pivot.y || 0) - (bone.offset.y || 0);
+                                var pz = (bone.pivot.z || 0) - (bone.offset.z || 0);
+                                var d = modelMatrix._data;
+                                var rpx = px * d[0] + py * d[4] + pz * d[8];
+                                var rpy = px * d[1] + py * d[5] + pz * d[9];
+                                var rpz = px * d[2] + py * d[6] + pz * d[10];
+                                modelMatrix._data[12] = bw.x - rpx;
+                                modelMatrix._data[13] = bw.y - rpy;
+                                modelMatrix._data[14] = bw.z - rpz;
+                            } else {
+                                modelMatrix._data[12] = bw.x;
+                                modelMatrix._data[13] = bw.y;
+                                modelMatrix._data[14] = bw.z;
                             }
-
-                            // Set translation directly on matrix data (matches EntityRenderer behavior).
-                            modelMatrix._data[12] = bw.x + modelMatrix._data[12];
-                            modelMatrix._data[13] = bw.y + modelMatrix._data[13];
-                            modelMatrix._data[14] = bw.z + modelMatrix._data[14];
 
                             var meshCache = this._getOrBuildMesh(
                                 bone.dimensions.w || 1,
