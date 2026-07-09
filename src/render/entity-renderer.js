@@ -333,18 +333,24 @@
         player: [
             { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#3366CC', offset: { x: 0, y: 0.85, z: 0 } },
             { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#3366CC', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#336969', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
+            { name: 'leftEye', meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: -0.12, y: 1.65, z: 0.24 }, parent: 'head' },
+            { name: 'rightEye', meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: 0.12, y: 1.65, z: 0.24 }, parent: 'head' },
+            { name: 'hair', meshType: 'box', dimensions: { w: 0.54, h: 0.18, d: 0.52 }, color: '#4a3728', offset: { x: 0, y: 1.82, z: -0.02 }, parent: 'head' },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 1.15, z: 0 }, pivot: { x: -0.42, y: 1.25, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: 0.42, y: 1.15, z: 0 }, pivot: { x: 0.42, y: 1.25, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: -0.15, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#3366CC', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0.15, y: 0.45, z: 0 } }
         ],
         npc: [
             { name: 'body', meshType: 'box', dimensions: { w: 0.6, h: 0.9, d: 0.3 }, color: '#8B0000', offset: { x: 0, y: 0.85, z: 0 } },
             { name: 'head', meshType: 'box', dimensions: { w: 0.5, h: 0.5, d: 0.5 }, color: '#FFCC99', offset: { x: 0, y: 1.55, z: 0 } },
-            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#8B0000', offset: { x: 0.42, y: 0.9, z: 0 }, pivot: { x: 0, y: 0.4, z: 0 } },
-            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } },
-            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0, y: 0.45, z: 0 } }
+            { name: 'leftEye', meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: -0.12, y: 1.65, z: 0.24 }, parent: 'head' },
+            { name: 'rightEye', meshType: 'box', dimensions: { w: 0.08, h: 0.06, d: 0.08 }, color: '#1a1a2e', offset: { x: 0.12, y: 1.65, z: 0.24 }, parent: 'head' },
+            { name: 'hair', meshType: 'box', dimensions: { w: 0.54, h: 0.18, d: 0.52 }, color: '#2c1810', offset: { x: 0, y: 1.82, z: -0.02 }, parent: 'head' },
+            { name: 'leftArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: -0.42, y: 1.15, z: 0 }, pivot: { x: -0.42, y: 1.25, z: 0 } },
+            { name: 'rightArm', meshType: 'box', dimensions: { w: 0.25, h: 0.8, d: 0.25 }, color: '#FFCC99', offset: { x: 0.42, y: 1.15, z: 0 }, pivot: { x: 0.42, y: 1.25, z: 0 } },
+            { name: 'leftLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: -0.15, y: 0.45, z: 0 }, pivot: { x: -0.15, y: 0.45, z: 0 } },
+            { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25, h: 0.9, d: 0.25 }, color: '#8B0000', offset: { x: 0.15, y: 0.45, z: 0 }, pivot: { x: 0.15, y: 0.45, z: 0 } }
         ],
         door: [
             { name: 'doorPanel', meshType: 'box', dimensions: { w: 0.75, h: 1.8, d: 0.1 }, color: '#8B4513' }
@@ -550,6 +556,157 @@
     };
 
     /**
+     * _buildBoneHierarchy — Build a hierarchical bone transform map from root to leaves.
+     *
+     * Processes bones in topological order (root → children → grandchildren) so that each
+     * child bone's world transform is computed relative to its parent's world transform.
+     * This ensures correct skeletal animation where limb segments rotate around their joints.
+     *
+     * For parented bones (e.g., eyes/hair attached to head), the child's offset is computed
+     * relative to its parent bone's world position, and the child inherits the parent's
+     * animation rotation so it stays visually attached.
+     *
+     * World transform = entityPos + yawRotation × (offset) for root bones
+     * World transform = parentWorld + yawRotation × (childOffset - parentOffset) + parentAnimRot for children
+     *
+     * @param {Object} entity - Entity instance with getPosition(), getRotation(), getBones() methods.
+     * @param {Object.<string, {rx: number, ry: number, rz: number}>} boneTransforms - Bone rotation transforms from animation controller.
+     * @returns {Object.<string, {x: number, y: number, z: number, rx: number, ry: number, rz: number, pivot: Object|null}>} Bone world transforms keyed by bone name.
+     */
+    Donkeycraft.EntityRenderer.prototype._buildBoneHierarchy = function (entity, boneTransforms) {
+        var pos = entity.getPosition();
+        if (!pos) return {};
+
+        var rot = entity.getRotation();
+        var bones = entity.getBones();
+        if (!bones || !Array.isArray(bones)) return {};
+
+        // Build a Map: boneName → boneDef for O(1) lookup.
+        var boneMap = new Map();
+        for (var bi = 0; bi < bones.length; bi++) {
+            boneMap.set(bones[bi].name, bones[bi]);
+        }
+
+        // Separate root bones (no parent or parent not in skeleton) from child bones.
+        var rootBones = [];
+        var childBones = [];
+        for (var j = 0; j < bones.length; j++) {
+            var b = bones[j];
+            if (b.parent && boneMap.has(b.parent)) {
+                childBones.push(b);
+            } else {
+                rootBones.push(b);
+            }
+        }
+
+        // World transform cache: boneName → {x, y, z, rx, ry, rz, pivot}.
+        var worldTransforms = {};
+
+        // Entity yaw: use a local variable to avoid cross-entity contamination.
+        var entityYaw = rot ? rot.yaw : 0;
+
+        /**
+         * Apply YXZ rotation (yaw → pitch → roll) to a vector.
+         * @param {number} vx - X component.
+         * @param {number} vy - Y component.
+         * @param {number} vz - Z component.
+         * @param {number} rx - Pitch rotation in radians.
+         * @param {number} ry - Yaw rotation in radians.
+         * @param {number} rz - Roll rotation in radians.
+         * @returns {{x: number, y: number, z: number}} Rotated vector.
+         */
+        function applyRotToVec(vx, vy, vz, rx, ry, rz) {
+            // Y rotation (yaw)
+            var x1 = vx * Math.cos(ry) - vz * Math.sin(ry);
+            var z1 = vx * Math.sin(ry) + vz * Math.cos(ry);
+            var y1 = vy;
+            // X rotation (pitch)
+            var y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
+            var z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
+            var x2 = x1;
+            // Z rotation (roll)
+            var x3 = x2 * Math.cos(rz) - y2 * Math.sin(rz);
+            var y3 = x2 * Math.sin(rz) + y2 * Math.cos(rz);
+            var z3 = z2;
+            return { x: x3, y: y3, z: z3 };
+        }
+
+        /**
+         * Compute world transform for a bone given its parent's world transform (or entity origin).
+         * @param {Object} boneDef - Bone definition with offset, pivot, and optional parent.
+         * @param {Object|null} parentWorld - Parent bone's world transform, or null for root bones.
+         * @param {Object} boneAnim - Animation transform for this bone {rx, ry, rz}.
+         * @returns {{x: number, y: number, z: number, rx: number, ry: number, rz: number, pivot: Object|null}} World transform.
+         */
+        function computeBoneWorld(boneDef, parentWorld, boneAnim) {
+            // Skip if already computed (prevents infinite recursion).
+            if (worldTransforms[boneDef.name]) return worldTransforms[boneDef.name];
+
+            var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
+            var pivot = boneDef.pivot || null;
+
+            if (!parentWorld) {
+                // Root bone: transform is entity position + yaw-rotated bone offset.
+                var cosYaw = Math.cos(entityYaw);
+                var sinYaw = Math.sin(entityYaw);
+                return {
+                    x: pos.x + (offset.x * cosYaw - offset.z * sinYaw),
+                    y: pos.y + offset.y,
+                    z: pos.z + (offset.x * sinYaw + offset.z * cosYaw),
+                    rx: 0, ry: 0, rz: 0,
+                    pivot: pivot
+                };
+            }
+
+            // Child bone: position is parent world + yaw-rotated relative offset.
+            var px = parentWorld.x;
+            var py = parentWorld.y;
+            var pz = parentWorld.z;
+
+            // Compute relative offset in entity-local space, then apply yaw rotation.
+            var cosYaw2 = Math.cos(entityYaw);
+            var sinYaw2 = Math.sin(entityYaw);
+            var localOffsetX = offset.x * cosYaw2 - offset.z * sinYaw2;
+            var localOffsetZ = offset.x * sinYaw2 + offset.z * cosYaw2;
+            var localOffsetY = offset.y;
+
+            // Apply parent's animation rotation to the relative offset.
+            var parentAnim = parentWorld;
+            var rotated = applyRotToVec(
+                localOffsetX, localOffsetY, localOffsetZ,
+                parentAnim.rx || 0, parentAnim.ry || 0, parentAnim.rz || 0
+            );
+
+            return {
+                x: px + rotated.x,
+                y: py + rotated.y,
+                z: pz + rotated.z,
+                rx: boneAnim.rx != null ? Number(boneAnim.rx) : 0,
+                ry: boneAnim.ry != null ? Number(boneAnim.ry) : 0,
+                rz: boneAnim.rz != null ? Number(boneAnim.rz) : 0,
+                pivot: pivot
+            };
+        }
+
+        // Process root bones first (no parent).
+        for (var k = 0; k < rootBones.length; k++) {
+            var rb = rootBones[k];
+            var boneAnim = boneTransforms[rb.name] || { rx: 0, ry: 0, rz: 0 };
+            worldTransforms[rb.name] = computeBoneWorld(rb, null, boneAnim);
+        }
+
+        // Process child bones (topological order — parents already computed).
+        for (var m = 0; m < childBones.length; m++) {
+            var cb = childBones[m];
+            var parentWorld = worldTransforms[cb.parent] || null;
+            var boneAnim = boneTransforms[cb.name] || { rx: 0, ry: 0, rz: 0 };
+            worldTransforms[cb.name] = computeBoneWorld(cb, parentWorld, boneAnim);
+        }
+
+        return worldTransforms;
+    };
+
+    /**
      * _getOrBuildMesh — Get a cached mesh or build a new one for the given shape definition.
      * Creates WebGL buffers from the mesh geometry and caches them for reuse.
      * @private
@@ -617,135 +774,6 @@
         this._meshCache[key] = cached;
 
         return cached;
-    };
-
-    /**
-     * _buildBoneHierarchy — Build a hierarchical bone transform map from root to leaves.
-     *
-     * Processes bones in topological order (root → children → grandchildren) so that each
-     * child bone's world transform is computed relative to its parent's world transform.
-     * This ensures correct skeletal animation where limb segments rotate around their joints.
-     *
-     * World transform = parentWorldMatrix × entityYawRotation × boneLocalOffset × boneAnimationRotation
-     *
-     * @private
-     * @param {Object} entity - Entity instance with getPosition(), getRotation(), getBones() methods.
-     * @param {Object.<string, {rx: number, ry: number, rz: number}>} boneTransforms - Bone rotation transforms from animation controller.
-     * @returns {Object.<string, {x: number, y: number, z: number, rx: number, ry: number, rz: number, pivot: Object|null, parentWorld: Object|null}>} Bone world transforms keyed by bone name.
-     */
-    Donkeycraft.EntityRenderer.prototype._buildBoneHierarchy = function (entity, boneTransforms) {
-        var pos = entity.getPosition();
-        if (!pos) return {};
-
-        var rot = entity.getRotation();
-        var bones = entity.getBones();
-        if (!bones || !Array.isArray(bones)) return {};
-
-        // Build a Map: boneName → boneDef for O(1) lookup
-        var boneMap = new Map();
-        for (var bi = 0; bi < bones.length; bi++) {
-            boneMap.set(bones[bi].name, bones[bi]);
-        }
-
-        // Separate root bones (no parent or parent not in skeleton) from child bones
-        var rootBones = [];
-        var childBones = [];
-        for (var j = 0; j < bones.length; j++) {
-            var b = bones[j];
-            if (b.parent && boneMap.has(b.parent)) {
-                childBones.push(b);
-            } else {
-                rootBones.push(b);
-            }
-        }
-
-        // World transform cache: boneName → {x, y, z, rx, ry, rz, pivot}
-        var worldTransforms = {};
-
-        // Entity yaw: use a local variable to avoid cross-entity contamination
-        // when multiple entities render concurrently in the same frame.
-        var entityYaw = rot ? rot.yaw : 0;
-
-        // Helper: compute world transform for a bone given its parent's world transform (or entity origin)
-        function computeBoneWorld(boneDef, parentWorld, boneAnim) {
-            var offset = boneDef.offset || { x: 0, y: 0, z: 0 };
-            var pivot = boneDef.pivot || null;
-
-            // Use local entityYaw variable instead of instance property.
-            var yaw = entityYaw;
-
-            if (!parentWorld) {
-                // Root bone: transform is entity position + bone offset
-                var cosYaw = Math.cos(yaw);
-                var sinYaw = Math.sin(yaw);
-
-                var localOffsetX = offset.x * cosYaw - offset.z * sinYaw;
-                var localOffsetZ = offset.x * sinYaw + offset.z * cosYaw;
-                var localOffsetY = offset.y;
-
-                return {
-                    x: pos.x + localOffsetX,
-                    y: pos.y + localOffsetY,
-                    z: pos.z + localOffsetZ,
-                    rx: 0, ry: 0, rz: 0,
-                    pivot: pivot,
-                    parentWorld: null
-                };
-            }
-
-            // Child bone: position is parent world position + rotated offset
-            // The offset is in the parent's local space, so we rotate it by the parent's yaw-adjusted orientation
-            var px = parentWorld.x;
-            var py = parentWorld.y;
-            var pz = parentWorld.z;
-
-            // For hierarchical bones, the offset is relative to parent's local coordinate system.
-            // We apply entity yaw to the offset (same as root bone) since animation rotations
-            // are in entity-local space.
-            var cosYaw2 = Math.cos(yaw);
-            var sinYaw2 = Math.sin(yaw);
-
-            var localOffsetX = offset.x * cosYaw2 - offset.z * sinYaw2;
-            var localOffsetZ = offset.x * sinYaw2 + offset.z * cosYaw2;
-            var localOffsetY = offset.y;
-
-            var finalX = px + localOffsetX;
-            var finalY = py + localOffsetY;
-            var finalZ = pz + localOffsetZ;
-
-            // Use Number() with fallback to handle falsy animation values (0, null, undefined)
-            var animRx = boneAnim.rx != null ? Number(boneAnim.rx) : 0;
-            var animRy = boneAnim.ry != null ? Number(boneAnim.ry) : 0;
-            var animRz = boneAnim.rz != null ? Number(boneAnim.rz) : 0;
-
-            return {
-                x: finalX,
-                y: finalY,
-                z: finalZ,
-                rx: animRx,
-                ry: animRy,
-                rz: animRz,
-                pivot: pivot,
-                parentWorld: parentWorld
-            };
-        }
-
-        // Process root bones first
-        for (var k = 0; k < rootBones.length; k++) {
-            var rb = rootBones[k];
-            var boneAnim = boneTransforms[rb.name] || { rx: 0, ry: 0, rz: 0 };
-            worldTransforms[rb.name] = computeBoneWorld(rb, null, boneAnim);
-        }
-
-        // Process child bones (topological order — parents are already processed)
-        for (var m = 0; m < childBones.length; m++) {
-            var cb = childBones[m];
-            var parentWorld = worldTransforms[cb.parent];
-            var boneAnim = boneTransforms[cb.name] || { rx: 0, ry: 0, rz: 0 };
-            worldTransforms[cb.name] = computeBoneWorld(cb, parentWorld || null, boneAnim);
-        }
-
-        return worldTransforms;
     };
 
     /**
