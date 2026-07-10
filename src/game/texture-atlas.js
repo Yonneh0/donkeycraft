@@ -116,6 +116,86 @@
   };
 
   /**
+   * Load a pre-built atlas canvas directly (for cached atlas restoration).
+   *
+   * Skips per-block texture registration and uploads the entire canvas to WebGL
+   * in one pass. UV coordinates are computed using the standard grid formula.
+   * This is used when restoring a cached texture atlas from IndexedDB.
+   *
+   * @param {HTMLCanvasElement} canvas - The full atlas canvas (e.g., 256×256).
+   * @returns {boolean} True if upload succeeded, false otherwise.
+   */
+  Donkeycraft.TextureAtlas.prototype.loadFromCanvas = function (canvas) {
+    var gl = this._gl;
+    if (!gl || !canvas) return false;
+
+    // Validate canvas dimensions match expected atlas size
+    if (canvas.width !== ATLAS_SIZE || canvas.height !== ATLAS_SIZE) {
+      Donkeycraft.Logger.warn(
+        'TextureAtlas',
+        'Canvas size mismatch: expected ' +
+          ATLAS_SIZE +
+          'x' +
+          ATLAS_SIZE +
+          ', got ' +
+          canvas.width +
+          'x' +
+          canvas.height
+      );
+      return false;
+    }
+
+    // Create and bind texture
+    this._texture = gl.createTexture();
+    if (!this._texture) {
+      Donkeycraft.Logger.error(
+        'TextureAtlas',
+        'Failed to create WebGL texture object'
+      );
+      return false;
+    }
+
+    gl.bindTexture(gl.TEXTURE_2D, this._texture);
+
+    // Upload the entire canvas in one call
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+
+    // Set texture parameters for nearest-neighbor filtering (pixelated look)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    // Compute UV coordinates using standard grid formula
+    var blocks = Donkeycraft.BlockRegistry
+      ? Donkeycraft.BlockRegistry.getAllBlocks()
+      : [];
+    for (var b = 0; b < blocks.length; b++) {
+      var block = blocks[b];
+      var id = block.id;
+      if (id >= MAX_BLOCK_ID) continue;
+
+      var col = id % ATLAS_GRID;
+      var row = Math.floor(id / ATLAS_GRID);
+      var u = col * TEX_SIZE;
+      var v = row * TEX_SIZE;
+
+      this._uvMap[id] = {
+        u: u / ATLAS_SIZE,
+        v: v / ATLAS_SIZE,
+        uSize: TEX_SIZE / ATLAS_SIZE,
+        vSize: TEX_SIZE / ATLAS_SIZE,
+        pixelU: u,
+        pixelV: v,
+        pixelUSize: TEX_SIZE,
+        pixelVSize: TEX_SIZE,
+      };
+    }
+
+    return true;
+  };
+
+  /**
    * Register a texture image for a block.
    *
    * The image must already be loaded (e.g., from a canvas or Image element).
@@ -275,11 +355,9 @@
       placeholder
     );
 
-    /**
-     * Temporary canvas for copying images before uploading to atlas.
-     * willReadFrequently: true prevents Chrome warning about repeated getImageData calls.
-     * @type {HTMLCanvasElement}
-     */
+    // Temporary canvas for copying images before uploading to atlas.
+    // willReadFrequently: true prevents Chrome warning about repeated getImageData calls.
+    // Created once and reused for all block uploads.
     var tempCanvas = document.createElement('canvas');
     tempCanvas.width = TEX_SIZE;
     tempCanvas.height = TEX_SIZE;

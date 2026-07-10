@@ -1657,9 +1657,8 @@
 
   /**
    * _buildTextureAtlasAsync — asynchronously build the texture atlas using requestIdleCallback.
+   * Checks AssetCache first for a cached atlas before generating textures from scratch.
    * Chunks texture registration and canvas upload into batches to avoid blocking the main thread.
-   * This prevents multi-second freezes during initialization when hundreds of textures must be
-   * converted from canvas to Image elements and uploaded to WebGL.
    * @private
    */
   Donkeycraft.Game.prototype._buildTextureAtlasAsync = function () {
@@ -1671,6 +1670,93 @@
       return;
     }
 
+    var gameInstance = this;
+    var worldName = 'default';
+
+    // Try loading cached texture atlas from AssetCache first
+    if (
+      Donkeycraft.AssetCache &&
+      typeof Donkeycraft.AssetCache.prototype.getTextureAtlas === 'function'
+    ) {
+      // Check if an AssetCache instance is available via init-sequence systems
+      var cachedAtlas = null;
+      if (
+        window._dkInitSystems &&
+        window._dkInitSystems.assetCache &&
+        window._dkInitSystems.assetCache.isReady()
+      ) {
+        try {
+          cachedAtlas =
+            window._dkInitSystems.assetCache.getTextureAtlas(worldName);
+        } catch (e) {
+          Donkeycraft.Logger.warn(
+            'Game',
+            'AssetCache.getTextureAtlas threw: ' + e.message
+          );
+        }
+      }
+
+      if (cachedAtlas) {
+        cachedAtlas
+          .then(function (canvas) {
+            if (canvas) {
+              Donkeycraft.Logger.info(
+                'Game',
+                'Loaded texture atlas from cache — skipping texture generation'
+              );
+              // Upload cached canvas directly to WebGL
+              var atlas = new Donkeycraft.TextureAtlas(gameInstance._gl);
+              if (atlas.loadFromCanvas(canvas)) {
+                gameInstance._textureAtlas = atlas;
+                Donkeycraft.Logger.info(
+                  'Game',
+                  'Cached texture atlas loaded successfully (' +
+                    canvas.width +
+                    'x' +
+                    canvas.height +
+                    ')'
+                );
+
+                // Wire atlas onto terrain renderer
+                if (
+                  gameInstance._terrainRenderer &&
+                  gameInstance._terrainRenderer.setTextureAtlas
+                ) {
+                  gameInstance._terrainRenderer.setTextureAtlas(atlas);
+                }
+              } else {
+                Donkeycraft.Logger.warn(
+                  'Game',
+                  'Cached atlas upload failed — falling back to generation'
+                );
+                gameInstance._generateTextureAtlasFromScratch();
+              }
+            } else {
+              // No cached canvas — generate from scratch
+              gameInstance._generateTextureAtlasFromScratch();
+            }
+          })
+          .catch(function (e) {
+            Donkeycraft.Logger.warn(
+              'Game',
+              'AssetCache promise rejected — generating textures: ' + e.message
+            );
+            gameInstance._generateTextureAtlasFromScratch();
+          });
+        return; // Async path — will call _generateTextureAtlasFromScratch() if needed
+      }
+    }
+
+    // No cache available — generate textures from scratch
+    this._generateTextureAtlasFromScratch();
+  };
+
+  /**
+   * _generateTextureAtlasFromScratch — generate all procedural textures and build the WebGL atlas.
+   * Called when no cached atlas is available, or when cache upload fails.
+   * @private
+   */
+  Donkeycraft.Game.prototype._generateTextureAtlasFromScratch = function () {
     var generatedTex = Donkeycraft.AssetManager.getAllTextures();
     if (!generatedTex || Object.keys(generatedTex).length === 0) {
       Donkeycraft.Logger.warn(
@@ -1720,14 +1806,18 @@
                 ' textures'
             );
 
-            // Persist texture cache to IndexedDB for faster page reloads
-            if (Donkeycraft.Storage && Donkeycraft.Storage.putTextureAtlas) {
+            // Persist texture atlas to AssetCache for faster page reloads
+            if (
+              window._dkInitSystems &&
+              window._dkInitSystems.assetCache &&
+              window._dkInitSystems.assetCache.isReady()
+            ) {
               try {
-                Donkeycraft.Storage.putTextureAtlas(generatedTex).catch(
-                  function () {
-                    /* ignore */
-                  }
-                );
+                window._dkInitSystems.assetCache
+                  .setTextureAtlas(atlas.canvas, 'default')
+                  .catch(function () {
+                    /* ignore persistence errors */
+                  });
               } catch (e) {
                 /* ignore persistence errors */
               }
