@@ -848,7 +848,9 @@
    * @returns {boolean}
    */
   Donkeycraft.Player.prototype.hasItem = function (itemId, requiredCount) {
-    return this.inventory ? this.inventory.hasItem(itemId, requiredCount) : false;
+    return this.inventory
+      ? this.inventory.hasItem(itemId, requiredCount)
+      : false;
   };
 
   /**
@@ -867,7 +869,9 @@
    * @returns {Object} Serialized inventory data.
    */
   Donkeycraft.Player.prototype.serializeInventory = function () {
-    return this.inventory ? this.inventory.serialize() : { slots: [], selectedSlot: 0 };
+    return this.inventory
+      ? this.inventory.serialize()
+      : { slots: [], selectedSlot: 0 };
   };
 
   /**

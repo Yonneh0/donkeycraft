@@ -22,7 +22,7 @@
     FOOD: 5,
     POTION: 6,
     MATERIAL: 7,
-    ENTITY_ITEM: 8
+    ENTITY_ITEM: 8,
   };
 
   // ============================================================
@@ -77,8 +77,7 @@
     this.type = type !== undefined ? type : Donkeycraft.ItemType.BLOCK;
     this.materialTier = materialTier !== undefined ? materialTier : 0;
     this.maxDurability = maxDurability !== undefined ? maxDurability : 0;
-    this.maxStackCount =
-      maxStackCount !== undefined ? maxStackCount : 64;
+    this.maxStackCount = maxStackCount !== undefined ? maxStackCount : 64;
     this.damage = damage !== undefined ? damage : 0;
     this.defense = defense !== undefined ? defense : 0;
     this.armorToughness = armorToughness !== undefined ? armorToughness : 0;
@@ -90,8 +89,7 @@
     this.toolType = toolType !== undefined ? toolType : '';
     this.blockId = blockId !== undefined ? blockId : 0;
     this.brewingEffects = brewingEffects !== undefined ? brewingEffects : null;
-    this.enchantability =
-      enchantability !== undefined ? enchantability : 0;
+    this.enchantability = enchantability !== undefined ? enchantability : 0;
     this.rarity = rarity !== undefined ? rarity : 0;
     this.repairItemBlockId =
       repairItemBlockId !== undefined ? repairItemBlockId : 0;
@@ -293,7 +291,7 @@
       brewingEffects: this.brewingEffects,
       enchantability: this.enchantability,
       rarity: this.rarity,
-      repairItemBlockId: this.repairItemBlockId
+      repairItemBlockId: this.repairItemBlockId,
     };
   };
 
@@ -404,11 +402,17 @@
         var materialTier = 0;
 
         // Check if this block is a tool/weapon/armor (by naming convention or ID range)
-        if (b.name.indexOf('pickaxe') >= 0 || b.name.indexOf('shovel') >= 0 || b.name.indexOf('axe') >= 0 || b.name.indexOf('hoe') >= 0) {
+        if (
+          b.name.indexOf('pickaxe') >= 0 ||
+          b.name.indexOf('shovel') >= 0 ||
+          b.name.indexOf('axe') >= 0 ||
+          b.name.indexOf('hoe') >= 0
+        ) {
           itemType = Donkeycraft.ItemType.TOOL;
           toolType = Donkeycraft.ToolRegistry.getToolTypeFromBlockId(b.id);
           // Determine material tier from name
-          if (b.name.indexOf('wooden') >= 0 || b.name.indexOf('Wood') >= 0) materialTier = 1;
+          if (b.name.indexOf('wooden') >= 0 || b.name.indexOf('Wood') >= 0)
+            materialTier = 1;
           else if (b.name.indexOf('stone') >= 0) materialTier = 2;
           else if (b.name.indexOf('iron') >= 0) materialTier = 3;
           else if (b.name.indexOf('diamond') >= 0) materialTier = 4;
@@ -416,13 +420,19 @@
           else if (b.name.indexOf('netherite') >= 0) materialTier = 6;
         } else if (b.name.indexOf('sword') >= 0) {
           itemType = Donkeycraft.ItemType.WEAPON;
-          if (b.name.indexOf('wooden') >= 0 || b.name.indexOf('Wood') >= 0) materialTier = 1;
+          if (b.name.indexOf('wooden') >= 0 || b.name.indexOf('Wood') >= 0)
+            materialTier = 1;
           else if (b.name.indexOf('stone') >= 0) materialTier = 2;
           else if (b.name.indexOf('iron') >= 0) materialTier = 3;
           else if (b.name.indexOf('diamond') >= 0) materialTier = 4;
           else if (b.name.indexOf('gold') >= 0) materialTier = 5;
           else if (b.name.indexOf('netherite') >= 0) materialTier = 6;
-        } else if (b.name.indexOf('helmet') >= 0 || b.name.indexOf('chestplate') >= 0 || b.name.indexOf('leggings') >= 0 || b.name.indexOf('boots') >= 0) {
+        } else if (
+          b.name.indexOf('helmet') >= 0 ||
+          b.name.indexOf('chestplate') >= 0 ||
+          b.name.indexOf('leggings') >= 0 ||
+          b.name.indexOf('boots') >= 0
+        ) {
           itemType = Donkeycraft.ItemType.ARMOR;
           if (b.name.indexOf('leather') >= 0) materialTier = 1;
           else if (b.name.indexOf('iron') >= 0) materialTier = 3;
@@ -433,40 +443,49 @@
 
         // Determine stack count based on type
         var maxStack = 64;
-        if (itemType === Donkeycraft.ItemType.TOOL || itemType === Donkeycraft.ItemType.WEAPON || itemType === Donkeycraft.ItemType.ARMOR) {
+        if (
+          itemType === Donkeycraft.ItemType.TOOL ||
+          itemType === Donkeycraft.ItemType.WEAPON ||
+          itemType === Donkeycraft.ItemType.ARMOR
+        ) {
           maxStack = 1;
         }
 
         // Get durability from tool material if applicable
         var durability = 0;
-        if (itemType === Donkeycraft.ItemType.TOOL || itemType === Donkeycraft.ItemType.WEAPON) {
+        if (
+          itemType === Donkeycraft.ItemType.TOOL ||
+          itemType === Donkeycraft.ItemType.WEAPON
+        ) {
           durability = Donkeycraft.ToolRegistry.getDurability(materialTier);
         }
 
         // Get hardness for mining speed calculations
         var hardness = b.hardness;
 
-        register(new Donkeycraft.Item(
-          b.id,
-          b.name,
-          itemType,
-          materialTier,
-          durability,
-          maxStack,
-          0, // damage (set below for weapons)
-          0, // defense (set below for armor)
-          0, // armorToughness
-          0, // armorKnockbackResist
-          0, // foodRestore
-          0, // saturation
-          hardness,
-          toolType,
-          b.id, // blockId
-          null, // brewingEffects
-          Donkeycraft.ToolRegistry.getEnchantability(materialTier),
-          0, // rarity
-          Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier)
-        ));
+        register(
+          new Donkeycraft.Item(
+            b.id,
+            b.name,
+            itemType,
+            materialTier,
+            durability,
+            maxStack,
+            0, // damage (set below for weapons)
+            0, // defense (set below for armor)
+            0, // armorToughness
+            0, // armorKnockbackResist
+            0, // foodRestore
+            0, // saturation
+            hardness,
+            toolType,
+            b.id, // blockId
+            null, // brewingEffects
+            Donkeycraft.ToolRegistry.getEnchantability(materialTier),
+            0, // rarity
+            Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier)
+          )
+        );
 
         count++;
       }
@@ -483,8 +502,7 @@
       getByName: getByName,
       getAll: getAll,
       getCount: getCount,
-      generateFromBlocks: generateFromBlocks
+      generateFromBlocks: generateFromBlocks,
     };
   })();
-
 })();

@@ -1352,6 +1352,20 @@ void main() {
                             var inventoryUI = new Donkeycraft.InventoryUI(null, hotbar);
                             game2._inventoryUI = inventoryUI;
 
+                            // Get player's ItemManager (41 slots: 9 hotbar + 27 main + 5 armor/unused)
+                            var playerInv = game2._player ? game2._player.getItemManager() : null;
+
+                            // Create backpack inventories (C1 = main backpack, C2-C9 = additional packs)
+                            var backpackInvs = [];
+                            for (var b = 0; b < 9; b++) {
+                                backpackInvs[b] = new Donkeycraft.ItemManager(null);
+                            }
+
+                            // Set the player inventory and main backpack (C1)
+                            if (playerInv) {
+                                inventoryUI.setInventory(playerInv, backpackInvs[0]);
+                            }
+
                             // Wire keyboard shortcut (I key) to toggle inventory
                             document.addEventListener('keydown', function (e2) {
                                 if (e2.code === 'KeyI' && !e2.ctrlKey && !e2.metaKey && !e2.altKey) {
@@ -1361,6 +1375,33 @@ void main() {
                                     }
                                 }
                             });
+
+                            // Initialize PaperdollRenderer with pause/resume lifecycle
+                            var paperdollContainer = document.querySelector('.dk-paperdoll-container');
+                            if (paperdollContainer) {
+                                var paperdollRenderer = new Donkeycraft.PaperdollRenderer(paperdollContainer);
+                                if (paperdollRenderer.init()) {
+                                    // Store reference for potential external access
+                                    window._dkPaperdollRenderer = paperdollRenderer;
+
+                                    // Wire pause/resume with inventory open/close
+                                    inventoryUI.onClose(function() {
+                                        if (paperdollRenderer && paperdollRenderer.isRunning()) {
+                                            paperdollRenderer.pause();
+                                        }
+                                    });
+                                    inventoryUI.onOpen(function() {
+                                        if (paperdollRenderer && !paperdollRenderer.isRunning()) {
+                                            paperdollRenderer.resume();
+                                        }
+                                    });
+
+                                    Donkeycraft.Logger.info('Game', 'PaperdollRenderer initialized');
+                                }
+                            }
+
+                            // Store backpack inventories on game for container slot management
+                            game2._backpackInvs = backpackInvs;
 
                             Donkeycraft.Logger.info('Game', 'Player Inventory UI initialized');
                         } catch (e) {

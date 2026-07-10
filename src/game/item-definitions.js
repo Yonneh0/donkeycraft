@@ -35,7 +35,7 @@
     MATERIAL_START: 600,
     MATERIAL_END: 699,
     ENTITY_ITEM_START: 700,
-    ENTITY_ITEM_END: 799
+    ENTITY_ITEM_END: 799,
   };
 
   // ============================================================
@@ -58,13 +58,33 @@
      */
     function registerTool(id, name, materialTier, toolType) {
       var durability = Donkeycraft.ToolRegistry.getDurability(materialTier);
-      var enchantability = Donkeycraft.ToolRegistry.getEnchantability(materialTier);
-      var repairId = Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.TOOL, materialTier, durability, 1,
-        0, 0, 0, 0, 0, 0, 1.0, toolType, 0, null,
-        enchantability, 0, repairId
-      ));
+      var enchantability =
+        Donkeycraft.ToolRegistry.getEnchantability(materialTier);
+      var repairId =
+        Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.TOOL,
+          materialTier,
+          durability,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          toolType,
+          0,
+          null,
+          enchantability,
+          0,
+          repairId
+        )
+      );
       _registered++;
       return id;
     }
@@ -79,13 +99,33 @@
      */
     function registerWeapon(id, name, materialTier, damage) {
       var durability = Donkeycraft.ToolRegistry.getDurability(materialTier);
-      var enchantability = Donkeycraft.ToolRegistry.getEnchantability(materialTier);
-      var repairId = Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.WEAPON, materialTier, durability, 1,
-        damage, 0, 0, 0, 0, 0, 1.0, '', 0, null,
-        enchantability, 0, repairId
-      ));
+      var enchantability =
+        Donkeycraft.ToolRegistry.getEnchantability(materialTier);
+      var repairId =
+        Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.WEAPON,
+          materialTier,
+          durability,
+          1,
+          damage,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          '',
+          0,
+          null,
+          enchantability,
+          0,
+          repairId
+        )
+      );
       _registered++;
       return id;
     }
@@ -101,17 +141,37 @@
      */
     function registerArmor(id, name, materialTier, defense, slot) {
       var durability = Donkeycraft.ToolRegistry.getDurability(materialTier);
-      var enchantability = Donkeycraft.ToolRegistry.getEnchantability(materialTier);
-      var repairId = Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
+      var enchantability =
+        Donkeycraft.ToolRegistry.getEnchantability(materialTier);
+      var repairId =
+        Donkeycraft.ToolRegistry.getRepairItemBlockId(materialTier);
       // Adjust durability per slot: boots/leggings have different values
       if (slot === 3) durability = Math.floor(durability * 0.75); // boots
       if (slot === 2) durability = Math.floor(durability * 0.875); // leggings
       if (slot === 1) durability = Math.floor(durability * 1.125); // chestplate
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.ARMOR, materialTier, durability, 1,
-        0, defense, 0, 0, 0, 0, 1.0, '', 0, null,
-        enchantability, 0, repairId
-      ));
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.ARMOR,
+          materialTier,
+          durability,
+          1,
+          0,
+          defense,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          '',
+          0,
+          null,
+          enchantability,
+          0,
+          repairId
+        )
+      );
       _registered++;
       return id;
     }
@@ -126,11 +186,29 @@
      */
     function registerFood(id, name, foodRestore, saturation) {
       saturation = saturation !== undefined ? saturation : 0.6;
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.FOOD, 0, 0, 64,
-        0, 0, 0, 0, foodRestore, foodRestore * saturation,
-        1.0, '', 0, null, 0, 0, 0
-      ));
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.FOOD,
+          0,
+          0,
+          64,
+          0,
+          0,
+          0,
+          0,
+          foodRestore,
+          foodRestore * saturation,
+          1.0,
+          '',
+          0,
+          null,
+          0,
+          0,
+          0
+        )
+      );
       _registered++;
       return id;
     }
@@ -143,11 +221,29 @@
      * @returns {number} Item ID.
      */
     function registerPotion(id, name, effects) {
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.POTION, 0, 0, 1,
-        0, 0, 0, 0, 0, 0, 1.0, '', 0, effects,
-        0, 1, 0 // rarity 1 = uncommon
-      ));
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.POTION,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          '',
+          0,
+          effects,
+          0,
+          1,
+          0 // rarity 1 = uncommon
+        )
+      );
       _registered++;
       return id;
     }
@@ -159,11 +255,29 @@
      * @returns {number} Item ID.
      */
     function registerMaterial(id, name) {
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.MATERIAL, 0, 0, 64,
-        0, 0, 0, 0, 0, 0, 1.0, '', 0, null,
-        0, 0, 0
-      ));
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.MATERIAL,
+          0,
+          0,
+          64,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          '',
+          0,
+          null,
+          0,
+          0,
+          0
+        )
+      );
       _registered++;
       return id;
     }
@@ -175,11 +289,29 @@
      * @returns {number} Item ID.
      */
     function registerEntityItem(id, name) {
-      Donkeycraft.ItemDefinitionRegistry.register(new Donkeycraft.Item(
-        id, name, ItemType.ENTITY_ITEM, 0, 0, 64,
-        0, 0, 0, 0, 0, 0, 1.0, '', 0, null,
-        0, 0, 0
-      ));
+      Donkeycraft.ItemDefinitionRegistry.register(
+        new Donkeycraft.Item(
+          id,
+          name,
+          ItemType.ENTITY_ITEM,
+          0,
+          0,
+          64,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          '',
+          0,
+          null,
+          0,
+          0,
+          0
+        )
+      );
       _registered++;
       return id;
     }
@@ -316,45 +448,79 @@
       registerPotion(551, 'water_bottle', []);
 
       // Healing potions (instant health)
-      registerPotion(552, 'potion_of_healing', [{ effectId: 1, duration: 0, amplifier: 0 }]);
-      registerPotion(553, 'potion_of_healing_ii', [{ effectId: 1, duration: 0, amplifier: 1 }]);
+      registerPotion(552, 'potion_of_healing', [
+        { effectId: 1, duration: 0, amplifier: 0 },
+      ]);
+      registerPotion(553, 'potion_of_healing_ii', [
+        { effectId: 1, duration: 0, amplifier: 1 },
+      ]);
 
       // Regeneration potions
-      registerPotion(554, 'potion_of_regeneration', [{ effectId: 2, duration: 900, amplifier: 0 }]);
-      registerPotion(555, 'potion_of_regeneration_ii', [{ effectId: 2, duration: 450, amplifier: 1 }]);
+      registerPotion(554, 'potion_of_regeneration', [
+        { effectId: 2, duration: 900, amplifier: 0 },
+      ]);
+      registerPotion(555, 'potion_of_regeneration_ii', [
+        { effectId: 2, duration: 450, amplifier: 1 },
+      ]);
 
       // Strength potions
-      registerPotion(556, 'potion_of_strength', [{ effectId: 3, duration: 900, amplifier: 0 }]);
-      registerPotion(557, 'potion_of_strength_ii', [{ effectId: 3, duration: 450, amplifier: 1 }]);
+      registerPotion(556, 'potion_of_strength', [
+        { effectId: 3, duration: 900, amplifier: 0 },
+      ]);
+      registerPotion(557, 'potion_of_strength_ii', [
+        { effectId: 3, duration: 450, amplifier: 1 },
+      ]);
 
       // Speed potions
-      registerPotion(558, 'potion_of_swiftness', [{ effectId: 4, duration: 900, amplifier: 0 }]);
-      registerPotion(559, 'potion_of_swiftness_ii', [{ effectId: 4, duration: 450, amplifier: 1 }]);
+      registerPotion(558, 'potion_of_swiftness', [
+        { effectId: 4, duration: 900, amplifier: 0 },
+      ]);
+      registerPotion(559, 'potion_of_swiftness_ii', [
+        { effectId: 4, duration: 450, amplifier: 1 },
+      ]);
 
       // Slowness potions
-      registerPotion(560, 'potion_of_slowness', [{ effectId: 5, duration: 900, amplifier: 0 }]);
-      registerPotion(561, 'potion_of_leaping', [{ effectId: 6, duration: 900, amplifier: 0 }]);
+      registerPotion(560, 'potion_of_slowness', [
+        { effectId: 5, duration: 900, amplifier: 0 },
+      ]);
+      registerPotion(561, 'potion_of_leaping', [
+        { effectId: 6, duration: 900, amplifier: 0 },
+      ]);
 
       // Fire Resistance potion
-      registerPotion(562, 'potion_of_fire_resistance', [{ effectId: 7, duration: 900, amplifier: 0 }]);
+      registerPotion(562, 'potion_of_fire_resistance', [
+        { effectId: 7, duration: 900, amplifier: 0 },
+      ]);
 
       // Water Breathing potion
-      registerPotion(563, 'potion_of_water_breathing', [{ effectId: 8, duration: 900, amplifier: 0 }]);
+      registerPotion(563, 'potion_of_water_breathing', [
+        { effectId: 8, duration: 900, amplifier: 0 },
+      ]);
 
       // Invisibility potion
-      registerPotion(564, 'potion_of_invisibility', [{ effectId: 9, duration: 900, amplifier: 0 }]);
+      registerPotion(564, 'potion_of_invisibility', [
+        { effectId: 9, duration: 900, amplifier: 0 },
+      ]);
 
       // Night Vision potion
-      registerPotion(565, 'potion_of_night_vision', [{ effectId: 10, duration: 900, amplifier: 0 }]);
+      registerPotion(565, 'potion_of_night_vision', [
+        { effectId: 10, duration: 900, amplifier: 0 },
+      ]);
 
       // Weakness potion
-      registerPotion(566, 'potion_of_weakness', [{ effectId: 11, duration: 900, amplifier: 0 }]);
+      registerPotion(566, 'potion_of_weakness', [
+        { effectId: 11, duration: 900, amplifier: 0 },
+      ]);
 
       // Slow Falling potion
-      registerPotion(567, 'potion_of_slow_falling', [{ effectId: 12, duration: 900, amplifier: 0 }]);
+      registerPotion(567, 'potion_of_slow_falling', [
+        { effectId: 12, duration: 900, amplifier: 0 },
+      ]);
 
       // Tipped arrow base
-      registerPotion(568, 'arrow_of_damage', [{ effectId: 1, duration: 0, amplifier: 0 }]);
+      registerPotion(568, 'arrow_of_damage', [
+        { effectId: 1, duration: 0, amplifier: 0 },
+      ]);
 
       // ============================================================
       // MATERIALS (IDs 600-699)
@@ -434,8 +600,7 @@
       registerMaterial: registerMaterial,
       registerEntityItem: registerEntityItem,
       registerAll: registerAll,
-      generateFromEntities: generateFromEntities
+      generateFromEntities: generateFromEntities,
     };
   })();
-
 })();

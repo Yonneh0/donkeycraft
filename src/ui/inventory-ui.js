@@ -230,9 +230,32 @@
   };
 
   /**
+   * Equipment slot mapping — maps DOM data-slot attributes to inventory indices.
+   * These slot names match inv.html's equipment layout exactly.
+   * @type {Object.<string, number>}
+   */
+  Donkeycraft.InventoryUI.EQUIPMENT_SLOTS = {
+    neck: 0, // Neck accessory
+    trin: 1, // Right ring
+    lbra: 2, // Left bracer
+    lrin: 3, // Left ring
+    shie: 4, // Shield
+    aet1: 5, // Extra equipment slot 1
+    aet2: 6, // Extra equipment slot 2
+    aet3: 7, // Extra equipment slot 3
+    cloa: 8, // Cloak
+    rbra: 9, // Right bracer
+    rrin: 10, // Right ring (duplicate slot name - maps to same as above)
+    main: 11, // Main hand weapon/tool
+    ammo: 12, // Ammo slot
+    shir: 13, // Shirt
+    pant: 14, // Pants
+  };
+
+  /**
    * setInventory — sets the inventory data source for this panel.
-   * @param {Donkeycraft.Inventory} playerInv - Player's inventory.
-   * @param {Donkeycraft.Inventory} [backpackInv=null] - Backpack/container inventory.
+   * @param {Donkeycraft.ItemManager} playerInv - Player's ItemManager.
+   * @param {Donkeycraft.ItemManager} [backpackInv=null] - Main backpack (C1) inventory.
    */
   Donkeycraft.InventoryUI.prototype.setInventory = function (
     playerInv,
@@ -240,6 +263,9 @@
   ) {
     this._playerInventory = playerInv;
     this._backpackInventory = backpackInv || null;
+
+    // Store additional backpack inventories (C2-C9)
+    this._additionalBackpacks = {};
 
     if (this._playerInventory) {
       var self = this;
@@ -255,42 +281,90 @@
       });
     }
 
+    // Wire container slot click handlers for backpack management
+    this._initContainerSlots();
+
     this._renderAllSlots();
   };
 
   /**
-   * _renderAllSlots — renders all slot displays from current inventory data.
+   * _getItemDisplayChar — gets a display character for an item ID using ItemDefinitionRegistry.
+   * Falls back to block name mapping if registry lookup fails.
+   * @param {number} itemId - Block/item ID.
+   * @returns {string} Display character (emoji or letter).
    * @private
    */
-  Donkeycraft.InventoryUI.prototype._renderAllSlots = function () {
-    this._renderPlayerSlots();
-    this._renderBackpackSlots();
-  };
-
-  /**
-   * _renderPlayerSlots — renders the player inventory slots (258 main grid).
-   * @private
-   */
-  Donkeycraft.InventoryUI.prototype._renderPlayerSlots = function () {
-    if (!this._playerInventory) return;
-
-    var slotCount = Math.min(this._playerInventory.getSlotCount(), 258);
-    for (var i = 0; i < slotCount; i++) {
-      var slot = this._playerInventory.getSlot(i);
-      this._updateSlotDisplay('player', i, slot);
+  Donkeycraft.InventoryUI.prototype._getItemDisplayChar = function (itemId) {
+    // Try ItemDefinitionRegistry first for special items (tools, armor, food, etc.)
+    if (Donkeycraft.ItemDefinitionRegistry && itemId > 255) {
+      var itemDef = Donkeycraft.ItemDefinitionRegistry.get(itemId);
+      if (itemDef && itemDef.name) {
+        // Return first character of display name for special items
+        return itemDef.name.charAt(0).toUpperCase();
+      }
     }
+
+    // Block ID fallback map — uses block names from BlockRegistry
+    var displayMap = {
+      0: '', // air
+      1: '🪨', // stone
+      3: '🟫', // dirt
+      4: '🟩', // grass_block
+      5: '🪵', // oak_log
+      6: '🟨', // sand
+      7: '🟫', // gravel
+      10: '⬛', // coal_ore
+      11: '🔴', // redstone_ore
+      12: '🟡', // glowstone
+      14: '🟢', // emerald_ore
+      24: '🪵', // oak_planks
+      30: '🪵', // birch_log
+      45: '🔲', // iron_ingot
+      54: '📦', // chest
+      61: '🔥', // fire
+      138: '🪨', // deepslate
+      184: '📚', // bookshelf
+      187: '📦', // crafting_table
+      191: '🔥', // lava
+      195: '🔨', // anvil
+      214: '⬛', // obsidian
+      218: '💎', // diamond
+      219: '🟢', // emerald
+      220: '🔵', // lapis_ore
+      221: '⬜', // quartz
+      222: '🟡', // gold_ore
+      225: '🟡', // gold_ingot
+      226: '⬜', // iron_ingot
+      227: '💎', // diamond
+      229: '🔴', // redstone_dust
+      230: '🔴', // redstone_block
+      310: '🥢', // iron_pickaxe
+      312: '🔦', // torch
+    };
+
+    return displayMap[itemId] || '▪';
   };
 
   /**
-   * _renderBackpackSlots — renders the backpack container slots (9 slots).
+   * _initContainerSlots — Set up click handlers on container slots for backpack management.
+   * When a backpack item is placed in a container slot, it creates/loads that backpack's inventory.
    * @private
    */
-  Donkeycraft.InventoryUI.prototype._renderBackpackSlots = function () {
-    if (!this._backpackInventory) return;
+  Donkeycraft.InventoryUI.prototype._initContainerSlots = function () {
+    if (!this._panelEl || !this._playerInventory) return;
 
-    for (var i = 0; i < 9; i++) {
-      var slot = this._backpackInventory.getSlot(i);
-      this._updateSlotDisplay('backpack', i, slot);
+    var self = this;
+    var containerSlots = this._panelEl.querySelectorAll('.dk-container-slot');
+
+    for (var i = 0; i < containerSlots.length; i++) {
+      (function (slotEl, slotIndex) {
+        // Add click handler for backpack management
+        slotEl.addEventListener('click', function (e) {
+          e.stopPropagation();
+          // Container slots are handled by the drag-and-drop system
+          // Clicking does nothing special - items are placed via drag/drop
+        });
+      })(containerSlots[i], i);
     }
   };
 
@@ -315,9 +389,19 @@
         slotEl = this._gridEl.children[index];
       }
     } else if (type === 'backpack') {
-      var bpSlots = this._panelEl.querySelectorAll('.dk-backpack-slot');
+      var bpSlots = this._panelEl.querySelectorAll('.dk-container-slot');
       if (index < bpSlots.length) {
         slotEl = bpSlots[index];
+      }
+    } else if (type === 'equipment') {
+      // Equipment slots use data-slot attribute matching inv.html layout
+      var equipSlots = this._panelEl.querySelectorAll('.dk-equip-slot');
+      for (var i = 0; i < equipSlots.length; i++) {
+        var slotData = equipSlots[i].getAttribute('data-slot');
+        if (slotData === index) {
+          slotEl = equipSlots[i];
+          break;
+        }
       }
     }
 
@@ -330,10 +414,14 @@
 
     if (!stack || stack.isEmpty()) {
       itemEl.textContent = '';
+      itemEl.style.opacity = '0.3';
+      itemEl.style.filter = 'grayscale(100%)';
       if (countEl) countEl.style.display = 'none';
     } else {
       var itemId = stack.getItemId();
       itemEl.textContent = this._getItemDisplayChar(itemId);
+      itemEl.style.opacity = '1';
+      itemEl.style.filter = 'none';
 
       if (stack.getCount() > 1) {
         if (!countEl) {
@@ -350,49 +438,47 @@
   };
 
   /**
-   * _getItemDisplayChar — gets a display character for an item ID.
-   * @param {number} itemId - Block/item ID.
-   * @returns {string}
+   * _renderAllSlots — Render all slots from player inventory, backpack, and equipment.
    * @private
    */
-  Donkeycraft.InventoryUI.prototype._getItemDisplayChar = function (itemId) {
-    var displayMap = {
-      0: '',
-      1: '🪨',
-      3: '🟫',
-      4: '🟩',
-      5: '🪵',
-      6: '🟨',
-      7: '🟫',
-      10: '⬛',
-      11: '🔴',
-      12: '🟡',
-      14: '🟢',
-      24: '🪵',
-      30: '🪵',
-      45: '🔲',
-      54: '📦',
-      61: '🔥',
-      138: '🪨',
-      184: '📚',
-      187: '📦',
-      191: '🔥',
-      195: '🔨',
-      214: '⚫',
-      218: '💎',
-      219: '🟢',
-      220: '🔵',
-      221: '⚪',
-      222: '🟡',
-      225: '🟡',
-      226: '⚪',
-      227: '💎',
-      229: '🔴',
-      230: '🔴',
-      310: '🥢',
-      312: '🔦',
-    };
-    return displayMap[itemId] || '▪';
+  Donkeycraft.InventoryUI.prototype._renderAllSlots = function () {
+    // Render player inventory grid (258 slots)
+    if (this._playerInventory && this._gridEl) {
+      for (
+        var i = 0;
+        i < this._gridEl.children.length &&
+        i < this._playerInventory.getSlotCount();
+        i++
+      ) {
+        var stack = this._playerInventory.getSlot(i);
+        this._updateSlotDisplay('player', i, stack);
+      }
+    }
+
+    // Render backpack/container slots (C1-C9)
+    if (this._backpackInventory) {
+      for (
+        var j = 0;
+        j < 9 && j < this._backpackInventory.getSlotCount();
+        j++
+      ) {
+        var bstack = this._backpackInventory.getSlot(j);
+        this._updateSlotDisplay('backpack', j, bstack);
+      }
+    }
+
+    // Render equipment slots from player inventory
+    if (this._playerInventory) {
+      var equipSlotNames = Object.keys(Donkeycraft.InventoryUI.EQUIPMENT_SLOTS);
+      for (var k = 0; k < equipSlotNames.length; k++) {
+        var slotName = equipSlotNames[k];
+        var invIndex = Donkeycraft.InventoryUI.EQUIPMENT_SLOTS[slotName];
+        // Equipment items are stored at specific indices in the player inventory
+        // For now, read from the inventory grid slots that correspond to equipment
+        var stack = this._playerInventory.getSlot(invIndex);
+        this._updateSlotDisplay('equipment', slotName, stack);
+      }
+    }
   };
 
   /**

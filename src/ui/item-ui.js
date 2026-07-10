@@ -22,7 +22,7 @@
       '#55FF55', // 1: Uncommon
       '#55FFFF', // 2: Rare
       '#FF55FF', // 3: Epic
-      '#FFAA00'  // 4: Legendary
+      '#FFAA00', // 4: Legendary
     ];
 
     /**
@@ -79,7 +79,7 @@
 
         var currentDur = stack.getDurability();
         var maxDur = itemDef.getMaxDurability();
-        var fraction = 1.0 - (currentDur / maxDur); // 0 = new, 1 = broken
+        var fraction = 1.0 - currentDur / maxDur; // 0 = new, 1 = broken
         var pct = Math.max(0, Math.min(100, fraction * 100));
 
         var fillEl = document.createElement('div');
@@ -184,13 +184,13 @@
         dropIndicator: dropIndicator,
         onSplit: onSplit,
         onCancel: onCancel || null,
-        splitCount: Math.ceil(stack.getCount() / 2) // Default split: half
+        splitCount: Math.ceil(stack.getCount() / 2), // Default split: half
       };
 
       // Track mouse movement
       var onMouseMove = function (e) {
-        ghostEl.style.left = (e.clientX - 16) + 'px';
-        ghostEl.style.top = (e.clientY - 16) + 'px';
+        ghostEl.style.left = e.clientX - 16 + 'px';
+        ghostEl.style.top = e.clientY - 16 + 'px';
 
         // Find element under cursor for drop indicator
         dropIndicator.style.display = 'none';
@@ -218,11 +218,16 @@
 
         // Remove ghost and indicator
         if (ghostEl.parentNode) ghostEl.parentNode.removeChild(ghostEl);
-        if (dropIndicator.parentNode) dropIndicator.parentNode.removeChild(dropIndicator);
+        if (dropIndicator.parentNode)
+          dropIndicator.parentNode.removeChild(dropIndicator);
 
         if (targetSlot && targetSlot !== slotEl) {
           // Perform split to target slot
-          onSplit(slotEl.dataset.slot, targetSlot.dataset.slot, _dragState.splitCount);
+          onSplit(
+            slotEl.dataset.slot,
+            targetSlot.dataset.slot,
+            _dragState.splitCount
+          );
         } else if (onCancel) {
           onCancel();
         }
@@ -245,7 +250,8 @@
 
       // Tools
       if (name.indexOf('pickaxe') >= 0) return '⛏️';
-      if (name.indexOf('shovel') >= 0 || name.indexOf('spade') >= 0) return '🔧';
+      if (name.indexOf('shovel') >= 0 || name.indexOf('spade') >= 0)
+        return '🔧';
       if (name.indexOf('axe') >= 0) return '🪓';
       if (name.indexOf('hoe') >= 0) return '🌾';
 
@@ -281,7 +287,8 @@
       if (name.indexOf('iron') >= 0) return '⬜';
       if (name.indexOf('gold') >= 0 && name.indexOf('ingot') >= 0) return '🟡';
       if (name.indexOf('netherite') >= 0) return '⬛';
-      if (name.indexOf('coal') >= 0 || name.indexOf('charcoal') >= 0) return '⬛';
+      if (name.indexOf('coal') >= 0 || name.indexOf('charcoal') >= 0)
+        return '⬛';
       if (name.indexOf('stick') >= 0) return '🥢';
       if (name.indexOf('flint') >= 0) return '🪨';
       if (name.indexOf('feather') >= 0) return '🪶';
@@ -408,8 +415,7 @@
       getRarityColor: getRarityColor,
       createContextMenu: createContextMenu,
       removeContextMenu: removeContextMenu,
-      _dragState: _dragState // Expose for testing/debugging
+      _dragState: _dragState, // Expose for testing/debugging
     };
   })();
-
 })();

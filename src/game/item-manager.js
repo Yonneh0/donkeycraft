@@ -54,7 +54,7 @@
     ARMOR_CHESTPLATE: 37,
     ARMOR_LEGGINGS: 38,
     ARMOR_BOOTS: 39,
-    TOTAL_SLOTS: 40
+    TOTAL_SLOTS: 40,
   };
 
   // ============================================================
@@ -82,7 +82,12 @@
     var oldStack = this._inventory[slot];
 
     // Only mark dirty if the stack actually changed
-    if (oldStack !== stack && (!oldStack || !oldStack.matches(stack) || oldStack.getCount() !== (stack ? stack.getCount() : 0))) {
+    if (
+      oldStack !== stack &&
+      (!oldStack ||
+        !oldStack.matches(stack) ||
+        oldStack.getCount() !== (stack ? stack.getCount() : 0))
+    ) {
       this._dirtySlots[slot] = true;
     }
 
@@ -95,7 +100,7 @@
           slot: slot,
           oldStack: oldStack,
           newStack: stack,
-          player: this._player
+          player: this._player,
         });
       } catch (e) {}
     }
@@ -179,7 +184,7 @@
       try {
         EventBus.emitSafe('item:selected:changed', {
           slot: index,
-          prevSlot: this._prevSelectedSlot
+          prevSlot: this._prevSelectedSlot,
         });
       } catch (e) {}
     }
@@ -211,7 +216,14 @@
     // First pass: try to stack with existing identical stacks
     for (var i = 0; i < this._inventory.length; i++) {
       var existing = this._inventory[i];
-      if (existing && !existing.isEmpty() && existing.canStackWith(stack) && existing.getCount() < existing.getMaxStackSize ? existing.getMaxStackSize() : 64) {
+      if (
+        existing &&
+        !existing.isEmpty() &&
+        existing.canStackWith(stack) &&
+        existing.getCount() < existing.getMaxStackSize
+          ? existing.getMaxStackSize()
+          : 64
+      ) {
         var space = 64 - existing.getCount();
         var toAdd = Math.min(remaining, space);
         existing.increment(toAdd);
@@ -235,7 +247,11 @@
       if (emptySlot === -1) break; // No space
 
       var countToAdd = Math.min(remaining, 64);
-      var newStack = new Donkeycraft.ItemStack(stack.getItemId(), countToAdd, stack.getTag());
+      var newStack = new Donkeycraft.ItemStack(
+        stack.getItemId(),
+        countToAdd,
+        stack.getTag()
+      );
       this._inventory[emptySlot] = newStack;
       this._dirtySlots[emptySlot] = true;
       remaining -= countToAdd;
@@ -247,7 +263,7 @@
         try {
           EventBus.emitSafe('item:add:partial', {
             remaining: remaining,
-            player: this._player
+            player: this._player,
           });
         } catch (e) {}
       }
@@ -283,7 +299,7 @@
         EventBus.emitSafe('item:removed', {
           slot: slot,
           count: actualRemove,
-          player: this._player
+          player: this._player,
         });
       } catch (e) {}
     }
@@ -312,7 +328,11 @@
    * @param {number} [toSlot=-1] - Destination slot (-1 = find empty slot).
    * @returns {Donkeycraft.ItemStack|null} The split stack or null.
    */
-  Donkeycraft.ItemManager.prototype.splitStack = function (fromSlot, count, toSlot) {
+  Donkeycraft.ItemManager.prototype.splitStack = function (
+    fromSlot,
+    count,
+    toSlot
+  ) {
     if (fromSlot < 0 || fromSlot >= this._inventory.length) return null;
 
     var sourceStack = this._inventory[fromSlot];
@@ -337,7 +357,9 @@
         this._dirtySlots[fromSlot] = true;
         this._dirtySlots[toSlot] = true;
       } else if (targetStack.canStackWith(splitStack)) {
-        var maxStack = targetStack.getMaxStackSize ? targetStack.getMaxStackSize() : 64;
+        var maxStack = targetStack.getMaxStackSize
+          ? targetStack.getMaxStackSize()
+          : 64;
         var space = maxStack - targetStack.getCount();
         var toAdd = Math.min(splitCount, space);
         targetStack.increment(toAdd);
@@ -380,7 +402,9 @@
     for (var i = 0; i < this._inventory.length; i++) {
       var existing = this._inventory[i];
       if (existing && existing.canStackWith(stack)) {
-        var maxStack = existing.getMaxStackSize ? existing.getMaxStackSize() : 64;
+        var maxStack = existing.getMaxStackSize
+          ? existing.getMaxStackSize()
+          : 64;
         if (existing.getCount() < maxStack) return true;
       }
     }
@@ -405,7 +429,9 @@
     for (var i = 0; i < this._inventory.length; i++) {
       var existing = this._inventory[i];
       if (existing && existing.canStackWith(stack)) {
-        var maxStack = existing.getMaxStackSize ? existing.getMaxStackSize() : 64;
+        var maxStack = existing.getMaxStackSize
+          ? existing.getMaxStackSize()
+          : 64;
         if (existing.getCount() < maxStack) return i;
       }
     }
@@ -474,7 +500,7 @@
             EventBus.emitSafe('item:broke', {
               slot: this._selectedSlot,
               itemId: stack.getItemId(),
-              player: this._player
+              player: this._player,
             });
           } catch (e) {}
         }
@@ -500,7 +526,10 @@
    * @param {Donkeycraft.ItemStack} materialStack - Repair material stack.
    * @returns {number} Amount of durability restored.
    */
-  Donkeycraft.ItemManager.prototype.repairItem = function (slot, materialStack) {
+  Donkeycraft.ItemManager.prototype.repairItem = function (
+    slot,
+    materialStack
+  ) {
     if (slot < 0 || slot >= this._inventory.length) return 0;
 
     var itemStack = this._inventory[slot];
@@ -519,7 +548,10 @@
 
     // Repair amount: 1/4 of max durability per repair
     var repairAmount = Math.floor(maxDurability / 4);
-    var newDurability = Math.min(maxDurability, currentDurability + repairAmount);
+    var newDurability = Math.min(
+      maxDurability,
+      currentDurability + repairAmount
+    );
     itemStack.setDurability(newDurability);
     this._dirtySlots[slot] = true;
 
@@ -551,7 +583,7 @@
 
     return {
       slots: slots,
-      selectedSlot: this._selectedSlot
+      selectedSlot: this._selectedSlot,
     };
   };
 

@@ -40,7 +40,7 @@
   right: 3px;
   font-size: 11px;
   font-weight: bold;
-  color: #FFFFFF;
+  color: #ffffff;
   text-shadow:
     1px 1px 0 #000,
     -1px -1px 0 #000,
@@ -69,21 +69,23 @@
 
 .dk-item-condition-fill {
   height: 100%;
-  background: #4CAF50;
-  transition: width 0.2s ease, background-color 0.2s ease;
+  background: #4caf50;
+  transition:
+    width 0.2s ease,
+    background-color 0.2s ease;
 }
 
 /* Condition states */
 .dk-condition-good {
-  background: #4CAF50 !important; /* Green: > 50% */
+  background: #4caf50 !important; /* Green: > 50% */
 }
 
 .dk-condition-worn {
-  background: #FFC107 !important; /* Yellow: 25-50% */
+  background: #ffc107 !important; /* Yellow: 25-50% */
 }
 
 .dk-condition-broken {
-  background: #F44336 !important; /* Red: < 25% */
+  background: #f44336 !important; /* Red: < 25% */
 }
 
 /* ============================================================
@@ -91,7 +93,7 @@
    ============================================================ */
 
 .dk-item-selected {
-  border: 2px solid #FFFFFF;
+  border: 2px solid #ffffff;
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
 }
 
@@ -104,8 +106,13 @@
 }
 
 @keyframes dkItemPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* ============================================================
@@ -127,7 +134,9 @@
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
   max-width: 320px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
@@ -161,7 +170,7 @@
   right: -2px;
   font-size: 10px;
   font-weight: bold;
-  color: #FFF;
+  color: #fff;
   background: rgba(0, 0, 0, 0.7);
   padding: 1px 4px;
   border-radius: 3px;
@@ -186,7 +195,7 @@
 /* Item type */
 .dk-examine-type {
   font-size: 11px;
-  color: #AAA;
+  color: #aaa;
   line-height: 1.3;
 }
 
@@ -202,7 +211,7 @@
 
 .dk-examine-durability-fill {
   height: 100%;
-  background: #4CAF50;
+  background: #4caf50;
   transition: width 0.2s ease;
   border-radius: 3px;
 }
@@ -213,7 +222,7 @@
   top: 50%;
   transform: translateY(-50%);
   font-size: 9px;
-  color: #FFF;
+  color: #fff;
   text-shadow: 1px 1px 1px #000;
   line-height: 1;
 }
@@ -227,17 +236,30 @@
 
 .dk-prop {
   font-size: 11px;
-  color: #CCC;
+  color: #ccc;
   line-height: 1.3;
   padding-left: 4px;
 }
 
-.dk-prop-tool { color: #88CCFF; }
-.dk-prop-damage { color: #FF8888; }
-.dk-prop-defense { color: #88FF88; }
-.dk-prop-food { color: #FFAA55; }
-.dk-prop-enchant { color: #AA88FF; font-style: italic; }
-.dk-prop-place { color: #AAAAAA; }
+.dk-prop-tool {
+  color: #88ccff;
+}
+.dk-prop-damage {
+  color: #ff8888;
+}
+.dk-prop-defense {
+  color: #88ff88;
+}
+.dk-prop-food {
+  color: #ffaa55;
+}
+.dk-prop-enchant {
+  color: #aa88ff;
+  font-style: italic;
+}
+.dk-prop-place {
+  color: #aaaaaa;
+}
 
 /* Lore/description */
 .dk-examine-lore {
@@ -270,7 +292,7 @@
 .dk-item-drop-indicator {
   position: absolute;
   inset: -2px;
-  border: 2px solid #55FF55;
+  border: 2px solid #55ff55;
   border-radius: 6px;
   background: rgba(85, 255, 85, 0.1);
   pointer-events: none;
@@ -278,8 +300,13 @@
 }
 
 @keyframes dkDropPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* ============================================================
@@ -307,7 +334,7 @@
   background: rgba(60, 60, 70, 0.7);
   border: 1px solid rgba(80, 80, 100, 0.4);
   border-radius: 3px;
-  color: #DDD;
+  color: #ddd;
   font-size: 12px;
   text-align: left;
   cursor: pointer;
@@ -324,10 +351,18 @@
 }
 
 /* Context button variants */
-.dk-context-drop { color: #FF8888; }
-.dk-context-split { color: #FFCC55; }
-.dk-context-use { color: #88CCFF; }
-.dk-context-repair { color: #88FF88; }
+.dk-context-drop {
+  color: #ff8888;
+}
+.dk-context-split {
+  color: #ffcc55;
+}
+.dk-context-use {
+  color: #88ccff;
+}
+.dk-context-repair {
+  color: #88ff88;
+}
 
 /* ============================================================
    SLOT — inventory/crafting slot base styles
@@ -342,7 +377,9 @@
   border: 1px solid rgba(80, 80, 90, 0.5);
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.1s ease, border-color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
   user-select: none;
 }
 
@@ -407,8 +444,13 @@
 }
 
 @keyframes dkLegendaryGlow {
-  0%, 100% { box-shadow: inset 0 0 6px rgba(255, 170, 0, 0.2); }
-  50% { box-shadow: inset 0 0 12px rgba(255, 170, 0, 0.4); }
+  0%,
+  100% {
+    box-shadow: inset 0 0 6px rgba(255, 170, 0, 0.2);
+  }
+  50% {
+    box-shadow: inset 0 0 12px rgba(255, 170, 0, 0.4);
+  }
 }
 
 /* ============================================================
@@ -420,11 +462,22 @@
 }
 
 @keyframes dkItemShake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-4px) rotate(-2deg); }
-  40% { transform: translateX(4px) rotate(2deg); }
-  60% { transform: translateX(-3px) rotate(-1deg); }
-  80% { transform: translateX(3px) rotate(1deg); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px) rotate(-2deg);
+  }
+  40% {
+    transform: translateX(4px) rotate(2deg);
+  }
+  60% {
+    transform: translateX(-3px) rotate(-1deg);
+  }
+  80% {
+    transform: translateX(3px) rotate(1deg);
+  }
 }
 
 /* ============================================================

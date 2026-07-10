@@ -112,7 +112,10 @@
 
     // Update name with rarity color
     var rarityColors = ['#FFFFFF', '#7E7E7E', '#1AC8FF', '#B24AE6', '#FF8C00']; // common, uncommon, rare, epic, legendary
-    var rarityName = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'][itemDef.getRarity()] || '';
+    var rarityName =
+      ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'][
+        itemDef.getRarity()
+      ] || '';
     this._nameEl.textContent = itemDef.name;
     this._nameEl.style.color = rarityColors[itemDef.getRarity()] || '#FFFFFF';
 
@@ -125,10 +128,14 @@
     this._updateIcon(itemDef, stack);
 
     // Update durability meter (if applicable)
-    if (itemDef.isDurable() && stack.hasTag() && stack.getTag().durability !== undefined) {
+    if (
+      itemDef.isDurable() &&
+      stack.hasTag() &&
+      stack.getTag().durability !== undefined
+    ) {
       var currentDur = stack.getDurability();
       var maxDur = itemDef.getMaxDurability();
-      var fraction = 1.0 - (currentDur / maxDur); // 0 = new, 1 = broken
+      var fraction = 1.0 - currentDur / maxDur; // 0 = new, 1 = broken
       var pct = Math.max(0, Math.min(100, fraction * 100));
 
       this._durabilityMeterEl.style.display = '';
@@ -137,8 +144,10 @@
       // Color based on remaining durability
       var remainingPct = ((maxDur - currentDur) / maxDur) * 100;
       var color;
-      if (remainingPct > 50) color = '#4CAF50'; // green
-      else if (remainingPct > 25) color = '#FFC107'; // yellow
+      if (remainingPct > 50)
+        color = '#4CAF50'; // green
+      else if (remainingPct > 25)
+        color = '#FFC107'; // yellow
       else color = '#F44336'; // red
       this._durabilityMeterEl._fillEl.style.backgroundColor = color;
 
@@ -146,7 +155,8 @@
       var durText = Math.floor(maxDur - currentDur) + '/' + maxDur;
       if (!this._durabilityMeterEl._textEl) {
         this._durabilityMeterEl._textEl = document.createElement('span');
-        this._durabilityMeterEl._textEl.className = 'dk-examine-durability-text';
+        this._durabilityMeterEl._textEl.className =
+          'dk-examine-durability-text';
         this._durabilityMeterEl.appendChild(this._durabilityMeterEl._textEl);
       }
       this._durabilityMeterEl._textEl.textContent = durText;
@@ -177,8 +187,8 @@
 
     // Position panel
     if (x !== undefined && y !== undefined) {
-      this._panel.style.left = (x + 16) + 'px';
-      this._panel.style.top = (y - 8) + 'px';
+      this._panel.style.left = x + 16 + 'px';
+      this._panel.style.top = y - 8 + 'px';
     } else {
       this._panel.style.left = '';
       this._panel.style.top = '';
@@ -211,7 +221,11 @@
    * @param {number} [y=0] - Y position.
    */
   Donkeycraft.ItemExamineUI.prototype.toggle = function (stack, slot, x, y) {
-    if (this._visible && this._currentStack && this._currentStack.matches(stack)) {
+    if (
+      this._visible &&
+      this._currentStack &&
+      this._currentStack.matches(stack)
+    ) {
       this.hide();
     } else {
       this.show(stack, slot, x, y);
@@ -229,19 +243,28 @@
     switch (itemDef.type) {
       case Donkeycraft.ItemType.TOOL:
         typeStr = 'Tool (' + this._getTierName(itemDef.getMaterialTier()) + ')';
-        if (itemDef.getToolType()) typeStr += ' — ' + itemDef.getToolType().charAt(0).toUpperCase() + itemDef.getToolType().slice(1);
+        if (itemDef.getToolType())
+          typeStr +=
+            ' — ' +
+            itemDef.getToolType().charAt(0).toUpperCase() +
+            itemDef.getToolType().slice(1);
         break;
       case Donkeycraft.ItemType.WEAPON:
-        typeStr = 'Weapon (' + this._getTierName(itemDef.getMaterialTier()) + ')';
-        if (itemDef.getDamage() > 0) typeStr += ' — ' + itemDef.getDamage() + ' damage';
+        typeStr =
+          'Weapon (' + this._getTierName(itemDef.getMaterialTier()) + ')';
+        if (itemDef.getDamage() > 0)
+          typeStr += ' — ' + itemDef.getDamage() + ' damage';
         break;
       case Donkeycraft.ItemType.ARMOR:
-        typeStr = 'Armor (' + this._getTierName(itemDef.getMaterialTier()) + ')';
-        if (itemDef.getDefense() > 0) typeStr += ' — ' + itemDef.getDefense() + ' defense';
+        typeStr =
+          'Armor (' + this._getTierName(itemDef.getMaterialTier()) + ')';
+        if (itemDef.getDefense() > 0)
+          typeStr += ' — ' + itemDef.getDefense() + ' defense';
         break;
       case Donkeycraft.ItemType.FOOD:
         typeStr = 'Food';
-        if (itemDef.getFoodRestore() > 0) typeStr += ' — +' + (itemDef.getFoodRestore() / 2) + ' hunger';
+        if (itemDef.getFoodRestore() > 0)
+          typeStr += ' — +' + itemDef.getFoodRestore() / 2 + ' hunger';
         break;
       case Donkeycraft.ItemType.POTION:
         typeStr = 'Potion';
@@ -276,7 +299,15 @@
    * @private
    */
   Donkeycraft.ItemExamineUI.prototype._getTierName = function (tier) {
-    var tiers = ['None', 'Wood', 'Stone', 'Iron', 'Diamond', 'Gold', 'Netherite'];
+    var tiers = [
+      'None',
+      'Wood',
+      'Stone',
+      'Iron',
+      'Diamond',
+      'Gold',
+      'Netherite',
+    ];
     return tiers[tier] || 'Unknown';
   };
 
@@ -299,7 +330,7 @@
       9: 'Invisibility',
       10: 'Night Vision',
       11: 'Weakness',
-      12: 'Slow Falling'
+      12: 'Slow Falling',
     };
     return names[effectId] || 'Effect ' + effectId;
   };
@@ -337,32 +368,51 @@
    * @param {Donkeycraft.ItemStack} stack - Item stack.
    * @private
    */
-  Donkeycraft.ItemExamineUI.prototype._updateProperties = function (itemDef, stack) {
+  Donkeycraft.ItemExamineUI.prototype._updateProperties = function (
+    itemDef,
+    stack
+  ) {
     var hasProperties = false;
     var props = [];
 
     // Tool properties
     if (itemDef.isTool() && itemDef.getToolType()) {
       hasProperties = true;
-      props.push('<span class="dk-prop dk-prop-tool">⛏️ ' + itemDef.getToolType().replace('_', ' ') + '</span>');
+      props.push(
+        '<span class="dk-prop dk-prop-tool">⛏️ ' +
+          itemDef.getToolType().replace('_', ' ') +
+          '</span>'
+      );
     }
 
     // Weapon damage
     if (itemDef.isWeapon() && itemDef.getDamage() > 0) {
       hasProperties = true;
-      props.push('<span class="dk-prop dk-prop-damage">⚔️ +' + itemDef.getDamage() + ' damage</span>');
+      props.push(
+        '<span class="dk-prop dk-prop-damage">⚔️ +' +
+          itemDef.getDamage() +
+          ' damage</span>'
+      );
     }
 
     // Armor defense
     if (itemDef.isArmor() && itemDef.getDefense() > 0) {
       hasProperties = true;
-      props.push('<span class="dk-prop dk-prop-defense">🛡️ +' + itemDef.getDefense() + ' defense</span>');
+      props.push(
+        '<span class="dk-prop dk-prop-defense">🛡️ +' +
+          itemDef.getDefense() +
+          ' defense</span>'
+      );
     }
 
     // Food info
     if (itemDef.isFood() && itemDef.getFoodRestore() > 0) {
       hasProperties = true;
-      props.push('<span class="dk-prop dk-prop-food">🍖 +' + (itemDef.getFoodRestore() / 2) + ' hunger</span>');
+      props.push(
+        '<span class="dk-prop dk-prop-food">🍖 +' +
+          itemDef.getFoodRestore() / 2 +
+          ' hunger</span>'
+      );
     }
 
     // Enchantments
@@ -371,7 +421,13 @@
       hasProperties = true;
       for (var i = 0; i < enchantments.length; i++) {
         var ench = enchantments[i];
-        props.push('<span class="dk-prop dk-prop-enchant">✨ ' + this._getEnchantmentName(ench.id) + ' ' + this._getRomanNumeral(ench.level) + '</span>');
+        props.push(
+          '<span class="dk-prop dk-prop-enchant">✨ ' +
+            this._getEnchantmentName(ench.id) +
+            ' ' +
+            this._getRomanNumeral(ench.level) +
+            '</span>'
+        );
       }
     }
 
@@ -443,7 +499,7 @@
       21: 'Curse of Binding',
       22: 'Riptide',
       23: 'Loyalty',
-      24: 'Channeling'
+      24: 'Channeling',
     };
     return names[enchId] || 'Enchantment ' + enchId;
   };
