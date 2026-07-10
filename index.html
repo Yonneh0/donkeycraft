@@ -141,14 +141,23 @@
             <div class="dk-inventory-left-pane">
                 <!-- Equipment layout: left slots | paperdoll | right slots -->
                 <div class="dk-equipment-layout">
-                    <!-- Left column: 4 slots stacked, gap, then 1 slot (aligned with the 2 right columns) -->
+                    <!-- Left column: 4 slots stacked, gap, then 1 slot -->
                     <div class="dk-equip-col dk-equip-left">
-                        <div class="dk-equip-slot" data-slot="helm"><span class="dk-slot-item"></span></div>
-                        <div class="dk-equip-slot" data-slot="chest"><span class="dk-slot-item"></span></div>
-                        <div class="dk-equip-slot" data-slot="legs"><span class="dk-slot-item"></span></div>
-                        <div class="dk-equip-slot" data-slot="boots"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-slot-col">
+                            <div class="dk-equip-slot" data-slot="neck"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">📿</span></div>
+                            <div class="dk-equip-slot" data-slot="trin"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🧸</span></div>
+                            <div class="dk-equip-slot" data-slot="lbra"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">💎</span></div>
+                            <div class="dk-equip-slot" data-slot="lrin"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">💍</span></div>
+                        </div>
                         <div class="dk-equip-half-space"></div>
-                        <div class="dk-equip-slot" data-slot="shield"><span class="dk-slot-item"></span></div>
+                        <div class="dk-equip-slot-row">
+                            <div class="dk-equip-slot" data-slot="shie"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🛡️</span></div>
+                        </div>
                     </div>
 
                     <!-- Center: Paperdoll placeholder with smoke effect -->
@@ -165,30 +174,55 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Right column: 2 columns of 4 slots, gap, then 2 horizontal slots -->
-                    <div class="dk-equip-col dk-equip-right">
+                    <!-- A1 -->
+                    <div class="dk-equip-col dk-equip-left">
                         <div class="dk-equip-slot-col">
-                            <div class="dk-equip-slot" data-slot="neck"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="offhand"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="belt"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="ring1"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="aet1"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🙄</span></div>
                         </div>
+                    </div>
+                    <!-- A2 -->
+                    <div class="dk-equip-col dk-equip-left">
+                        <div class="dk-equip-slot-row">
+                            <div class="dk-equip-slot" data-slot="aet2"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">😱</span></div>
+
+                        </div>
+                        <div class="dk-equip-whole-space"></div>
                         <div class="dk-equip-slot-col">
-                            <div class="dk-equip-slot" data-slot="ring2"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="ring3"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="ring4"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="ring5"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="rbra"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">💎</span></div>
+                            <div class="dk-equip-slot" data-slot="rrin"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">💍</span></div>
                         </div>
                         <div class="dk-equip-half-space"></div>
                         <div class="dk-equip-slot-row">
-                            <div class="dk-equip-slot" data-slot="ring6"><span class="dk-slot-item"></span></div>
-                            <div class="dk-equip-slot" data-slot="ring7"><span class="dk-slot-item"></span></div>
+                            <div class="dk-equip-slot" data-slot="main"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🗡️</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Right column: 2 columns of 4 slots, gap, then 2 horizontal slots -->
+                    <div class="dk-equip-col dk-equip-left">
+                        <div class="dk-equip-slot-col">
+                            <div class="dk-equip-slot" data-slot="aet3"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🤯</span></div>
+                            <div class="dk-equip-slot" data-slot="cloa"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">🧣</span></div>
+                            <div class="dk-equip-slot" data-slot="shir"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">👕</span></div>
+                            <div class="dk-equip-slot" data-slot="pant"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">👖</span></div>
+                        </div>
+                        <div class="dk-equip-half-space"></div>
+                        <div class="dk-equip-slot-row">
+                            <div class="dk-equip-slot" data-slot="ammo"><span class="dk-slot-item"
+                                    style="opacity: 0.3; filter: grayscale(100%);">➴</span></div>
                         </div>
                     </div>
                 </div>
-                <!-- Inventory Grid Section (bottom 2/5 of panel) -->
 
+                <!-- Inventory Grid Section (bottom 2/5 of panel) -->
                 <div class="dk-inventory-grid-section">
                     <div class="dk-inventory-grid-wrapper">
                         <div id="dk-inventory-grid" class="dk-inventory-grid"></div>
