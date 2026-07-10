@@ -30,6 +30,28 @@
   Donkeycraft.Player = function (config) {
     config = config || {};
 
+    // ============================================================
+    // INVENTORY — Item management system
+    // ============================================================
+
+    /**
+     * ItemManager — manages all item stacks in the player's inventory.
+     * @type {Donkeycraft.ItemManager}
+     */
+    this.inventory = new Donkeycraft.ItemManager(this);
+
+    /**
+     * Currently selected hotbar slot index (0-8).
+     * @type {number}
+     */
+    this._selectedItemIndex = 0;
+
+    /**
+     * Previously selected hotbar slot index (for undo/transition tracking).
+     * @type {number}
+     */
+    this._prevSelectedItemIndex = -1;
+
     /**
      * Player position as a Vector3 — represents the center point at feet level.
      * Used for all movement, collision, and rendering calculations.
@@ -665,6 +687,199 @@
 
     // No valid land found after exhaustive search
     return null;
+  };
+
+  // ============================================================
+  // Inventory — Accessors & Mutators
+  // ============================================================
+
+  /**
+   * Get the player's ItemManager instance.
+   *
+   * @returns {Donkeycraft.ItemManager}
+   */
+  Donkeycraft.Player.prototype.getItemManager = function () {
+    return this.inventory;
+  };
+
+  /**
+   * Get the currently selected item stack (from the active hotbar slot).
+   *
+   * @returns {Donkeycraft.ItemStack|null}
+   */
+  Donkeycraft.Player.prototype.getSelectedStack = function () {
+    return this.inventory ? this.inventory.getSelectedStack() : null;
+  };
+
+  /**
+   * Get the index of the currently selected hotbar slot.
+   *
+   * @returns {number} Hotbar slot index (0-8).
+   */
+  Donkeycraft.Player.prototype.getSelectedItemIndex = function () {
+    return this._selectedItemIndex;
+  };
+
+  /**
+   * Set the currently selected hotbar slot.
+   *
+   * Updates _prevSelectedItemIndex for transition tracking.
+   * Emits `item:selected:changed` event via EventBus.
+   *
+   * @param {number} index - Hotbar slot index (0-8).
+   */
+  Donkeycraft.Player.prototype.setSelectedItemIndex = function (index) {
+    if (index < 0 || index > 8) return;
+
+    this._prevSelectedItemIndex = this._selectedItemIndex;
+    this._selectedItemIndex = index;
+
+    // Sync with ItemManager
+    if (this.inventory) {
+      this.inventory.setSelectedSlot(index);
+    }
+
+    // Emit event via EventBus
+    if (EventBus) {
+      try {
+        EventBus.emitSafe('item:selected:changed', {
+          slot: index,
+          prevSlot: this._prevSelectedItemIndex,
+          stack: this.getSelectedStack(),
+        });
+      } catch (e) {}
+    }
+  };
+
+  /**
+   * Get the previously selected hotbar slot index.
+   *
+   * @returns {number} Previous hotbar slot index (-1 if none).
+   */
+  Donkeycraft.Player.prototype.getPreviousSelectedIndex = function () {
+    return this._prevSelectedItemIndex;
+  };
+
+  /**
+   * Get the full inventory array.
+   *
+   * @returns {Array} Array of ItemStacks (41 slots: 9 hotbar + 27 main + 5 unused/armor).
+   */
+  Donkeycraft.Player.prototype.getInventory = function () {
+    return this.inventory ? this.inventory.getInventory() : [];
+  };
+
+  /**
+   * Get the hotbar slots (0-8).
+   *
+   * @returns {Array} Array of 9 ItemStacks.
+   */
+  Donkeycraft.Player.prototype.getHotbar = function () {
+    return this.inventory ? this.inventory.getHotbar() : [];
+  };
+
+  /**
+   * Get the main inventory slots (9-35).
+   *
+   * @returns {Array} Array of 27 ItemStacks.
+   */
+  Donkeycraft.Player.prototype.getMainInventory = function () {
+    return this.inventory ? this.inventory.getMainInventory() : [];
+  };
+
+  /**
+   * Get the armor inventory slots (36-39).
+   *
+   * @returns {Array} Array of 4 ItemStacks.
+   */
+  Donkeycraft.Player.prototype.getArmorInventory = function () {
+    return this.inventory ? this.inventory.getArmorInventory() : [];
+  };
+
+  /**
+   * Get the item stack in a specific slot.
+   *
+   * @param {number} slot - Slot index (0-40).
+   * @returns {Donkeycraft.ItemStack|null}
+   */
+  Donkeycraft.Player.prototype.getItemInSlot = function (slot) {
+    return this.inventory ? this.inventory.getStack(slot) : null;
+  };
+
+  /**
+   * Set the item stack in a specific slot.
+   *
+   * @param {number} slot - Slot index (0-40).
+   * @param {Donkeycraft.ItemStack|null} stack - Stack to set (null to clear).
+   */
+  Donkeycraft.Player.prototype.setItemInSlot = function (slot, stack) {
+    if (this.inventory) {
+      this.inventory.setStack(slot, stack);
+    }
+  };
+
+  /**
+   * Add an item stack to the inventory.
+   * Attempts to stack with existing items first, then finds empty slots.
+   *
+   * @param {Donkeycraft.ItemStack} stack - Stack to add.
+   * @returns {number} Number of items that couldn't be added (0 = all added).
+   */
+  Donkeycraft.Player.prototype.addItem = function (stack) {
+    return this.inventory ? this.inventory.addItem(stack) : 64;
+  };
+
+  /**
+   * Remove items from a specific slot.
+   *
+   * @param {number} slot - Slot index.
+   * @param {number} count - Number of items to remove.
+   * @returns {number} Number of items actually removed.
+   */
+  Donkeycraft.Player.prototype.removeItemFromSlot = function (slot, count) {
+    return this.inventory ? this.inventory.removeItem(slot, count) : 0;
+  };
+
+  /**
+   * Check if the inventory contains a specific item.
+   *
+   * @param {number} itemId - Item ID to check.
+   * @param {number} [requiredCount=1] - Minimum count required.
+   * @returns {boolean}
+   */
+  Donkeycraft.Player.prototype.hasItem = function (itemId, requiredCount) {
+    return this.inventory ? this.inventory.hasItem(itemId, requiredCount) : false;
+  };
+
+  /**
+   * Get the total count of a specific item across all slots.
+   *
+   * @param {number} itemId - Item ID to count.
+   * @returns {number} Total count.
+   */
+  Donkeycraft.Player.prototype.getItemCount = function (itemId) {
+    return this.inventory ? this.inventory.getCount(itemId) : 0;
+  };
+
+  /**
+   * Serialize the inventory for saving.
+   *
+   * @returns {Object} Serialized inventory data.
+   */
+  Donkeycraft.Player.prototype.serializeInventory = function () {
+    return this.inventory ? this.inventory.serialize() : { slots: [], selectedSlot: 0 };
+  };
+
+  /**
+   * Deserialize and load inventory from saved data.
+   *
+   * @param {Object} data - Serialized inventory data.
+   */
+  Donkeycraft.Player.prototype.deserializeInventory = function (data) {
+    if (this.inventory) {
+      this.inventory.deserialize(data);
+      this._selectedItemIndex = data.selectedSlot || 0;
+    }
   };
 
   // ============================================================

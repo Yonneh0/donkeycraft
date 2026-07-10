@@ -54,7 +54,11 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 ### Gameplay
 - **Block interactions** — Raycast-based mining and placement with reach distance (1–12 blocks)
 - **Tool system** — 7 material tiers (None through Netherite) with speed multipliers and correct-for-drop detection
-- **Inventory system** — Multi-slot inventories with drag-and-drop and shift-click distribution
+- **Item system** — Unified item definition with ItemType enum (tool/weapon/armor/food/potion/block/material/dirt/construction), MaterialTier enum, durability, damage, defense, food restore, rarity colors, NBT-like tags (item.js)
+- **Item definitions** — Runtime-generated definitions from blocks and entities with inline config (item-definitions.js)
+- **Item manager** — Efficient lifecycle tracking, inventory management (41 slots), stack merging, split operations, serialization (item-manager.js)
+- **Item UI** — Universal item icon renderer with count badges, condition meters, rarity borders, context menus, drag/split UI (item-ui.js, item-examine.js)
+- **Inventory system** — Multi-slot inventories with drag-and-drop, shift-click distribution, hotbar selection with event emission (player.js inventory accessors)
 - **Crafting** — 2×2 furnace crafting, 3×3 crafting table with 57 shaped + 28 shapeless recipes
 - **Furnace** — Smelting with fuel management and progress tracking (furnace-ui.js: 782 lines)
 - **Chest** — Single (27 slots) and double (54 slots) chests
@@ -232,7 +236,10 @@ src/                # Source code
     movement.js           # Walking, sprinting, swimming, flying speeds
     passive-mobs.js       # Cow, pig, sheep, chicken
     physics.js            # Gravity-affected blocks, liquid flow
-    player.js             # Player entity (position, velocity, rotation), Hitbox, damage, knockback, fall damage, stamina management
+    player.js             # Player entity (position, velocity, rotation), Hitbox, damage, knockback, fall damage, stamina management, inventory system (41 slots)
+    item.js               # Core item definition — ItemType enum, MaterialTier enum, Item class with all properties, ItemDefinitionRegistry
+    item-definitions.js   # Inline item definitions — runtime-generated from blocks/entities, special mechanic items (armor, weapons, tools, potions)
+    item-manager.js       # Item lifecycle manager — inventory operations, stack merging, split, serialization
     portal.js             # Inter-dimensional portals
     potion.js             # 18 effects, 40 potions
     projectiles.js        # Arrows, snowballs, ender pearls
@@ -313,16 +320,22 @@ src/                # Source code
     hotbar.js             # Hotbar UI with integrated stamina bar
     hunger-bar.css        # Hunger bar styles
     hunger-bar.js         # Hunger HUD overlay
-    item.css              # Item stack styles
-    item.js               # Item stacks with NBT-like tags
+    inventory-ui.css      # Inventory GUI styles
+    inventory-ui.js       # Inventory UI with drag-and-drop, shift-click distribution
+    item.css              # Item system styles — icons, condition meters, rarity borders, context menus, drag/split UI
+    item.js               # Item stacks with NBT-like tags (existing ItemStack class)
+    item-ui.js            # Universal item icon renderer, slot creation, drag/split operations, context menus
+    item-examine.js       # Item examine tooltip panel — rarity colors, property display, enchantment info
     keybindings-panel.css # Keybinds panel styles
     keybindings-panel.js  # Keybind configuration UI
     loading-screen.css    # Loading screen styles
     loading-screen.js     # Loading screen UI
-    minimap.css           # Minimap styles: circular border, compass ring positioning
-    minimap.js            # Minimap UI module: DOM management, rotating terrain rendering with player-centered rotation, compass ring display
     map.css               # Full map view styles: panel layout, toggle button, close button, overlay background
     map.js                # Full map panel UI module: DOM creation, drag-to-pan interaction, mousewheel zoom targeting, auto-zoom calculation, chunk grid and block border rendering
+    minimap.css           # Minimap styles: circular border, compass ring positioning
+    minimap.js            # Minimap UI module: DOM management, rotating terrain rendering with player-centered rotation, compass ring display
+    nametags.css          # Entity nametag styles
+    nametags.js           # Entity nametag rendering and positioning
     tod.css               # Time-of-day dial styles: circular dial background, daylight arc pointer, slider popup, freeze button states
     tod.js                # Time-of-day dial UI module: DOM creation, time display updates, sun/moon emoji pointer, creative mode time slider with freeze/unfreeze controls
     speed-indicator.css   # Speed indicator styles
