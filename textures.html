@@ -308,6 +308,96 @@
       color: #888;
     }
 
+    /* Pasted Textures Section */
+    .pasted-textures-section {
+      background: #16213e;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-top: 15px;
+    }
+
+    .pasted-textures-section h2 {
+      font-size: 1.1em;
+      color: #00d4ff;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #pastedTextarea {
+      width: 100%;
+      min-height: 150px;
+      background: #0a0a1a;
+      color: #7ec85f;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.5;
+    }
+
+    #pastedTextarea:focus {
+      border-color: #00d4ff;
+    }
+
+    .pasted-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .texture-display-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-top: 15px;
+      min-height: 40px;
+    }
+
+    .texture-card {
+      background: #0a0a1a;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      min-width: 128px;
+      max-width: 256px;
+      flex: 1 1 128px;
+    }
+
+    .texture-card-label {
+      color: #00d4ff;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      word-break: break-all;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+
+    .texture-card img {
+      max-width: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 16px 16px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .texture-card-empty {
+      color: #555;
+      font-size: 13px;
+      padding: 20px;
+      text-align: center;
+      width: 100%;
+    }
+
     /* Stats bar */
     .stats-bar {
       display: flex;
@@ -442,6 +532,22 @@
         placeholder="// Load a texture sheet to generate export code..."></textarea>
       <div class="export-info">Paste this code directly into your browser JavaScript console or .js file. Each chunk is
         exported as a base64 data URL PNG.</div>
+    </div>
+
+    <!-- Pasted Textures Section -->
+    <div class="pasted-textures-section">
+      <h2>
+        Pasted Textures
+        <button class="btn" id="clearPastedBtn">✕ Clear</button>
+      </h2>
+      <textarea id="pastedTextarea" placeholder="// Paste your texture export code here&#10;// Example:&#10;// var texture_row0_col0 = "data:image/png;base64,iVBOR...";&#10;// var texture_row0_col1 = "data:image/png;base64,iVBOR...";"></textarea>
+      <div class="pasted-controls">
+        <button class="btn btn-primary" id="parsePastedBtn">▶ Parse & Display</button>
+        <span id="pastedParseStatus" style="font-size: 12px; color: #888; margin-left: 10px;"></span>
+      </div>
+      <div class="texture-display-grid" id="pastedTextureDisplay">
+        <div class="texture-card-empty">Paste texture code above and click "Parse & Display"</div>
+      </div>
     </div>
   </div>
 
@@ -891,8 +997,129 @@
         stats.exported.textContent = chunkIndex;
       }
 
-      // === Initialize on page load ===
-      loadSettings();
+      // === Pasted Textures Parser & Display ===
+      var pastedTextarea = document.getElementById('pastedTextarea');
+      var parsePastedBtn = document.getElementById('parsePastedBtn');
+      var clearPastedBtn = document.getElementById('clearPastedBtn');
+      var pastedParseStatus = document.getElementById('pastedParseStatus');
+      var pastedTextureDisplay = document.getElementById('pastedTextureDisplay');
+
+      // Regex patterns for variable extraction
+      var varPattern = /(?:var|const|let)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*["']([^"']+)["'];?/g;
+
+      /**
+       * Parse pasted text and extract variable definitions with base64 data URLs
+       */
+      function parsePastedTextures(pasteText) {
+        var results = [];
+        var match;
+
+        // Reset regex lastIndex
+        varPattern.lastIndex = 0;
+
+        while ((match = varPattern.exec(pasteText)) !== null) {
+          var varName = match[1];
+          var dataUrl = match[2];
+
+          // Validate it's a data URL (image)
+          if (dataUrl.startsWith('data:image/') || dataUrl.startsWith('data:application/octet-stream;base64,')) {
+            results.push({
+              name: varName,
+              dataUrl: dataUrl
+            });
+          }
+        }
+
+        return results;
+      }
+
+      /**
+       * Create a texture card element for display
+       */
+      function createTextureCard(varName, dataUrl) {
+        var card = document.createElement('div');
+        card.className = 'texture-card';
+
+        var label = document.createElement('div');
+        label.className = 'texture-card-label';
+        label.textContent = varName;
+
+        var img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = varName;
+        img.style.width = '128px';
+        img.style.height = '128px';
+        img.loading = 'lazy';
+
+        card.appendChild(label);
+        card.appendChild(img);
+
+        return card;
+      }
+
+      /**
+       * Display parsed textures in the display area
+       */
+      function displayPastedTextures(textures) {
+        pastedTextureDisplay.innerHTML = '';
+
+        if (textures.length === 0) {
+          pastedTextureDisplay.innerHTML = '<div class="texture-card-empty">No valid texture variables found. Paste code with variable definitions like:<br><code style="color:#7ec85f;">var myTexture = "data:image/png;base64,...";</code></div>';
+          pastedParseStatus.textContent = '0 textures found';
+          pastedParseStatus.style.color = '#f44';
+          return;
+        }
+
+        // Create fragment for efficient DOM insertion
+        var fragment = document.createDocumentFragment();
+        for (var i = 0; i < textures.length; i++) {
+          fragment.appendChild(createTextureCard(textures[i].name, textures[i].dataUrl));
+        }
+        pastedTextureDisplay.appendChild(fragment);
+
+        pastedParseStatus.textContent = textures.length + ' texture' + (textures.length !== 1 ? 's' : '') + ' loaded';
+        pastedParseStatus.style.color = '#7ec85f';
+      }
+
+      /**
+       * Clear the pasted textures display
+       */
+      function clearPastedTextures() {
+        pastedTextarea.value = '';
+        pastedTextureDisplay.innerHTML = '<div class="texture-card-empty">Paste texture code above and click "Parse & Display"</div>';
+        pastedParseStatus.textContent = '';
+      }
+
+      // === Parse Button Click Handler ===
+      parsePastedBtn.addEventListener('click', function () {
+        var pasteText = pastedTextarea.value.trim();
+
+        if (!pasteText) {
+          pastedParseStatus.textContent = 'Please paste texture code first';
+          pastedParseStatus.style.color = '#f44';
+          return;
+        }
+
+        try {
+          var textures = parsePastedTextures(pasteText);
+          displayPastedTextures(textures);
+        } catch (e) {
+          pastedParseStatus.textContent = 'Error: ' + e.message;
+          pastedParseStatus.style.color = '#f44';
+          console.error('Parse error:', e);
+        }
+      });
+
+      // === Clear Button Click Handler ===
+      clearPastedBtn.addEventListener('click', clearPastedTextures);
+
+      // === Allow Ctrl+Enter to parse from textarea ===
+      pastedTextarea.addEventListener('keydown', function (e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+          e.preventDefault();
+          parsePastedBtn.click();
+        }
+      });
 
     })();
   </script>
