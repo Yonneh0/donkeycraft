@@ -268,6 +268,14 @@
   };
 
   /**
+   * getMaxStackSize — gets the maximum stack size for this item type.
+   * @returns {number} Maximum stack count (default 64).
+   */
+  Donkeycraft.Item.prototype.getMaxStackSize = function () {
+    return this.maxStackCount || 64;
+  };
+
+  /**
    * serialize — serializes this item definition to a plain object.
    * @returns {Object} Serialized item data.
    */

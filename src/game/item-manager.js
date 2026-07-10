@@ -203,6 +203,26 @@
   // ============================================================
 
   /**
+   * _getMaxStackForItem — gets the maximum stack size for an item ID.
+   * Uses ItemDefinitionRegistry if available, falls back to 64.
+   * @param {number} itemId - Item ID to look up.
+   * @returns {number} Maximum stack size.
+   * @private
+   */
+  Donkeycraft.ItemManager.prototype._getMaxStackForItem = function (itemId) {
+    if (
+      Donkeycraft.ItemDefinitionRegistry &&
+      typeof Donkeycraft.ItemDefinitionRegistry.get === 'function'
+    ) {
+      var itemDef = Donkeycraft.ItemDefinitionRegistry.get(itemId);
+      if (itemDef && typeof itemDef.getMaxStackSize === 'function') {
+        return itemDef.getMaxStackSize();
+      }
+    }
+    return 64; // Default max stack size
+  };
+
+  /**
    * addItem — tries to add a stack to the inventory.
    * First attempts to stack with existing identical stacks, then finds empty slots.
    * @param {Donkeycraft.ItemStack} stack - Stack to add.
@@ -212,25 +232,39 @@
     if (!stack || stack.isEmpty()) return 0;
 
     var remaining = stack.getCount();
+    var itemId = stack.getItemId();
+    var maxStack = this._getMaxStackForItem(itemId);
 
     // First pass: try to stack with existing identical stacks
     for (var i = 0; i < this._inventory.length; i++) {
       var existing = this._inventory[i];
-      if (
-        existing &&
-        !existing.isEmpty() &&
-        existing.canStackWith(stack) &&
-        existing.getCount() < existing.getMaxStackSize
-          ? existing.getMaxStackSize()
-          : 64
-      ) {
-        var space = 64 - existing.getCount();
-        var toAdd = Math.min(remaining, space);
-        existing.increment(toAdd);
-        remaining -= toAdd;
-        this._dirtySlots[i] = true;
+      if (existing && !existing.isEmpty() && existing.canStackWith(stack)) {
+        // Use the smaller of the two max stack sizes (existing item's definition or new stack's)
+        var existingMax = 64;
+        if (
+          Donkeycraft.ItemDefinitionRegistry &&
+          typeof Donkeycraft.ItemDefinitionRegistry.get === 'function'
+        ) {
+          var existingDef = Donkeycraft.ItemDefinitionRegistry.get(
+            existing.getItemId()
+          );
+          if (
+            existingDef &&
+            typeof existingDef.getMaxStackSize === 'function'
+          ) {
+            existingMax = existingDef.getMaxStackSize();
+          }
+        }
+        var effectiveMax = Math.min(maxStack, existingMax);
+        var space = effectiveMax - existing.getCount();
+        if (space > 0) {
+          var toAdd = Math.min(remaining, space);
+          existing.increment(toAdd);
+          remaining -= toAdd;
+          this._dirtySlots[i] = true;
 
-        if (remaining <= 0) return 0;
+          if (remaining <= 0) return 0;
+        }
       }
     }
 
@@ -246,9 +280,9 @@
 
       if (emptySlot === -1) break; // No space
 
-      var countToAdd = Math.min(remaining, 64);
+      var countToAdd = Math.min(remaining, maxStack);
       var newStack = new Donkeycraft.ItemStack(
-        stack.getItemId(),
+        itemId,
         countToAdd,
         stack.getTag()
       );
@@ -265,7 +299,14 @@
             remaining: remaining,
             player: this._player,
           });
-        } catch (e) {}
+        } catch (e) {
+          if (Donkeycraft.Logger) {
+            Donkeycraft.Logger.warn(
+              'ItemManager',
+              'Failed to emit item:add:partial event: ' + e.message
+            );
+          }
+        }
       }
     }
 
@@ -678,6 +719,14 @@
       }
     }
     return false;
+  };
+
+  /**
+   * getSlotCount — gets the total number of slots in this inventory.
+   * @returns {number} Total slot count (41 for player inventory).
+   */
+  Donkeycraft.ItemManager.prototype.getSlotCount = function () {
+    return this._inventory.length;
   };
 
   /**

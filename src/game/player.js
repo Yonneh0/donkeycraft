@@ -702,6 +702,70 @@
     return this.inventory;
   };
 
+  // ============================================================
+  // Experience / XP Level — Accessors & Mutators
+  // ============================================================
+
+  /**
+   * Get the player's current XP level.
+   *
+   * @returns {number} Current XP level.
+   */
+  Donkeycraft.Player.prototype.getLevel = function () {
+    return this._xpLevel || 0;
+  };
+
+  /**
+   * Set the player's XP level with clamping.
+   *
+   * Clamps to [0, 100] (MAX_LEVEL). Emits 'xp:changed' event via EventBus.
+   *
+   * @param {number} level - XP level to set.
+   */
+  Donkeycraft.Player.prototype.setLevel = function (level) {
+    var oldLevel = this._xpLevel || 0;
+    var clamped = Math.max(0, Math.min(100, Math.floor(level)));
+    this._xpLevel = clamped;
+
+    if (EventBus && clamped !== oldLevel) {
+      try {
+        EventBus.emitSafe('xp:changed', {
+          level: this._xpLevel,
+          delta: this._xpLevel - oldLevel,
+        });
+      } catch (e) {}
+    }
+  };
+
+  /**
+   * Add or remove XP levels from the player.
+   *
+   * Positive values add levels, negative values remove them.
+   * Clamps to [0, 100] and emits 'xp:changed' event via EventBus.
+   * Used by AnvilUI to deduct XP costs.
+   *
+   * @param {number} delta - Level change (positive = gain, negative = lose).
+   * @returns {number} Actual level change applied.
+   */
+  Donkeycraft.Player.prototype.addLevel = function (delta) {
+    var oldLevel = this._xpLevel || 0;
+    var newLevel = oldLevel + delta;
+    var clamped = Math.max(0, Math.min(100, Math.floor(newLevel)));
+    var actualDelta = clamped - oldLevel;
+    this._xpLevel = clamped;
+
+    if (EventBus && actualDelta !== 0) {
+      try {
+        EventBus.emitSafe('xp:changed', {
+          level: this._xpLevel,
+          delta: actualDelta,
+        });
+      } catch (e) {}
+    }
+
+    return actualDelta;
+  };
+
   /**
    * Get the currently selected item stack (from the active hotbar slot).
    *
@@ -1110,16 +1174,8 @@
     var oldHealth = this._health;
     this.setHealth(this._health + delta);
 
-    // Emit event with actual delta after clamping
-    if (EventBus && this._health !== oldHealth) {
-      try {
-        EventBus.emitSafe('health:changed', {
-          health: this._health,
-          maxHealth: this.maxHealth,
-          delta: this._health - oldHealth,
-        });
-      } catch (e) {}
-    }
+    // setHealth() already emits 'health:changed' — no duplicate emission needed.
+    // This method exists for convenience with the correct delta value.
   };
 
   /**
@@ -1180,15 +1236,8 @@
     var oldStamina = this._stamina;
     this.setStamina(this._stamina + delta);
 
-    if (EventBus && this._stamina !== oldStamina) {
-      try {
-        EventBus.emitSafe('stamina:changed', {
-          stamina: this._stamina,
-          maxStamina: this.maxStamina,
-          delta: this._stamina - oldStamina,
-        });
-      } catch (e) {}
-    }
+    // setStamina() already emits 'stamina:changed' — no duplicate emission needed.
+    // This method exists for convenience with the correct delta value.
   };
 
   /**
@@ -1249,15 +1298,8 @@
     var oldMana = this._mana;
     this.setMana(this._mana + delta);
 
-    if (EventBus && this._mana !== oldMana) {
-      try {
-        EventBus.emitSafe('mana:changed', {
-          mana: this._mana,
-          maxMana: this.maxMana,
-          delta: this._mana - oldMana,
-        });
-      } catch (e) {}
-    }
+    // setMana() already emits 'mana:changed' — no duplicate emission needed.
+    // This method exists for convenience with the correct delta value.
   };
 
   /**
@@ -1317,15 +1359,8 @@
     var oldLevel = this._foodLevel;
     this.setFoodLevel(this._foodLevel + delta);
 
-    if (EventBus && this._foodLevel !== oldLevel) {
-      try {
-        EventBus.emitSafe('hunger:changed', {
-          foodLevel: this._foodLevel,
-          hydration: this._hydration,
-          delta: this._foodLevel - oldLevel,
-        });
-      } catch (e) {}
-    }
+    // setFoodLevel() already emits 'hunger:changed' — no duplicate emission needed.
+    // This method exists for convenience with the correct delta value.
   };
 
   /**
@@ -1394,15 +1429,8 @@
     var oldHydration = this._hydration;
     this.setHydration(this._hydration + delta);
 
-    if (EventBus && this._hydration !== oldHydration) {
-      try {
-        EventBus.emitSafe('hunger:changed', {
-          foodLevel: this._foodLevel,
-          hydration: this._hydration,
-          hydrationDelta: this._hydration - oldHydration,
-        });
-      } catch (e) {}
-    }
+    // setHydration() already emits 'hunger:changed' — no duplicate emission needed.
+    // This method exists for convenience with the correct delta value.
   };
 
   // ============================================================

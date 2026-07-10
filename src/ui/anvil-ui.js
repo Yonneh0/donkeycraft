@@ -620,11 +620,17 @@
     this._resultStack = null;
 
     // Deduct XP cost from player
-    if (this._player && this._player.addLevel) {
+    if (this._player && this._price > 0) {
       try {
-        // addLevel with negative value removes levels
         this._player.addLevel(-this._price);
-      } catch (e) {}
+      } catch (e) {
+        if (Donkeycraft.Logger) {
+          Donkeycraft.Logger.warn(
+            'AnvilUI',
+            'Failed to deduct XP cost: ' + e.message
+          );
+        }
+      }
     }
 
     this._updateSlotDisplay(2);

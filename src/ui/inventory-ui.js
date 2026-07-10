@@ -267,18 +267,29 @@
     // Store additional backpack inventories (C2-C9)
     this._additionalBackpacks = {};
 
-    if (this._playerInventory) {
+    // Subscribe to EventBus for slot change events
+    // ItemManager emits 'item:slot:changed' with { slot, oldStack, newStack, player }
+    // We filter by source ItemManager using the 'player' reference in event data.
+    if (Donkeycraft.EventBus) {
       var self = this;
-      this._playerInventory.onSlotChange(function (slotIdx, newStack) {
-        self._updateSlotDisplay('player', slotIdx, newStack);
-      });
-    }
-
-    if (this._backpackInventory) {
-      var self2 = this;
-      this._backpackInventory.onSlotChange(function (slotIdx, newStack) {
-        self2._updateSlotDisplay('backpack', slotIdx, newStack);
-      });
+      this._slotChangeListener = function (data) {
+        // Filter events by source ItemManager to avoid unnecessary DOM updates
+        if (data.player === self._player && data.slot >= 0 && data.slot < 258) {
+          self._updateSlotDisplay('player', data.slot, data.newStack);
+        }
+        if (
+          self._backpackInventory &&
+          data.player === self._backpackInventory._owner &&
+          data.slot >= 0 &&
+          data.slot < 9
+        ) {
+          self._updateSlotDisplay('backpack', data.slot, data.newStack);
+        }
+      };
+      this._unsubscribeSlotChange = Donkeycraft.EventBus.onSafe(
+        'item:slot:changed',
+        this._slotChangeListener
+      );
     }
 
     // Wire container slot click handlers for backpack management
@@ -1854,42 +1865,60 @@
   };
 
   /**
-   * setMouseTrack — Set normalized mouse position for head tracking.
-   *
-   * Clamps input to [-1, 1] before mapping to configured rotation limits.
-   *
-   * @param {number} x - Normalized X position in [-1, 1] (-1 = left, 1 = right).
-   * @param {number} y - Normalized Y position in [-1, 1] (-1 = top, 1 = bottom).
+   * setInventory — sets the inventory data source for this panel.
+   * @param {Donkeycraft.ItemManager} playerInv - Player's ItemManager.
+   * @param {Donkeycraft.ItemManager} [backpackInv=null] - Main backpack (C1) inventory.
    */
-  Donkeycraft.PaperdollRenderer.prototype.setMouseTrack = function (x, y) {
-    var cx = Math.max(-1, Math.min(1, x));
-    var cy = Math.max(-1, Math.min(1, y));
-    // Map to head rotation: positive X → head turns right.
-    this._headOverride.yaw = cx * _HEAD_YAW_LIMIT;
-    this._headOverride.pitch = cy * _HEAD_PITCH_LIMIT;
-  };
+  Donkeycraft.InventoryUI.prototype.setInventory = function (
+    playerInv,
+    backpackInv
+  ) {
+    this._playerInventory = playerInv;
+    this._backpackInventory = backpackInv || null;
 
-  /**
-   * clearMouseTrack — Clear the head tracking override.
-   *
-   * Resets yaw and pitch overrides to zero, returning head rotation
-   * to its default animation state.
-   */
-  Donkeycraft.PaperdollRenderer.prototype.clearMouseTrack = function () {
-    this._headOverride.yaw = 0;
-    this._headOverride.pitch = 0;
-  };
+    // Store the Player reference from the ItemManager for event filtering.
+    // ItemManager stores the Player in _player property.
+    this._player = playerInv ? playerInv._player : null;
 
-  /**
-   * isRunning — Check if the renderer's animation loop is active.
-   *
-   * Returns `true` if `init()` was called successfully and `destroy()` has not been called.
-   * Note: the render loop may be paused (via `pause()` or hover) but `isRunning` still returns true.
-   *
-   * @returns {boolean} True if the renderer is in its active lifecycle.
-   */
-  Donkeycraft.PaperdollRenderer.prototype.isRunning = function () {
-    return this._running;
+    // Store additional backpack inventories (C2-C9)
+    this._additionalBackpacks = {};
+
+    // Subscribe to EventBus for slot change events.
+    // ItemManager emits 'item:slot:changed' with { slot, oldStack, newStack, player }
+    // We store the unsubscribe function to clean up in destroy().
+    if (Donkeycraft.EventBus) {
+      var self = this;
+      this._slotChangeListener = function (data) {
+        // Filter events by source ItemManager using the 'player' reference in event data.
+        // This avoids unnecessary DOM updates when events from other ItemManagers fire.
+        if (
+          self._player &&
+          data.player === self._player &&
+          data.slot >= 0 &&
+          data.slot < 258
+        ) {
+          self._updateSlotDisplay('player', data.slot, data.newStack);
+        }
+        // Update backpack slots if set — backpack inventories use the same Player reference
+        if (
+          self._backpackInventory &&
+          data.player === self._player &&
+          data.slot >= 0 &&
+          data.slot < 9
+        ) {
+          self._updateSlotDisplay('backpack', data.slot, data.newStack);
+        }
+      };
+      this._unsubscribeSlotChange = Donkeycraft.EventBus.onSafe(
+        'item:slot:changed',
+        this._slotChangeListener
+      );
+    }
+
+    // Wire container slot click handlers for backpack management
+    this._initContainerSlots();
+
+    this._renderAllSlots();
   };
 
   /**
@@ -1959,14 +1988,24 @@
   };
 
   /**
-   * destroy — cleans up all DOM elements and event listeners for InventoryUI.
+   * destroy — cleans up all DOM elements, event listeners, and subscriptions for InventoryUI.
    *
    * Note: This is the InventoryUI.destroy(), not PaperdollRenderer.destroy().
+   * The PaperdollRenderer lifecycle should be managed separately by the caller.
    */
   Donkeycraft.InventoryUI.prototype.destroy = function () {
     if (this._open) {
       this.close();
     }
+
+    // Unsubscribe from EventBus slot change listener to prevent memory leaks
+    if (this._unsubscribeSlotChange) {
+      try {
+        this._unsubscribeSlotChange();
+      } catch (e) {}
+      this._unsubscribeSlotChange = null;
+    }
+    this._slotChangeListener = null;
 
     if (this._panelEl && this._panelEl.parentNode) {
       this._panelEl.parentNode.removeChild(this._panelEl);
@@ -1979,5 +2018,6 @@
     this._subscriptions = {};
     this._playerInventory = null;
     this._backpackInventory = null;
+    this._player = null;
   };
 })();
