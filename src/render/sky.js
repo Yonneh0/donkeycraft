@@ -40,6 +40,26 @@
     this._starGeometry = null;
     this._starVertBuf = null;
 
+    // Skybox state
+    this._skyboxReady = false;
+    this._skyboxTexture = null;
+    this._skyboxGeometry = null;
+    this._skyboxVertBuf = null;
+    this._skyboxIndexBuf = null;
+
+    // Time-of-day tint keyframes: [timeOfDay, r, g, b, intensity]
+    // Intensity controls how strongly the tint is applied (0.9 = subtle night tint, 1.0 = full day tint)
+    this._tintKeyframes = [
+      { t: 0.0, r: 0.02, g: 0.02, b: 0.08, intensity: 0.9 },
+      { t: 0.2, r: 0.03, g: 0.02, b: 0.06, intensity: 0.9 },
+      { t: 0.3, r: 0.9, g: 0.5, b: 0.15, intensity: 1.0 },
+      { t: 0.45, r: 0.4, g: 0.65, b: 0.95, intensity: 1.0 },
+      { t: 0.55, r: 0.3, g: 0.55, b: 0.95, intensity: 1.0 },
+      { t: 0.7, r: 0.85, g: 0.45, b: 0.1, intensity: 1.0 },
+      { t: 0.8, r: 0.03, g: 0.02, b: 0.06, intensity: 0.9 },
+      { t: 1.0, r: 0.02, g: 0.02, b: 0.08, intensity: 0.9 },
+    ];
+
     // View matrix transform for sky dome (zeroed translation)
     this._skyViewTemp = new Float32Array(16);
 
@@ -48,6 +68,8 @@
     this._buildSunDisc();
     this._buildMoonDisc();
     this._buildStarField();
+    this._buildSkyboxGeometry();
+    this._loadSkyboxTextures();
     this._initBuffers();
   };
 
@@ -241,6 +263,440 @@
       indexCount: this._starCount * 6,
       floatsPerVertex: 7, // position(3) + color(4)
     };
+  };
+
+  /**
+   * Build a unit cube geometry for the skybox.
+   * The cube is centered at origin with radius 1.0.
+   * Each face has unique UV coordinates mapped from the 6-face atlas grid defined in skybox.js.
+   * Atlas layout (4 columns × 3 rows, each cell = 512×512):
+   *   Row 0: [empty, UP(+Y), empty, empty]
+   *   Row 1: [LEFT(-X), FORWARD(+Z), RIGHT(+X), BACK(-Z)]
+   *   Row 2: [empty, DOWN(-Y), empty, empty]
+   * UV cell sizes: width = 0.25, height = 1/3 per cell.
+   * Vertex layout: position(3) + uv(2) = 5 floats per vertex.
+   * Face order: +X(right), -X(left), +Y(up), -Y(down), +Z(forward), -Z(back).
+   * @private
+   * @returns {void}
+   */
+  Donkeycraft.Sky.prototype._buildSkyboxGeometry = function () {
+    // Face definitions with normal vectors and UV atlas base coordinates.
+    // uBase/vBase = bottom-left corner of each face's cell in the 4×3 grid.
+    // Cell dimensions: cellW = 0.25 (1/4 cols), cellH = 1/3 (1/3 rows).
+    var faces = [
+      { nx: 1, ny: 0, nz: 0, uBase: 0.5, vBase: 1.0 / 3.0 }, // +X right  = row1_col2
+      { nx: -1, ny: 0, nz: 0, uBase: 0.0, vBase: 1.0 / 3.0 }, // -X left   = row1_col0
+      { nx: 0, ny: 1, nz: 0, uBase: 0.25, vBase: 2.0 / 3.0 }, // +Y up     = row0_col1
+      { nx: 0, ny: -1, nz: 0, uBase: 0.25, vBase: 0.0 }, // -Y down   = row2_col1
+      { nx: 0, ny: 0, nz: 1, uBase: 0.25, vBase: 1.0 / 3.0 }, // +Z forward= row1_col1
+      { nx: 0, ny: 0, nz: -1, uBase: 0.75, vBase: 1.0 / 3.0 }, // -Z back   = row1_col3
+    ];
+
+    var vertices = [];
+    var indices = [];
+    var vertexCount = 0;
+    var cellW = 0.25; // Each cell is 1/4 of total width (4 columns)
+    var cellH = 1.0 / 3.0; // Each cell is 1/3 of total height (3 rows)
+
+    for (var f = 0; f < faces.length; f++) {
+      var face = faces[f];
+      var nx = face.nx,
+        ny = face.ny,
+        nz = face.nz;
+      var uBase = face.uBase,
+        vBase = face.vBase;
+
+      // 4 corners of the face quad (CCW winding for front-face culling).
+      // Corner coordinates (-1,-1) to (1,1) map to UV [0,1] within each cell.
+      var corners = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ];
+
+      for (var c = 0; c < 4; c++) {
+        var cx = corners[c][0];
+        var cy = corners[c][1];
+
+        // Compute 3D position based on face normal.
+        // The corner coordinates define the local X/Y axes on each face plane.
+        var px, py, pz;
+        if (Math.abs(nx) > 0.5) {
+          // Right/Left face: normal is ±X, face plane is YZ
+          px = nx;
+          py = cx;
+          pz = cy;
+        } else if (Math.abs(ny) > 0.5) {
+          // Up/Down face: normal is ±Y, face plane is XZ
+          px = cx;
+          py = ny;
+          pz = cy;
+        } else {
+          // Forward/Back face: normal is ±Z, face plane is XY
+          px = cx;
+          py = cy;
+          pz = nz;
+        }
+
+        // Map corner (-1,-1)→(1,1) to UV within the cell.
+        var u = uBase + ((cx + 1) / 2.0) * cellW;
+        var v = vBase + ((cy + 1) / 2.0) * cellH;
+
+        vertices.push(px, py, pz, u, v);
+      }
+
+      // Two triangles per quad (CCW winding for front-face culling).
+      indices.push(vertexCount, vertexCount + 1, vertexCount + 2);
+      indices.push(vertexCount, vertexCount + 2, vertexCount + 3);
+      vertexCount += 4;
+    }
+
+    this._skyboxGeometry = {
+      vertices: new Float32Array(vertices),
+      indices: new Uint16Array(indices),
+      vertexCount: vertexCount,
+      indexCount: indices.length,
+      floatsPerVertex: 5, // position(3) + uv(2)
+    };
+  };
+
+  /**
+   * Load skybox textures from global variables defined in skybox.js.
+   * Creates a WebGL cube map texture from the 6 base64 PNG images.
+   * Validates that all 6 texture variables exist before loading, and logs
+   * per-face success/failure for debugging.
+   *
+   * Texture mapping (matches skybox.js variable names):
+   *   GL_TEXTURE_CUBE_MAP_POSITIVE_X (+X, right)  = texture_row1_col2
+   *   GL_TEXTURE_CUBE_MAP_NEGATIVE_X (-X, left)   = texture_row1_col0
+   *   GL_TEXTURE_CUBE_MAP_POSITIVE_Y (+Y, up)     = texture_row0_col1
+   *   GL_TEXTURE_CUBE_MAP_NEGATIVE_Y (-Y, down)   = texture_row2_col1
+   *   GL_TEXTURE_CUBE_MAP_POSITIVE_Z (+Z, forward)= texture_row1_col1
+   *   GL_TEXTURE_CUBE_MAP_NEGATIVE_Z (-Z, back)   = texture_row1_col3
+   *
+   * @private
+   * @returns {void}
+   */
+  Donkeycraft.Sky.prototype._loadSkyboxTextures = function () {
+    var gl = this._gl;
+    if (!gl) return;
+
+    // Map of cube map faces to global variable names from skybox.js.
+    var faceMap = [
+      { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, varName: 'texture_row1_col2' }, // right (+X)
+      { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, varName: 'texture_row1_col0' }, // left (-X)
+      { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, varName: 'texture_row0_col1' }, // up (+Y)
+      { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, varName: 'texture_row2_col1' }, // down (-Y)
+      { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, varName: 'texture_row1_col1' }, // forward (+Z)
+      { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, varName: 'texture_row1_col3' }, // back (-Z)
+    ];
+
+    // Pre-flight validation: check all 6 texture variables exist before creating buffers.
+    // This prevents allocating GPU memory for a skybox that will fail anyway.
+    var missingVars = [];
+    for (var i = 0; i < faceMap.length; i++) {
+      if (
+        !window[faceMap[i].varName] ||
+        typeof window[faceMap[i].varName] !== 'string'
+      ) {
+        missingVars.push(faceMap[i].varName);
+      }
+    }
+    if (missingVars.length > 0) {
+      Donkeycraft.Logger.warn(
+        'Sky',
+        'Skybox texture variables missing: ' +
+          missingVars.join(', ') +
+          ' — using gradient fallback'
+      );
+      this._skyboxReady = false;
+      return;
+    }
+
+    // Create the cube map texture.
+    this._skyboxTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this._skyboxTexture);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    var loadedCount = 0;
+    var errorCount = 0;
+    var totalFaces = faceMap.length;
+    var self = this;
+
+    function checkComplete() {
+      loadedCount++;
+      if (loadedCount + errorCount === totalFaces) {
+        // All faces processed — skybox is only ready if ALL faces succeeded.
+        // WebGL cube maps require all 6 faces; a single missing face makes the texture invalid.
+        self._skyboxReady = errorCount === 0;
+        if (self._skyboxReady) {
+          Donkeycraft.Logger.info(
+            'Sky',
+            'Skybox textures loaded successfully (' +
+              totalFaces +
+              '/' +
+              totalFaces +
+              ' faces)'
+          );
+        } else {
+          Donkeycraft.Logger.warn(
+            'Sky',
+            'Skybox loading incomplete: ' +
+              errorCount +
+              '/' +
+              totalFaces +
+              ' faces failed — using gradient fallback'
+          );
+        }
+      }
+    }
+
+    for (var i = 0; i < faceMap.length; i++) {
+      (function (face, idx) {
+        var imgSrc = window[face.varName];
+        var image = new Image();
+        image.crossOrigin = 'anonymous';
+
+        image.onload = function () {
+          // Verify image has valid dimensions before uploading.
+          if (image.width === 0 || image.height === 0) {
+            Donkeycraft.Logger.warn(
+              'Sky',
+              'Invalid texture dimensions for: ' + face.varName
+            );
+            errorCount++;
+            checkComplete();
+            return;
+          }
+          gl.bindTexture(gl.TEXTURE_CUBE_MAP, self._skyboxTexture);
+          gl.texImage2D(
+            face.target,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            image
+          );
+          Donkeycraft.Logger.debug(
+            'Sky',
+            'Loaded skybox face: ' +
+              face.varName +
+              ' (' +
+              image.width +
+              'x' +
+              image.height +
+              ')'
+          );
+          checkComplete();
+        };
+
+        image.onerror = function () {
+          Donkeycraft.Logger.warn(
+            'Sky',
+            'Failed to load skybox texture: ' + face.varName
+          );
+          errorCount++;
+          checkComplete();
+        };
+
+        image.src = imgSrc;
+      })(faceMap[i], i);
+    }
+  };
+
+  /**
+   * Get the time-of-day tint color for skybox rendering.
+   * Interpolates RGB values and intensity from predefined keyframes using smoothstep easing.
+   * Intensity is interpolated between keyframe values to ensure smooth transitions at boundaries.
+   *
+   * Tint keyframe schedule:
+   * - t=0.00 (midnight):    dark blue-black (0.02, 0.02, 0.08) — intensity 0.9
+   * - t=0.20 (pre-dawn):    very dark (0.03, 0.02, 0.06) — intensity 0.9
+   * - t=0.30 (sunrise):     orange-pink (0.9, 0.5, 0.15) — intensity 1.0
+   * - t=0.45 (morning):     blue sky (0.4, 0.65, 0.95) — intensity 1.0
+   * - t=0.55 (midday):      deep blue sky (0.3, 0.55, 0.95) — intensity 1.0
+   * - t=0.70 (sunset):      orange (0.85, 0.45, 0.1) — intensity 1.0
+   * - t=0.80 (dusk):        dark (0.03, 0.02, 0.06) — intensity 0.9
+   * - t=1.00 (midnight):    dark blue-black again — intensity 0.9
+   *
+   * @private
+   * @param {number} timeOfDay - Time value in [0, 1). 0.25=sunrise, 0.5=noon, 0.75=sunset.
+   * @returns {{r: number, g: number, b: number, intensity: number}} Tint color and intensity.
+   */
+  Donkeycraft.Sky.prototype._getTintColor = function (timeOfDay) {
+    var kf = this._tintKeyframes;
+    var t = timeOfDay;
+
+    // Find surrounding keyframes for interpolation.
+    var lower = kf[0];
+    var upper = kf[kf.length - 1];
+
+    for (var i = 0; i < kf.length - 1; i++) {
+      if (t >= kf[i].t && t <= kf[i + 1].t) {
+        lower = kf[i];
+        upper = kf[i + 1];
+        break;
+      }
+    }
+
+    // Compute local phase within the current keyframe pair.
+    var range = upper.t - lower.t;
+    var phase = range > 0 ? (t - lower.t) / range : 0;
+
+    // Apply smoothstep easing for smooth color transitions.
+    phase = phase * phase * (3 - 2 * phase);
+
+    // Interpolate intensity between keyframe values (not global linear ramp).
+    // This ensures intensity matches the color transition at each keyframe boundary.
+    var intensity = Donkeycraft.lerp(lower.intensity, upper.intensity, phase);
+
+    return {
+      r: lower.r + (upper.r - lower.r) * phase,
+      g: lower.g + (upper.g - lower.g) * phase,
+      b: lower.b + (upper.b - lower.b) * phase,
+      intensity: intensity,
+    };
+  };
+
+  /**
+   * Render the skybox cube map.
+   * Draws a large unit cube (400×400×400 world units) centered at the origin,
+   * with the camera positioned inside it. The cube map texture is sampled
+   * using the normalized direction vector from the camera to each fragment.
+   *
+   * Time-of-day tinting is applied per-frame by multiplying the texture color
+   * with the interpolated tint color from `_getTintColor()`.
+   *
+   * CRITICAL: The view matrix translation is zeroed out (components 12-14) to keep
+   * the skybox fixed at world center regardless of camera position. Without this,
+   * the skybox would appear to move with the camera.
+   *
+   * @private
+   * @param {Donkeycraft.Camera} camera - The camera instance.
+   * @param {number} timeOfDay - Time value in [0, 1). 0.25=sunrise, 0.5=noon, 0.75=sunset.
+   * @returns {boolean} True if rendered successfully.
+   */
+  Donkeycraft.Sky.prototype._renderSkybox = function (camera, timeOfDay) {
+    var gl = this._gl;
+    if (!gl) return false;
+
+    // Guard: skip rendering if the WebGL context was lost.
+    if (gl.isContextLost()) return false;
+
+    // Validate required resources exist.
+    if (!this._skyboxTexture || !this._skyboxVertBuf || !this._skyboxIndexBuf) {
+      return false;
+    }
+
+    // Validate skybox geometry data.
+    if (!this._skyboxGeometry || !this._skyboxGeometry.indexCount) {
+      Donkeycraft.Logger.warn(
+        'Sky',
+        '_renderSkybox: skybox geometry invalid — skipping'
+      );
+      return false;
+    }
+
+    if (!this._shaderManager.use('sky')) {
+      return false;
+    }
+
+    // Scale the skybox to a large radius (400 world units) so it fills the visible scene.
+    // Translation is zero since the camera sits inside the cube at the origin.
+    var modelMatrix = Donkeycraft.Matrix4.createScale(400, 400, 400);
+
+    // Set projection matrix from camera.
+    var camData = camera.getMatrices();
+    this._shaderManager.setMat4('uProjection', camData.projection);
+
+    // Zero out view matrix translation to keep skybox fixed at world center.
+    // The view matrix normally encodes camera position, but the skybox must not
+    // move with the camera — it should appear as a distant background.
+    for (var i = 0; i < 16; i++) {
+      this._skyViewTemp[i] = camData.view.getData()[i];
+    }
+    this._skyViewTemp[12] = 0; // Zero X translation
+    this._skyViewTemp[13] = 0; // Zero Y translation
+    this._skyViewTemp[14] = 0; // Zero Z translation
+    var skyboxViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+    this._shaderManager.setMat4('uView', skyboxViewMatrix);
+
+    // Set model matrix (scale only, no translation).
+    this._shaderManager.setMat4('uModel', modelMatrix);
+
+    // Bind the cube map texture to texture unit 0.
+    this._shaderManager.setInt('uUseSkybox', 1);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, this._skyboxTexture);
+    this._shaderManager.setInt('uSkyboxTexture', 0);
+
+    // Apply time-of-day tint color.
+    var tint = this._getTintColor(timeOfDay);
+    if (
+      typeof tint.r !== 'number' ||
+      typeof tint.g !== 'number' ||
+      typeof tint.b !== 'number'
+    ) {
+      Donkeycraft.Logger.warn(
+        'Sky',
+        '_renderSkybox: invalid tint color — using default'
+      );
+      tint = { r: 0.5, g: 0.65, b: 0.95, intensity: 1.0 };
+    }
+    this._shaderManager.setVec3('uTintColor', tint.r, tint.g, tint.b);
+    this._shaderManager.setFloat(
+      'uTintIntensity',
+      typeof tint.intensity === 'number' ? tint.intensity : 1.0
+    );
+
+    // Disable gradient uniforms — not used when rendering skybox.
+    this._shaderManager.setInt('uHasColorOverlay', 0);
+
+    // Bind vertex attributes: position(3) + UV(2) = 5 floats per vertex.
+    gl.bindBuffer(gl.ARRAY_BUFFER, this._skyboxVertBuf);
+    var posLoc = this._shaderManager.getAttribute('aPosition');
+    var uvLoc = this._shaderManager.getAttribute('aUV');
+
+    if (posLoc >= 0) {
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 5 * 4, 0);
+    }
+    if (uvLoc >= 0) {
+      gl.enableVertexAttribArray(uvLoc);
+      gl.vertexAttribPointer(uvLoc, 2, gl.FLOAT, false, 5 * 4, 12);
+    }
+
+    // Draw the skybox cube (36 indices = 6 faces × 2 triangles × 3 vertices).
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyboxIndexBuf);
+    try {
+      gl.drawElements(
+        gl.TRIANGLES,
+        this._skyboxGeometry.indexCount,
+        gl.UNSIGNED_SHORT,
+        0
+      );
+    } catch (e) {
+      Donkeycraft.Logger.error(
+        'Sky',
+        '_renderSkybox: drawElements failed — ' +
+          (e && e.message ? e.message : String(e))
+      );
+      // Reset skybox uniform even on error.
+      this._shaderManager.setInt('uUseSkybox', 0);
+      return false;
+    }
+
+    // Disable attribute arrays to prevent state leakage.
+    if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+    if (uvLoc >= 0) gl.disableVertexAttribArray(uvLoc);
+
+    // Reset skybox uniform for subsequent rendering passes (sun/moon/stars).
+    this._shaderManager.setInt('uUseSkybox', 0);
+    return true;
   };
 
   /**
@@ -609,74 +1065,85 @@
     gl.disable(gl.CULL_FACE);
 
     try {
-      // ---- Sky dome (always drawn first, depth write disabled) ----
-      gl.depthMask(false);
-
-      if (!this._shaderManager.use('sky')) {
-        Donkeycraft.Logger.warn(
-          'Sky',
-          'render: sky shader not available — skipping sky render'
-        );
-        return;
-      }
-
-      // CRITICAL: Reset color overlay flag at the start to prevent state leakage.
-      // If sun/moon rendering is skipped (e.g., sunIntensity < 0.1), the flag may
-      // retain a previous value from an earlier frame, causing stars to render
-      // with incorrect color overlay behavior.
-      this._shaderManager.setInt('uHasColorOverlay', 0);
-
-      var matrices = camera.getMatrices();
-      this._shaderManager.setMat4('uProjection', matrices.projection);
-
-      // Zero out view translation to keep sky fixed at world center.
-      var viewData = matrices.view.getData();
-      for (var i = 0; i < 16; i++) this._skyViewTemp[i] = viewData[i];
-      this._skyViewTemp[12] = 0;
-      this._skyViewTemp[13] = 0;
-      this._skyViewTemp[14] = 0;
-      var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
-
-      this._shaderManager.setMat4('uView', skyViewMatrix);
-
-      // Set sky colors from lighting
-      var skyColor = lighting.getSkyColor();
+      // Get sun intensity at the top so it's available for all rendering passes
       var sunIntensity = lighting.getSunIntensity();
 
-      this._shaderManager.setVec3(
-        'uTopColor',
-        skyColor.r * (0.5 + 0.5 * sunIntensity),
-        skyColor.g * (0.5 + 0.5 * sunIntensity),
-        skyColor.b * (0.5 + 0.5 * sunIntensity)
-      );
+      // ---- Skybox (rendered first, depth write disabled) ----
+      gl.depthMask(false);
 
-      this._shaderManager.setVec3(
-        'uBottomColor',
-        skyColor.r * 0.8,
-        skyColor.g * 0.8,
-        skyColor.b * 0.8
-      );
-
-      this._shaderManager.setFloat('uHorizon', 0.1);
-
-      // Draw sky dome — only aPosition is needed since uHasColorOverlay=0 uses gradient.
-      gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
-      var posLoc = this._shaderManager.getAttribute('aPosition');
-
-      if (posLoc >= 0) {
-        gl.enableVertexAttribArray(posLoc);
-        gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 3 * 4, 0);
+      var skyboxRendered = false;
+      if (this._skyboxReady) {
+        skyboxRendered = this._renderSkybox(camera, this._timeOfDay);
       }
 
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
-      gl.drawElements(
-        gl.TRIANGLES,
-        this._skyDomeGeometry.indexCount,
-        gl.UNSIGNED_SHORT,
-        0
-      );
+      // ---- Sky dome gradient fallback (only if skybox not ready) ----
+      if (!skyboxRendered) {
+        if (!this._shaderManager.use('sky')) {
+          Donkeycraft.Logger.warn(
+            'Sky',
+            'render: sky shader not available — skipping sky render'
+          );
+          return;
+        }
 
-      if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+        // CRITICAL: Reset color overlay flag at the start to prevent state leakage.
+        // If sun/moon rendering is skipped (e.g., sunIntensity < 0.1), the flag may
+        // retain a previous value from an earlier frame, causing stars to render
+        // with incorrect color overlay behavior.
+        this._shaderManager.setInt('uHasColorOverlay', 0);
+
+        var matrices = camera.getMatrices();
+        this._shaderManager.setMat4('uProjection', matrices.projection);
+
+        // Zero out view translation to keep sky fixed at world center.
+        var viewData = matrices.view.getData();
+        for (var _gv = 0; _gv < 16; _gv++)
+          this._skyViewTemp[_gv] = viewData[_gv];
+        this._skyViewTemp[12] = 0;
+        this._skyViewTemp[13] = 0;
+        this._skyViewTemp[14] = 0;
+        var skyViewMatrix = new Donkeycraft.Matrix4(this._skyViewTemp);
+
+        this._shaderManager.setMat4('uView', skyViewMatrix);
+
+        // Set sky colors from lighting
+        var skyColor = lighting.getSkyColor();
+
+        this._shaderManager.setVec3(
+          'uTopColor',
+          skyColor.r * (0.5 + 0.5 * sunIntensity),
+          skyColor.g * (0.5 + 0.5 * sunIntensity),
+          skyColor.b * (0.5 + 0.5 * sunIntensity)
+        );
+
+        this._shaderManager.setVec3(
+          'uBottomColor',
+          skyColor.r * 0.8,
+          skyColor.g * 0.8,
+          skyColor.b * 0.8
+        );
+
+        this._shaderManager.setFloat('uHorizon', 0.1);
+
+        // Draw sky dome — only aPosition is needed since uHasColorOverlay=0 uses gradient.
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._skyDomeVertBuf);
+        var posLoc = this._shaderManager.getAttribute('aPosition');
+
+        if (posLoc >= 0) {
+          gl.enableVertexAttribArray(posLoc);
+          gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 3 * 4, 0);
+        }
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyDomeIndexBuf);
+        gl.drawElements(
+          gl.TRIANGLES,
+          this._skyDomeGeometry.indexCount,
+          gl.UNSIGNED_SHORT,
+          0
+        );
+
+        if (posLoc >= 0) gl.disableVertexAttribArray(posLoc);
+      }
 
       // ---- Sun disc (visible during day) — translucent overlay ----
       if (this._sunMoonVisible && sunIntensity > 0.1) {
@@ -695,8 +1162,9 @@
         this._renderMoonDisc(camera, moonDir);
       }
 
-      // Reset color overlay flag after sun/moon rendering so stars use default gradient passthrough.
+      // Reset color overlay and skybox flags after all sky rendering is done
       this._shaderManager.setInt('uHasColorOverlay', 0);
+      this._shaderManager.setInt('uUseSkybox', 0);
 
       // ---- Stars (visible at night, translucent point sprites) ----
       if (this._starsVisible && sunIntensity < 0.3 && this._starVertBuf) {
@@ -713,8 +1181,8 @@
           this._shaderManager.setMat4('uProjection', starMatrices.projection);
 
           // Zero out view translation for stars (keep sky fixed at world center).
-          for (var si = 0; si < 16; si++)
-            this._skyViewTemp[si] = starMatrices.view.getData()[si];
+          for (var _si = 0; _si < 16; _si++)
+            this._skyViewTemp[_si] = starMatrices.view.getData()[_si];
           this._skyViewTemp[12] = 0;
           this._skyViewTemp[13] = 0;
           this._skyViewTemp[14] = 0;
@@ -753,6 +1221,25 @@
   Donkeycraft.Sky.prototype._initBuffers = function () {
     var gl = this._gl;
     if (!gl) return;
+
+    // === Skybox buffers ===
+    if (this._skyboxGeometry) {
+      this._skyboxVertBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this._skyboxVertBuf);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        this._skyboxGeometry.vertices,
+        gl.STATIC_DRAW
+      );
+
+      this._skyboxIndexBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._skyboxIndexBuf);
+      gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        this._skyboxGeometry.indices,
+        gl.STATIC_DRAW
+      );
+    }
 
     // Sky dome
     if (this._skyDomeGeometry) {
@@ -826,6 +1313,20 @@
   Donkeycraft.Sky.prototype.destroy = function () {
     var gl = this._gl;
     if (!gl) return;
+
+    // === Skybox resources ===
+    if (this._skyboxTexture) {
+      gl.deleteTexture(this._skyboxTexture);
+      this._skyboxTexture = null;
+    }
+    if (this._skyboxVertBuf) {
+      gl.deleteBuffer(this._skyboxVertBuf);
+      this._skyboxVertBuf = null;
+    }
+    if (this._skyboxIndexBuf) {
+      gl.deleteBuffer(this._skyboxIndexBuf);
+      this._skyboxIndexBuf = null;
+    }
 
     if (this._skyDomeVertBuf) {
       gl.deleteBuffer(this._skyDomeVertBuf);

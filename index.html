@@ -708,17 +708,33 @@ uniform vec3 uTopColor;
 uniform vec3 uBottomColor;
 uniform float uHorizon;
 uniform int uHasColorOverlay;
+uniform samplerCube uSkyboxTexture;
+uniform int uUseSkybox;
+uniform vec3 uTintColor;
+uniform float uTintIntensity;
 
 void main() {
-    // Default: sky dome gradient (no color overlay).
-    float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);
-    vec3 finalColor = mix(uBottomColor, uTopColor, t);
+    vec3 finalColor;
     float alpha = 1.0;
 
-    // When a color overlay is active (sun/moon/stars), use the per-vertex color instead.
-    if (uHasColorOverlay == 1) {
-        finalColor = vColor.rgb;
-        alpha = vColor.a;
+    // === Skybox rendering (cube map) ===
+    if (uUseSkybox == 1) {
+        vec3 dir = normalize(vWorldPos);
+        vec3 texColor = textureCube(uSkyboxTexture, dir).rgb;
+
+        // Time-of-day tinting: mix between original texture and tinted color
+        finalColor = mix(texColor, texColor * uTintColor, uTintIntensity);
+    }
+    // === Fallback gradient rendering ===
+    else {
+        float t = smoothstep(uHorizon - 0.1, uHorizon + 0.1, normalize(vWorldPos).y);
+        finalColor = mix(uBottomColor, uTopColor, t);
+
+        // Color overlay for sun/moon/stars
+        if (uHasColorOverlay == 1) {
+            finalColor = vColor.rgb;
+            alpha = vColor.a;
+        }
     }
 
     gl_FragColor = vec4(finalColor, alpha);
@@ -985,6 +1001,7 @@ void main() {
     <script src="src/render/water-renderer.js"></script>
     <script src="src/render/camera.js"></script>
     <script src="src/render/fog.js"></script>
+    <script src="src/entities/skybox.js"></script>
     <script src="src/render/sky.js"></script>
     <script src="src/render/lighting.js"></script>
     <script src="src/render/hand-renderer.js"></script>

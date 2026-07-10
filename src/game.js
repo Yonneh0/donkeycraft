@@ -2633,10 +2633,18 @@
 
     // Update time of day and apply lighting to sky
     try {
+      var timeOfDay = this._getTimeOfDay();
+
+      // Sync time-of-day onto lighting system (sun intensity, sky color, sun direction)
       if (this._lighting) {
-        var timeOfDay = this._getTimeOfDay();
         this._lighting.setTimeOfDay(timeOfDay);
       }
+
+      // Sync time-of-day onto sky renderer (skybox tint, sun/moon/stars visibility)
+      if (this._sky) {
+        this._sky.setTimeOfDay(timeOfDay);
+      }
+
       if (this._renderSky && this._sky) {
         this._sky.render(this._camera, this._lighting);
       }
