@@ -107,6 +107,15 @@
   };
 
   /**
+   * getSlot — alias for getStack, gets the item stack in a slot.
+   * @param {number} slot - Slot index.
+   * @returns {Donkeycraft.ItemStack|null}
+   */
+  Donkeycraft.ItemManager.prototype.getSlot = function (slot) {
+    return this.getStack(slot);
+  };
+
+  /**
    * setSlot — alias for setStack, sets the item stack in a slot.
    * @param {number} slot - Slot index.
    * @param {Donkeycraft.ItemStack|null} stack - Stack to set (null to clear).
