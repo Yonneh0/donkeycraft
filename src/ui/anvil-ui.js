@@ -336,6 +336,62 @@
   };
 
   /**
+   * _emitResultChange — emits a result change event via EventBus.
+   * @param {*} result - The result data to emit.
+   * @private
+   */
+  Donkeycraft.AnvilUI.prototype._emitResultChange = function (result) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('anvil:result:changed', {
+          result: result,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onResultChange) {
+      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+        try {
+          this._listeners.onResultChange[i](result);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitSlotChange — emits a slot change event via EventBus.
+   * @param {number} index - Slot index.
+   * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
+   * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
+   * @private
+   */
+  Donkeycraft.AnvilUI.prototype._emitSlotChange = function (
+    index,
+    newStack,
+    oldStack
+  ) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('anvil:slot:changed', {
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _calculateResult — calculates the output based on inputs and rename text.
    * @private
    */
@@ -349,14 +405,8 @@
       this._price = 0;
       this._updateSlotDisplay(2);
       this._priceEl.textContent = 'Level 0';
-      // Emit result change event even in early-return path
-      if (this._listeners.onResultChange) {
-        for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-          try {
-            this._listeners.onResultChange[i](null);
-          } catch (e) {}
-        }
-      }
+      // Emit result change event even in early-return path via EventBus
+      this._emitResultChange(null);
       return;
     }
 
@@ -471,14 +521,8 @@
     this._updateSlotDisplay(2);
     this._priceEl.textContent = 'Level ' + this._price;
 
-    // Emit result change event
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i](this._resultStack);
-        } catch (e) {}
-      }
-    }
+    // Emit result change event via EventBus
+    this._emitResultChange(this._resultStack);
   };
 
   /**
@@ -532,14 +576,8 @@
     this._updateSlotDisplay(0);
     this._calculateResult();
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](0, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(0, stack, oldStack);
     return true;
   };
 
@@ -555,14 +593,8 @@
     this._updateSlotDisplay(1);
     this._calculateResult();
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](1, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(1, stack, oldStack);
     return true;
   };
 
@@ -686,14 +718,8 @@
         this._updateSlotDisplay(slotIdx);
         this._calculateResult();
 
-        // Emit slot change event
-        if (this._listeners.onSlotChange) {
-          for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-            try {
-              this._listeners.onSlotChange[i](slotIdx, null, oldStack);
-            } catch (e) {}
-          }
-        }
+        // Emit slot change event via EventBus
+        this._emitSlotChange(slotIdx, null, oldStack);
       }
     }
   };
@@ -739,14 +765,8 @@
       this.setRightSlot(itemStack);
     }
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](slotIndex, itemStack, null);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(slotIndex, itemStack, null);
 
     return true;
   };

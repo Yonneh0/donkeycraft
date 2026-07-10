@@ -320,6 +320,30 @@
   };
 
   /**
+   * _emitResultChange — emits a result change event via EventBus.
+   * @param {*} result - The result data to emit.
+   * @private
+   */
+  Donkeycraft.EnchantingUI.prototype._emitResultChange = function (result) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('enchanting:result:changed', {
+          result: result,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onResultChange) {
+      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+        try {
+          this._listeners.onResultChange[i](result);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _applyEnchantment — computes the enchanted output based on input item, selected enchantment option,
    * player levels, and lapis lazuli count. Updates the output slot and DOM display.
    * Emits onResultChange events when the output changes.
@@ -373,14 +397,8 @@
     // Update slot display
     this._updateSlotDisplay('output');
 
-    // Emit result change event
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i](this._outputSlot);
-        } catch (e) {}
-      }
-    }
+    // Emit result change event via EventBus
+    this._emitResultChange(this._outputSlot);
   };
 
   /**
@@ -599,18 +617,12 @@
     this._outputSlot = null;
     this._updateSlotDisplay('output');
 
-    // Emit result change event with cost info for external deduction
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i]({
-            item: result,
-            levelCost: cost,
-            lapisCost: lapisCost,
-          });
-        } catch (e) {}
-      }
-    }
+    // Emit result change event with cost info for external deduction via EventBus
+    this._emitResultChange({
+      item: result,
+      levelCost: cost,
+      lapisCost: lapisCost,
+    });
 
     return {
       item: result,

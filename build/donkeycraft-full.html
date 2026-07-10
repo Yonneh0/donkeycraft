@@ -39369,6 +39369,15 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
+   * setSlot — alias for setStack, sets the item stack in a slot.
+   * @param {number} slot - Slot index.
+   * @param {Donkeycraft.ItemStack|null} stack - Stack to set (null to clear).
+   */
+  Donkeycraft.ItemManager.prototype.setSlot = function (slot, stack) {
+    this.setStack(slot, stack);
+  };
+
+  /**
    * getInventory — gets the full inventory array.
    * @returns {Array} Array of 41 ItemStacks (null for empty slots).
    */
@@ -39614,14 +39623,29 @@ body.dk-pointer-locked #dk-canvas-container {
    * swapItems — swaps stacks between two slots.
    * @param {number} fromSlot - Source slot index.
    * @param {number} toSlot - Destination slot index.
+   * @returns {boolean} True if the swap was successful.
    */
   Donkeycraft.ItemManager.prototype.swapItems = function (fromSlot, toSlot) {
+    // Validate slot indices
+    if (
+      typeof fromSlot !== 'number' ||
+      typeof toSlot !== 'number' ||
+      !Number.isInteger(fromSlot) ||
+      !Number.isInteger(toSlot) ||
+      fromSlot < 0 ||
+      fromSlot >= this._inventory.length ||
+      toSlot < 0 ||
+      toSlot >= this._inventory.length
+    )
+      return false;
+
     var temp = this._inventory[fromSlot];
     this._inventory[fromSlot] = this._inventory[toSlot];
     this._inventory[toSlot] = temp;
 
     this._dirtySlots[fromSlot] = true;
     this._dirtySlots[toSlot] = true;
+    return true;
   };
 
   /**
@@ -39636,7 +39660,14 @@ body.dk-pointer-locked #dk-canvas-container {
     count,
     toSlot
   ) {
-    if (fromSlot < 0 || fromSlot >= this._inventory.length) return null;
+    // Validate fromSlot index
+    if (
+      typeof fromSlot !== 'number' ||
+      !Number.isInteger(fromSlot) ||
+      fromSlot < 0 ||
+      fromSlot >= this._inventory.length
+    )
+      return null;
 
     var sourceStack = this._inventory[fromSlot];
     if (!sourceStack || sourceStack.isEmpty()) return null;
@@ -39649,6 +39680,15 @@ body.dk-pointer-locked #dk-canvas-container {
     splitStack.setCount(splitCount);
 
     if (toSlot >= 0 && toSlot < this._inventory.length) {
+      // Validate toSlot index
+      if (
+        typeof toSlot !== 'number' ||
+        !Number.isInteger(toSlot) ||
+        toSlot < 0 ||
+        toSlot >= this._inventory.length
+      )
+        return null;
+
       // Place into specific slot
       var targetStack = this._inventory[toSlot];
       if (!targetStack || targetStack.isEmpty()) {
@@ -39659,6 +39699,7 @@ body.dk-pointer-locked #dk-canvas-container {
         }
         this._dirtySlots[fromSlot] = true;
         this._dirtySlots[toSlot] = true;
+        return splitStack;
       } else if (targetStack.canStackWith(splitStack)) {
         var maxStack = targetStack.getMaxStackSize
           ? targetStack.getMaxStackSize()
@@ -39673,7 +39714,10 @@ body.dk-pointer-locked #dk-canvas-container {
         }
         this._dirtySlots[fromSlot] = true;
         this._dirtySlots[toSlot] = true;
+        return splitStack;
       }
+      // Target slot has incompatible item — return null since nothing was placed
+      return null;
     } else {
       // Find empty slot
       for (var i = 0; i < this._inventory.length; i++) {
@@ -41357,52 +41401,6 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
-   * setInventory — sets the inventory data source for this panel.
-   * @param {Donkeycraft.ItemManager} playerInv - Player's ItemManager.
-   * @param {Donkeycraft.ItemManager} [backpackInv=null] - Main backpack (C1) inventory.
-   */
-  Donkeycraft.InventoryUI.prototype.setInventory = function (
-    playerInv,
-    backpackInv
-  ) {
-    this._playerInventory = playerInv;
-    this._backpackInventory = backpackInv || null;
-
-    // Store additional backpack inventories (C2-C9)
-    this._additionalBackpacks = {};
-
-    // Subscribe to EventBus for slot change events
-    // ItemManager emits 'item:slot:changed' with { slot, oldStack, newStack, player }
-    // We filter by source ItemManager using the 'player' reference in event data.
-    if (Donkeycraft.EventBus) {
-      var self = this;
-      this._slotChangeListener = function (data) {
-        // Filter events by source ItemManager to avoid unnecessary DOM updates
-        if (data.player === self._player && data.slot >= 0 && data.slot < 258) {
-          self._updateSlotDisplay('player', data.slot, data.newStack);
-        }
-        if (
-          self._backpackInventory &&
-          data.player === self._backpackInventory._owner &&
-          data.slot >= 0 &&
-          data.slot < 9
-        ) {
-          self._updateSlotDisplay('backpack', data.slot, data.newStack);
-        }
-      };
-      this._unsubscribeSlotChange = Donkeycraft.EventBus.onSafe(
-        'item:slot:changed',
-        this._slotChangeListener
-      );
-    }
-
-    // Wire container slot click handlers for backpack management
-    this._initContainerSlots();
-
-    this._renderAllSlots();
-  };
-
-  /**
    * _getItemDisplayChar — gets a display character for an item ID using ItemDefinitionRegistry.
    * Falls back to block name mapping if registry lookup fails.
    * @param {number} itemId - Block/item ID.
@@ -42969,6 +42967,14 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
+   * isRunning — checks if the paperdoll renderer is currently running.
+   * @returns {boolean} True if the renderer is active.
+   */
+  Donkeycraft.PaperdollRenderer.prototype.isRunning = function () {
+    return this._running;
+  };
+
+  /**
    * setInventory — sets the inventory data source for this panel.
    * @param {Donkeycraft.ItemManager} playerInv - Player's ItemManager.
    * @param {Donkeycraft.ItemManager} [backpackInv=null] - Main backpack (C1) inventory.
@@ -43788,6 +43794,89 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
+   * _emitSlotChange — emits a slot change event via EventBus.
+   * @param {number} index - Slot index.
+   * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
+   * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitSlotChange = function (
+    index,
+    newStack,
+    oldStack
+  ) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:slot:changed', {
+          furnaceId: this._furnaceId,
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitProgressChange — emits a progress change event via EventBus.
+   * @param {number} progress - Current burn progress (0.0 to 1.0).
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitProgressChange = function (progress) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:progress:changed', {
+          furnaceId: this._furnaceId,
+          progress: progress,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onProgressChange) {
+      for (var i = 0; i < this._listeners.onProgressChange.length; i++) {
+        try {
+          this._listeners.onProgressChange[i](progress);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitOutputReady — emits an output ready event via EventBus.
+   * @param {Donkeycraft.ItemStack} outputStack - The completed output item.
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitOutputReady = function (outputStack) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:output:ready', {
+          furnaceId: this._furnaceId,
+          outputStack: outputStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onOutputReady) {
+      for (var i = 0; i < this._listeners.onOutputReady.length; i++) {
+        try {
+          this._listeners.onOutputReady[i](outputStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _updateSlotDisplay — updates the DOM display for a specific slot.
    * @param {number} index - Slot index (0=fuel, 1=input, 2=output).
    * @private
@@ -43923,14 +44012,8 @@ body.dk-pointer-locked #dk-canvas-container {
     this._slots[index] = stack;
     this._updateSlotDisplay(index);
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](index, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(index, stack, oldStack);
 
     // Update burning state if fuel/input changed
     if (index === 0 || index === 1) {
@@ -43962,14 +44045,8 @@ body.dk-pointer-locked #dk-canvas-container {
       this._progressBarEl.style.height = this._burnProgress * 100 + '%';
     }
 
-    // Emit progress change event
-    if (this._listeners.onProgressChange) {
-      for (var i = 0; i < this._listeners.onProgressChange.length; i++) {
-        try {
-          this._listeners.onProgressChange[i](this._burnProgress);
-        } catch (e) {}
-      }
-    }
+    // Emit progress change event via EventBus
+    this._emitProgressChange(this._burnProgress);
     return true;
   };
 
@@ -44345,14 +44422,8 @@ body.dk-pointer-locked #dk-canvas-container {
       this._slots[0] = null;
     }
 
-    // Emit slot change event for fuel slot (index 0)
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](0, this._slots[0], oldFuelStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event for fuel slot (index 0) via EventBus
+    this._emitSlotChange(0, this._slots[0], oldFuelStack);
   };
 
   /**
@@ -44477,22 +44548,10 @@ body.dk-pointer-locked #dk-canvas-container {
       this._lastProgressPercent = -1;
       this.setProgress(0);
 
-      // Emit slot change for output if produced
-      if (result && result.outputStack && this._listeners.onSlotChange) {
-        for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-          try {
-            this._listeners.onSlotChange[i](2, this._slots[2], null);
-          } catch (e) {}
-        }
-      }
-
-      // Emit onOutputReady event if listener registered
-      if (result && result.outputStack && this._listeners.onOutputReady) {
-        for (var j = 0; j < this._listeners.onOutputReady.length; j++) {
-          try {
-            this._listeners.onOutputReady[j](result.outputStack);
-          } catch (e) {}
-        }
+      // Emit slot change for output if produced via EventBus
+      if (result && result.outputStack) {
+        this._emitSlotChange(2, this._slots[2], null);
+        this._emitOutputReady(result.outputStack);
       }
 
       // Check if more fuel + input available for continuous smelting
@@ -44993,7 +45052,7 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
-   * _emitSlotChange — emits a slot change event to all listeners.
+   * _emitSlotChange — emits a slot change event via EventBus.
    * @param {number} index - Slot index.
    * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
    * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
@@ -45004,26 +45063,51 @@ body.dk-pointer-locked #dk-canvas-container {
     newStack,
     oldStack
   ) {
-    if (!this._listeners.onSlotChange) return;
-    for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
       try {
-        this._listeners.onSlotChange[i](index, newStack, oldStack);
+        Donkeycraft.EventBus.emitSafe('chest:slot:changed', {
+          chestKey: this._dataKey,
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
       } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
     }
   };
 
   /**
-   * _emitDrop — emits a drop event to all listeners.
+   * _emitDrop — emits a drop event via EventBus.
    * @param {Donkeycraft.ItemStack} stack - The dropped stack.
    * @param {number} [slotIndex=-1] - Source slot index (-1 = unknown).
    * @private
    */
   Donkeycraft.ChestUI.prototype._emitDrop = function (stack, slotIndex) {
-    if (!this._listeners.onDrop) return;
-    for (var i = 0; i < this._listeners.onDrop.length; i++) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
       try {
-        this._listeners.onDrop[i](stack, slotIndex);
+        Donkeycraft.EventBus.emitSafe('chest:item:dropped', {
+          chestKey: this._dataKey,
+          stack: stack,
+          slotIndex: slotIndex,
+        });
       } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onDrop) {
+      for (var i = 0; i < this._listeners.onDrop.length; i++) {
+        try {
+          this._listeners.onDrop[i](stack, slotIndex);
+        } catch (e) {}
+      }
     }
   };
 
@@ -45091,8 +45175,16 @@ body.dk-pointer-locked #dk-canvas-container {
     // Try to stack with existing item
     var existing = this._slots[target];
     if (existing && !existing.isEmpty() && existing.canStackWith(itemStack)) {
-      // Check if stack can fit
-      var maxCount = 64; // Standard max stack size
+      // Look up max stack size from ItemDefinitionRegistry
+      var maxCount = 64; // Default fallback
+      if (Donkeycraft.ItemDefinitionRegistry) {
+        var itemDef = Donkeycraft.ItemDefinitionRegistry.get(
+          existing.getItemId()
+        );
+        if (itemDef && typeof itemDef.getMaxStackSize === 'function') {
+          maxCount = itemDef.getMaxStackSize();
+        }
+      }
       var space = maxCount - existing.getCount();
       if (space > 0) {
         var addCount = Math.min(space, itemStack.getCount());
@@ -45618,6 +45710,62 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
+   * _emitResultChange — emits a result change event via EventBus.
+   * @param {*} result - The result data to emit.
+   * @private
+   */
+  Donkeycraft.AnvilUI.prototype._emitResultChange = function (result) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('anvil:result:changed', {
+          result: result,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onResultChange) {
+      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+        try {
+          this._listeners.onResultChange[i](result);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitSlotChange — emits a slot change event via EventBus.
+   * @param {number} index - Slot index.
+   * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
+   * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
+   * @private
+   */
+  Donkeycraft.AnvilUI.prototype._emitSlotChange = function (
+    index,
+    newStack,
+    oldStack
+  ) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('anvil:slot:changed', {
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _calculateResult — calculates the output based on inputs and rename text.
    * @private
    */
@@ -45631,14 +45779,8 @@ body.dk-pointer-locked #dk-canvas-container {
       this._price = 0;
       this._updateSlotDisplay(2);
       this._priceEl.textContent = 'Level 0';
-      // Emit result change event even in early-return path
-      if (this._listeners.onResultChange) {
-        for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-          try {
-            this._listeners.onResultChange[i](null);
-          } catch (e) {}
-        }
-      }
+      // Emit result change event even in early-return path via EventBus
+      this._emitResultChange(null);
       return;
     }
 
@@ -45753,14 +45895,8 @@ body.dk-pointer-locked #dk-canvas-container {
     this._updateSlotDisplay(2);
     this._priceEl.textContent = 'Level ' + this._price;
 
-    // Emit result change event
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i](this._resultStack);
-        } catch (e) {}
-      }
-    }
+    // Emit result change event via EventBus
+    this._emitResultChange(this._resultStack);
   };
 
   /**
@@ -45814,14 +45950,8 @@ body.dk-pointer-locked #dk-canvas-container {
     this._updateSlotDisplay(0);
     this._calculateResult();
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](0, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(0, stack, oldStack);
     return true;
   };
 
@@ -45837,14 +45967,8 @@ body.dk-pointer-locked #dk-canvas-container {
     this._updateSlotDisplay(1);
     this._calculateResult();
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](1, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(1, stack, oldStack);
     return true;
   };
 
@@ -45968,14 +46092,8 @@ body.dk-pointer-locked #dk-canvas-container {
         this._updateSlotDisplay(slotIdx);
         this._calculateResult();
 
-        // Emit slot change event
-        if (this._listeners.onSlotChange) {
-          for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-            try {
-              this._listeners.onSlotChange[i](slotIdx, null, oldStack);
-            } catch (e) {}
-          }
-        }
+        // Emit slot change event via EventBus
+        this._emitSlotChange(slotIdx, null, oldStack);
       }
     }
   };
@@ -46021,14 +46139,8 @@ body.dk-pointer-locked #dk-canvas-container {
       this.setRightSlot(itemStack);
     }
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](slotIndex, itemStack, null);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(slotIndex, itemStack, null);
 
     return true;
   };
@@ -46460,6 +46572,30 @@ body.dk-pointer-locked #dk-canvas-container {
   };
 
   /**
+   * _emitResultChange — emits a result change event via EventBus.
+   * @param {*} result - The result data to emit.
+   * @private
+   */
+  Donkeycraft.EnchantingUI.prototype._emitResultChange = function (result) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('enchanting:result:changed', {
+          result: result,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onResultChange) {
+      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
+        try {
+          this._listeners.onResultChange[i](result);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _applyEnchantment — computes the enchanted output based on input item, selected enchantment option,
    * player levels, and lapis lazuli count. Updates the output slot and DOM display.
    * Emits onResultChange events when the output changes.
@@ -46513,14 +46649,8 @@ body.dk-pointer-locked #dk-canvas-container {
     // Update slot display
     this._updateSlotDisplay('output');
 
-    // Emit result change event
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i](this._outputSlot);
-        } catch (e) {}
-      }
-    }
+    // Emit result change event via EventBus
+    this._emitResultChange(this._outputSlot);
   };
 
   /**
@@ -46739,18 +46869,12 @@ body.dk-pointer-locked #dk-canvas-container {
     this._outputSlot = null;
     this._updateSlotDisplay('output');
 
-    // Emit result change event with cost info for external deduction
-    if (this._listeners.onResultChange) {
-      for (var i = 0; i < this._listeners.onResultChange.length; i++) {
-        try {
-          this._listeners.onResultChange[i]({
-            item: result,
-            levelCost: cost,
-            lapisCost: lapisCost,
-          });
-        } catch (e) {}
-      }
-    }
+    // Emit result change event with cost info for external deduction via EventBus
+    this._emitResultChange({
+      item: result,
+      levelCost: cost,
+      lapisCost: lapisCost,
+    });
 
     return {
       item: result,

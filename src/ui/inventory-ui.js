@@ -253,52 +253,6 @@
   };
 
   /**
-   * setInventory — sets the inventory data source for this panel.
-   * @param {Donkeycraft.ItemManager} playerInv - Player's ItemManager.
-   * @param {Donkeycraft.ItemManager} [backpackInv=null] - Main backpack (C1) inventory.
-   */
-  Donkeycraft.InventoryUI.prototype.setInventory = function (
-    playerInv,
-    backpackInv
-  ) {
-    this._playerInventory = playerInv;
-    this._backpackInventory = backpackInv || null;
-
-    // Store additional backpack inventories (C2-C9)
-    this._additionalBackpacks = {};
-
-    // Subscribe to EventBus for slot change events
-    // ItemManager emits 'item:slot:changed' with { slot, oldStack, newStack, player }
-    // We filter by source ItemManager using the 'player' reference in event data.
-    if (Donkeycraft.EventBus) {
-      var self = this;
-      this._slotChangeListener = function (data) {
-        // Filter events by source ItemManager to avoid unnecessary DOM updates
-        if (data.player === self._player && data.slot >= 0 && data.slot < 258) {
-          self._updateSlotDisplay('player', data.slot, data.newStack);
-        }
-        if (
-          self._backpackInventory &&
-          data.player === self._backpackInventory._owner &&
-          data.slot >= 0 &&
-          data.slot < 9
-        ) {
-          self._updateSlotDisplay('backpack', data.slot, data.newStack);
-        }
-      };
-      this._unsubscribeSlotChange = Donkeycraft.EventBus.onSafe(
-        'item:slot:changed',
-        this._slotChangeListener
-      );
-    }
-
-    // Wire container slot click handlers for backpack management
-    this._initContainerSlots();
-
-    this._renderAllSlots();
-  };
-
-  /**
    * _getItemDisplayChar — gets a display character for an item ID using ItemDefinitionRegistry.
    * Falls back to block name mapping if registry lookup fails.
    * @param {number} itemId - Block/item ID.
@@ -1862,6 +1816,14 @@
    */
   Donkeycraft.PaperdollRenderer.prototype.resume = function () {
     this._paused = false;
+  };
+
+  /**
+   * isRunning — checks if the paperdoll renderer is currently running.
+   * @returns {boolean} True if the renderer is active.
+   */
+  Donkeycraft.PaperdollRenderer.prototype.isRunning = function () {
+    return this._running;
   };
 
   /**

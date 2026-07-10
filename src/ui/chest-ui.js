@@ -390,7 +390,7 @@
   };
 
   /**
-   * _emitSlotChange — emits a slot change event to all listeners.
+   * _emitSlotChange — emits a slot change event via EventBus.
    * @param {number} index - Slot index.
    * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
    * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
@@ -401,26 +401,51 @@
     newStack,
     oldStack
   ) {
-    if (!this._listeners.onSlotChange) return;
-    for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
       try {
-        this._listeners.onSlotChange[i](index, newStack, oldStack);
+        Donkeycraft.EventBus.emitSafe('chest:slot:changed', {
+          chestKey: this._dataKey,
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
       } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
     }
   };
 
   /**
-   * _emitDrop — emits a drop event to all listeners.
+   * _emitDrop — emits a drop event via EventBus.
    * @param {Donkeycraft.ItemStack} stack - The dropped stack.
    * @param {number} [slotIndex=-1] - Source slot index (-1 = unknown).
    * @private
    */
   Donkeycraft.ChestUI.prototype._emitDrop = function (stack, slotIndex) {
-    if (!this._listeners.onDrop) return;
-    for (var i = 0; i < this._listeners.onDrop.length; i++) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
       try {
-        this._listeners.onDrop[i](stack, slotIndex);
+        Donkeycraft.EventBus.emitSafe('chest:item:dropped', {
+          chestKey: this._dataKey,
+          stack: stack,
+          slotIndex: slotIndex,
+        });
       } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onDrop) {
+      for (var i = 0; i < this._listeners.onDrop.length; i++) {
+        try {
+          this._listeners.onDrop[i](stack, slotIndex);
+        } catch (e) {}
+      }
     }
   };
 
@@ -488,8 +513,16 @@
     // Try to stack with existing item
     var existing = this._slots[target];
     if (existing && !existing.isEmpty() && existing.canStackWith(itemStack)) {
-      // Check if stack can fit
-      var maxCount = 64; // Standard max stack size
+      // Look up max stack size from ItemDefinitionRegistry
+      var maxCount = 64; // Default fallback
+      if (Donkeycraft.ItemDefinitionRegistry) {
+        var itemDef = Donkeycraft.ItemDefinitionRegistry.get(
+          existing.getItemId()
+        );
+        if (itemDef && typeof itemDef.getMaxStackSize === 'function') {
+          maxCount = itemDef.getMaxStackSize();
+        }
+      }
       var space = maxCount - existing.getCount();
       if (space > 0) {
         var addCount = Math.min(space, itemStack.getCount());

@@ -107,6 +107,15 @@
   };
 
   /**
+   * setSlot — alias for setStack, sets the item stack in a slot.
+   * @param {number} slot - Slot index.
+   * @param {Donkeycraft.ItemStack|null} stack - Stack to set (null to clear).
+   */
+  Donkeycraft.ItemManager.prototype.setSlot = function (slot, stack) {
+    this.setStack(slot, stack);
+  };
+
+  /**
    * getInventory — gets the full inventory array.
    * @returns {Array} Array of 41 ItemStacks (null for empty slots).
    */
@@ -352,14 +361,29 @@
    * swapItems — swaps stacks between two slots.
    * @param {number} fromSlot - Source slot index.
    * @param {number} toSlot - Destination slot index.
+   * @returns {boolean} True if the swap was successful.
    */
   Donkeycraft.ItemManager.prototype.swapItems = function (fromSlot, toSlot) {
+    // Validate slot indices
+    if (
+      typeof fromSlot !== 'number' ||
+      typeof toSlot !== 'number' ||
+      !Number.isInteger(fromSlot) ||
+      !Number.isInteger(toSlot) ||
+      fromSlot < 0 ||
+      fromSlot >= this._inventory.length ||
+      toSlot < 0 ||
+      toSlot >= this._inventory.length
+    )
+      return false;
+
     var temp = this._inventory[fromSlot];
     this._inventory[fromSlot] = this._inventory[toSlot];
     this._inventory[toSlot] = temp;
 
     this._dirtySlots[fromSlot] = true;
     this._dirtySlots[toSlot] = true;
+    return true;
   };
 
   /**
@@ -374,7 +398,14 @@
     count,
     toSlot
   ) {
-    if (fromSlot < 0 || fromSlot >= this._inventory.length) return null;
+    // Validate fromSlot index
+    if (
+      typeof fromSlot !== 'number' ||
+      !Number.isInteger(fromSlot) ||
+      fromSlot < 0 ||
+      fromSlot >= this._inventory.length
+    )
+      return null;
 
     var sourceStack = this._inventory[fromSlot];
     if (!sourceStack || sourceStack.isEmpty()) return null;
@@ -387,6 +418,15 @@
     splitStack.setCount(splitCount);
 
     if (toSlot >= 0 && toSlot < this._inventory.length) {
+      // Validate toSlot index
+      if (
+        typeof toSlot !== 'number' ||
+        !Number.isInteger(toSlot) ||
+        toSlot < 0 ||
+        toSlot >= this._inventory.length
+      )
+        return null;
+
       // Place into specific slot
       var targetStack = this._inventory[toSlot];
       if (!targetStack || targetStack.isEmpty()) {
@@ -397,6 +437,7 @@
         }
         this._dirtySlots[fromSlot] = true;
         this._dirtySlots[toSlot] = true;
+        return splitStack;
       } else if (targetStack.canStackWith(splitStack)) {
         var maxStack = targetStack.getMaxStackSize
           ? targetStack.getMaxStackSize()
@@ -411,7 +452,10 @@
         }
         this._dirtySlots[fromSlot] = true;
         this._dirtySlots[toSlot] = true;
+        return splitStack;
       }
+      // Target slot has incompatible item — return null since nothing was placed
+      return null;
     } else {
       // Find empty slot
       for (var i = 0; i < this._inventory.length; i++) {

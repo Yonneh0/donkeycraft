@@ -119,6 +119,89 @@
   };
 
   /**
+   * _emitSlotChange — emits a slot change event via EventBus.
+   * @param {number} index - Slot index.
+   * @param {Donkeycraft.ItemStack|null} newStack - New stack value.
+   * @param {Donkeycraft.ItemStack|null} oldStack - Previous stack value.
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitSlotChange = function (
+    index,
+    newStack,
+    oldStack
+  ) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:slot:changed', {
+          furnaceId: this._furnaceId,
+          slotIndex: index,
+          newStack: newStack,
+          oldStack: oldStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onSlotChange) {
+      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
+        try {
+          this._listeners.onSlotChange[i](index, newStack, oldStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitProgressChange — emits a progress change event via EventBus.
+   * @param {number} progress - Current burn progress (0.0 to 1.0).
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitProgressChange = function (progress) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:progress:changed', {
+          furnaceId: this._furnaceId,
+          progress: progress,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onProgressChange) {
+      for (var i = 0; i < this._listeners.onProgressChange.length; i++) {
+        try {
+          this._listeners.onProgressChange[i](progress);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
+   * _emitOutputReady — emits an output ready event via EventBus.
+   * @param {Donkeycraft.ItemStack} outputStack - The completed output item.
+   * @private
+   */
+  Donkeycraft.FurnaceUI.prototype._emitOutputReady = function (outputStack) {
+    // Primary: emit via EventBus for cross-module communication
+    if (Donkeycraft.EventBus) {
+      try {
+        Donkeycraft.EventBus.emitSafe('furnace:output:ready', {
+          furnaceId: this._furnaceId,
+          outputStack: outputStack,
+        });
+      } catch (e) {}
+    }
+    // Fallback: direct listeners for backward compatibility
+    if (this._listeners.onOutputReady) {
+      for (var i = 0; i < this._listeners.onOutputReady.length; i++) {
+        try {
+          this._listeners.onOutputReady[i](outputStack);
+        } catch (e) {}
+      }
+    }
+  };
+
+  /**
    * _updateSlotDisplay — updates the DOM display for a specific slot.
    * @param {number} index - Slot index (0=fuel, 1=input, 2=output).
    * @private
@@ -254,14 +337,8 @@
     this._slots[index] = stack;
     this._updateSlotDisplay(index);
 
-    // Emit slot change event
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](index, stack, oldStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event via EventBus
+    this._emitSlotChange(index, stack, oldStack);
 
     // Update burning state if fuel/input changed
     if (index === 0 || index === 1) {
@@ -293,14 +370,8 @@
       this._progressBarEl.style.height = this._burnProgress * 100 + '%';
     }
 
-    // Emit progress change event
-    if (this._listeners.onProgressChange) {
-      for (var i = 0; i < this._listeners.onProgressChange.length; i++) {
-        try {
-          this._listeners.onProgressChange[i](this._burnProgress);
-        } catch (e) {}
-      }
-    }
+    // Emit progress change event via EventBus
+    this._emitProgressChange(this._burnProgress);
     return true;
   };
 
@@ -676,14 +747,8 @@
       this._slots[0] = null;
     }
 
-    // Emit slot change event for fuel slot (index 0)
-    if (this._listeners.onSlotChange) {
-      for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-        try {
-          this._listeners.onSlotChange[i](0, this._slots[0], oldFuelStack);
-        } catch (e) {}
-      }
-    }
+    // Emit slot change event for fuel slot (index 0) via EventBus
+    this._emitSlotChange(0, this._slots[0], oldFuelStack);
   };
 
   /**
@@ -808,22 +873,10 @@
       this._lastProgressPercent = -1;
       this.setProgress(0);
 
-      // Emit slot change for output if produced
-      if (result && result.outputStack && this._listeners.onSlotChange) {
-        for (var i = 0; i < this._listeners.onSlotChange.length; i++) {
-          try {
-            this._listeners.onSlotChange[i](2, this._slots[2], null);
-          } catch (e) {}
-        }
-      }
-
-      // Emit onOutputReady event if listener registered
-      if (result && result.outputStack && this._listeners.onOutputReady) {
-        for (var j = 0; j < this._listeners.onOutputReady.length; j++) {
-          try {
-            this._listeners.onOutputReady[j](result.outputStack);
-          } catch (e) {}
-        }
+      // Emit slot change for output if produced via EventBus
+      if (result && result.outputStack) {
+        this._emitSlotChange(2, this._slots[2], null);
+        this._emitOutputReady(result.outputStack);
       }
 
       // Check if more fuel + input available for continuous smelting
