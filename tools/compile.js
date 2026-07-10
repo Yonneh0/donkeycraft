@@ -5,11 +5,12 @@
  *
  * Produces:
  *   - build/donkeycraft-full.html  (inlined, readable)
- *   - build/donkeycraft-prod.html  (inlined + minified)
+ *   - build/donkeycraft-prod.html  (inlined + minified via html-minifier-terser)
  */
 
 const fs = require('fs');
 const path = require('path');
+const { minify } = require('html-minifier-terser');
 
 // --- Resolve paths ---
 const TOOLS_DIR = __dirname;
@@ -209,153 +210,31 @@ function generateReport(inlinedHtml, cssFiles, jsFiles, inputPath) {
 
   report.push('');
   report.push('--- Output Files ---');
-  report.push(`Total source size:  ${formatFileSize(cssFiles.reduce((s, f) => s + fs.statSync(f).size, 0) + jsFiles.reduce((s, f) => s + fs.statSync(f).size, 0))}`);
+  const totalSourceSize = cssFiles.reduce((s, f) => s + fs.statSync(f).size, 0) + jsFiles.reduce((s, f) => s + fs.statSync(f).size, 0);
+  report.push(`Total source size:  ${formatFileSize(totalSourceSize)}`);
   report.push(`Inlined HTML size:  ${formatFileSize(inlinedHtml.length)}`);
-  report.push(`Compression ratio:  ${(inlinedHtml.length / (cssFiles.reduce((s, f) => s + fs.statSync(f).size, 0) + jsFiles.reduce((s, f) => s + fs.statSync(f).size, 0))).toFixed(2)}x`);
+  if (totalSourceSize > 0) {
+    report.push(`Compression ratio:  ${(inlinedHtml.length / totalSourceSize).toFixed(2)}x`);
+  }
   report.push('');
 
   return report.join('\n');
 }
 
-// --- Simple JS minifier (removes comments, collapses whitespace) ---
-function minifyJs(jsContent) {
-  // Remove single-line comments (// ...) but not in strings
-  let result = '';
-  let i = 0;
-
-  while (i < jsContent.length) {
-    // Handle strings
-    if (jsContent[i] === '"' || jsContent[i] === "'") {
-      const quote = jsContent[i];
-      result += jsContent[i];
-      i++;
-      while (i < jsContent.length && jsContent[i] !== quote) {
-        if (jsContent[i] === '\\') {
-          result += jsContent[i];
-          i++;
-          if (i < jsContent.length) {
-            result += jsContent[i];
-            i++;
-          }
-        } else {
-          result += jsContent[i];
-          i++;
-        }
-      }
-      if (i < jsContent.length) {
-        result += jsContent[i]; // closing quote
-        i++;
-      }
-      continue;
-    }
-
-    // Remove single-line comments
-    if (jsContent[i] === '/' && i + 1 < jsContent.length && jsContent[i + 1] === '/') {
-      while (i < jsContent.length && jsContent[i] !== '\n') i++;
-      continue;
-    }
-
-    // Remove multi-line comments
-    if (jsContent[i] === '/' && i + 1 < jsContent.length && jsContent[i + 1] === '*') {
-      i += 2;
-      while (i < jsContent.length - 1 && !(jsContent[i] === '*' && jsContent[i + 1] === '/')) i++;
-      i += 2; // skip */
-      result += ' '; // replace comment with space
-      continue;
-    }
-
-    result += jsContent[i];
-    i++;
-  }
-
-  // Collapse whitespace (but preserve newlines for structure)
-  return result
-    .replace(/\r\n/g, '\n')
-    .replace(/  +/g, ' ') // collapse spaces
-    .replace(/\n+/g, '\n') // collapse newlines to single
-    .replace(/\s*{\s*/g, '{\n  ')
-    .replace(/\s*}\s*/g, '\n}')
-    .replace(/\s*;\s*/g, ';')
-    .replace(/\s*,\s*/g, ',')
-    .replace(/\s*\(\s*/g, '(')
-    .replace(/\s*\)\s*/g, ')')
-    .replace(/\s*\[\s*/g, '[')
-    .replace(/\s*\]\s*/g, ']')
-    .replace(/\n\s*\n/g, '\n') // remove blank lines
-    .trim();
-}
-
-// --- Simple CSS minifier ---
-function minifyCss(cssContent) {
-  return cssContent
-    .replace(/\/\*[\s\S]*?\*\//g, '') // remove comments
-    .replace(/\r\n/g, '\n')
-    .replace(/\s+/g, ' ') // collapse whitespace
-    .replace(/\s*{\s*/g, '{')
-    .replace(/\s*}\s*/g, '}')
-    .replace(/\s*;\s*/g, ';')
-    .replace(/\s*:\s*/g, ':')
-    .replace(/\s*,\s*/g, ',')
-    .trim();
-}
-
-// --- Minify HTML (inline minifier — no external deps required) ---
-function minifyHtml(html) {
-  // Strategy: Split by script/style blocks, minify each part appropriately
-  const parts = html.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>)/gi);
-
-  const minifiedParts = parts.map(part => {
-    const trimmed = part.trim();
-
-    // Skip empty parts
-    if (!trimmed) return '';
-
-    // HTML parts: collapse whitespace, remove comments
-    if (!/^<script/i.test(trimmed) && !/^<style/i.test(trimmed)) {
-      return trimmed
-        .replace(/<!--[\s\S]*?-->/g, '') // remove HTML comments
-        .replace(/\s+/g, ' ') // collapse whitespace
-        .replace(/>\s+</g, '><') // remove whitespace between tags
-        .trim();
-    }
-
-    // Script tag: minify JS content
-    if (/^<script/i.test(trimmed)) {
-      // Check if it's type="text/plain" (shader content) — still minify but preserve structure
-      const isPlain = /type\s*=\s*["']text\/plain["']/i.test(trimmed);
-
-      // Extract tag and content
-      const tagMatch = trimmed.match(/^(<script[^>]*>)([\s\S]*)(<\/script>)$/i);
-      if (!tagMatch) return part;
-
-      const [_, tag, content, closeTag] = tagMatch;
-
-      // For type="text/plain" (shaders), remove comments but preserve line structure
-      let minifiedContent;
-      if (isPlain) {
-        minifiedContent = content
-          .replace(/\/\/\/.*/g, '') // remove /// comments
-          .replace(/\r\n/g, '\n')
-          .replace(/[ \t]+$/gm, '') // trim trailing whitespace
-          .replace(/\n{3,}/g, '\n\n'); // collapse multiple blank lines
-      } else {
-        minifiedContent = minifyJs(content);
-      }
-
-      return tag + minifiedContent + closeTag;
-    }
-
-    // Style tag: minify CSS content
-    const styleMatch = trimmed.match(/^(<style[\s\S]*?>)([\s\S]*)(<\/style>)$/i);
-    if (styleMatch) {
-      const [_, tag, content, closeTag] = styleMatch;
-      return tag + minifyCss(content) + closeTag;
-    }
-
-    return part;
+// --- Minify HTML using html-minifier-terser ---
+async function minifyHtml(html) {
+  const prodHtml = await minify(html, {
+    collapseWhitespace: true,
+    removeComments: true,
+    removeRedundantAttributes: true,
+    minifyCSS: true,
+    minifyJS: true,
+    removeEmptyAttributes: true,
+    collapseBooleanAttributes: false,
+    sortAttributes: false,
+    useShortDoctype: true,
   });
-
-  return minifiedParts.join('');
+  return prodHtml;
 }
 
 // --- Compile HTML ---
@@ -401,7 +280,7 @@ function writeOutput(label, outputPath, content) {
 }
 
 // --- Main compile function ---
-function run() {
+async function run() {
   const config = loadConfig();
   const inputPath = path.join(PROJECT_ROOT, config.input);
   const outputDir = path.join(PROJECT_ROOT, config.outputDir);
@@ -422,9 +301,9 @@ function run() {
   console.log(`[compile] Writing: ${path.relative(PROJECT_ROOT, fullPath)}`);
   writeOutput('Full:', fullPath, inlined);
 
-  // Write production build (inlined + minified)
+  // Write production build (inlined + minified via html-minifier-terser)
   console.log('[compile] Minifying for production build...');
-  const prodHtml = minifyHtml(inlined);
+  const prodHtml = await minifyHtml(inlined);
   const prodPath = path.join(outputDir, config.outputs.prod);
   console.log(`[compile] Writing: ${path.relative(PROJECT_ROOT, prodPath)}`);
   writeOutput('Prod:', prodPath, prodHtml);
@@ -445,8 +324,8 @@ module.exports = { run, compileHtml, minifyHtml, collectCssLinks, collectJsLinks
 
 // Run if executed directly
 if (require.main === module) {
-  const result = run();
-  if (!result.success) {
+  run().catch(err => {
+    console.error('[compile] Build failed:', err);
     process.exit(1);
-  }
+  });
 }

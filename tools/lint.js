@@ -54,8 +54,20 @@ function collectFiles() {
 function commandExists(cmd) {
   try {
     const { execSync } = require('child_process');
-    execSync(`${cmd} --version`, { stdio: ['pipe', 'pipe', 'pipe'] });
-    return true;
+    // First check global, then npx/local node_modules/.bin
+    try {
+      execSync(`${cmd} --version`, { stdio: ['pipe', 'pipe', 'pipe'] });
+      return true;
+    } catch {
+      // Check local node_modules/.bin
+      const localBin = path.join(PROJECT_ROOT, 'node_modules', '.bin', cmd);
+      if (fs.existsSync(localBin)) {
+        return true;
+      }
+      // Try via npx
+      execSync(`npx ${cmd} --version`, { stdio: ['pipe', 'pipe', 'pipe'] });
+      return true;
+    }
   } catch {
     return false;
   }
@@ -106,6 +118,10 @@ function runEslint(jsFiles, config) {
   const failOnWarning = eslintConfig.failOnWarning !== false; // default true
   const failOnError = eslintConfig.failOnError !== false; // default true
 
+  // Use local eslint from node_modules/.bin if available
+  const localEslint = path.join(PROJECT_ROOT, 'node_modules', '.bin', 'eslint');
+  const eslintCmd = fs.existsSync(localEslint) ? `"${localEslint}"` : 'eslint';
+
   let allErrors = [];
   let allWarnings = [];
 
@@ -116,7 +132,7 @@ function runEslint(jsFiles, config) {
     const fileArgs = batch.map(f => `"${f}"`).join(' ');
 
     try {
-      const result = execSync(`eslint --no-eslintrc --env browser --parser-options ecmaVersion:2020,sourceType:module ${fileArgs} 2>&1`, {
+      const result = execSync(`${eslintCmd} --no-eslintrc --env browser --parser-options ecmaVersion:2020,sourceType:module ${fileArgs} 2>&1`, {
         cwd: PROJECT_ROOT,
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'pipe'],
