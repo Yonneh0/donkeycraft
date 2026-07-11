@@ -112,9 +112,10 @@
   /**
    * River loop detection: tracks visited world coordinates per-chunk to prevent infinite loops
    * in flat terrain where gradient descent finds equal-height neighbors.
-   * Uses a Set of numeric hashes for O(1) lookup.
+   * Uses a Set of string keys "wx,wz" for O(1) lookup — avoids hash collisions that can
+   * occur with 32-bit integer hashes when different coordinate pairs produce the same hash value.
    * Cleared at the start of each _placeRivers() call to avoid accumulation across chunks.
-   * @type {Set<number>}
+   * @type {Set<string>}
    * @private
    */
   var _riverVisited = new Set();
@@ -447,7 +448,8 @@
 
       // River loop detection: track visited positions to prevent infinite loops
       // in flat terrain where multiple cells have equal height.
-      var visitedKey = _hash2D(worldX, worldZ);
+      // Uses string-based coordinate key "wx,wz" to avoid 32-bit hash collisions.
+      var visitedKey = Math.floor(worldX) + ',' + Math.floor(worldZ);
       if (_riverVisited.has(visitedKey)) {
         // Loop detected — river dissipates
         break;
@@ -753,6 +755,19 @@
     var h = ((xi * 374761393 + yi * 668265263) ^ 0x5bd1e995) & 0xffffffff;
     h = (((h >>> 13) ^ h) * 0x5bd1e995) & 0xffffffff;
     return ((h ^ (h >>> 15)) & 0xffffffff) >>> 0;
+  }
+
+  /**
+   * Create a unique string key for river loop detection from world coordinates.
+   * Uses "wx,wz" format to avoid 32-bit hash collisions that can cause premature
+   * river termination or false loop detection in flat terrain.
+   * @param {number} wx - World X coordinate.
+   * @param {number} wz - World Z coordinate.
+   * @returns {string} Unique coordinate key.
+   * @private
+   */
+  function _riverVisitedKey(wx, wz) {
+    return Math.floor(wx) + ',' + Math.floor(wz);
   }
 
   /**

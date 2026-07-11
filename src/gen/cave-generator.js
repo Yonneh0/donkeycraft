@@ -67,6 +67,27 @@
   var MAX_CAVE_RADIUS = 4;
 
   /**
+   * Bedrock block ID — caves must never carve through bedrock to prevent void access.
+   * Resolved from BlockRegistry at init time.
+   * @type {number}
+   */
+  var BEDROCK_ID = 1000; // Hardcoded per block.js definition
+
+  /**
+   * Minimum Y level below which caves cannot carve (just above bedrock).
+   * Prevents caves from breaking through the world bottom.
+   * @type {number}
+   */
+  var MIN_CAVE_Y = 3;
+
+  /**
+   * Maximum Y level for cave generation — prevents surface caves that break terrain.
+   * Set to 80% of world height to keep caves underground.
+   * @type {number}
+   */
+  var MAX_CAVE_Y = Math.floor(WORLD_HEIGHT * 0.8);
+
+  /**
    * Minimum radius of small cave tunnels.
    * Valid range: 0.5-5. Higher values = thicker small caves.
    * @type {number}
@@ -369,10 +390,10 @@
     }
 
     // Generate lava caves in the deep underground layer.
-    // startY: upper bound for lava cave generation (below main cave systems)
-    // endY: lower bound (just above bedrock)
-    var startY = Math.min(WORLD_HEIGHT - 30, lavaYLevel + 80); // Start above lava level
-    var endY = Math.max(5, lavaYLevel - 5); // End just above bedrock
+    // startY: upper bound for lava cave generation — starts below main cave systems (Y=100+)
+    // endY: lower bound (just above bedrock, at MIN_CAVE_Y)
+    var startY = Math.max(WORLD_HEIGHT * 0.5, lavaYLevel + 20); // Start deep underground
+    var endY = Math.max(MIN_CAVE_Y, lavaYLevel - 5); // End just above bedrock boundary
 
     for (var y = startY; y >= endY; y--) {
       for (var x = 0; x < CHUNK_SIZE; x++) {
@@ -507,6 +528,7 @@
    * Uses sphere distance algorithm for efficient voxel placement.
    * Allows multi-pass expansion by carving through existing air blocks,
    * enabling subsequent passes to connect and expand caves carved by earlier passes.
+   * Protects bedrock (Y=0) and enforces MIN_CAVE_Y/MAX_CAVE_Y boundaries.
    * @param {Donkeycraft.Chunk} chunk - The chunk to carve in.
    * @param {number} cx - Center X.
    * @param {number} cy - Center Y.
@@ -554,12 +576,23 @@
           // Check chunk bounds
           if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE)
             continue;
-          if (by < 0 || by >= WORLD_HEIGHT) continue;
+
+          // Protect bedrock layer (Y=0) — caves must never carve through bedrock
+          if (by <= 0) continue;
+
+          // Enforce minimum cave Y boundary — prevent caves below world bottom
+          if (by < MIN_CAVE_Y) continue;
+
+          // Enforce maximum cave Y boundary — prevent surface-breaking caves
+          if (by > MAX_CAVE_Y) continue;
+
+          // Protect bedrock: skip any block that is bedrock (prevents edge-case carving)
+          var currentBlock = chunk.getBlock(bx, by, bz);
+          if (currentBlock === BEDROCK_ID) continue;
 
           // Carve: replace any non-air block with the target block (usually air).
           // This allows multi-pass caves to expand through previously carved areas,
           // creating connected tunnel networks instead of isolated pockets.
-          var currentBlock = chunk.getBlock(bx, by, bz);
           if (currentBlock !== blockId) {
             chunk.setBlock(bx, by, bz, blockId);
             count++;

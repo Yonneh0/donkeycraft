@@ -736,23 +736,32 @@
       opts.surface &&
       typeof Donkeycraft.TerrainSurface.applySurfaceLayers === 'function'
     ) {
-      // Self-initialize TerrainSurface if needed (handles module load order race conditions)
-      if (!Donkeycraft.TerrainSurface.isInitialized()) {
-        try {
-          Donkeycraft.TerrainSurface.init();
-        } catch (e) {
-          /* ignore */
+      try {
+        // Self-initialize TerrainSurface if needed (handles module load order race conditions)
+        if (!Donkeycraft.TerrainSurface.isInitialized()) {
+          try {
+            Donkeycraft.TerrainSurface.init();
+          } catch (e) {
+            /* ignore */
+          }
+        }
+        var surfaceStats = Donkeycraft.TerrainSurface.applySurfaceLayers(
+          chunk,
+          chunkX,
+          chunkZ,
+          biomeName,
+          heightmap
+        );
+        stats.surfaceApplied = true;
+        stats.blocksModified += surfaceStats.blocksModified || 0;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(
+            '[StructureGenerator] Pass 2 (surface layers) failed: ' +
+              (e && e.message ? e.message : String(e))
+          );
         }
       }
-      var surfaceStats = Donkeycraft.TerrainSurface.applySurfaceLayers(
-        chunk,
-        chunkX,
-        chunkZ,
-        biomeName,
-        heightmap
-      );
-      stats.surfaceApplied = true;
-      stats.blocksModified += surfaceStats.blocksModified || 0;
     }
 
     // Pass 3: Place ores via OreGenerator
@@ -760,14 +769,23 @@
       opts.ores &&
       typeof Donkeycraft.OreGenerator.generateOres === 'function'
     ) {
-      var oreStats = Donkeycraft.OreGenerator.generateOres(
-        chunk,
-        chunkX,
-        chunkZ,
-        biomeId
-      );
-      stats.oresPlaced += oreStats.oresPlaced || 0;
-      stats.veinsCreated += oreStats.veinsCreated || 0;
+      try {
+        var oreStats = Donkeycraft.OreGenerator.generateOres(
+          chunk,
+          chunkX,
+          chunkZ,
+          biomeId
+        );
+        stats.oresPlaced += oreStats.oresPlaced || 0;
+        stats.veinsCreated += oreStats.veinsCreated || 0;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(
+            '[StructureGenerator] Pass 3 (ores) failed: ' +
+              (e && e.message ? e.message : String(e))
+          );
+        }
+      }
     }
 
     // Pass 4: Generate caves via CaveGenerator
@@ -775,19 +793,28 @@
       opts.caves &&
       typeof Donkeycraft.CaveGenerator.generateCaves === 'function'
     ) {
-      var caveStats = Donkeycraft.CaveGenerator.generateCaves(
-        chunk,
-        chunkX,
-        chunkZ,
-        heightmap
-      );
-      stats.cavesCarved +=
-        (caveStats.pass1 ? caveStats.pass1.mainCavesCarved : 0) +
-        (caveStats.pass2 ? caveStats.pass2.smallCavesCarved : 0) +
-        (caveStats.pass3 ? caveStats.pass3.entrancesCarved : 0) +
-        (caveStats.pass4 ? caveStats.pass4.lavaCavesCarved : 0) +
-        (caveStats.pass5 ? caveStats.pass5.decoCaves : 0);
-      stats.blocksModified += caveStats.totalBlocksModified || 0;
+      try {
+        var caveStats = Donkeycraft.CaveGenerator.generateCaves(
+          chunk,
+          chunkX,
+          chunkZ,
+          heightmap
+        );
+        stats.cavesCarved +=
+          (caveStats.pass1 ? caveStats.pass1.mainCavesCarved : 0) +
+          (caveStats.pass2 ? caveStats.pass2.smallCavesCarved : 0) +
+          (caveStats.pass3 ? caveStats.pass3.entrancesCarved : 0) +
+          (caveStats.pass4 ? caveStats.pass4.lavaCavesCarved : 0) +
+          (caveStats.pass5 ? caveStats.pass5.decoCaves : 0);
+        stats.blocksModified += caveStats.totalBlocksModified || 0;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(
+            '[StructureGenerator] Pass 4 (caves) failed: ' +
+              (e && e.message ? e.message : String(e))
+          );
+        }
+      }
     }
 
     // Pass 5: Place water via WaterGenerator
@@ -795,27 +822,45 @@
       opts.water &&
       typeof Donkeycraft.WaterGenerator.placeWater === 'function'
     ) {
-      var waterStats = Donkeycraft.WaterGenerator.placeWater(
-        chunk,
-        chunkX,
-        chunkZ,
-        biomeId,
-        heightmap,
-        opts
-      );
-      stats.waterBlocksPlaced += waterStats.waterBlocksPlaced || 0;
+      try {
+        var waterStats = Donkeycraft.WaterGenerator.placeWater(
+          chunk,
+          chunkX,
+          chunkZ,
+          biomeId,
+          heightmap,
+          opts
+        );
+        stats.waterBlocksPlaced += waterStats.waterBlocksPlaced || 0;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(
+            '[StructureGenerator] Pass 5 (water) failed: ' +
+              (e && e.message ? e.message : String(e))
+          );
+        }
+      }
     }
 
     // Pass 6: Place decorations via placeDecorations
     if (opts.decorations && typeof placeDecorations === 'function') {
-      var decoStats = placeDecorations(
-        chunk,
-        chunkX,
-        chunkZ,
-        biomeName,
-        heightmap
-      );
-      stats.decorationsPlaced += decoStats.decorationsPlaced || 0;
+      try {
+        var decoStats = placeDecorations(
+          chunk,
+          chunkX,
+          chunkZ,
+          biomeName,
+          heightmap
+        );
+        stats.decorationsPlaced += decoStats.decorationsPlaced || 0;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(
+            '[StructureGenerator] Pass 6 (decorations) failed: ' +
+              (e && e.message ? e.message : String(e))
+          );
+        }
+      }
     }
 
     return { heightmap: heightmap, stats: stats };

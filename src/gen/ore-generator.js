@@ -51,6 +51,93 @@
     this.biomeIds = biomeIds || null; // null = appears in all biomes
   }
 
+  /**
+   * Block IDs that ores can safely replace (geologically valid ore hosts).
+   * Includes stone variants, dirt, gravel, and deepslate — excludes ores, liquids, and decorative blocks.
+   * @type {Set<number>}
+   * @private
+   */
+  var _oreReplaceableBlocks = null;
+
+  /**
+   * Initialize the set of ore-replaceable block IDs from BlockRegistry.
+   * Called during init() to resolve at module initialization time.
+   * @private
+   */
+  function _initOreReplaceableBlocks() {
+    if (!_oreReplaceableBlocks && Donkeycraft.BlockRegistry) {
+      _oreReplaceableBlocks = new Set();
+      var allBlocks = Donkeycraft.BlockRegistry.getAllBlocks();
+      // Stone family
+      var stoneNames = [
+        'stone',
+        'granite',
+        'diorite',
+        'andesite',
+        'deepslate',
+        'cobbled_deepslate',
+        'polished_deepslate',
+        'deepslate_bricks',
+        'cracked_deepslate_bricks',
+        'deepslate_tiles',
+        'cracked_deepslate_tiles',
+        'cobblestone',
+        'mossy_cobblestone',
+      ];
+      // Dirt family
+      var dirtNames = ['dirt', 'gravel', 'sand', 'red_sand', 'clay'];
+      for (var i = 0; i < stoneNames.length; i++) {
+        var b = Donkeycraft.BlockRegistry.getBlockByName(stoneNames[i]);
+        if (b) _oreReplaceableBlocks.add(b.id);
+      }
+      for (var j = 0; j < dirtNames.length; j++) {
+        var d = Donkeycraft.BlockRegistry.getBlockByName(dirtNames[j]);
+        if (d) _oreReplaceableBlocks.add(d.id);
+      }
+    }
+  }
+
+  /**
+   * Check if a block ID is geologically valid for ore replacement.
+   * Only allows replacement of stone/dirt/gravel variants, not other ores or special blocks.
+   * @param {number} blockId - Block ID to check.
+   * @returns {boolean} True if the block can be replaced by ore.
+   * @private
+   */
+  function _isOreReplaceable(blockId) {
+    if (_oreReplaceableBlocks && _oreReplaceableBlocks.has(blockId))
+      return true;
+    // Fallback: use BlockRegistry.isSolid as a broad check
+    if (
+      Donkeycraft.BlockRegistry &&
+      Donkeycraft.BlockRegistry.isSolid(blockId)
+    ) {
+      // Exclude known ore blocks to prevent ore-on-ore replacement
+      var oreNames = [
+        'coal_ore',
+        'iron_ore',
+        'gold_ore',
+        'diamond_ore',
+        'redstone_ore',
+        'lapis_ore',
+        'emerald_ore',
+        'copper_ore',
+        'tin_ore',
+        'nether_quartz_ore',
+        'nether_gold_ore',
+      ];
+      for (var k = 0; k < oreNames.length; k++) {
+        var ob = Donkeycraft.BlockRegistry.getBlockByName(oreNames[k]);
+        if (ob && ob.id === blockId) return false;
+      }
+      // Exclude bedrock and other unbreakable blocks
+      var bedrock = Donkeycraft.BlockRegistry.getBlockByName('bedrock');
+      if (bedrock && bedrock.id === blockId) return false;
+      return true;
+    }
+    return false;
+  }
+
   // ============================================================
   // Ore Registry
   // ============================================================
@@ -112,6 +199,7 @@
   function init() {
     _ores = getDefaultOres();
     _resolveOreBlocks();
+    _initOreReplaceableBlocks(); // Resolve ore-replaceable block set
 
     // Validate that all ores have resolved block IDs
     var unresolvedOres = [];
@@ -356,18 +444,10 @@
             continue;
           if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-          // Validate: ore must be placed inside solid rock or replace other ores/stone variants
-          // This allows natural geological layering where newer veins replace older ones
+          // Validate: ore must be placed inside geologically valid host rock.
+          // Only replaces stone/dirt/gravel variants — not other ores, liquids, or decorative blocks.
           var currentBlock = chunk.getBlock(bx, by, bz);
-          if (currentBlock === stoneId || currentBlock === oreBlockId) {
-            chunk.setBlock(bx, by, bz, oreBlockId);
-            placed++;
-          } else if (
-            Donkeycraft.BlockRegistry &&
-            Donkeycraft.BlockRegistry.isSolid(currentBlock)
-          ) {
-            // Also allow replacement of any solid block for natural ore distribution
-            // This prevents ores from floating in air and ensures they're embedded in rock
+          if (currentBlock === stoneId || _isOreReplaceable(currentBlock)) {
             chunk.setBlock(bx, by, bz, oreBlockId);
             placed++;
           }
@@ -427,15 +507,9 @@
             continue;
           if (by < 0 || by >= WORLD_HEIGHT) continue;
 
-          // Validate: ore must be placed inside solid rock or replace other ores
+          // Validate: ore must be placed inside geologically valid host rock.
           var currentBlock = chunk.getBlock(bx, by, bz);
-          if (currentBlock === stoneId || currentBlock === oreBlockId) {
-            chunk.setBlock(bx, by, bz, oreBlockId);
-            placed++;
-          } else if (
-            Donkeycraft.BlockRegistry &&
-            Donkeycraft.BlockRegistry.isSolid(currentBlock)
-          ) {
+          if (currentBlock === stoneId || _isOreReplaceable(currentBlock)) {
             chunk.setBlock(bx, by, bz, oreBlockId);
             placed++;
           }
@@ -486,15 +560,9 @@
           if (bx < 0 || bx >= CHUNK_SIZE || bz < 0 || bz >= CHUNK_SIZE)
             continue;
 
-          // Validate: ore must be placed inside solid rock or replace other ores
+          // Validate: ore must be placed inside geologically valid host rock.
           var currentBlock = chunk.getBlock(bx, currentY, bz);
-          if (currentBlock === stoneId || currentBlock === oreBlockId) {
-            chunk.setBlock(bx, currentY, bz, oreBlockId);
-            placed++;
-          } else if (
-            Donkeycraft.BlockRegistry &&
-            Donkeycraft.BlockRegistry.isSolid(currentBlock)
-          ) {
+          if (currentBlock === stoneId || _isOreReplaceable(currentBlock)) {
             chunk.setBlock(bx, currentY, bz, oreBlockId);
             placed++;
           }

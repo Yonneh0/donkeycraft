@@ -20,6 +20,29 @@
         }
     </style>
     <link rel="stylesheet" href="src/ui/inventory-ui.css">
+    <!-- 1. The HTML audio element (starts muted) -->
+    <audio id="bg-audio" autoplay loop muted>
+        <source src="menu.mp3" type="audio/mp3">
+    </audio>
+
+    <!-- 2. The JavaScript to unmute on user interaction -->
+    <script>
+        const audio = document.getElementById('bg-audio');
+        audio.volume = 0.25;
+
+        const unmuteAudio = () => {
+            audio.muted = false; // Unmute the audio
+            audio.play();        // Ensure it is playing
+
+            // Remove the listeners so it only triggers on the first interaction
+            window.removeEventListener('click', unmuteAudio);
+            window.removeEventListener('keydown', unmuteAudio);
+        };
+
+        // Listen for clicks or key presses anywhere on the page
+        window.addEventListener('click', unmuteAudio);
+        window.addEventListener('keydown', unmuteAudio);
+    </script>
 </head>
 
 <body>

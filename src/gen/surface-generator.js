@@ -351,8 +351,9 @@
         // Micro-detail (10%) — surface roughness
         height += _clampNoise(microNoise) * params.heightVariation * 0.1;
 
-        // Apply shore/beach transitions for smooth coastlines
-        // Pass all noise values to match the exact height calculation formula
+        // Apply shore/beach transitions for smooth coastlines.
+        // Only affects terrain BELOW sea level to prevent underwater peaks.
+        // Uses a smoothstep curve for natural-looking beach gradients.
         var distFromShore = _calculateShoreDistance(
           continentalNoise,
           terrainNoise,
@@ -361,9 +362,11 @@
           microNoise,
           params
         );
-        if (distFromShore > 0) {
-          // Smooth transition between land and water
-          height = height + distFromShore * (seaLevel - height) * 0.3;
+        if (distFromShore > 0 && height < seaLevel) {
+          // Smoothstep-based transition: gradual slope from shore up to sea level
+          var smoothFactor =
+            distFromShore * distFromShore * (3 - 2 * distFromShore);
+          height = height + smoothFactor * (seaLevel - height) * 0.5;
         }
 
         // Detect and carve lake basins in low areas
@@ -391,13 +394,19 @@
   /**
    * Generate an empty heightmap filled with sea level.
    * Used as fallback for invalid inputs.
-   * @returns {number[]} Empty heightmap array filled with grass biome sea level (63).
+   * @param {string} [fallbackBiome='grass'] - Biome name to use for sea level reference.
+   * @returns {number[]} Empty heightmap array filled with the specified biome's sea level.
    * @private
    */
-  function _createEmptyHeightmap() {
-    var defaultParams = BIOME_PARAMETERS.grass;
-    var seaLevel = isFinite(defaultParams.seaLevel)
-      ? defaultParams.seaLevel
+  function _createEmptyHeightmap(fallbackBiome) {
+    fallbackBiome =
+      fallbackBiome && BIOME_PARAMETERS[fallbackBiome]
+        ? fallbackBiome
+        : 'grass';
+    var fallbackParams = BIOME_PARAMETERS[fallbackBiome];
+    if (!fallbackParams) fallbackParams = BIOME_PARAMETERS.grass;
+    var seaLevel = isFinite(fallbackParams.seaLevel)
+      ? fallbackParams.seaLevel
       : 63;
     var result = new Array(CHUNK_SIZE * CHUNK_SIZE);
     for (var i = 0; i < result.length; i++) {
@@ -559,8 +568,9 @@
 
   /**
    * Calculate shore distance factor for coastline smoothing.
-   * Shore transition occurs when estimated height is between shoreLevelMin and shoreLevelMax,
+   * Shore transition occurs when terrain is below sea level but within the shore zone,
    * creating smooth gradients that prevent harsh cliff-like coastlines.
+   * Only affects terrain BELOW sea level — prevents underwater peaks from being raised above water.
    * @param {number} continentalNoise - Continental noise value [-1, 1].
    * @param {number} terrainNoise - Terrain shaping noise value [-1, 1].
    * @param {number} detailNoise - Detail noise value [-1, 1].
@@ -587,18 +597,26 @@
       _clampNoise(ridgeNoise) * params.heightVariation * 0.2 +
       _clampNoise(microNoise) * params.heightVariation * 0.1;
 
-    // Shore zone: terrain is between shoreLevelMin and shoreLevelMax
-    if (
-      estimatedHeight < params.shoreLevelMin ||
-      estimatedHeight > params.shoreLevelMax
-    ) {
+    // Only apply shore transition when terrain is BELOW sea level.
+    // This prevents underwater terrain from being raised above the water surface,
+    // which would create unnatural submerged peaks.
+    if (estimatedHeight >= params.seaLevel) {
       return 0;
     }
-    // Smooth transition in shore zone
-    return (
-      (estimatedHeight - params.shoreLevelMin) /
-      (params.shoreLevelMax - params.shoreLevelMin)
-    );
+
+    // Shore zone: terrain is between shoreLevelMin and seaLevel.
+    // If estimatedHeight is below shoreLevelMin, use full shore smoothing (factor = 1).
+    // If estimatedHeight is between shoreLevelMin and seaLevel, interpolate smoothly.
+    if (estimatedHeight < params.shoreLevelMin) {
+      return 1.0; // Full shore smoothing for deep underwater terrain
+    }
+
+    // Smooth quadratic transition from shoreLevelMin to seaLevel
+    var range = params.seaLevel - params.shoreLevelMin;
+    if (range <= 0) return 0;
+    var t = (estimatedHeight - params.shoreLevelMin) / range;
+    // Use smoothstep for smoother transition: 6t^5 - 15t^4 + 10t^3
+    return 1.0 - t * t * t * (t * (t * 6 - 15) + 10);
   }
 
   /**

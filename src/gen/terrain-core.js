@@ -50,6 +50,30 @@
   }
 
   /**
+   * Hash generation options into a deterministic integer for cache key inclusion.
+   * Sorts keys alphabetically and hashes each key-value pair using FNV-1a inspired mixing.
+   * @param {Object} [options] - Generation options object (may be null/undefined).
+   * @returns {number} Unsigned 32-bit hash integer.
+   * @private
+   */
+  function _hashGenerationOptions(options) {
+    if (!options || typeof options !== 'object') return 0;
+    var hash = 0;
+    var optKeys = Object.keys(options).sort();
+    for (var _i = 0; _i < optKeys.length; _i++) {
+      var k = optKeys[_i];
+      var v = options[k];
+      // Hash key name characters
+      for (var c = 0; c < k.length; c++) {
+        hash = ((hash << 5) - hash + k.charCodeAt(c)) | 0;
+      }
+      // Hash value (coerce to boolean: true=1, false=0)
+      hash = ((hash << 5) - hash + (v ? 1 : 0)) | 0;
+    }
+    return hash >>> 0;
+  }
+
+  /**
    * Generate a deterministic hash from seed and chunk coordinates.
    * Used for cache key generation and noise offsetting.
    * @param {number} chunkX - Chunk X coordinate (may be negative).
@@ -70,14 +94,17 @@
    * Validates all inputs are finite numbers before constructing the key.
    * Invalid inputs return a sentinel key that skips caching rather than
    * polluting the cache with unique timestamps.
+   * Includes generation options hash so that changing cave/ore/water/decoration
+   * settings invalidates the cache and forces regeneration.
    * @param {number} chunkX - Chunk X coordinate.
    * @param {number} chunkZ - Chunk Z coordinate.
    * @param {number} biomeId - Biome ID.
    * @param {number} seed - World seed.
+   * @param {Object} [options] - Optional generation options (caves, ores, water, decorations).
    * @returns {string} Unique cache key string, or 'terrain__invalid' for bad inputs.
    * @private
    */
-  function _makeCacheKey(chunkX, chunkZ, biomeId, seed) {
+  function _makeCacheKey(chunkX, chunkZ, biomeId, seed, options) {
     // Validate inputs are finite numbers — return sentinel key for invalid inputs
     if (
       !isFinite(chunkX) ||
@@ -87,6 +114,7 @@
     ) {
       return 'terrain__invalid';
     }
+    var optHash = _hashGenerationOptions(options);
     return (
       'terrain_' +
       Math.floor(seed) +
@@ -95,7 +123,9 @@
       '_' +
       Math.floor(chunkZ) +
       '_b' +
-      Math.floor(biomeId || 0)
+      Math.floor(biomeId || 0) +
+      '_o' +
+      optHash
     );
   }
 
@@ -330,7 +360,7 @@
       });
     }
 
-    var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed);
+    var cacheKey = _makeCacheKey(chunkX, chunkZ, _currentBiomeId, _seed, null);
 
     // Skip caching for invalid cache keys (bad inputs) — but still record as cache miss
     if (_isInvalidCacheKey(cacheKey)) {
