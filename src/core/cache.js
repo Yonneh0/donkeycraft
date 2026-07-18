@@ -79,12 +79,11 @@
   };
 
   /**
-   * Compute a simple hash-based checksum for an object — used for cache invalidation.
-   * Serializes the object to JSON (sorted keys), then computes a 32-bit hash.
-   * Identical objects produce identical checksums; any structural change produces a different hash.
+   * _computeChecksum — compute a simple hash-based checksum for an object.
+   * Used for cache invalidation: identical objects produce identical checksums.
    * @private
    * @param {Object|null} obj — Object to checksum, or null/undefined.
-   * @returns {string} Non-negative hexadecimal checksum string (e.g., 'a3f2c1b0'). Returns 'empty' for null input.
+   * @returns {string} Non-negative hexadecimal checksum string. Returns 'empty' for null input.
    */
   Donkeycraft.AssetCache.prototype._computeChecksum = function (obj) {
     if (!obj) return 'empty';
@@ -93,13 +92,48 @@
     for (var i = 0; i < str.length; i++) {
       var chr = str.charCodeAt(i);
       hash = (hash << 5) - hash + chr;
-      hash = hash & hash; // Convert to 32-bit int
+      hash = hash & hash;
     }
     return Math.abs(hash).toString(16);
   };
 
   /**
-   * Get a cached texture atlas from IndexedDB.
+   * _imageDataToArray — convert ImageData to a plain array for IndexedDB storage.
+   * IndexedDB cannot store ImageData objects directly in all browsers.
+   * @private
+   * @param {ImageData} imageData — ImageData object to convert.
+   * @returns {{data: number[], width: number, height: number}} Serializable representation.
+   */
+  Donkeycraft.AssetCache.prototype._imageDataToArray = function (imageData) {
+    var arr = [];
+    var data = imageData.data;
+    for (var i = 0; i < data.length; i++) {
+      arr[i] = data[i];
+    }
+    return { data: arr, width: imageData.width, height: imageData.height };
+  };
+
+  /**
+   * _arrayToImageData — reconstruct ImageData from a plain array.
+   * @private
+   * @param {{data: number[], width: number, height: number}} serialized — Serializable representation.
+   * @returns {ImageData} Reconstructed ImageData object.
+   */
+  Donkeycraft.AssetCache.prototype._arrayToImageData = function (serialized) {
+    var canvas = document.createElement('canvas');
+    canvas.width = serialized.width;
+    canvas.height = serialized.height;
+    var ctx = canvas.getContext('2d');
+    var imageData = ctx.createImageData(serialized.width, serialized.height);
+    var data = imageData.data;
+    for (var i = 0; i < serialized.data.length && i < data.length; i++) {
+      data[i] = serialized.data[i];
+    }
+    return imageData;
+  };
+
+  /**
+   * getTextureAtlas — get a cached texture atlas from IndexedDB.
    * Validates stored dimensions match ImageData before reconstruction.
    * @param {string} [worldName=default] — World name for cache key.
    * @returns {Promise<HTMLCanvasElement|null>} Resolves with canvas or null if not cached.
@@ -121,16 +155,17 @@
         var request = store.get('texture-atlas:' + worldName);
 
         request.onsuccess = function () {
-          if (!request.result || !request.result.imageData) {
+          var result = request.result;
+          if (!result || !result.imageData) {
             resolve(null);
             return;
           }
 
-          var storedW = request.result.width;
-          var storedH = request.result.height;
-          var imageData = request.result.imageData;
+          var storedW = result.width;
+          var storedH = result.height;
+          var imageData = result.imageData;
 
-          // Validate dimensions match ImageData byte length (4 bytes per pixel)
+          // Validate dimensions
           if (!storedW || !storedH || storedW <= 0 || storedH <= 0) {
             Donkeycraft.Logger.warn(
               'AssetCache',
@@ -140,25 +175,28 @@
             return;
           }
 
-          // Validate that imageData has a valid data property (ArrayBufferView or Array)
-          if (!imageData || !imageData.data || !(imageData.data instanceof Uint8ClampedArray || Array.isArray(imageData.data))) {
+          // Handle both plain array and TypedArray formats
+          var imageDataObj;
+          if (Array.isArray(imageData) && imageData.data !== undefined) {
+            // Serialized format: {data: number[], width, height}
+            imageDataObj = this._arrayToImageData(imageData);
+          } else if (imageData.data instanceof Uint8ClampedArray || Array.isArray(imageData.data)) {
+            // Direct ImageData format
+            var expectedBytes = storedW * storedH * 4;
+            if (imageData.data.length !== expectedBytes) {
+              Donkeycraft.Logger.warn(
+                'AssetCache',
+                'Texture atlas ImageData size mismatch: expected ' +
+                  expectedBytes + ' bytes, got ' + imageData.data.length
+              );
+              resolve(null);
+              return;
+            }
+            imageDataObj = imageData;
+          } else {
             Donkeycraft.Logger.warn(
               'AssetCache',
-              'Texture atlas ImageData missing or corrupted: imageData.data is invalid'
-            );
-            resolve(null);
-            return;
-          }
-
-          var expectedBytes = storedW * storedH * 4;
-          if (imageData.data.length !== expectedBytes) {
-            Donkeycraft.Logger.warn(
-              'AssetCache',
-              'Texture atlas ImageData size mismatch: expected ' +
-                expectedBytes +
-                ' bytes, got ' +
-                imageData.data.length +
-                '. Cache may be corrupted.'
+              'Texture atlas ImageData missing or corrupted'
             );
             resolve(null);
             return;
@@ -171,7 +209,7 @@
           var ctx = canvas.getContext('2d');
           if (ctx) {
             try {
-              ctx.putImageData(imageData, 0, 0);
+              ctx.putImageData(imageDataObj, 0, 0);
               resolve(canvas);
             } catch (e) {
               Donkeycraft.Logger.warn(
@@ -183,7 +221,7 @@
           } else {
             resolve(null);
           }
-        };
+        }.bind(this);
 
         request.onerror = function () {
           resolve(null);
@@ -195,8 +233,8 @@
   };
 
   /**
-   * Cache a texture atlas canvas to IndexedDB.
-   * Stores as ImageData for exact reconstruction.
+   * setTextureAtlas — cache a texture atlas canvas to IndexedDB.
+   * Converts ImageData to a plain array for reliable IndexedDB serialization.
    * @param {HTMLCanvasElement} canvas — The texture atlas canvas.
    * @param {string} [worldName=default] — World name for cache key.
    * @returns {Promise<boolean>} Resolves true on success.
@@ -223,6 +261,9 @@
 
         var imageData = ctx.getImageData(0, 0, w, h);
 
+        // Convert to serializable format for IndexedDB compatibility
+        var serializedImageData = this._imageDataToArray(imageData);
+
         var transaction = self._db.transaction(
           [Donkeycraft.ASSET_CACHE_STORE_NAME],
           'readwrite'
@@ -233,7 +274,7 @@
           type: 'texture-atlas',
           width: w,
           height: h,
-          imageData: imageData,
+          imageData: serializedImageData,
           cachedAt: Date.now(),
         };
 
@@ -367,7 +408,7 @@
   };
 
   /**
-   * Check if a specific asset is cached.
+   * has — check if a specific asset is cached.
    * @param {string} key — Cache key (e.g., 'texture-atlas:default', 'sound:step1').
    * @returns {Promise<boolean>} True if the key exists in cache.
    */
@@ -404,7 +445,7 @@
   };
 
   /**
-   * Delete a specific cached asset.
+   * delete — delete a specific cached asset.
    * Returns false if the key is not found or cache is not ready.
    * Uses cursor-based single-transaction approach for efficiency.
    * @param {string} key — Cache key to delete.
@@ -455,10 +496,9 @@
   };
 
   /**
-   * Clear all cached assets that are older than the expiration threshold.
+   * clearExpired — clear all cached assets older than the expiration threshold.
    * Default expiration is 24 hours (86400000 ms).
-   * On error, resolves with the number of entries cleared up to the failure point
-   * rather than rejecting, allowing graceful degradation.
+   * On error, resolves with the number of entries cleared up to the failure point.
    * @param {number} [maxAgeMs=86400000] — Maximum age in milliseconds before an entry is considered expired.
    * @returns {Promise<number>} Number of entries cleared (may be partial on error).
    */
@@ -505,7 +545,7 @@
   };
 
   /**
-   * Clear all cached assets.
+   * clearAll — clear all cached assets.
    * Always resolves (never rejects) to allow graceful degradation on error.
    * @returns {Promise<number>} Number of entries cleared (always 0 on failure).
    */
@@ -538,7 +578,7 @@
   };
 
   /**
-   * Get cache usage statistics.
+   * getUsageStats — get cache usage statistics.
    * @returns {Promise<Object>} Stats object with entryCount, totalSize, and entries array.
    */
   Donkeycraft.AssetCache.prototype.getUsageStats = function () {
@@ -600,7 +640,7 @@
   };
 
   /**
-   * Get the total cache size in bytes (approximate).
+   * getTotalSize — get the total cache size in bytes (approximate).
    * @returns {Promise<number>} Approximate size in bytes.
    */
   Donkeycraft.AssetCache.prototype.getTotalSize = function () {
@@ -611,7 +651,7 @@
   };
 
   /**
-   * Get cache size in human-readable format (bytes, KB, MB).
+   * getFormattedSize — get cache size in human-readable format (bytes, KB, MB).
    * @returns {Promise<string>} Human-readable size string.
    */
   Donkeycraft.AssetCache.prototype.getFormattedSize = function () {

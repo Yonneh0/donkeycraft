@@ -22,7 +22,13 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 - **Portals** — Obsidian frame detection and inter-dimensional travel (gen/portal.js — 666 lines)
 - **Day/night cycle** — 24000-tick day with moon phases, sky gradients, sun/moon/stars
 - **Weather** — Rain, thunder, and snow with biome restrictions and particle effects
-- **Persistent worlds** — IndexedDB save/load with chunk dirty batching
+- **Persistent worlds** — IndexedDB-based WorldStore (`src/core/world-store.js`) with chunk dirty batching, schema version tracking, and quota handling
+
+### Storage
+- **WorldStore** (`src/core/world-store.js`) — IndexedDB world persistence with automatic chunk save batching, schema versioning, and quota exceeded recovery
+- **Storage** (`src/core/storage.js`) — Hybrid IndexedDB + in-memory LRU cache for terrain chunks; batched writes, automatic eviction, and deferred flush
+- **AssetCache** (`src/core/cache.js`) — IndexedDB-based persistent cache for texture atlases and sounds with checksum-based invalidation and ImageData serialization
+- **LevelData** (`src/core/level-data.js`) — World-level state management (spawn, mode, time, seed, player data) with periodic auto-save to WorldStore
 
 ### Rendering
 - **Custom WebGL 1.0 pipeline** — No Three.js, no external libraries

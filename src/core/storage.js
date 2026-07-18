@@ -287,11 +287,35 @@
   }
 
   /**
-   * Flush all pending writes to IndexedDB in a single transaction.
-   * Returns a Promise that resolves when the flush is complete.
-   * Uses a chain of promises to ensure sequential flushes without race conditions.
-   * Handles quota exceeded errors by clearing old cache entries.
-   * @returns {Promise<void>} Resolves when flush is done.
+   * _createFlushPromise — create a thenable with _resolved tracking for concurrent flush sequencing.
+   * @param {Function} executor — Function that performs the actual IndexedDB write.
+   * @returns {Object} Thenable with _resolved property for chaining.
+   * @private
+   */
+  function _createFlushPromise(executor) {
+    var result = {
+      _resolved: false,
+      then: function (onFulfilled, onRejected) {
+        return executor().then(function () {
+          result._resolved = true;
+          _flushPromise = null;
+          if (onFulfilled) return onFulfilled();
+        }).catch(function (err) {
+          result._resolved = true;
+          _flushPromise = null;
+          if (onRejected) return onRejected(err);
+          throw err;
+        });
+      },
+    };
+    return result;
+  }
+
+  /**
+   * _flushPendingWrites — flush all pending writes to IndexedDB in a single transaction.
+   * Chains off any in-progress flush to prevent race conditions.
+   * Handles quota exceeded errors by clearing old cache entries and retrying.
+   * @returns {Object} Thenable with _resolved property for chaining.
    * @private
    */
   function _flushPendingWrites() {
@@ -312,106 +336,70 @@
       return Promise.resolve();
     }
 
-    // Capture writes before clearing — only flush the current batch
     var writesCopy = _pendingWrites.slice();
     _pendingWrites = [];
 
     // Chain off any in-progress flush to prevent race conditions.
-    // Use a proper sentinel value (_resolved) that is set BEFORE the promise is created,
-    // so the chaining check works correctly on first flush.
     var chainPromise =
       _flushPromise && !_flushPromise._resolved
         ? _flushPromise
         : Promise.resolve();
 
-    // Create a proper thenable object with _resolved tracking from the start.
-    // This ensures proper sequencing of concurrent flush requests.
-    var newFlushPromise = {
-      _resolved: false,
-      then: function (onFulfilled, onRejected) {
-        return chainPromise
-          .then(function () {
-            return new Promise(function (resolve) {
-              try {
-                var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
-                var store = tx.objectStore(CHUNK_STORE_NAME);
+    return _createFlushPromise(function () {
+      return new Promise(function (resolve, reject) {
+        try {
+          var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+          var store = tx.objectStore(CHUNK_STORE_NAME);
 
-                for (var i = 0; i < writesCopy.length; i++) {
-                  var write = writesCopy[i];
-                  store.put({
-                    key: write.key,
-                    data: write.data,
-                    savedAt: Date.now(),
-                  });
-                }
-
-                tx.oncomplete = function () {
-                  newFlushPromise._resolved = true;
-                  _flushPromise = null;
-                  resolve();
-                };
-
-                tx.onerror = function () {
-                  // Check for quota exceeded error — clear old cache entries and retry
-                  if (tx.error && tx.error.name === 'QuotaExceededError') {
-                    _warn(
-                      'IndexedDB quota exceeded — clearing old cache entries'
-                    );
-                    try {
-                      var clearTx = _db.transaction(
-                        [CHUNK_STORE_NAME],
-                        'readwrite'
-                      );
-                      clearTx.objectStore(CHUNK_STORE_NAME).clear();
-                      clearTx.oncomplete = function () {
-                        _memoryCache.clear();
-                        _lruOrder = [];
-                        resolve();
-                      };
-                      clearTx.onerror = function () {
-                        resolve();
-                      };
-                    } catch (e) {
-                      resolve();
-                    }
-                  } else {
-                    _warn(
-                      'IndexedDB flush error: ' +
-                        (tx.error ? String(tx.error) : 'unknown')
-                    );
-                    resolve();
-                  }
-                  newFlushPromise._resolved = true;
-                  _flushPromise = null;
-                };
-              } catch (e) {
-                _warn(
-                  'Flush error: ' + (e && e.message ? e.message : String(e))
-                );
-                newFlushPromise._resolved = true;
-                _flushPromise = null;
-                resolve();
-              }
+          for (var i = 0; i < writesCopy.length; i++) {
+            var write = writesCopy[i];
+            store.put({
+              key: write.key,
+              data: write.data,
+              savedAt: Date.now(),
             });
-          })
-          .then(onFulfilled, onRejected);
-      },
-    };
+          }
 
-    _flushPromise = newFlushPromise;
-    return _flushPromise;
+          tx.oncomplete = function () {
+            resolve();
+          };
+
+          tx.onerror = function () {
+            if (tx.error && tx.error.name === 'QuotaExceededError') {
+              _warn('IndexedDB quota exceeded — clearing old cache entries');
+              var clearTx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
+              clearTx.objectStore(CHUNK_STORE_NAME).clear();
+              clearTx.oncomplete = function () {
+                _memoryCache.clear();
+                _lruOrder = [];
+                resolve();
+              };
+              clearTx.onerror = function () {
+                reject(new Error('QuotaExceededError: cache clear failed'));
+              };
+            } else {
+              var msg = tx.error ? String(tx.error.message || tx.error) : 'unknown';
+              _warn('IndexedDB flush error: ' + msg);
+              reject(new Error('IndexedDB flush failed: ' + msg));
+            }
+          };
+        } catch (e) {
+          reject(new Error('Flush exception: ' + e.message));
+        }
+      });
+    });
   }
 
   /**
-   * Delete a chunk from IndexedDB.
-   * Returns a Promise that resolves when the deletion is complete.
+   * deleteFromIndexedDB — delete a chunk from IndexedDB.
+   * Returns a Promise that rejects on actual errors for proper error propagation.
    * @param {string} key - Cache key.
    * @returns {Promise<void>} Resolves when deletion is complete.
    */
   function deleteFromIndexedDB(key) {
     if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
 
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       try {
         var tx = _db.transaction([CHUNK_STORE_NAME], 'readwrite');
         var store = tx.objectStore(CHUNK_STORE_NAME);
@@ -421,10 +409,11 @@
           resolve();
         };
         request.onerror = function () {
-          resolve();
-        }; // Resolve even on error to avoid breaking callers
+          var msg = request.error ? String(request.error.message || request.error) : 'unknown';
+          reject(new Error('deleteFromIndexedDB failed for "' + key + '": ' + msg));
+        };
       } catch (e) {
-        resolve();
+        reject(new Error('deleteFromIndexedDB exception: ' + e.message));
       }
     });
   }
@@ -434,8 +423,8 @@
   // ============================================================
 
   /**
-   * Save metadata to IndexedDB.
-   * Returns a Promise that resolves when the save is complete.
+   * saveMetadata — save metadata to IndexedDB.
+   * Returns a Promise that rejects on actual errors.
    * @param {string} key - Metadata key.
    * @param {*} data - Metadata data.
    * @returns {Promise<void>} Resolves when save is complete.
@@ -443,7 +432,7 @@
   function saveMetadata(key, data) {
     if (!INDEXEDDB_AVAILABLE || !_db) return Promise.resolve();
 
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       try {
         var tx = _db.transaction([META_STORE_NAME], 'readwrite');
         var store = tx.objectStore(META_STORE_NAME);
@@ -453,16 +442,17 @@
           resolve();
         };
         request.onerror = function () {
-          resolve();
-        }; // Resolve even on error to avoid breaking callers
+          reject(new Error('saveMetadata failed for "' + key + '": ' + (request.error ? String(request.error) : 'unknown')));
+        };
       } catch (e) {
-        resolve();
+        reject(new Error('saveMetadata exception: ' + e.message));
       }
     });
   }
 
   /**
-   * Load metadata from IndexedDB.
+   * loadMetadata — load metadata from IndexedDB.
+   * Returns null on error rather than rejecting (read operations are forgiving).
    * @param {string} key - Metadata key.
    * @returns {Promise<*|null>} Resolves to metadata or null.
    */
@@ -499,7 +489,7 @@
   // ============================================================
 
   /**
-   * Save a texture atlas tile to IndexedDB for cache persistence.
+   * putTexture — save a texture atlas tile to IndexedDB for cache persistence.
    * Stores the base64 data URL which can be restored on page reload.
    * @param {string} key - Texture key (e.g., "block_stone_42").
    * @param {string} dataUrl - Base64 PNG data URL of the texture.
@@ -531,7 +521,7 @@
   }
 
   /**
-   * Save multiple texture atlas tiles in a single batched flush.
+   * putTextureAtlas — save multiple texture atlas tiles in a single batched flush.
    * @param {Object} textures - Object mapping keys to data URLs.
    * @returns {Promise<void>} Resolves when all saved.
    */
@@ -551,7 +541,8 @@
   }
 
   /**
-   * Get a cached texture from IndexedDB.
+   * getTexture — get a cached texture from IndexedDB.
+   * Returns null on error (read operations are forgiving).
    * @param {string} key - Texture key.
    * @returns {Promise<string|null>} Resolves to data URL or null.
    */
@@ -615,7 +606,7 @@
   }
 
   /**
-   * Clear the texture cache from IndexedDB.
+   * clearTextureCache — clear the texture cache from IndexedDB.
    * @returns {Promise<void>} Resolves when cleared.
    */
   function clearTextureCache() {
@@ -690,7 +681,8 @@
     _memoryCache.delete(key);
     var idx = _lruOrder.indexOf(key);
     if (idx >= 0) _lruOrder.splice(idx, 1);
-    deleteFromIndexedDB(key);
+    // deleteFromIndexedDB returns a Promise; catch errors to prevent unhandled rejections
+    deleteFromIndexedDB(key).catch(function () { /* ignore */ });
   }
 
   /**

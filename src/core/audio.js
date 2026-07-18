@@ -33,9 +33,6 @@
 
     /** @type {boolean} — True when the audio context is initialized and running. */
     this._audioReady = false;
-
-    /** @type {Function|null} — Reference to the statechange listener for cleanup in destroy(). */
-    this._stateChangeListener = null;
   };
 
   /**
@@ -58,24 +55,13 @@
         self._masterGain.gain.value = self._volume;
         self._masterGain.connect(self._context.destination);
 
-        // Context is ready to play only if already running.
-        // Store listener reference for cleanup in destroy().
-        if (self._context.state === 'running') {
-          self._audioReady = true;
-        } else {
-          // Track when context resumes — sounds will start playing then.
-          self._stateChangeListener = function () {
-            if (self._context.state === 'running') {
-              self._audioReady = true;
-            }
-          };
-          self._context.addEventListener(
-            'statechange',
-            self._stateChangeListener
-          );
-        }
+         // Context is ready to play only if already running.
+         // On browsers that defer audio creation, it starts suspended and
+         // requires a user gesture to resume — the game will call resumeContext()
+         // after the first click/keydown.
+         self._audioReady = self._context.state === 'running';
 
-        resolve();
+         resolve();
       } catch (e) {
         if (Donkeycraft.Logger) {
           Donkeycraft.Logger.warn('Web Audio API not available:', e);
@@ -119,32 +105,42 @@
    * that defer audio context creation until a user gesture (common on mobile).
    * @returns {Promise<boolean>} True if the context was successfully resumed and is running.
    */
-  Donkeycraft.AudioSystem.prototype.resumeContext = function () {
-    var self = this;
-    if (!this._context) return Promise.resolve(false);
+   Donkeycraft.AudioSystem.prototype.resumeContext = function () {
+     var self = this;
+     if (!this._context) return Promise.resolve(false);
 
-    if (this._context.state === 'running') {
-      this._audioReady = true;
-      return Promise.resolve(true);
-    }
+     if (this._context.state === 'running') {
+       this._audioReady = true;
+       return Promise.resolve(true);
+     }
 
-    return this._context
-      .resume()
-      .then(function () {
-        self._audioReady = self._context.state === 'running';
-        return self._audioReady;
-      })
-      .catch(function (e) {
-        if (Donkeycraft.Logger) {
-          Donkeycraft.Logger.warn(
-            'AudioSystem',
-            'Failed to resume audio context:',
-            e
-          );
-        }
-        return false;
-      });
-  };
+     // Guard against hangs: resume() can block indefinitely on browsers that
+     // require a user gesture.  Resolve after 500 ms with whatever state we have.
+     var timeout = new Promise(function (resolve) {
+       setTimeout(resolve, 500);
+     });
+
+     return Promise.race([
+       this._context.resume().then(function () {
+         self._audioReady = self._context.state === 'running';
+         return self._audioReady;
+       }),
+       timeout.then(function () {
+         // Check state one more time after the timeout fires
+         self._audioReady = self._context.state === 'running';
+         return self._audioReady;
+       }),
+     ]).catch(function (e) {
+       if (Donkeycraft.Logger) {
+         Donkeycraft.Logger.warn(
+           'AudioSystem',
+           'Failed to resume audio context:',
+           e
+         );
+       }
+       return false;
+     });
+   };
 
   /**
    * Check if the audio system is ready to play sounds.
@@ -379,19 +375,6 @@
    */
   Donkeycraft.AudioSystem.prototype.destroy = function () {
     var self = this;
-
-    // Remove the statechange listener to prevent memory leaks
-    if (this._stateChangeListener && this._context) {
-      try {
-        this._context.removeEventListener(
-          'statechange',
-          this._stateChangeListener
-        );
-      } catch (e) {
-        // Context may already be closed — ignore
-      }
-      this._stateChangeListener = null;
-    }
 
     if (this._context) {
       // AudioContext.close() returns a Promise in modern browsers

@@ -737,15 +737,10 @@
   };
 
   /**
-   * Persist current level data to WorldStore immediately.
-   *
+   * persistToStore — persist current level data to WorldStore immediately.
    * Loads existing world data first to preserve chunk data, then merges the
    * updated level data on top. Also triggers dirty chunk save via
    * `WorldStore.saveDirtyChunks()`.
-   *
-   * If the world doesn't exist yet (`loadWorld` returns null), creates a new
-   * entry while preserving any existing chunks from a previous save.
-   *
    * @returns {Promise<boolean>} True if persistence succeeded, false otherwise.
    */
   Donkeycraft.LevelData.prototype.persistToStore = function () {
@@ -756,18 +751,11 @@
 
     this.markSaved();
 
-    // Load existing world data to preserve chunks before overwriting
     return this._worldStore
       .loadWorld(this._worldNameRef)
       .then(function (worldData) {
         var levelData = self.serialize();
-        var existingChunks = [];
-
-        // Preserve existing chunks if world exists
-        if (worldData && worldData.chunks) {
-          existingChunks = worldData.chunks;
-        }
-        // If worldData is null (new world), existingChunks stays empty — this is correct.
+        var existingChunks = worldData && worldData.chunks ? worldData.chunks : [];
 
         // Save merged data: updated level + preserved chunks
         return self._worldStore
@@ -802,12 +790,19 @@
   };
 
   /**
-   * Destroy the LevelData instance: stops auto-save, clears player data reference,
-   * and nullifies internal state for garbage collection.
+   * destroy — stop auto-save, clear all internal state for garbage collection.
    * After calling this method, the instance should not be reused.
    */
   Donkeycraft.LevelData.prototype.destroy = function () {
     this.stopAutoSave();
     this._playerData = null;
+    this._spawnX = Donkeycraft.DEFAULT_SPAWN_X;
+    this._spawnY = Donkeycraft.DEFAULT_SPAWN_Y;
+    this._spawnZ = Donkeycraft.DEFAULT_SPAWN_Z;
+    this._gameMode = 'survival';
+    this._worldTime = 0;
+    this._seed = 42;
+    this._worldName = 'DefaultWorld';
+    this._lastSaved = 0;
   };
 })();

@@ -199,9 +199,25 @@
   };
 
   /**
+   * _normalizeTypedArray — copy a TypedArray or plain array into a new plain array.
+   * Returns null for null/undefined input, passes through numbers as-is.
+   * @memberof Donkeycraft.WorldStore
+   * @private
+   * @param {*} data — TypedArray, array, number, or null.
+   * @returns {number[]|null} Plain array copy or null.
+   */
+  Donkeycraft.WorldStore.prototype._normalizeTypedArray = function (data) {
+    if (data == null) return null;
+    if (typeof data === 'number') return data;
+    if (data instanceof Uint8Array || data instanceof Uint16Array || Array.isArray(data)) {
+      return Array.prototype.slice.call(data);
+    }
+    return null;
+  };
+
+  /**
    * _normalizeChunks — normalize chunk data to internal format.
    * Handles both old format ({ cx, cz, blockData, skyLight, blockLight }) and new format ({ cx, cz, data: { blockData, skyLight, blockLight } }).
-   * Copies TypedArray data into plain arrays for safe JSON serialization.
    * Validates all entries; skips invalid entries with warnings.
    * @memberof Donkeycraft.WorldStore
    * @private
@@ -217,141 +233,46 @@
     for (var i = 0; i < chunks.length; i++) {
       var c = chunks[i];
 
-      // Validate required coordinate fields
       if (typeof c.cx !== 'number' || typeof c.cz !== 'number') {
         Donkeycraft.Logger.warn(
           'WorldStore',
-          'Skipping chunk entry at index ' +
-            i +
-            ': missing or invalid cx/cz coordinates'
+          'Skipping chunk at index ' + i + ': missing cx/cz'
         );
         continue;
       }
 
       if (c.data && typeof c.data === 'object') {
-        // New format: { cx, cz, data: { blockData, skyLight, blockLight } }
-        // Validate that data has at least one expected property
         if (
           c.data.blockData !== undefined ||
           c.data.skyLight !== undefined ||
           c.data.blockLight !== undefined
         ) {
-          // Normalize each field: copy TypedArrays to plain arrays, pass through numbers/nulls
-          var normBlockData = null;
-          if (
-            c.data.blockData instanceof Uint16Array ||
-            Array.isArray(c.data.blockData)
-          ) {
-            normBlockData = Array.prototype.slice.call(c.data.blockData);
-          } else if (
-            c.data.blockData !== null &&
-            c.data.blockData !== undefined
-          ) {
-            Donkeycraft.Logger.warn(
-              'WorldStore',
-              'Chunk (' +
-                c.cx +
-                ',' +
-                c.cz +
-                '): blockData has unexpected type: ' +
-                typeof c.data.blockData
-            );
-          }
-
-          var normSkyLight = 0;
-          if (
-            c.data.skyLight instanceof Uint8Array ||
-            Array.isArray(c.data.skyLight)
-          ) {
-            normSkyLight = Array.prototype.slice.call(c.data.skyLight);
-          } else if (typeof c.data.skyLight === 'number') {
-            normSkyLight = c.data.skyLight;
-          }
-
-          var normBlockLight = 0;
-          if (
-            c.data.blockLight instanceof Uint8Array ||
-            Array.isArray(c.data.blockLight)
-          ) {
-            normBlockLight = Array.prototype.slice.call(c.data.blockLight);
-          } else if (typeof c.data.blockLight === 'number') {
-            normBlockLight = c.data.blockLight;
-          }
-
+          var normBlockData = this._normalizeTypedArray(c.data.blockData);
+          var normSkyLight = this._normalizeTypedArray(c.data.skyLight);
+          var normBlockLight = this._normalizeTypedArray(c.data.blockLight);
           normalized.push({
             cx: c.cx,
             cz: c.cz,
             data: {
               blockData: normBlockData,
-              skyLight: normSkyLight,
-              blockLight: normBlockLight,
+              skyLight: normSkyLight !== null ? normSkyLight : 0,
+              blockLight: normBlockLight !== null ? normBlockLight : 0,
             },
           });
-        } else {
-          Donkeycraft.Logger.warn(
-            'WorldStore',
-            'Skipping chunk entry at index ' +
-              i +
-              ' (cx=' +
-              c.cx +
-              ', cz=' +
-              c.cz +
-              '): data object has no expected properties'
-          );
         }
       } else if (c.blockData !== undefined) {
-        // Old format: { cx, cz, blockData, skyLight, blockLight }
-        // Normalize TypedArrays to plain arrays for JSON serialization
-        var oldBlockData = null;
-        if (c.blockData instanceof Uint16Array || Array.isArray(c.blockData)) {
-          oldBlockData = Array.prototype.slice.call(c.blockData);
-        } else if (c.blockData !== null && c.blockData !== undefined) {
-          Donkeycraft.Logger.warn(
-            'WorldStore',
-            'Chunk (' +
-              c.cx +
-              ',' +
-              c.cz +
-              '): blockData has unexpected type: ' +
-              typeof c.blockData
-          );
-        }
-
-        var oldSkyLight = 0;
-        if (c.skyLight instanceof Uint8Array || Array.isArray(c.skyLight)) {
-          oldSkyLight = Array.prototype.slice.call(c.skyLight);
-        } else if (typeof c.skyLight === 'number') {
-          oldSkyLight = c.skyLight;
-        }
-
-        var oldBlockLight = 0;
-        if (c.blockLight instanceof Uint8Array || Array.isArray(c.blockLight)) {
-          oldBlockLight = Array.prototype.slice.call(c.blockLight);
-        } else if (typeof c.blockLight === 'number') {
-          oldBlockLight = c.blockLight;
-        }
-
+        var obd = this._normalizeTypedArray(c.blockData);
+        var osl = this._normalizeTypedArray(c.skyLight);
+        var obl = this._normalizeTypedArray(c.blockLight);
         normalized.push({
           cx: c.cx,
           cz: c.cz,
           data: {
-            blockData: oldBlockData,
-            skyLight: oldSkyLight,
-            blockLight: oldBlockLight,
+            blockData: obd,
+            skyLight: osl !== null ? osl : 0,
+            blockLight: obl !== null ? obl : 0,
           },
         });
-      } else {
-        // Skip invalid entries with warning
-        Donkeycraft.Logger.warn(
-          'WorldStore',
-          'Skipping invalid chunk entry at index ' +
-            i +
-            ' (cx=' +
-            (c.cx || '?') +
-            ', cz=' +
-            (c.cz || '?') +
-            '): unrecognized format'
-        );
       }
     }
     return normalized;
@@ -938,40 +859,15 @@
 
     /**
      * serializeChunkData — extract serializable data from a chunk.
-     * Copies TypedArray data into plain arrays for safe JSON serialization.
-     * @memberof Donkeycraft.WorldStore
-     * @private
-     * @param {Donkeycraft.Chunk} chunk — Chunk instance.
-     * @returns {{blockData: number[], skyLight: number[], blockLight: number[]}} Serialized chunk data.
+     * Uses _normalizeTypedArray for consistent TypedArray-to-array conversion.
      */
     var serializeChunkData = function (chunk) {
-      var blockDataArr = null;
-      var skyLightArr = null;
-      var blockLightArr = null;
-
-      if (chunk.blocks && chunk.blocks instanceof Uint16Array) {
-        blockDataArr = Array.prototype.slice.call(chunk.blocks);
-      } else if (chunk.getBlockData) {
-        var bd = chunk.getBlockData();
-        if (bd) {
-          blockDataArr = Array.prototype.slice.call(bd);
-        }
-      }
-
-      if (chunk.skyLight && chunk.skyLight instanceof Uint8Array) {
-        skyLightArr = Array.prototype.slice.call(chunk.skyLight);
-      }
-
-      if (chunk.blockLight && chunk.blockLight instanceof Uint8Array) {
-        blockLightArr = Array.prototype.slice.call(chunk.blockLight);
-      }
-
       return {
-        blockData: blockDataArr,
-        skyLight: skyLightArr,
-        blockLight: blockLightArr,
+        blockData: this._normalizeTypedArray(chunk.blocks),
+        skyLight: this._normalizeTypedArray(chunk.skyLight),
+        blockLight: this._normalizeTypedArray(chunk.blockLight),
       };
-    };
+    }.bind(this);
 
     var saveNextBatch = function () {
       if (batchIndex >= dirtyList.length) {
@@ -1038,6 +934,9 @@
    * @memberof Donkeycraft.WorldStore
    */
   Donkeycraft.WorldStore.prototype.destroy = function () {
+    // Emit before clearing references so handlers can still access this instance
+    this._emit('storage:closed', {});
+
     if (this._db) {
       try {
         this._db.close();
@@ -1052,6 +951,5 @@
     this._ready = false;
     this._chunkManager = null;
     this._eventBus = null;
-    this._emit('storage:closed', {});
   };
 })();

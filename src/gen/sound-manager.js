@@ -94,9 +94,17 @@
         gain.connect(offline.destination);
         osc.start(offline.currentTime);
         osc.stop(offline.currentTime + duration);
-        var renderedBuffer = offline.startRendering().wait();
-        _soundCache[key] = renderedBuffer;
-        return renderedBuffer;
+        // Use Promise-based startRendering() — .wait() is deprecated and can hang
+        var rendered = offline.startRendering();
+        if (rendered && typeof rendered.then === 'function') {
+          rendered.then(function (buffer) {
+            _soundCache[key] = buffer;
+          }).catch(function () {
+            // Fallback to noise buffer on render failure
+            _soundCache[key] = _createNoiseBuffer(ctx, 0.15);
+          });
+        }
+        return _soundCache[key];
       } catch (e) {
         if (Donkeycraft.Logger) {
           Donkeycraft.Logger.error(
@@ -142,9 +150,17 @@
         gain.connect(offline.destination);
         osc.start(offline.currentTime);
         osc.stop(offline.currentTime + duration);
-        var renderedBuffer = offline.startRendering().wait();
-        _soundCache[key] = renderedBuffer;
-        return renderedBuffer;
+        // Use Promise-based startRendering() — .wait() is deprecated and can hang
+        var rendered = offline.startRendering();
+        if (rendered && typeof rendered.then === 'function') {
+          rendered.then(function (buffer) {
+            _soundCache[key] = buffer;
+          }).catch(function () {
+            // Fallback to noise buffer on render failure
+            _soundCache[key] = _createNoiseBuffer(ctx, 0.08);
+          });
+        }
+        return _soundCache[key];
       } catch (e) {
         if (Donkeycraft.Logger)
           Donkeycraft.Logger.error(
