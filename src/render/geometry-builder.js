@@ -648,7 +648,7 @@
           blockId +
           ' — returning placeholder UV'
       );
-      return { u0: 0, v0: 0, u1: 1 / ATLAS_GRID, v1: 1.0 };
+      return { u0: 0, v0: 0, u1: 1 / ATLAS_GRID, v1: 1 / ATLAS_GRID };
     }
 
     // Validate faceName
