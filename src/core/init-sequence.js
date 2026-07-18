@@ -339,40 +339,51 @@
         }
 
         // Create audio system — AudioContext may start suspended on some browsers.
-        // The game.js click handler will call resume() when the user clicks.
         var audioSys = new Donkeycraft.AudioSystem();
-        audioSys
-          .init()
-          .then(function () {
-            // Check if destroy was called while waiting for init to complete
-            if (self._destroyed) {
-              // Clean up the audio system before rejecting
-              audioSys.destroy().catch(function () {});
-              resolve({ perlinNoiseReady: true });
-              return;
-            }
-
-            // Attempt to resume if the context is in 'suspended' state.
-            // This is required on mobile browsers and some desktop browsers
-            // that defer audio context creation until a user gesture.
-            if (audioSys._context && audioSys._context.state === 'suspended') {
-              audioSys.resumeContext().catch(function () {
-                Donkeycraft.Logger.warn(
-                  'InitSequence',
-                  'AudioContext could not be auto-resumed: audio will start after first user interaction.'
-                );
-              });
-            }
-            resolve({ audioSystem: audioSys, perlinNoiseReady: true });
-          })
-          .catch(function (err) {
-            Donkeycraft.Logger.warn(
-              'InitSequence',
-              'Audio init failed: ' + err.message
-            );
-            // Still resolve with noise ready so terrain can generate
+        audioSys.init().then(function () {
+          // Check if destroy was called while waiting for init to complete
+          if (self._destroyed) {
+            audioSys.destroy().catch(function () {});
             resolve({ perlinNoiseReady: true });
-          });
+            return;
+          }
+
+          // Attempt to resume if the context is in 'suspended' state.
+          // This is required on mobile browsers and some desktop browsers
+          // that defer audio context creation until a user gesture.
+          // CRITICAL FIX: Wait for resumeContext() to complete before resolving
+          // so that _audioReady is true when the promise resolves.
+          if (audioSys._context && audioSys._context.state === 'suspended') {
+            audioSys.resumeContext().then(function (resumed) {
+              Donkeycraft.Logger.info(
+                'InitSequence',
+                'AudioContext resumed: ' + (resumed ? 'yes' : 'no')
+              );
+              resolve({ audioSystem: audioSys, perlinNoiseReady: true });
+            }).catch(function () {
+              // Resume failed — context may still become ready after user interaction.
+              Donkeycraft.Logger.warn(
+                'InitSequence',
+                'AudioContext could not be auto-resumed: audio will start after first user interaction.'
+              );
+              resolve({ audioSystem: audioSys, perlinNoiseReady: true });
+            });
+          } else {
+            // Context is already running — resolve immediately.
+            Donkeycraft.Logger.info(
+              'InitSequence',
+              'AudioContext ready (state: ' + audioSys._context.state + ')'
+            );
+            resolve({ audioSystem: audioSys, perlinNoiseReady: true });
+          }
+        }).catch(function (err) {
+          Donkeycraft.Logger.warn(
+            'InitSequence',
+            'Audio init failed: ' + err.message
+          );
+          // Still resolve with noise ready so terrain can generate
+          resolve({ perlinNoiseReady: true });
+        });
       } catch (e) {
         Donkeycraft.Logger.warn(
           'InitSequence',
@@ -481,24 +492,75 @@
   };
 
   /**
-   * _initIndexedDB — open IndexedDB connections for world persistence and asset caching.
-   * Runs both WorldStore and AssetCache initialization sequentially.
+   * _initStorage — initialize the hybrid IndexedDB + LRU memory cache (Storage module).
+   * Provides chunk-level caching with automatic LRU eviction and batched writes.
    * @private
-   * @returns {Promise<Object>} Resolves with { worldStore, assetCache } when ready.
+   * @returns {Promise<Object>} Resolves with { storage } when ready.
+   */
+  Donkeycraft.InitSequence.prototype._initStorage = function () {
+    var self = this;
+    return new Promise(function (resolve) {
+      try {
+        if (!Donkeycraft.Storage) {
+          Donkeycraft.Logger.warn(
+            'InitSequence',
+            'Storage module not available — terrain chunk caching disabled'
+          );
+          resolve({});
+          return;
+        }
+
+        var storage = Donkeycraft.Storage;
+        storage.init().then(function (ok) {
+          // Check if destroy was called while waiting for init to complete
+          if (self._destroyed) {
+            storage.destroy().catch(function () {});
+            resolve({});
+            return;
+          }
+          if (ok) {
+            Donkeycraft.Logger.info('InitSequence', 'Storage initialized — terrain chunk caching enabled');
+            resolve({ storage: storage });
+          } else {
+            Donkeycraft.Logger.warn(
+              'InitSequence',
+              'Storage init failed — terrain chunk caching disabled'
+            );
+            resolve({}); // Graceful fallback
+          }
+        });
+      } catch (e) {
+        Donkeycraft.Logger.warn(
+          'InitSequence',
+          'Storage exception: ' + e.message
+        );
+        resolve({}); // Graceful fallback
+      }
+    });
+  };
+
+  /**
+   * _initIndexedDB — open IndexedDB connections for world persistence, asset caching, and terrain storage.
+   * Runs WorldStore, AssetCache, and Storage initialization in parallel.
+   * @private
+   * @returns {Promise<Object>} Resolves with { worldStore, assetCache, storage } when ready.
    */
   Donkeycraft.InitSequence.prototype._initIndexedDB = function () {
     var self = this;
     return new Promise(function (resolve) {
-      // Run both initializers in parallel since they don't depend on each other
+      // Run all three initializers in parallel since they don't depend on each other
       var worldPromise = self._initWorldStore();
       var cachePromise = self._initAssetCache();
+      var storagePromise = self._initStorage();
 
-      Promise.all([worldPromise, cachePromise]).then(function (results) {
+      Promise.all([worldPromise, cachePromise, storagePromise]).then(function (results) {
         var worldResult = results[0] || {};
         var cacheResult = results[1] || {};
+        var storageResult = results[2] || {};
         resolve({
           worldStore: worldResult.worldStore || null,
           assetCache: cacheResult.assetCache || null,
+          storage: storageResult.storage || null,
         });
       });
     });
@@ -600,7 +662,7 @@
             self._systems.perlinNoiseReady = true;
           }
         }
-        // Merge indexedDB phase results (worldStore, assetCache) if available
+        // Merge indexedDB phase results (worldStore, assetCache, storage) if available
         var idbResult = self._getPhaseResult('indexeddb');
         if (idbResult) {
           if (idbResult.worldStore) {
@@ -608,6 +670,9 @@
           }
           if (idbResult.assetCache) {
             self._systems.assetCache = idbResult.assetCache;
+          }
+          if (idbResult.storage) {
+            self._systems.storage = idbResult.storage;
           }
         }
         // Clean up stored phase results

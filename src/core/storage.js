@@ -41,7 +41,7 @@
    * @param {number} chunkZ - Chunk Z coordinate.
    * @param {number} biomeId - Biome ID.
    * @param {number} seed - World seed.
-   * @returns {string} Cache key string.
+   * @returns {string} Deterministic cache key string in format "chunk_{cx}_{cz}_b{biome}_s{seed}".
    * @private
    */
   function _makeKey(chunkX, chunkZ, biomeId, seed) {
@@ -49,9 +49,9 @@
   }
 
   /**
-   * Update LRU order for a cache entry.
-   * Moves the key to the end (most recently used).
-   * @param {string} key - Cache key.
+   * Update LRU order for a cache entry — moves the key to the end (most recently used).
+   * O(n) operation; acceptable for cache sizes up to ~50 entries.
+   * @param {string} key - Cache key to update.
    * @private
    */
   function _updateLRU(key) {
@@ -63,7 +63,8 @@
   }
 
   /**
-   * Evict oldest entries from memory cache when size exceeds limit.
+   * Evict oldest entries from memory cache when size exceeds MAX_CHUNK_CACHE_SIZE.
+   * Removes entries from the front of _lruOrder (least recently used) until size is within limit.
    * @private
    */
   function _evictLRU() {
@@ -75,7 +76,9 @@
 
   /**
    * Log a warning message to the console if available.
-   * @param {string} message - Warning message.
+   * Prefixes messages with "[Storage]" for identification.
+   * Silently ignores errors if console is unavailable.
+   * @param {string} message - Warning message to log.
    * @private
    */
   function _warn(message) {
@@ -90,7 +93,8 @@
 
   /**
    * Check if IndexedDB is available in this environment.
-   * @returns {boolean} True if IndexedDB is supported.
+   * Wraps the check in a try/catch for environments where accessing indexedDB throws.
+   * @returns {boolean} True if IndexedDB is supported and accessible.
    * @private
    */
   function _checkIndexedDB() {

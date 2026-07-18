@@ -78,7 +78,7 @@
   /**
    * _ensurePlayerData — ensure player data object exists, initializing defaults if needed.
    * Creates a player data object with default values (health=20, food=12, hydration=6, inventory=[], etc.)
-   * if `_playerData` is currently null.
+   * if `_playerData` is currently null. Called lazily by any player-related setter.
    * @private
    */
   Donkeycraft.LevelData.prototype._ensurePlayerData = function () {
@@ -97,6 +97,16 @@
         alive: true,
       };
     }
+  };
+
+  /**
+   * Ensure player data exists (public alias for _ensurePlayerData).
+   * Used by external code that needs to guarantee player data before reading.
+   * @returns {boolean} True if player data was ensured (now exists).
+   */
+  Donkeycraft.LevelData.prototype.ensurePlayerData = function () {
+    this._ensurePlayerData();
+    return this._playerData !== null;
   };
 
   /**

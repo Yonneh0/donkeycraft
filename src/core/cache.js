@@ -79,10 +79,12 @@
   };
 
   /**
-   * Compute a simple checksum for an object (for cache invalidation).
+   * Compute a simple hash-based checksum for an object — used for cache invalidation.
+   * Serializes the object to JSON (sorted keys), then computes a 32-bit hash.
+   * Identical objects produce identical checksums; any structural change produces a different hash.
    * @private
-   * @param {Object} obj — Object to checksum.
-   * @returns {string} Hexadecimal checksum string.
+   * @param {Object|null} obj — Object to checksum, or null/undefined.
+   * @returns {string} Non-negative hexadecimal checksum string (e.g., 'a3f2c1b0'). Returns 'empty' for null input.
    */
   Donkeycraft.AssetCache.prototype._computeChecksum = function (obj) {
     if (!obj) return 'empty';
@@ -138,8 +140,18 @@
             return;
           }
 
+          // Validate that imageData has a valid data property (ArrayBufferView or Array)
+          if (!imageData || !imageData.data || !(imageData.data instanceof Uint8ClampedArray || Array.isArray(imageData.data))) {
+            Donkeycraft.Logger.warn(
+              'AssetCache',
+              'Texture atlas ImageData missing or corrupted: imageData.data is invalid'
+            );
+            resolve(null);
+            return;
+          }
+
           var expectedBytes = storedW * storedH * 4;
-          if (imageData.data && imageData.data.length !== expectedBytes) {
+          if (imageData.data.length !== expectedBytes) {
             Donkeycraft.Logger.warn(
               'AssetCache',
               'Texture atlas ImageData size mismatch: expected ' +

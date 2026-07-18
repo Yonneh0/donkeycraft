@@ -61,11 +61,12 @@
   };
 
   /**
-   * _emit — emit an event with storage context.
+   * _emit — emit an event with storage context via the internal EventBus.
+   * Silently handles errors to prevent cascading failures.
    * @memberof Donkeycraft.WorldStore
    * @private
-   * @param {string} eventName - Event name.
-   * @param {Object} [data={}] - Event payload.
+   * @param {string} eventName — Event name to emit.
+   * @param {Object} [data] — Event payload (defaults to empty object).
    */
   Donkeycraft.WorldStore.prototype._emit = function (eventName, data) {
     if (this._eventBus) {
@@ -87,9 +88,10 @@
    * Initialize the IndexedDB database and create object stores.
    * Creates the worlds object store if it does not already exist, and stores
    * a schema version sentinel to detect incompatible upgrades.
+   * Handles the case where IndexedDB is unavailable by resolving false gracefully.
    * @memberof Donkeycraft.WorldStore
    * @throws {Error} If the database fails to open or upgrade.
-   * @returns {Promise<boolean>} Resolves true when DB is ready.
+   * @returns {Promise<boolean>} Resolves true when DB is ready, false if IndexedDB is unavailable.
    */
   Donkeycraft.WorldStore.prototype.init = function () {
     var self = this;
@@ -188,9 +190,9 @@
   };
 
   /**
-   * Check if the store is ready (database opened successfully).
+   * Check if the store is ready (database opened successfully and connection is valid).
    * @memberof Donkeycraft.WorldStore
-   * @returns {boolean} True if ready.
+   * @returns {boolean} True if the database is open and ready for operations.
    */
   Donkeycraft.WorldStore.prototype.isReady = function () {
     return this._ready && !!this._db;
@@ -203,8 +205,8 @@
    * Validates all entries; skips invalid entries with warnings.
    * @memberof Donkeycraft.WorldStore
    * @private
-   * @param {Array} chunks — Raw chunk array from storage.
-   * @returns {Array} Normalized chunk array in format [{ cx, cz, data: { blockData: number[]|null, skyLight: number[]|number, blockLight: number[]|number } }].
+   * @param {Array|null} chunks — Raw chunk array from storage (may be null or non-array).
+   * @returns {Array} Normalized chunk array in format [{ cx, cz, data: {blockData: number[]|null, skyLight: number[]|number, blockLight: number[]|number } }].
    */
   Donkeycraft.WorldStore.prototype._normalizeChunks = function (chunks) {
     if (!chunks || !Array.isArray(chunks)) {
