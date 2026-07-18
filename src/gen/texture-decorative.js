@@ -2431,6 +2431,165 @@
   }
 
   /**
+   * Generate all textures for all registered blocks — async chunked version.
+   * Processes BLOCKS_PER_CHUNK textures per frame using requestIdleCallback
+   * to keep the main thread responsive during generation.
+   * 
+   * Caching support: if a cachedMap is provided, textures already in the map
+   * are skipped (loaded from cache). Only missing textures are generated.
+   * Generated textures are saved to the global AssetCache (window._dkInitSystems.assetCache)
+   * for faster loads on subsequent page visits.
+   * 
+   * @param {Function} [callback] - Optional progress callback(pct, msg).
+   * @param {Object} [cachedMap] - Map of blockId → HTMLCanvasElement from cache.
+   * @param {number} [blocksPerChunk=50] - Textures to generate per chunk.
+   * @returns {Promise<Object>} Resolves with { textures, totalBlocks } when complete.
+   */
+  function generateAllTexturesAsync(callback, cachedMap, blocksPerChunk) {
+    // Reorder params for backward compatibility:
+    // Old style: generateAllTexturesAsync(blocksPerChunk) — number as first arg
+    // New style: generateAllTexturesAsync(callback, cachedMap, blocksPerChunk)
+    if (typeof callback === 'number' && blocksPerChunk === undefined) {
+      // Called as generateAllTexturesAsync(blocksPerChunk) — old-style
+      blocksPerChunk = callback;
+      callback = null;
+      cachedMap = {};
+    } else if (typeof callback === 'object' && callback !== null && blocksPerChunk === undefined) {
+      // Called as generateAllTexturesAsync(cachedMap) — shift args
+      blocksPerChunk = 50;
+      cachedMap = callback;
+      callback = null;
+    }
+    
+    blocksPerChunk = blocksPerChunk || 50;
+    cachedMap = cachedMap || {};
+    
+    var blocks = Donkeycraft.BlockRegistry
+      ? Donkeycraft.BlockRegistry.getAllBlocks()
+      : [];
+
+    // Count non-air blocks for progress tracking
+    var totalBlocks = 0;
+    var cachedCount = 0;
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].name !== 'air') {
+        totalBlocks++;
+        if (cachedMap[blocks[i].id]) cachedCount++;
+      }
+    }
+
+    var textures = {};
+    // Start with cached textures — convert canvases to ImageElements for atlas
+    for (var cid in cachedMap) {
+      if (cachedMap.hasOwnProperty(cid)) {
+        var cv = cachedMap[cid];
+        if (cv instanceof HTMLCanvasElement) {
+          // Convert canvas to ImageElement
+          var img = new Image();
+          img.src = cv.toDataURL('image/png');
+          textures[parseInt(cid)] = img;
+        }
+      }
+    }
+
+    var processed = 0;
+    var deferred = { resolve: null, reject: null };
+    var promise = new Promise(function (res, rej) {
+      deferred.resolve = res;
+      deferred.reject = rej;
+    });
+
+    // AssetCache reference for saving textures after generation
+    var assetCache = null;
+    if (window._dkInitSystems && window._dkInitSystems.assetCache && window._dkInitSystems.assetCache.isReady()) {
+      assetCache = window._dkInitSystems.assetCache;
+    }
+
+    var processChunk = function () {
+      var end = Math.min(processed + blocksPerChunk, totalBlocks);
+      var blockIdx = 0;
+
+      for (var i = 0; i < blocks.length && processed < end; i++) {
+        var block = blocks[i];
+        if (block.name !== 'air') {
+          // Skip if already in cache
+          if (cachedMap[block.id]) {
+            processed++;
+            blockIdx++;
+            continue;
+          }
+          
+          textures[block.id] = generateTextureForBlock(block.name);
+          processed++;
+        }
+        blockIdx++;
+      }
+
+      // Emit progress update
+      if (callback) {
+        var pct = Math.floor((processed / totalBlocks) * 100);
+        var remaining = totalBlocks - processed;
+        callback(pct, 'Generating textures... (' + remaining + ' remaining)');
+      }
+
+      if (processed < totalBlocks) {
+        // More chunks remaining — schedule next batch
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(processChunk, { timeout: 100 });
+        } else {
+          setTimeout(processChunk, 0);
+        }
+      } else {
+        // All done — save newly generated textures to cache for next load
+        if (assetCache) {
+          var savePromises = [];
+          for (var sid in textures) {
+            if (textures.hasOwnProperty(sid)) {
+              var tex = textures[sid];
+              if (tex instanceof HTMLImageElement && tex.src) {
+                // Convert ImageElement to canvas for saving
+                var saveCanvas = document.createElement('canvas');
+                saveCanvas.width = 16;
+                saveCanvas.height = 16;
+                var sctx = saveCanvas.getContext('2d');
+                if (sctx) {
+                  try {
+                    sctx.drawImage(tex, 0, 0);
+                    savePromises.push(
+                      assetCache.setTexture(saveCanvas, parseInt(sid)).catch(function() {})
+                    );
+                  } catch (e) {}
+                }
+              } else if (tex instanceof HTMLCanvasElement) {
+                // Already a canvas — save directly
+                savePromises.push(
+                  assetCache.setTexture(tex, parseInt(sid)).catch(function() {})
+                );
+              }
+            }
+          }
+          // Fire and forget — don't wait for saves
+          if (savePromises.length > 0) {
+            Promise.all(savePromises).catch(function() {});
+          }
+        }
+        
+        // All done
+        deferred.resolve({ textures: textures, totalBlocks: totalBlocks });
+      }
+    };
+
+    // Start first chunk
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(processChunk, { timeout: 100 });
+    } else {
+      setTimeout(processChunk, 0);
+    }
+
+    return promise;
+  }
+
+  /**
    * Get the texture name mapping for a block ID.
    * @param {number} blockId - Block ID.
    * @returns {string|null} Primary texture name, or null if not found.
@@ -2465,6 +2624,7 @@
   Donkeycraft.TextureGenerator.generateTextureForBlock =
     generateTextureForBlock;
   Donkeycraft.TextureGenerator.generateAllTextures = generateAllTextures;
+  Donkeycraft.TextureGenerator.generateAllTexturesAsync = generateAllTexturesAsync;
   Donkeycraft.TextureGenerator.getTextureNameForBlock = getTextureNameForBlock;
   Donkeycraft.TextureGenerator.getNameMap = getNameMap;
 

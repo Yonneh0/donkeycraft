@@ -174,6 +174,8 @@
   /**
    * _initTextureAtlas — generate all procedural block textures, register them on a TextureAtlas,
    * build the WebGL texture, and return it.
+   * Uses per-texture IndexedDB caching: loads cached textures first, only generates
+   * missing ones, then saves new textures back to cache for next load.
    * Emits sub-phase progress events for loading screen integration.
    * @private
    * @returns {Promise<Object>} Resolves with { textures, atlas } when ready.
@@ -192,27 +194,238 @@
 
         if (
           Donkeycraft.AssetGenerator &&
-          typeof Donkeycraft.AssetGenerator.generateAllTextures === 'function'
+          typeof Donkeycraft.AssetGenerator.generateAllTexturesAsync === 'function'
         ) {
-          Donkeycraft.AssetGenerator.generateAllTextures()
-            .then(function (textures) {
-              // Sub-phase: Block textures (ores, metals, concrete/wool, decorative)
+          // Step 1: Try to load cached textures from IndexedDB first
+          var assetCache = null;
+          var cachedTexturesLoaded = 0;
+          var totalBlocksToLoad = 0;
+
+          // Check if we have an AssetCache available
+          if (
+            window._dkInitSystems &&
+            window._dkInitSystems.assetCache &&
+            window._dkInitSystems.assetCache.isReady()
+          ) {
+            assetCache = window._dkInitSystems.assetCache;
+          }
+
+          // If no cache yet, we'll create one after IndexedDB init — but we need textures
+          // before that phase completes. So we check if AssetCache is ready now.
+          // If not, we'll rely on caching on the NEXT load.
+          if (assetCache) {
+            // Get block list for cache lookup
+            var blocks = Donkeycraft.BlockRegistry
+              ? Donkeycraft.BlockRegistry.getAllBlocks()
+              : [];
+
+            // Count non-air blocks
+            for (var b = 0; b < blocks.length; b++) {
+              if (blocks[b].name !== 'air') totalBlocksToLoad++;
+            }
+
+            if (totalBlocksToLoad > 0) {
               self._emitSubPhase(
                 'texture-atlas',
-                'block-textures',
-                'Generating block textures...',
-                55
+                'cache-load',
+                'Loading cached textures...',
+                35
               );
 
-              // Wire generated textures into AssetManager so game.js can read them via getAllTextures()
+              // Batch-load all cached textures in parallel
+              var loadPromises = [];
+              for (var bi = 0; bi < blocks.length; bi++) {
+                if (blocks[bi].name !== 'air') {
+                  loadPromises.push(
+                    assetCache.getTexture(blocks[bi].id).then(function (canvas) {
+                      if (canvas) cachedTexturesLoaded++;
+                      return canvas;
+                    })
+                  );
+                }
+              }
+
+              // Wait for all cache loads to complete
+              Promise.all(loadPromises).then(function (cachedCanvases) {
+                var cachedMap = {};
+                var cacheIdx = 0;
+                for (var ci = 0; ci < blocks.length; ci++) {
+                  if (blocks[ci].name !== 'air') {
+                    var cv = cachedCanvases[cacheIdx++];
+                    if (cv) {
+                      cachedMap[blocks[ci].id] = cv;
+                    }
+                  }
+                }
+
+                self._emitSubPhase(
+                  'texture-atlas',
+                  'cache-load',
+                  'Loaded ' + Object.keys(cachedMap).length + '/' + totalBlocksToLoad + ' cached textures',
+                  40
+                );
+
+                // Step 2: Generate textures — the async function will use the cache
+                // Pass the cached map to skip already-cached textures
+                Donkeycraft.AssetGenerator.generateAllTexturesAsync(
+                  function (pct, msg) {
+                    self._emitSubPhase('texture-atlas', 'block-textures', msg || 'Generating block textures...', pct);
+                  },
+                  cachedMap  // Pass cached textures to skip regeneration
+                ).then(function (result) {
+                  var textures = result.textures || {};
+                  var totalBlocks = result.totalBlocks || 0;
+
+                  // Merge cached + generated textures (cached ones were passed through)
+                  Object.keys(cachedMap).forEach(function (id) {
+                    if (!textures[id]) {
+                      // Convert canvas to ImageElement for atlas
+                      var c = cachedMap[id];
+                      var img = new Image();
+                      img.src = c.toDataURL('image/png');
+                      textures[parseInt(id)] = img;
+                    }
+                  });
+
+                  // Step 3: Save newly generated textures to cache for next load
+                  if (assetCache) {
+                    var savePromises = [];
+                    for (var sid in textures) {
+                      if (textures.hasOwnProperty(sid)) {
+                        var tex = textures[sid];
+                        if (tex instanceof HTMLImageElement && tex.src) {
+                          // Create canvas from image to save
+                          var saveCanvas = document.createElement('canvas');
+                          saveCanvas.width = 16;
+                          saveCanvas.height = 16;
+                          var sctx = saveCanvas.getContext('2d');
+                          sctx.drawImage(tex, 0, 0);
+                          savePromises.push(
+                            assetCache.setTexture(saveCanvas, parseInt(sid)).catch(function() {})
+                          );
+                        }
+                      }
+                    }
+                    // Don't wait for saves — fire and forget
+                    Promise.all(savePromises).catch(function() {});
+                  }
+
+                  // Wire generated textures into AssetManager so game.js can read them via getAllTextures()
+                  if (
+                    Donkeycraft.AssetManager &&
+                    typeof Donkeycraft.AssetManager.generateAllBlockTextures ===
+                      'function'
+                  ) {
+                    try {
+                      var managed =
+                        Donkeycraft.AssetManager.generateAllBlockTextures();
+                    } catch (e) {
+                      Donkeycraft.Logger.warn(
+                        'InitSequence',
+                        'Failed to wire textures to AssetManager: ' + e.message
+                      );
+                    }
+                  }
+
+                  // Sub-phase: Building WebGL texture atlas
+                  self._emitSubPhase(
+                    'texture-atlas',
+                    'atlas-build',
+                    'Building WebGL texture atlas (' + totalBlocks + ' blocks)...',
+                    75
+                  );
+
+                  // Build a WebGL TextureAtlas from the generated textures if WebGL context is available.
+                  var atlas = null;
+                  try {
+                    var canvas = document.getElementById('dk-canvas');
+                    if (canvas && typeof WebGLRenderingContext !== 'undefined') {
+                      var gl =
+                        canvas.getContext('webgl') ||
+                        canvas.getContext('experimental-webgl');
+                      if (
+                        gl &&
+                        Donkeycraft.TextureAtlas &&
+                        Donkeycraft.BlockRegistry
+                      ) {
+                        atlas = new Donkeycraft.TextureAtlas(gl);
+                        var blocks2 = Donkeycraft.BlockRegistry.getAllBlocks();
+                        var registered = 0;
+                        for (var i = 0; i < blocks2.length; i++) {
+                          var id = blocks2[i].id;
+                          if (textures[id] instanceof HTMLImageElement) {
+                            atlas.registerBlockTexture(id, textures[id]);
+                            registered++;
+                          }
+                        }
+                        if (atlas.generate()) {
+                          // Atlas generated successfully
+                        } else {
+                          Donkeycraft.Logger.warn(
+                            'InitSequence',
+                            'TextureAtlas.generate() returned false'
+                          );
+                          atlas = null;
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    Donkeycraft.Logger.warn(
+                      'InitSequence',
+                      'Failed to build TextureAtlas: ' + e.message
+                    );
+                    atlas = null;
+                  }
+
+                  // Final progress update for texture-atlas phase
+                  self._emitProgress(90, 'Texture atlas ready');
+
+                  resolve({ textures: textures || {}, atlas: atlas });
+                }).catch(function (err) {
+                  Donkeycraft.Logger.error(
+                    'InitSequence',
+                    'Texture generation failed: ' + err.message
+                  );
+                  resolve({ textures: {}, atlas: null });
+                });
+              }).catch(function () {
+                // Cache load failed — fall through to full generation
+                self._emitSubPhase(
+                  'texture-atlas',
+                  'cache-load',
+                  'Cache unavailable — generating all textures',
+                  35
+                );
+                _generateAndBuildAtlas(null);
+              });
+            } else {
+              // No blocks to load — generate normally
+              _generateAndBuildAtlas(null);
+            }
+          } else {
+            // No AssetCache available yet — generate without caching (will cache on next load)
+            _generateAndBuildAtlas(null);
+          }
+
+          // Helper: generate textures and build atlas (used when no cache or cache failed)
+          function _generateAndBuildAtlas(cachedMap) {
+            Donkeycraft.AssetGenerator.generateAllTexturesAsync(
+              function (pct, msg) {
+                self._emitSubPhase('texture-atlas', 'block-textures', msg || 'Generating block textures...', pct);
+              },
+              cachedMap || {}
+            ).then(function (result) {
+              var textures = result.textures || {};
+              var totalBlocks = result.totalBlocks || 0;
+
+              // Wire generated textures into AssetManager
               if (
                 Donkeycraft.AssetManager &&
                 typeof Donkeycraft.AssetManager.generateAllBlockTextures ===
                   'function'
               ) {
                 try {
-                  var managed =
-                    Donkeycraft.AssetManager.generateAllBlockTextures();
+                  Donkeycraft.AssetManager.generateAllBlockTextures();
                 } catch (e) {
                   Donkeycraft.Logger.warn(
                     'InitSequence',
@@ -225,11 +438,10 @@
               self._emitSubPhase(
                 'texture-atlas',
                 'atlas-build',
-                'Building WebGL texture atlas...',
+                'Building WebGL texture atlas (' + totalBlocks + ' blocks)...',
                 75
               );
 
-              // Build a WebGL TextureAtlas from the generated textures if WebGL context is available.
               var atlas = null;
               try {
                 var canvas = document.getElementById('dk-canvas');
@@ -243,18 +455,14 @@
                     Donkeycraft.BlockRegistry
                   ) {
                     atlas = new Donkeycraft.TextureAtlas(gl);
-                    var blocks = Donkeycraft.BlockRegistry.getAllBlocks();
-                    var registered = 0;
-                    for (var i = 0; i < blocks.length; i++) {
-                      var id = blocks[i].id;
+                    var blocks3 = Donkeycraft.BlockRegistry.getAllBlocks();
+                    for (var i = 0; i < blocks3.length; i++) {
+                      var id = blocks3[i].id;
                       if (textures[id] instanceof HTMLImageElement) {
                         atlas.registerBlockTexture(id, textures[id]);
-                        registered++;
                       }
                     }
-                    if (atlas.generate()) {
-                      // Atlas generated successfully
-                    } else {
+                    if (!atlas.generate()) {
                       Donkeycraft.Logger.warn(
                         'InitSequence',
                         'TextureAtlas.generate() returned false'
@@ -271,18 +479,16 @@
                 atlas = null;
               }
 
-              // Final progress update for texture-atlas phase
               self._emitProgress(90, 'Texture atlas ready');
-
               resolve({ textures: textures || {}, atlas: atlas });
-            })
-            .catch(function (err) {
+            }).catch(function (err) {
               Donkeycraft.Logger.error(
                 'InitSequence',
                 'Texture generation failed: ' + err.message
               );
               resolve({ textures: {}, atlas: null });
             });
+          }
         } else {
           Donkeycraft.Logger.warn(
             'InitSequence',
@@ -568,7 +774,8 @@
 
   /**
    * initialize — run the full async initialization pipeline sequentially.
-   * Phases: config → texture-atlas → audio → indexeddb.
+   * Phases: config → indexeddb → texture-atlas → audio.
+   * IndexedDB must open BEFORE texture generation so cached textures can be loaded.
    * Emits 'init:phase:start', 'init:phase:end' per phase, and 'init:complete' on success.
    * If destroy() is called mid-pipeline, the promise rejects with an error.
    * @returns {Promise<Object>} Resolves with systems object containing config and eventBus.
@@ -588,8 +795,24 @@
         },
       },
       {
+        name: 'indexeddb',
+        fn: function () {
+          self._setPhase('indexeddb');
+          return self._initIndexedDB().then(function (result) {
+            self._endPhase('indexeddb');
+            return result;
+          });
+        },
+      },
+      {
         name: 'texture-atlas',
         fn: function () {
+          // Store IndexedDB results globally so _initTextureAtlas can access AssetCache
+          var idbResult = self._getPhaseResult('indexeddb');
+          if (idbResult && idbResult.assetCache) {
+            window._dkInitSystems = window._dkInitSystems || {};
+            window._dkInitSystems.assetCache = idbResult.assetCache;
+          }
           self._setPhase('texture-atlas');
           return self._initTextureAtlas().then(function (result) {
             self._endPhase('texture-atlas');
@@ -603,16 +826,6 @@
           self._setPhase('audio');
           return self._initAudio().then(function (result) {
             self._endPhase('audio');
-            return result;
-          });
-        },
-      },
-      {
-        name: 'indexeddb',
-        fn: function () {
-          self._setPhase('indexeddb');
-          return self._initIndexedDB().then(function (result) {
-            self._endPhase('indexeddb');
             return result;
           });
         },

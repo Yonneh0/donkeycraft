@@ -22,8 +22,8 @@
     this._fog = fog;
     this._lighting = lighting || null;
 
-    /** @type {Object|null} Cached identity model matrix (lazy-init). */
-    this._identityMatrix = null;
+    // Identity model matrix (static — chunks use identity transform)
+    this._identityMatrix = Donkeycraft.Matrix4.createIdentity();
 
     // Chunk mesh storage: map "chunkX,chunkZ" → ChunkMesh
     this._chunks = {};
@@ -129,11 +129,6 @@
     this._skipWaterBlocks = !!enabled;
     if (this._geometryBuilder) {
       this._geometryBuilder._skipWaterBlocks = !!enabled;
-    } else if (!this._geometryBuilder) {
-      Donkeycraft.Logger.warn(
-        'TerrainRenderer',
-        'setSkipWaterBlocks called before _geometryBuilder initialized — will apply on next build'
-      );
     }
   };
 
@@ -265,30 +260,7 @@
     chunkZ
   ) {
     var gl = this._gl;
-    if (!gl) {
-      Donkeycraft.Logger.error(
-        'TerrainRenderer',
-        'WebGL context is null — cannot create chunk mesh'
-      );
-      return;
-    }
-
-    if (!this._getBlockFunc) {
-      Donkeycraft.Logger.warn(
-        'TerrainRenderer',
-        '_getBlockFunc not set — cannot create chunk mesh'
-      );
-      return;
-    }
-
-    // Validate geometry builder is available
-    if (!this._geometryBuilder) {
-      Donkeycraft.Logger.error(
-        'TerrainRenderer',
-        '_geometryBuilder is null — cannot build chunk geometry'
-      );
-      return;
-    }
+    if (!gl || !this._getBlockFunc) return;
 
     // Wrap world-coordinate getter into local chunk coordinates
     var self = this;
@@ -322,29 +294,14 @@
     // Empty geometry (all air) — defer until data is available
     if (geometry.vertexCount === 0) {
       var pendingKey = chunkX + ',' + chunkZ;
-      // Only create entry if one doesn't already exist (existing ones have retries incremented)
       if (!this._pendingMeshes[pendingKey]) {
         this._pendingMeshes[pendingKey] = { x: chunkX, z: chunkZ, retries: 0 };
       }
-      Donkeycraft.Logger.warn(
-        'TerrainRenderer',
-        'Chunk [' +
-          chunkX +
-          ',' +
-          chunkZ +
-          '] geometry has 0 vertices — deferred (retries: ' +
-          (this._pendingMeshes[pendingKey].retries || 0) +
-          ')'
-      );
       return;
     }
 
-    // MeshOptimizer: vertex dedup + optional back-face culling.
-    // CPU-side culling disabled: camera moves every frame, so GPU culling (gl.cullFace) is correct.
-    if (this._meshOptimizer) {
-      // Pass null cameraPos + false cullBackFaces — let GPU handle per-frame culling
-      geometry = this._meshOptimizer.optimize(geometry, null, false);
-    }
+    // Vertex deduplication; CPU back-face culling disabled since GPU handles it per-frame.
+    geometry = this._meshOptimizer.optimize(geometry, null, false);
 
     // Upload geometry to GPU buffers
     var chunkMesh = new Donkeycraft.ChunkMesh(gl, this._shaderManager);
@@ -667,10 +624,10 @@
       maxZ,
     ];
 
-    // If all 8 corners behind a plane → culled
+    // If all 8 corners outside a plane → culled
     for (var p = 0; p < this._frustumPlanes.length; p++) {
       var plane = this._frustumPlanes[p];
-      var allBehind = true;
+      var allOutside = true;
       for (var c = 0; c < 8; c++) {
         var base = c * 3;
         var dot =
@@ -679,12 +636,12 @@
           corners[base + 2] * plane.axis.z +
           plane.dist;
         if (dot <= 0) {
-          allBehind = false;
+          allOutside = false;
           break;
         }
       }
-      // All corners behind → culled
-      if (allBehind) return false;
+      // All corners outside → culled
+      if (allOutside) return false;
     }
     // Visible — passes at least one plane
     return true;
@@ -771,10 +728,7 @@
         this._lastFrustumKey = cacheKey;
       }
 
-      // Set identity model matrix
-      if (!this._identityMatrix) {
-        this._identityMatrix = Donkeycraft.Matrix4.createIdentity();
-      }
+      // Set identity model matrix (chunks use world-space coordinates)
       this._shaderManager.setMat4('uModel', this._identityMatrix);
 
       // Bind texture atlas (unit 0)

@@ -891,12 +891,14 @@
       'varying vec3 vNormal;\n' +
       'varying vec3 vWorldPos;\n' +
       'varying float vDepth;\n' +
+      'varying float vLight;\n' +
       'void main() {\n' +
       '  gl_Position = uProjection * uView * uModel * vec4(aPosition, 1.0);\n' +
       '  vUV = aUV;\n' +
       '  vNormal = aNormal;\n' +
       '  vWorldPos = (uModel * vec4(aPosition, 1.0)).xyz;\n' +
       '  vDepth = -((uView * uModel * vec4(aPosition, 1.0)).z);\n' +
+      '  vLight = max(dot(normalize(aNormal), normalize(vec3(0.5, 1.0, 0.3))), 0.3);\n' +
       '}';
 
     var waterFrag =
@@ -905,6 +907,7 @@
       'varying vec3 vNormal;\n' +
       'varying vec3 vWorldPos;\n' +
       'varying float vDepth;\n' +
+      'varying float vLight;\n' +
       'uniform sampler2D uTexture;\n' +
       'uniform vec3 uFogColor;\n' +
       'uniform float uFogDensity;\n' +

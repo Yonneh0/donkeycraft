@@ -430,7 +430,7 @@
    */
   Donkeycraft.AssetGenerator = (function () {
     /**
-     * Generate all procedural block textures and return them as a Promise.
+     * Generate all procedural block textures synchronously and return them as a Promise.
      * @returns {Promise<Object>} Resolves with { blockId: HTMLImageElement } map.
      */
     function generateAllTextures() {
@@ -463,6 +463,84 @@
           Donkeycraft.Logger.error(
             'AssetGenerator',
             'Texture generation failed: ' + e.message
+          );
+          resolve({});
+        }
+      });
+    }
+
+    /**
+     * Generate all procedural block textures asynchronously using chunked processing.
+     * Uses requestIdleCallback to keep the main thread responsive during generation.
+     * Emits progress updates via onProgress callback if provided.
+     * @param {Function} [onProgress] - Optional callback(progress, message) for UI updates.
+     * @returns {Promise<Object>} Resolves with { textures, totalBlocks } when ready.
+     */
+    function generateAllTexturesAsync(onProgress) {
+      return new Promise(function (resolve, reject) {
+        try {
+          if (!Donkeycraft.BlockRegistry || !Donkeycraft.TextureGenerator) {
+            Donkeycraft.Logger.warn(
+              'AssetGenerator',
+              'BlockRegistry or TextureGenerator not available — falling back to sync'
+            );
+            // Fall back to synchronous generation
+            var syncTextures = Donkeycraft.TextureGenerator.generateAllTextures();
+            resolve({ textures: syncTextures || {}, totalBlocks: 0 });
+            return;
+          }
+
+          // Check if async version is available
+          if (typeof Donkeycraft.TextureGenerator.generateAllTexturesAsync !== 'function') {
+            Donkeycraft.Logger.warn(
+              'AssetGenerator',
+              'generateAllTexturesAsync not available — falling back to sync'
+            );
+            var syncTextures2 = Donkeycraft.TextureGenerator.generateAllTextures();
+            resolve({ textures: syncTextures2 || {}, totalBlocks: 0 });
+            return;
+          }
+
+          // Use async chunked generation
+          Donkeycraft.TextureGenerator.generateAllTexturesAsync(50)
+            .then(function (result) {
+              var textures = result.textures;
+              var totalBlocks = result.totalBlocks;
+
+              if (Donkeycraft.AssetManager && typeof Donkeycraft.AssetManager.generateAllBlockTextures === 'function') {
+                try {
+                  Donkeycraft.AssetManager.generateAllBlockTextures();
+                } catch (e) {
+                  Donkeycraft.Logger.warn(
+                    'AssetGenerator',
+                    'Failed to wire textures to AssetManager: ' + e.message
+                  );
+                }
+              }
+
+              if (onProgress) {
+                onProgress(100, 'Textures generated (' + totalBlocks + ' blocks)');
+              }
+
+              resolve({ textures: textures, totalBlocks: totalBlocks });
+            })
+            .catch(function (err) {
+              Donkeycraft.Logger.error(
+                'AssetGenerator',
+                'Async texture generation failed: ' + err.message
+              );
+              // Fall back to sync
+              try {
+                var fallback = Donkeycraft.TextureGenerator.generateAllTextures();
+                resolve({ textures: fallback || {}, totalBlocks: 0 });
+              } catch (e2) {
+                resolve({});
+              }
+            });
+        } catch (e) {
+          Donkeycraft.Logger.error(
+            'AssetGenerator',
+            'Texture generation error: ' + e.message
           );
           resolve({});
         }
@@ -522,6 +600,7 @@
     return {
       getInstance: getInstance,
       generateAllTextures: generateAllTextures,
+      generateAllTexturesAsync: generateAllTexturesAsync,
       generateMissingTexture: generateMissingTexture,
     };
   })();

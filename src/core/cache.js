@@ -651,10 +651,206 @@
   };
 
   /**
-   * getFormattedSize — get cache size in human-readable format (bytes, KB, MB).
-   * @returns {Promise<string>} Human-readable size string.
+   * _imageDataToBase64 — convert ImageData to a compact base64 string for IndexedDB storage.
+   * Much smaller than PNG data URL, faster to encode/decode.
+   * @private
+   * @param {ImageData} imageData - ImageData object to convert.
+   * @returns {string} Base64-encoded string (RGBA bytes only, no header).
    */
-  Donkeycraft.AssetCache.prototype.getFormattedSize = function () {
+  Donkeycraft.AssetCache.prototype._imageDataToBase64 = function (imageData) {
+    var data = imageData.data;
+    var byteCharacters = '';
+    var chunkSize = 8192; // Process in chunks to avoid stack overflow
+    for (var i = 0; i < data.length; i += chunkSize) {
+      var end = Math.min(i + chunkSize, data.length);
+      var chunk = new Uint8Array(data.buffer || data, i, end - i);
+      // For regular arrays, copy manually
+      if (data.buffer === undefined) {
+        var manual = new Uint8Array(end - i);
+        for (var j = 0; j < manual.length; j++) {
+          manual[j] = data[i + j];
+        }
+        chunk = manual;
+      }
+      // Use atob with String.fromCharCode for each chunk
+      var str = '';
+      for (var k = 0; k < chunk.length; k += 8192) {
+        var sliceEnd = Math.min(k + 8192, chunk.length);
+        var slice = chunk.slice(k, sliceEnd);
+        var codes = new Array(slice.length);
+        for (var m = 0; m < slice.length; m++) {
+          codes[m] = slice[m];
+        }
+        str += String.fromCharCode.apply(null, codes);
+      }
+      byteCharacters += str;
+    }
+    return btoa(byteCharacters);
+  };
+
+  /**
+   * _base64ToImageData — reconstruct ImageData from a base64 string.
+   * @private
+   * @param {string} base64 - Base64-encoded RGBA bytes.
+   * @param {number} width - Canvas width.
+   * @param {number} height - Canvas height.
+   * @returns {ImageData} Reconstructed ImageData object.
+   */
+  Donkeycraft.AssetCache.prototype._base64ToImageData = function (base64, width, height) {
+    var byteCharacters = atob(base64);
+    var bytes = new Uint8ClampedArray(byteCharacters.length);
+    for (var i = 0; i < byteCharacters.length; i++) {
+      bytes[i] = byteCharacters.charCodeAt(i);
+    }
+    var canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    var ctx = canvas.getContext('2d');
+    var imageData = ctx.createImageData(width, height);
+    var data = imageData.data;
+    for (var j = 0; j < bytes.length && j < data.length; j++) {
+      data[j] = bytes[j];
+    }
+    return imageData;
+  };
+
+  /**
+   * getTexture — get a cached individual texture from IndexedDB.
+   * Stores textures as compact base64-encoded ImageData for fast serialization.
+   * @param {number} blockId - Block ID to retrieve.
+   * @returns {Promise<HTMLCanvasElement|null>} Resolves with canvas or null if not cached.
+   */
+  Donkeycraft.AssetCache.prototype.getTexture = function (blockId) {
+    var self = this;
+    if (!this.isReady()) {
+      return Promise.resolve(null);
+    }
+
+    return new Promise(function (resolve) {
+      try {
+        var transaction = self._db.transaction(
+          [Donkeycraft.ASSET_CACHE_STORE_NAME],
+          'readonly'
+        );
+        var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
+        var request = store.get('texture:' + blockId);
+
+        request.onsuccess = function () {
+          var result = request.result;
+          if (!result || !result.base64) {
+            resolve(null);
+            return;
+          }
+
+          // Reconstruct canvas from stored ImageData
+          var canvas = document.createElement('canvas');
+          canvas.width = Donkeycraft.TextureGenerator ? Donkeycraft.TextureGenerator.TEX_SIZE || 16 : 16;
+          canvas.height = Donkeycraft.TextureGenerator && Donkeycraft.TextureGenerator.TEX_SIZE ? Donkeycraft.TextureGenerator.TEX_SIZE : 16;
+          var ctx = canvas.getContext('2d');
+          if (ctx) {
+            try {
+              var imageData = self._base64ToImageData(result.base64, canvas.width, canvas.height);
+              ctx.putImageData(imageData, 0, 0);
+              resolve(canvas);
+            } catch (e) {
+              Donkeycraft.Logger.warn(
+                'AssetCache',
+                'Failed to reconstruct texture ' + blockId + ': ' + e.message
+              );
+              resolve(null);
+            }
+          } else {
+            resolve(null);
+          }
+        };
+
+        request.onerror = function () {
+          resolve(null);
+        };
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  };
+
+  /**
+   * setTexture — cache an individual texture canvas to IndexedDB.
+   * Converts canvas ImageData to compact base64 for efficient storage.
+   * @param {HTMLCanvasElement} canvas - The texture canvas (16×16).
+   * @param {number} blockId - Block ID for cache key.
+   * @returns {Promise<boolean>} Resolves true on success.
+   */
+  Donkeycraft.AssetCache.prototype.setTexture = function (canvas, blockId) {
+    var self = this;
+    if (!this.isReady() || !canvas) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise(function (resolve) {
+      try {
+        var w = canvas.width;
+        var h = canvas.height;
+        var ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(false);
+          return;
+        }
+
+        var imageData = ctx.getImageData(0, 0, w, h);
+        var base64 = self._imageDataToBase64(imageData);
+
+        var transaction = self._db.transaction(
+          [Donkeycraft.ASSET_CACHE_STORE_NAME],
+          'readwrite'
+        );
+        var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
+        var data = {
+          key: 'texture:' + blockId,
+          type: 'texture',
+          base64: base64,
+          width: w,
+          height: h,
+          cachedAt: Date.now(),
+        };
+
+        var request = store.put(data);
+
+        request.onsuccess = function () {
+          resolve(true);
+        };
+
+        request.onerror = function () {
+          if (request.error && request.error.name === 'QuotaExceededError') {
+            // Quota exceeded — clear old textures and retry
+            self.clearExpired().then(function () {
+              var txn2 = self._db.transaction(
+                [Donkeycraft.ASSET_CACHE_STORE_NAME],
+                'readwrite'
+              );
+              var store2 = txn2.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
+              var req2 = store2.put(data);
+              req2.onsuccess = function () {
+                resolve(true);
+              };
+              req2.onerror = function () {
+                resolve(false);
+              };
+            });
+          } else {
+            resolve(false);
+          }
+        };
+      } catch (e) {
+        resolve(false);
+      }
+    });
+  };
+
+  /**
+   * getFormattedSize — get cache size in human-readable format (bytes, KB, MB).
+    * @returns {Promise<string>} Human-readable size string.
+    */
+   Donkeycraft.AssetCache.prototype.getFormattedSize = function () {
     var self = this;
     return self.getTotalSize().then(function (bytes) {
       if (bytes < 1024) {
