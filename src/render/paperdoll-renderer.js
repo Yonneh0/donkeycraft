@@ -1,5 +1,6 @@
 // Donkeycraft — Paperdoll Renderer
 // WebGL-based 3D entity renderer for the inventory paperdoll slot.
+// Renders a scaled player entity with animation state machine and head-tracking.
 (function () {
   'use strict';
 
@@ -11,11 +12,6 @@
   var _CANVAS_HEIGHT = 180;
   var _MAGENTA = { r: 1, g: 0, b: 1 };
 
-  /**
-   * PaperdollRenderer — Renders a 3D player entity over the inventory paperdoll slot.
-   * @constructor
-   * @param {HTMLElement} container - The .dk-paperdoll-container element.
-   */
   Donkeycraft.PaperdollRenderer = function (container) {
     this._container = container || null;
     this._canvas = null;
@@ -178,16 +174,13 @@
   Donkeycraft.PaperdollRenderer.prototype._createEntity = function () {
     var self = this;
     self._pos = { x: 0, y: 0, z: 0 };
-    self._rot = { yaw: 0, pitch: 0 };
+    self._rot = { yaw: Math.PI * 0.85, pitch: 0 };
     var S = 1.5;
 
     this._entity = {
       type: 'player',
-      _width: 0.6 * S,
-      _height: 1.8 * S,
       getPosition: function () { return self._pos; },
       getRotation: function () { return self._rot; },
-      getDimensions: function () { return { width: self._width, height: self._height }; },
       isAlive: function () { return true; },
       getBones: function () {
         return [
@@ -202,7 +195,7 @@
           { name: 'rightLeg', meshType: 'box', dimensions: { w: 0.25 * S, h: 0.9 * S, d: 0.25 * S }, color: '#3366CC', offset: { x: 0.15 * S, y: 0.0, z: 0 }, pivot: { x: 0.15 * S, y: 0.45 * S, z: 0 } }
         ];
       },
-      getBoneTransforms: function () { return self._getLastTransforms(); }
+      getBoneTransforms: function () { return self._lastTransforms; }
     };
   };
 
@@ -246,11 +239,13 @@
     if (!vbo) { console.warn('[PaperdollRenderer] gl.createBuffer() failed'); return null; }
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
     gl.bufferData(gl.ARRAY_BUFFER, mesh.vertices, gl.STATIC_DRAW);
+    if (gl.getError()) { console.warn('[PaperdollRenderer] VBO bufferData failed for key "' + key + '"'); gl.deleteBuffer(vbo); return null; }
 
     var ibo = gl.createBuffer();
     if (!ibo) { console.warn('[PaperdollRenderer] gl.createBuffer() failed for IBO'); gl.deleteBuffer(vbo); return null; }
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+    if (gl.getError()) { console.warn('[PaperdollRenderer] IBO bufferData failed for key "' + key + '"'); gl.deleteBuffer(vbo); gl.deleteBuffer(ibo); return null; }
 
     this._meshCache[key] = { vbo: vbo, ibo: ibo, count: mesh.count, stride: 8 * 4 };
     return this._meshCache[key];
@@ -278,7 +273,10 @@
       r = parseInt(hex.charAt(0)+hex.charAt(0), 16) / 255;
       g = parseInt(hex.charAt(1)+hex.charAt(1), 16) / 255;
       b = parseInt(hex.charAt(2)+hex.charAt(2), 16) / 255;
-    } else { r = _MAGENTA.r; g = _MAGENTA.g; b = _MAGENTA.b; }
+    } else {
+      console.warn('[PaperdollRenderer] Unrecognized color format "' + color + '", using magenta fallback');
+      r = _MAGENTA.r; g = _MAGENTA.g; b = _MAGENTA.b;
+    }
 
     gl.uniform3f(this._uColor, r, g, b);
     gl.bindBuffer(gl.ARRAY_BUFFER, cache.vbo);
@@ -288,6 +286,11 @@
     gl.vertexAttribPointer(this._aNormalLoc, 3, gl.FLOAT, false, cache.stride, 12);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cache.ibo);
     gl.drawElements(gl.TRIANGLES, cache.count, gl.UNSIGNED_SHORT, 0);
+    var err = gl.getError();
+    if (err !== gl.NO_ERROR) {
+      console.warn('[PaperdollRenderer] drawElements failed with error code:', err);
+      return false;
+    }
     return true;
   };
 
@@ -297,8 +300,9 @@
 
     switch (this._animState) {
       case 'idle': {
-        transforms.body = { rx: 0, ry: Math.sin(t * 0.8) * 0.15, rz: 0 };
-        transforms.head = { rx: Math.sin(t * 0.6) * 0.08, ry: Math.sin(t * 0.5) * 0.2, rz: 0 };
+        // Natural idle: subtle shoulder tilt (rz) and head bob, no body yaw
+        transforms.body = { rx: 0, ry: 0, rz: Math.sin(t * 0.8) * 0.05 };
+        transforms.head = { rx: -Math.sin(t * 0.6) * 0.08, ry: Math.sin(t * 0.5) * 0.15, rz: 0 };
         transforms.leftArm = { rx: Math.sin(t * 0.7) * 0.1, ry: 0, rz: 0 };
         transforms.rightArm = { rx: Math.sin(t * 0.7 + 1) * 0.1, ry: 0, rz: 0 };
         transforms.leftLeg = { rx: 0, ry: Math.sin(t * 0.5) * 0.05, rz: 0 };
@@ -307,30 +311,38 @@
       }
       case 'walk': {
         var ws = 2.5, sa = 0.6;
-        transforms.body = { rx: 0.05, ry: Math.sin(t * ws) * 0.1, rz: 0 };
-        transforms.head = { rx: 0, ry: Math.sin(t * ws) * 0.08, rz: 0 };
-        transforms.leftArm = { rx: -Math.sin(t * ws) * sa, ry: 0, rz: 0 };
-        transforms.rightArm = { rx: Math.sin(t * ws) * sa, ry: 0, rz: 0 };
+        // Body leans forward slightly (rx), no yaw - faces forward while walking
+        transforms.body = { rx: 0.05, ry: 0, rz: 0 };
+        // Head stays stable, slight forward pitch to look ahead
+        transforms.head = { rx: 0.03, ry: 0, rz: 0 };
+        // Left arm and left leg swing TOGETHER (both +sin), right arm/leg swing together (both -sin)
+        transforms.leftArm = { rx: Math.sin(t * ws) * sa, ry: 0, rz: 0 };
+        transforms.rightArm = { rx: -Math.sin(t * ws) * sa, ry: 0, rz: 0 };
         transforms.leftLeg = { rx: Math.sin(t * ws) * sa, ry: 0, rz: 0 };
         transforms.rightLeg = { rx: -Math.sin(t * ws) * sa, ry: 0, rz: 0 };
         break;
       }
       case 'run': {
         var rs = 4.5, ra = 1.0;
-        transforms.body = { rx: 0.2, ry: Math.sin(t * rs) * 0.15, rz: 0 };
-        transforms.head = { rx: -0.15, ry: Math.sin(t * rs) * 0.1, rz: 0 };
-        transforms.leftArm = { rx: -Math.sin(t * rs) * ra, ry: 0, rz: 0 };
-        transforms.rightArm = { rx: Math.sin(t * rs) * ra, ry: 0, rz: 0 };
+        // More forward lean, no yaw
+        transforms.body = { rx: 0.2, ry: 0, rz: 0 };
+        // Head pitched forward slightly to look ahead while running
+        transforms.head = { rx: 0.15, ry: 0, rz: 0 };
+        // Arms swing faster and harder, left arm with left leg (both +sin)
+        transforms.leftArm = { rx: Math.sin(t * rs) * ra, ry: 0, rz: 0 };
+        transforms.rightArm = { rx: -Math.sin(t * rs) * ra, ry: 0, rz: 0 };
         transforms.leftLeg = { rx: Math.sin(t * rs) * ra, ry: 0, rz: 0 };
         transforms.rightLeg = { rx: -Math.sin(t * rs) * ra, ry: 0, rz: 0 };
         break;
       }
       case 'wave': {
         var wc = Math.sin(t * 5);
-        transforms.body = { rx: 0, ry: -0.15, rz: 0 };
-        transforms.head = { rx: 0, ry: 0.1, rz: 0 };
+        // Subtle body turn toward waving side
+        transforms.body = { rx: 0, ry: 0.15, rz: 0 };
+        transforms.head = { rx: 0, ry: 0.2, rz: 0 };
         transforms.leftArm = { rx: 0, ry: 0, rz: 0 };
-        transforms.rightArm = { rx: -2.5 + wc * 0.3, ry: 0.5 + wc * 0.4, rz: 0.3 };
+        // Right arm raises up (rx ~ -pi/2) and waves up/down with small oscillation
+        transforms.rightArm = { rx: -1.57 + wc * 0.4, ry: 0.3, rz: 0.2 };
         transforms.leftLeg = { rx: 0, ry: 0, rz: 0 };
         transforms.rightLeg = { rx: 0, ry: 0, rz: 0 };
         break;
@@ -338,6 +350,7 @@
     }
 
     if (this._mouseInside) {
+      // Head tracks mouse: pitch from mouse Y, yaw from mouse X
       transforms.head = { rx: this._headOverride.pitch, ry: this._headOverride.yaw, rz: 0 };
     }
 
@@ -394,10 +407,6 @@
     this._meshCache = {};
   };
 
-  Donkeycraft.PaperdollRenderer.prototype._getLastTransforms = function () {
-    return this._lastTransforms;
-  };
-
   Donkeycraft.PaperdollRenderer.prototype._updateAnimationState = function (dt) {
     if (this._paused) return;
     this._animTime += dt;
@@ -413,6 +422,7 @@
         if (r <= cumulative) { newState = states[i]; break; }
       }
       this._animState = newState;
+      this._animTime = 0;
       this._stateTimer = 2 + Math.random() * 3;
     }
   };
@@ -471,15 +481,21 @@
             var boneWorld = {};
 
             function applyRotToVec(vx, vy, vz, rx, ry, rz) {
-              var x1 = vx * Math.cos(ry) - vz * Math.sin(ry);
-              var z1 = vx * Math.sin(ry) + vz * Math.cos(ry);
-              var y1 = vy;
+              // Apply rotations in Z→X→Y order to match matrix multiplication order:
+              // modelMatrix = rotY * rotX * rotZ => vector transform: rotY(rotX(rotZ(v)))
+              // Step 1: Z rotation (roll) - around up axis relative to local space
+              var x1 = vx * Math.cos(rz) - vy * Math.sin(rz);
+              var y1 = vx * Math.sin(rz) + vy * Math.cos(rz);
+              var z1 = vz;
+              // Step 2: X rotation (pitch) - around right axis
+              var x2 = x1;
               var y2 = y1 * Math.cos(rx) - z1 * Math.sin(rx);
               var z2 = y1 * Math.sin(rx) + z1 * Math.cos(rx);
-              var x2 = x1;
-              var x3 = x2 * Math.cos(rz) - y2 * Math.sin(rz);
-              var y3 = x2 * Math.sin(rz) + y2 * Math.cos(rz);
-              return { x: x3, y: y3, z: z2 };
+              // Step 3: Y rotation (yaw) - around world up axis
+              var x3 = x2 * Math.cos(ry) - z2 * Math.sin(ry);
+              var y3 = y2;
+              var z3 = x2 * Math.sin(ry) + z2 * Math.cos(ry);
+              return { x: x3, y: y3, z: z3 };
             }
 
             function computeBoneWorld(boneDef, animTransform) {
@@ -538,17 +554,15 @@
               return boneWorld[boneDef.name];
             }
 
-            for (var bi = 0; bi < bones.length; bi++) computeBoneWorld(bones[bi], transforms);
-
             for (var i = 0; i < bones.length; i++) {
               var bone = bones[i];
+              var bw = computeBoneWorld(bone, transforms);
               var transform = transforms[bone.name] || { rx: 0, ry: 0, rz: 0 };
-              var bw = computeBoneWorld(bone);
 
               var modelMatrix = Donkeycraft.Matrix4.createIdentity();
-              if (transform.ry !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
-              if (transform.rx !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
-              if (transform.rz !== 0) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
+              if (transform.ry) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.ry, new Donkeycraft.Vector3(0, 1, 0)));
+              if (transform.rx) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rx, new Donkeycraft.Vector3(1, 0, 0)));
+              if (transform.rz) modelMatrix = Donkeycraft.Matrix4.multiply(modelMatrix, Donkeycraft.Matrix4.createRotation(transform.rz, new Donkeycraft.Vector3(0, 0, 1)));
 
               if (bone.pivot) {
                 var px = (bone.pivot.x || 0) - (bone.offset.x || 0);
@@ -583,6 +597,7 @@
   Donkeycraft.PaperdollRenderer.prototype.init = function () {
     if (this._running) return true;
     if (!this._container) { console.error('[PaperdollRenderer] No container element provided'); return false; }
+    if (!Donkeycraft.Matrix4 || !Donkeycraft.Vector3) { console.error('[PaperdollRenderer] Matrix4/Vector3 unavailable'); return false; }
     if (!this._createCanvas()) { console.error('[PaperdollRenderer] Canvas creation failed'); return false; }
     if (!this._createShaderProgram()) { console.error('[PaperdollRenderer] Shader program creation failed'); return false; }
     this._createEntity();
@@ -599,50 +614,41 @@
     var container = this._container;
     if (!panel || !container) return;
 
-    var globalMouseMove = function (e) {
-      if (!self._mouseInside) return;
-      var cRect = container.getBoundingClientRect();
-      if (!cRect) return;
-      var mx = Math.max(-1, Math.min(1, ((e.clientX - cRect.left) / cRect.width) * 2 - 1));
-      var my = Math.max(-1, Math.min(1, ((e.clientY - cRect.top) / cRect.height) * 2 - 1));
-      self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
-      self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
-    };
+    var cRect = panel.getBoundingClientRect();
+    if (!cRect || cRect.width === 0 || cRect.height === 0) return;
 
     var handleEnter = function () {
       self._mouseInside = true;
       self.pause();
-      document.addEventListener('mousemove', globalMouseMove);
+      panel.addEventListener('mousemove', self._hoverHandlers.move);
       for (var i = 0; i < self._onHoverChange.length; i++) { try { self._onHoverChange[i](true); } catch (e) {} }
     };
 
     var handleLeave = function () {
       self._mouseInside = false;
       self.resume();
-      document.removeEventListener('mousemove', globalMouseMove);
+      panel.removeEventListener('mousemove', self._hoverHandlers.move);
       self._headOverride.yaw = 0;
       self._headOverride.pitch = 0;
       for (var i = 0; i < self._onHoverChange.length; i++) { try { self._onHoverChange[i](false); } catch (e) {} }
     };
 
-    this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: globalMouseMove };
+    var handleMove = function (e) {
+      var mx = Math.max(-1, Math.min(1, ((e.clientX - cRect.left) / cRect.width) * 2 - 1));
+      var my = Math.max(-1, Math.min(1, ((e.clientY - cRect.top) / cRect.height) * 2 - 1));
+      self._headOverride.yaw = mx * _HEAD_YAW_LIMIT;
+      self._headOverride.pitch = my * _HEAD_PITCH_LIMIT;
+    };
+
+    this._hoverHandlers = { enter: handleEnter, leave: handleLeave, move: handleMove };
     panel.addEventListener('mouseenter', handleEnter);
     panel.addEventListener('mouseleave', handleLeave);
   };
 
-  /** pause — Pause animation updates while keeping the last frame rendered. */
   Donkeycraft.PaperdollRenderer.prototype.pause = function () { this._paused = true; };
-
-  /** resume — Resume animation updates after a pause. */
   Donkeycraft.PaperdollRenderer.prototype.resume = function () { this._paused = false; };
-
-  /** isRunning — Check if the renderer is active. */
   Donkeycraft.PaperdollRenderer.prototype.isRunning = function () { return this._running; };
 
-  /**
-   * destroy — Clean up all PaperdollRenderer resources.
-   * After calling, create a new instance to use again.
-   */
   Donkeycraft.PaperdollRenderer.prototype.destroy = function () {
     this._running = false;
     if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
@@ -652,7 +658,6 @@
       if (panel) {
         panel.removeEventListener('mouseenter', this._hoverHandlers.enter);
         panel.removeEventListener('mouseleave', this._hoverHandlers.leave);
-        panel.removeEventListener('mousemove', this._hoverHandlers.move);
       }
       this._hoverHandlers = null;
     }
@@ -674,11 +679,6 @@
     this._entity = null;
   };
 
-  /**
-   * onHoverChange — Subscribe to hover state changes.
-   * @param {Function} callback - Called with (isHovered).
-   * @returns {Function} Unsubscribe function.
-   */
   Donkeycraft.PaperdollRenderer.prototype.onHoverChange = function (callback) {
     this._onHoverChange.push(callback);
     var self = this;
