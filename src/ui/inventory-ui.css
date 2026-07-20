@@ -38,6 +38,37 @@
 }
 
 /* ============================================================
+   CREATIVE ITEM PICKER TOGGLE BUTTON
+   ============================================================ */
+
+.dk-item-picker-toggle {
+  width: 24px;
+  height: 24px;
+  background: rgba(60, 120, 60, 0.6);
+  border: 1px solid #5a5;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: none; /* Hidden by default — shown in creative mode */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+  padding: 0;
+}
+
+.dk-item-picker-toggle:hover {
+  background: rgba(80, 160, 80, 0.8);
+}
+
+/* Show picker button only when inventory panel has creative class */
+.dk-inventory-panel.creative-mode .dk-item-picker-toggle {
+  display: flex;
+}
+
+/* ============================================================
    TITLE BAR
    ============================================================ */
 
@@ -470,6 +501,227 @@
 }
 
 /* ============================================================
+   CREATIVE ITEM PICKER PANEL
+   ============================================================ */
+
+.dk-item-picker-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  width: 720px;
+  max-width: 90vw;
+  height: 540px;
+  max-height: 80vh;
+  background: rgba(30, 30, 35, 0.95);
+  border: 2px solid #666;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.dk-item-picker-panel.open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+/* Title bar */
+.dk-item-picker-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(50, 50, 55, 0.9);
+  border-bottom: 1px solid #444;
+  border-radius: 6px 6px 0 0;
+  flex-shrink: 0;
+  height: 32px;
+}
+
+.dk-item-picker-title-text {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ddd;
+  text-shadow: 1px 1px 2px #000;
+  letter-spacing: 0.5px;
+}
+
+.dk-item-picker-close-btn {
+  width: 22px;
+  height: 22px;
+  background: rgba(180, 50, 50, 0.6);
+  border: 1px solid #888;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.dk-item-picker-close-btn:hover {
+  background: rgba(220, 60, 60, 0.8);
+}
+
+/* Search bar */
+.dk-item-picker-search {
+  padding: 6px 8px;
+  background: rgba(40, 40, 45, 0.8);
+  border-bottom: 1px solid #444;
+  flex-shrink: 0;
+}
+
+.dk-item-picker-search-input {
+  width: 100%;
+  background: rgba(20, 20, 25, 0.9);
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #ddd;
+  font-size: 12px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.dk-item-picker-search-input:focus {
+  border-color: #888;
+}
+
+.dk-item-picker-search-input::placeholder {
+  color: #777;
+}
+
+/* Category tabs */
+.dk-item-picker-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.dk-item-picker-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px 6px;
+  background: rgba(35, 35, 40, 0.8);
+  border-bottom: 1px solid #444;
+  flex-shrink: 0;
+}
+
+.dk-item-picker-cat-btn {
+  background: rgba(60, 60, 70, 0.7);
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #bbb;
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.dk-item-picker-cat-btn:hover {
+  background: rgba(80, 80, 90, 0.8);
+  color: #ddd;
+}
+
+.dk-item-picker-cat-btn.active {
+  background: rgba(60, 100, 160, 0.7);
+  border-color: #6af;
+  color: #fff;
+}
+
+/* Item grid */
+.dk-item-picker-grid-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
+}
+
+.dk-item-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 48px);
+  gap: 2px;
+  width: fit-content;
+  min-width: 100%;
+}
+
+/* Creative item slot (draggable source) */
+.dk-item-picker-slot {
+  width: 48px;
+  height: 48px;
+  background: rgba(70, 70, 85, 0.7);
+  border: 2px solid #556;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: grab;
+  transition: all 0.15s ease;
+}
+
+.dk-item-picker-slot:hover {
+  border-color: #8af;
+  background: rgba(90, 90, 110, 0.85);
+  transform: scale(1.05);
+}
+
+.dk-item-picker-slot:active {
+  cursor: grabbing;
+}
+
+.dk-item-picker-slot .dk-slot-item {
+  font-size: 24px;
+  text-align: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.dk-item-picker-slot .dk-slot-count {
+  position: absolute;
+  bottom: 1px;
+  left: 3px;
+  font-size: 10px;
+  color: #fff;
+  font-weight: bold;
+  text-shadow:
+    1px 1px 2px #000,
+    -1px -1px 1px #000;
+  pointer-events: none;
+}
+
+/* Creative glow effect on picker slots */
+.dk-item-picker-slot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  box-shadow: inset 0 0 6px rgba(100, 150, 255, 0.2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.dk-item-picker-slot:hover::after {
+  opacity: 1;
+}
+
+/* ============================================================
    RESPONSIVE ADJUSTMENTS
    ============================================================ */
 
@@ -487,5 +739,60 @@
 
   .dk-inventory-grid {
     grid-template-columns: repeat(6, 40px);
+  }
+}
+
+/* Drag ghost while dragging from picker */
+.dk-picker-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  font-size: 28px;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* Drop target highlight on inventory slots during picker drag */
+.dk-inv-slot.drag-target,
+.dk-container-slot.drag-target {
+  border-color: #6af !important;
+  box-shadow: inset 0 0 8px rgba(100, 170, 255, 0.4);
+  background: rgba(60, 100, 160, 0.3) !important;
+}
+
+/* Scrollbar for picker grid */
+.dk-item-picker-grid-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dk-item-picker-grid-wrapper::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.dk-item-picker-grid-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(100, 150, 100, 0.5);
+  border-radius: 4px;
+}
+
+.dk-item-picker-grid-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 180, 120, 0.6);
+}
+
+/* Responsive adjustments for picker */
+@media (max-width: 768px) {
+  .dk-item-picker-panel {
+    width: 95vw;
+    height: 90vh;
+  }
+
+  .dk-item-picker-grid {
+    grid-template-columns: repeat(10, 40px);
+  }
+
+  .dk-item-picker-slot {
+    width: 40px;
+    height: 40px;
   }
 }

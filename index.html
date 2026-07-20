@@ -132,6 +132,7 @@
         <!-- Title bar -->
         <div class="dk-inventory-titlebar">
             <span class="dk-title-text">Inventory of Player</span>
+            <button class="dk-item-picker-toggle" id="dk-item-picker-toggle" title="Creative Item Picker">[+]</button>
             <div class="dk-inventory-close-btn" id="dk-inventory-close-btn">X</div>
         </div>
 
@@ -243,6 +244,33 @@
                     <div class="dk-container-slot" data-slot="c8"><span class="dk-slot-item"></span></div>
                     <div class="dk-container-slot" data-slot="c9"><span class="dk-slot-item"></span></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Creative Item Picker Panel -->
+    <div id="dk-item-picker-panel" class="dk-item-picker-panel">
+        <div class="dk-item-picker-titlebar">
+            <span class="dk-item-picker-title-text">Creative Item Picker</span>
+            <div class="dk-item-picker-close-btn" id="dk-item-picker-close-btn">X</div>
+        </div>
+        <div class="dk-item-picker-search">
+            <input type="text" id="dk-item-picker-search-input" class="dk-item-picker-search-input" placeholder="Search items...">
+        </div>
+        <div class="dk-item-picker-content">
+            <div class="dk-item-picker-categories">
+                <button class="dk-item-picker-cat-btn active" data-category="all">All</button>
+                <button class="dk-item-picker-cat-btn" data-category="blocks">Blocks</button>
+                <button class="dk-item-picker-cat-btn" data-category="tools">Tools</button>
+                <button class="dk-item-picker-cat-btn" data-category="weapons">Weapons</button>
+                <button class="dk-item-picker-cat-btn" data-category="armor">Armor</button>
+                <button class="dk-item-picker-cat-btn" data-category="food">Food</button>
+                <button class="dk-item-picker-cat-btn" data-category="potions">Potions</button>
+                <button class="dk-item-picker-cat-btn" data-category="materials">Materials</button>
+                <button class="dk-item-picker-cat-btn" data-category="entity">Entities</button>
+            </div>
+            <div class="dk-item-picker-grid-wrapper">
+                <div id="dk-item-picker-grid" class="dk-item-picker-grid"></div>
             </div>
         </div>
     </div>

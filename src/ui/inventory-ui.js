@@ -1,5 +1,6 @@
 // Donkeycraft — Player Inventory UI
 // Player inventory panel with paperdoll, equipment slots, backpack grid, and main inventory grid.
+// Includes Creative Item Picker panel for creative mode item selection.
 (function () {
   'use strict';
 
@@ -27,8 +28,29 @@
     this._gridEl = null;
     this._toggleBtnEl = null;
 
+    // Item picker DOM elements
+    this._pickerPanelEl = null;
+    this._pickerGridEl = null;
+    this._pickerToggleEl = null;
+    this._pickerCloseEl = null;
+    this._pickerSearchEl = null;
+    this._pickerCatBtns = null;
+
+    // Item picker state
+    this._pickerOpen = false;
+    this._currentCategory = 'all';
+    this._searchFilter = '';
+    this._pickerSlots = [];
+
     // Event subscriptions
     this._subscriptions = {};
+    this._unsubscribeSlotChange = null;
+    this._slotChangeListener = null;
+    this._unsubscribeGameModeChanged = null;
+    this._gameModeChangeListener = null;
+
+    // Escape key handler for picker panel
+    this._pickerEscapeHandler = null;
 
     // Build DOM
     this._initDOM();
@@ -49,6 +71,9 @@
           self.close();
         });
       }
+
+      // Add [+] picker toggle button to title bar
+      this._buildPickerToggle();
 
       this._gridEl = document.getElementById('dk-inventory-grid');
       if (!this._gridEl) {
@@ -72,6 +97,72 @@
     }
 
     this._buildToggleButton();
+
+    // Initialize item picker panel elements from static HTML
+    this._initItemPickerDOM();
+  };
+
+  /**
+   * _initItemPickerDOM — initializes references to the static HTML item picker elements.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._initItemPickerDOM = function () {
+    var self = this;
+
+    // Get panel elements
+    this._pickerPanelEl = document.getElementById('dk-item-picker-panel');
+    this._pickerGridEl = document.getElementById('dk-item-picker-grid');
+    this._pickerToggleEl = document.getElementById('dk-item-picker-toggle');
+    this._pickerCloseEl = document.getElementById('dk-item-picker-close-btn');
+    this._pickerSearchEl = document.getElementById('dk-item-picker-search-input');
+    this._pickerCatBtns = document.querySelectorAll('.dk-item-picker-cat-btn');
+
+    // Picker toggle button (in inventory title bar)
+    if (this._pickerToggleEl) {
+      this._pickerToggleEl.addEventListener('click', function (e) {
+        e.stopPropagation();
+        self._toggleItemPicker();
+      });
+    }
+
+    // Close button in picker panel
+    if (this._pickerCloseEl) {
+      this._pickerCloseEl.addEventListener('click', function (e) {
+        e.stopPropagation();
+        self._closeItemPicker();
+      });
+    }
+
+    // Search input filter
+    if (this._pickerSearchEl) {
+      this._pickerSearchEl.addEventListener('input', function () {
+        self._searchFilter = this.value.toLowerCase().trim();
+        self._filterPickerItems();
+      });
+    }
+
+    // Category button clicks — filter existing grid instead of full re-render
+    if (this._pickerCatBtns.length > 0) {
+      for (var i = 0; i < this._pickerCatBtns.length; i++) {
+        (function (catBtn) {
+          catBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var cat = this.getAttribute('data-category');
+            if (cat) {
+              self._currentCategory = cat;
+              // Update active state
+              for (var j = 0; j < self._pickerCatBtns.length; j++) {
+                self._pickerCatBtns[j].classList.remove('active');
+              }
+              this.classList.add('active');
+              self._filterPickerItems();
+            }
+          });
+        })(this._pickerCatBtns[i]);
+      }
+    }
+
+    // Focus search input when picker opens (handled in _openItemPicker)
   };
 
   /**
@@ -86,6 +177,7 @@
         var slotIdx = row * 6 + col;
         var invSlot = document.createElement('div');
         invSlot.className = 'dk-inv-slot';
+        invSlot.dataset.slotIndex = slotIdx;
 
         var numEl = document.createElement('span');
         numEl.className = 'dk-slot-number';
@@ -126,6 +218,31 @@
   };
 
   /**
+   * _buildPickerToggle — adds the [+] button to the inventory title bar.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._buildPickerToggle = function () {
+    var self = this;
+    if (!this._panelEl) return;
+
+    var titlebar = this._panelEl.querySelector('.dk-inventory-titlebar');
+    if (!titlebar) return;
+
+    var btn = document.createElement('button');
+    btn.className = 'dk-item-picker-toggle';
+    btn.textContent = '+';
+    btn.title = 'Creative Item Picker';
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      self._toggleItemPicker();
+    });
+
+    titlebar.appendChild(btn);
+    this._pickerToggleEl = btn;
+  };
+
+  /**
    * open — opens the inventory panel with animation.
    * If currently closing, cancels the close and re-opens immediately.
    */
@@ -151,6 +268,9 @@
       this._toggleBtnEl.classList.add('active');
     }
 
+    // Update creative mode visibility for picker button
+    this._updateCreativeModeVisibility();
+
     if (this._subscriptions.onOpen) {
       for (var i = 0; i < this._subscriptions.onOpen.length; i++) {
         try {
@@ -158,6 +278,17 @@
         } catch (e) {}
       }
     }
+  };
+
+  /**
+   * _updateCreativeModeVisibility — shows/hides the item picker button based on game mode.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._updateCreativeModeVisibility = function () {
+    if (!this._panelEl || !this._pickerToggleEl || !this._player) return;
+
+    var isInCreative = this._player.getGameMode ? this._player.getGameMode() === 'creative' : false;
+    this._panelEl.classList.toggle('creative-mode', isInCreative);
   };
 
   /**
@@ -259,6 +390,7 @@
    * @private
    */
   Donkeycraft.InventoryUI.prototype._getItemDisplayChar = function (itemId) {
+    // Try ItemDefinitionRegistry first for non-block items
     if (Donkeycraft.ItemDefinitionRegistry && itemId > 255) {
       var itemDef = Donkeycraft.ItemDefinitionRegistry.get(itemId);
       if (itemDef && itemDef.name) return itemDef.name.charAt(0).toUpperCase();
@@ -289,6 +421,342 @@
         slotEl.addEventListener('click', function (e) { e.stopPropagation(); });
       })(containerSlots[i], i);
     }
+  };
+
+  // ============================================================
+  // CREATIVE ITEM PICKER
+  // ============================================================
+
+  /**
+   * _toggleItemPicker — toggles the creative item picker panel open/closed.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._toggleItemPicker = function () {
+    if (this._pickerOpen) {
+      this._closeItemPicker();
+    } else {
+      this._openItemPicker();
+    }
+  };
+
+  /**
+   * _openItemPicker — opens the creative item picker panel and renders items.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._openItemPicker = function () {
+    if (!this._pickerPanelEl) return;
+    this._pickerOpen = true;
+
+    // Render items on first open only
+    if (this._pickerSlots.length === 0) {
+      this._renderItemPickerGrid();
+    }
+
+    // Show panel
+    this._pickerPanelEl.classList.add('open');
+    if (this._pickerToggleEl) {
+      this._pickerToggleEl.classList.add('active');
+    }
+
+    // Wire escape key handler to close picker
+    this._wirePickerEscapeHandler();
+  };
+
+  /**
+   * _closeItemPicker — closes the creative item picker panel.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._closeItemPicker = function () {
+    if (!this._pickerOpen) return;
+    this._pickerOpen = false;
+
+    if (this._pickerPanelEl) {
+      this._pickerPanelEl.classList.remove('open');
+    }
+    if (this._pickerToggleEl) {
+      this._pickerToggleEl.classList.remove('active');
+    }
+
+    // Unwire escape key handler
+    this._unwirePickerEscapeHandler();
+  };
+
+  /**
+   * _getItemCategory — determines the category for an item ID.
+   * @param {number} itemId - Item ID to categorize.
+   * @returns {string} Category string ('blocks', 'tools', 'weapons', etc.).
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._getItemCategory = function (itemId) {
+    if (!Donkeycraft.ItemIdRange) return 'blocks';
+
+    var range = Donkeycraft.ItemIdRange;
+
+    // Block items (0-255)
+    if (itemId >= range.BLOCK_START && itemId <= range.BLOCK_END) {
+      return 'blocks';
+    }
+    // Tools
+    if (itemId >= range.TOOL_START && itemId <= range.TOOL_END) {
+      return 'tools';
+    }
+    // Weapons
+    if (itemId >= range.WEAPON_START && itemId <= range.WEAPON_END) {
+      return 'weapons';
+    }
+    // Armor
+    if (itemId >= range.ARMOR_START && itemId <= range.ARMOR_END) {
+      return 'armor';
+    }
+    // Food
+    if (itemId >= range.FOOD_START && itemId <= range.FOOD_END) {
+      return 'food';
+    }
+    // Potions
+    if (itemId >= range.POTION_START && itemId <= range.POTION_END) {
+      return 'potions';
+    }
+    // Materials
+    if (itemId >= range.MATERIAL_START && itemId <= range.MATERIAL_END) {
+      return 'materials';
+    }
+    // Entity items
+    if (itemId >= range.ENTITY_ITEM_START && itemId <= range.ENTITY_ITEM_END) {
+      return 'entity';
+    }
+
+    return 'blocks';
+  };
+
+  /**
+   * _renderItemPickerGrid — renders all available creative items into the picker grid.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._renderItemPickerGrid = function () {
+    if (!this._pickerGridEl) return;
+
+    // Clear existing grid
+    this._pickerGridEl.innerHTML = '';
+    this._pickerSlots = [];
+
+    // Get all item definitions from the registry
+    var items = [];
+    if (Donkeycraft.ItemDefinitionRegistry) {
+      var allItems = Donkeycraft.ItemDefinitionRegistry.getAll();
+      for (var i = 0; i < allItems.length; i++) {
+        var itemDef = allItems[i];
+        if (itemDef && itemDef.id !== undefined) {
+          items.push(itemDef);
+        }
+      }
+    }
+
+    // Filter by category
+    if (this._currentCategory !== 'all') {
+      var catFilter = this._currentCategory;
+      items = items.filter(function (item) {
+        return this._getItemCategory(item.id) === catFilter;
+      }, this);
+    }
+
+    // Filter by search text
+    if (this._searchFilter) {
+      var filter = this._searchFilter;
+      items = items.filter(function (item) {
+        var name = item.name.toLowerCase();
+        return name.indexOf(filter) >= 0;
+      }, this);
+    }
+
+    // Sort by ID for consistent ordering
+    items.sort(function (a, b) {
+      return a.id - b.id;
+    });
+
+    // Create slot elements for each item
+    for (var i = 0; i < items.length; i++) {
+      var itemDef = items[i];
+      var itemId = itemDef.id;
+
+      var slotEl = document.createElement('div');
+      slotEl.className = 'dk-item-picker-slot';
+      slotEl.dataset.itemId = itemId;
+      slotEl.dataset.itemName = (itemDef.name || '').toLowerCase();
+
+      // Item display character
+      var itemEl = document.createElement('span');
+      itemEl.className = 'dk-slot-item';
+      itemEl.textContent = this._getItemDisplayChar(itemId);
+      slotEl.appendChild(itemEl);
+
+      // Stack count badge (creative items show "∞")
+      var countEl = document.createElement('span');
+      countEl.className = 'dk-slot-count';
+      countEl.textContent = '∞';
+      slotEl.appendChild(countEl);
+
+      // Title/tooltip with item name
+      slotEl.title = itemDef.name + ' (ID: ' + itemId + ')';
+
+      // Make draggable via mousedown
+      this._makePickerSlotDraggable(slotEl, itemId);
+
+      this._pickerGridEl.appendChild(slotEl);
+      this._pickerSlots.push({ el: slotEl, itemDef: itemDef });
+    }
+  };
+
+  /**
+   * _filterPickerItems — filters the picker grid based on search text and active category.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._filterPickerItems = function () {
+    if (!this._pickerSlots) return;
+
+    for (var i = 0; i < this._pickerSlots.length; i++) {
+      var slot = this._pickerSlots[i];
+      var name = slot.el.dataset.itemName;
+      var category = this._getItemCategory(slot.itemDef.id);
+
+      // Check category filter
+      var catMatch = this._currentCategory === 'all' || category === this._currentCategory;
+
+      // Check search filter
+      var searchMatch = !this._searchFilter || name.indexOf(this._searchFilter) >= 0;
+
+      slot.el.style.display = (catMatch && searchMatch) ? '' : 'none';
+    }
+  };
+
+  /**
+   * _makePickerSlotDraggable — makes a picker slot element draggable into inventory slots.
+   * @param {HTMLElement} slotEl - The picker slot element.
+   * @param {number} itemId - The item ID to drag.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._makePickerSlotDraggable = function (slotEl, itemId) {
+    var self = this;
+    var ghostEl = null;
+
+    var onMouseDown = function (e) {
+      if (e.button !== 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Create drag ghost element
+      ghostEl = document.createElement('div');
+      ghostEl.className = 'dk-picker-drag-ghost';
+      ghostEl.textContent = self._getItemDisplayChar(itemId);
+      document.body.appendChild(ghostEl);
+
+      ghostEl.style.left = e.clientX + 'px';
+      ghostEl.style.top = e.clientY + 'px';
+
+      // Track mouse move — highlight drop targets
+      var onMouseMove = function (ev) {
+        if (!ghostEl) return;
+        ghostEl.style.left = ev.clientX + 'px';
+        ghostEl.style.top = ev.clientY + 'px';
+
+        // Remove highlight from all slots
+        var prevTargets = document.querySelectorAll('.drag-target');
+        for (var i = 0; i < prevTargets.length; i++) {
+          prevTargets[i].classList.remove('drag-target');
+        }
+
+        // Find element under cursor and highlight if it's a valid drop target
+        var targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+        if (targetEl) {
+          var invSlot = targetEl.closest('.dk-inv-slot, .dk-container-slot');
+          if (invSlot) {
+            invSlot.classList.add('drag-target');
+          }
+        }
+      };
+
+      // Track mouse up — find drop target
+      var onMouseUp = function (ev) {
+        // Remove event listeners
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+
+        // Remove all drag highlights
+        var dragTargets = document.querySelectorAll('.drag-target');
+        for (var j = 0; j < dragTargets.length; j++) {
+          dragTargets[j].classList.remove('drag-target');
+        }
+
+        // Remove ghost
+        if (ghostEl && ghostEl.parentNode) {
+          ghostEl.parentNode.removeChild(ghostEl);
+        }
+        ghostEl = null;
+
+        // Find drop target slot
+        var targetEl = document.elementFromPoint(ev.clientX, ev.clientY);
+        if (!targetEl) return;
+
+        var invSlot = targetEl.closest('.dk-inv-slot');
+        if (!invSlot) return;
+
+        // Get target slot index
+        var slotIdx = parseInt(invSlot.dataset.slotIndex, 10);
+        if (isNaN(slotIdx)) {
+          var grid = invSlot.parentElement;
+          if (grid) {
+            var children = Array.prototype.slice.call(grid.children);
+            slotIdx = children.indexOf(invSlot);
+          }
+        }
+
+        // Place item into inventory
+        if (slotIdx >= 0 && self._playerInventory) {
+          self._placeCreativeItem(slotIdx, itemId);
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    slotEl.addEventListener('mousedown', onMouseDown);
+  };
+
+  /**
+   * _placeCreativeItem — places a creative mode item into the given inventory slot.
+   * In creative mode, items are infinite (always succeeds).
+   * @param {number} slotIdx - Target inventory slot index.
+   * @param {number} itemId - Item ID to place.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._placeCreativeItem = function (slotIdx, itemId) {
+    if (!this._playerInventory) return;
+
+    var maxStack = 64;
+    if (Donkeycraft.ItemDefinitionRegistry) {
+      var itemDef = Donkeycraft.ItemDefinitionRegistry.get(itemId);
+      if (itemDef && itemDef.maxStackCount) {
+        maxStack = itemDef.maxStackCount;
+      }
+    }
+
+    var existingStack = this._playerInventory.getStack(slotIdx);
+
+    // If slot has a matching stack, increment it
+    if (existingStack && !existingStack.isEmpty()) {
+      if (existingStack.getItemId() === itemId) {
+        if (existingStack.getCount() < maxStack) {
+          existingStack.increment(1); // Add 1 at a time per drag drop
+          this._playerInventory.setStack(slotIdx, existingStack);
+        }
+        return;
+      }
+    }
+
+    // If slot is empty or has non-matching item, create new stack
+    var newStack = new Donkeycraft.ItemStack(itemId, maxStack, null);
+    this._playerInventory.setStack(slotIdx, newStack);
   };
 
   /**
@@ -357,6 +825,35 @@
       } else {
         if (countEl) countEl.style.display = 'none';
       }
+    }
+  };
+
+  /**
+   * _wirePickerEscapeHandler — adds escape key listener to close the picker panel.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._wirePickerEscapeHandler = function () {
+    if (this._pickerEscapeHandler) return; // Already wired
+
+    var self = this;
+    this._pickerEscapeHandler = function (e) {
+      if (e.code === 'Escape' && self._pickerOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        self._closeItemPicker();
+      }
+    };
+    document.addEventListener('keydown', this._pickerEscapeHandler);
+  };
+
+  /**
+   * _unwirePickerEscapeHandler — removes the escape key listener.
+   * @private
+   */
+  Donkeycraft.InventoryUI.prototype._unwirePickerEscapeHandler = function () {
+    if (this._pickerEscapeHandler) {
+      document.removeEventListener('keydown', this._pickerEscapeHandler);
+      this._pickerEscapeHandler = null;
     }
   };
 
@@ -432,13 +929,10 @@
     this._player = playerInv ? playerInv._player : null;
 
     // Subscribe to EventBus for slot change events.
-    // ItemManager emits 'item:slot:changed' with { slot, oldStack, newStack, player }
-    // We store the unsubscribe function to clean up in destroy().
     if (Donkeycraft.EventBus) {
       var self = this;
       this._slotChangeListener = function (data) {
         // Filter events by source ItemManager using the 'player' reference in event data.
-        // This avoids unnecessary DOM updates when events from other ItemManagers fire.
         if (
           self._player &&
           data.player === self._player &&
@@ -447,7 +941,7 @@
         ) {
           self._updateSlotDisplay('player', data.slot, data.newStack);
         }
-        // Update backpack slots if set — backpack inventories use the same Player reference
+        // Update backpack slots if set
         if (
           self._backpackInventory &&
           data.player === self._player &&
@@ -461,12 +955,30 @@
         'item:slot:changed',
         this._slotChangeListener
       );
+
+      // Subscribe to gameMode:changed events to update creative mode visibility
+      this._gameModeChangeListener = function (data) {
+        if (data && data.newMode) {
+          self._updateCreativeModeVisibility();
+          // Re-render picker grid if it's open
+          if (self._pickerOpen) {
+            self._renderItemPickerGrid();
+          }
+        }
+      };
+      this._unsubscribeGameModeChanged = Donkeycraft.EventBus.onSafe(
+        'gameMode:changed',
+        this._gameModeChangeListener
+      );
     }
 
     // Wire container slot click handlers for backpack management
     this._initContainerSlots();
 
     this._renderAllSlots();
+
+    // Update creative mode visibility based on current game mode
+    this._updateCreativeModeVisibility();
   };
 
   /**
@@ -477,14 +989,27 @@
       this.close();
     }
 
+    // Close picker if open
+    if (this._pickerOpen) {
+      this._closeItemPicker();
+    }
+
     // Unsubscribe from EventBus slot change listener to prevent memory leaks
     if (this._unsubscribeSlotChange) {
-      try {
-        this._unsubscribeSlotChange();
-      } catch (e) {}
+      try { this._unsubscribeSlotChange(); } catch (e) {}
       this._unsubscribeSlotChange = null;
     }
     this._slotChangeListener = null;
+
+    // Unsubscribe from game mode change listener
+    if (this._unsubscribeGameModeChanged) {
+      try { this._unsubscribeGameModeChanged(); } catch (e) {}
+      this._unsubscribeGameModeChanged = null;
+    }
+    this._gameModeChangeListener = null;
+
+    // Unwire escape key handler
+    this._unwirePickerEscapeHandler();
 
     if (this._panelEl && this._panelEl.parentNode) {
       this._panelEl.parentNode.removeChild(this._panelEl);
