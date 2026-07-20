@@ -287,8 +287,6 @@
     <script src="src/core/timer.js"></script>
     <script src="src/core/input.js"></script>
     <script src="src/core/math-utils.js"></script>
-    <script src="src/core/audio.js"></script>
-
     <!-- Block System -->
     <script src="src/game/block.js"></script>
     <script src="src/game/block-state.js"></script>
@@ -340,8 +338,6 @@
     <script src="src/gen/texture-blocks.js"></script>
     <script src="src/gen/texture-special.js"></script>
     <script src="src/gen/texture-decorative.js"></script>
-    <script src="src/gen/sound-manager.js"></script>
-
     <!-- Loading Screen & Init -->
     <script src="src/core/init-sequence.js"></script>
     <script src="src/ui/loading-screen.js"></script>
@@ -1169,7 +1165,7 @@ void main() {
                 // Set overlay reference for pointer lock
                 game.setOverlay(document.getElementById('dk-overlay'));
 
-                // --- Input: Pointer Lock & AudioContext Resume ---
+                // --- Input: Pointer Lock ---
                 // NOTE: Click handler must be on canvas, NOT overlay. The overlay has
                 // pointer-events: none in CSS, so clicks pass through to the canvas.
                 var canvas = document.getElementById('dk-canvas');
@@ -1177,18 +1173,6 @@ void main() {
                     // Hide cursor class — set on body when pointer is locked so CSS can hide it.
                     if (!document.pointerLockElement) {
                         game.requestPointerLock();
-                    }
-                    // Resume AudioContext if suspended — required on mobile browsers
-                    // and some desktop browsers that defer audio until user gesture.
-                    // Check both the Game instance's _audioContext and any AudioSystem from init-sequence.
-                    var audioCtx = null;
-                    if (window._dkGame && window._dkGame._audioContext) {
-                        audioCtx = window._dkGame._audioContext;
-                    } else if (window._dkInitSystems && window._dkInitSystems.audioSystem && window._dkInitSystems.audioSystem._context) {
-                        audioCtx = window._dkInitSystems.audioSystem._context;
-                    }
-                    if (audioCtx && audioCtx.state === 'suspended') {
-                        try { audioCtx.resume().catch(function () { }); } catch (e) { }
                     }
                 });
 
@@ -1341,7 +1325,7 @@ void main() {
             var initSeq = new Donkeycraft.InitSequence(Donkeycraft.Config);
 
             // Wire loading screen progress updates to init phases
-            // Phase milestones: config=25%, texture-atlas=50%, audio=75%, indexeddb=100%
+            // Phase milestones: config=25%, texture-atlas=50%, indexeddb=100%
             initSeq.on('init:phase:start', function (data) {
                 loadingScreen.handlePhaseStart(data);
             });
@@ -1368,12 +1352,12 @@ void main() {
                 loadingScreen.showError(data.error.message || 'Unknown error');
             });
 
-            // Store init systems globally for audio context resume and debugging
+            // Store init systems globally for debugging
             window._dkInitSystems = null;
 
             // Start the async pipeline and handle completion
             initSeq.initialize().then(function (systems) {
-                // Store globally so the click handler can access the AudioContext
+                // Store globally for debugging
                 window._dkInitSystems = systems;
 
                 // Update progress to 100%

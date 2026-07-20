@@ -44,9 +44,6 @@ this._worldTime = new Donkeycraft.WorldTime(6000);
     // Texture atlas (generated from AssetManager textures)
     this._textureAtlas = null;
 
-    // Audio context (shared with init-sequence AudioSystem)
-    this._audioContext = null;
-
     // Hunger system for HUD rendering (set by setSystems())
     this._hungerSystem = null;
 
@@ -193,33 +190,6 @@ this._worldTime = new Donkeycraft.WorldTime(6000);
 
       // Create lighting system
       this._lighting = new Donkeycraft.Lighting();
-
-      // Web Audio Context is created during init-sequence.js pipeline.
-      // Access it via the global systems object if available, otherwise
-      // create a fallback context for AssetManager (sounds will still work).
-      try {
-        var AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (AudioContext) {
-          // Use existing context from init-sequence if available, otherwise create new one.
-          // The init-sequence creates an AudioSystem with its own context — we reuse it.
-          this._audioContext = null;
-          if (
-            window._dkInitSystems &&
-            window._dkInitSystems.audioSystem &&
-            window._dkInitSystems.audioSystem._context
-          ) {
-            this._audioContext = window._dkInitSystems.audioSystem._context;
-          } else {
-            this._audioContext = new AudioContext();
-          }
-          Donkeycraft.AssetManager.init(this._audioContext);
-        }
-      } catch (e) {
-        Donkeycraft.Logger.warn(
-          'Game',
-          'Web Audio API not available: ' + e.message
-        );
-      }
 
       // ============================================================
       // Create and upload the texture atlas from generated textures.

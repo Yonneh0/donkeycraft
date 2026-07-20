@@ -206,8 +206,6 @@
         case INTERACTIVE_BLOCK_IDS.DISPENSER:
         case INTERACTIVE_BLOCK_IDS.DROPPER:
           return 'dispenser';
-        case INTERACTIVE_BLOCK_IDS.NOTE_BLOCK:
-          return 'note_block';
         default:
           return null;
       }
@@ -250,8 +248,6 @@
           return openFurnace(chunkManager, player, ix, iy, iz);
         case 'dispenser':
           return activateDispenser(chunkManager, ix, iy, iz);
-        case 'note_block':
-          return playNoteBlock(chunkManager, ix, iy, iz);
         default:
           return false;
       }
@@ -296,7 +292,7 @@
         blockId: currentBlockId,
       };
 
-      // Emit event for UI/audio feedback
+      // Emit event for UI feedback
       _emit('blockToggled', {
         x: ix,
         y: iy,
@@ -476,24 +472,6 @@
     }
 
     /**
-     * Play a note block sound.
-     * @param {Donkeycraft.ChunkManager} chunkManager - The chunk manager.
-     * @param {number} x - Global X.
-     * @param {number} y - Global Y.
-     * @param {number} z - Global Z.
-     * @returns {boolean} True if played.
-     */
-    function playNoteBlock(chunkManager, x, y, z) {
-      var ix = Math.floor(x);
-      var iy = Math.floor(y);
-      var iz = Math.floor(z);
-      var blockId = Donkeycraft.WorldUtils.getBlockAt(chunkManager, ix, iy, iz);
-      if (blockId !== INTERACTIVE_BLOCK_IDS.NOTE_BLOCK) return false;
-      _emit('noteBlockPlayed', { x: ix, y: iy, z: iz });
-      return true;
-    }
-
-    /**
      * Get all interactive block IDs.
      * @returns {Object.<number>}
      */
@@ -566,7 +544,6 @@
       openChest: openChest,
       openFurnace: openFurnace,
       activateDispenser: activateDispenser,
-      playNoteBlock: playNoteBlock,
       cancelAllButtonTimers: cancelAllButtonTimers,
       getInteractiveBlockIds: getInteractiveBlockIds,
       setCurrentTick: setCurrentTick,

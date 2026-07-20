@@ -1,5 +1,5 @@
 // Donkeycraft — Initialization Sequence
-// Async initialization pipeline: config validation → texture-atlas → audio → indexeddb.
+// Async initialization pipeline: config validation → texture-atlas → indexeddb.
 // Each phase runs sequentially, emitting events for progress tracking by LoadingScreen.
 (function () {
   'use strict';
@@ -8,7 +8,7 @@
 
   /**
    * InitSequence — orchestrates async game initialization pipeline.
-   * Runs config validation, texture atlas setup, audio init, and IndexedDB opening
+   * Runs config validation, texture atlas setup, and IndexedDB opening
    * sequentially, emitting events at each phase boundary for LoadingScreen integration.
    * @param {Object} [config] - Donkeycraft.Config object. Defaults to window.Donkeycraft.Config if null.
    */
@@ -507,97 +507,24 @@
   };
 
   /**
-   * _initAudio — initialize the audio system with decoded buffers.
-   * Attempts to create AudioContext and pre-load procedural sounds.
-   * Handles browsers that require a user gesture by deferring context creation
-   * and attempting resume() on first interaction.
+   * _seedNoise — seed the PRNGs for terrain generation.
+   * Seeds both Donkeycraft._gen (for textures) and Donkeycraft.PerlinNoise (from math-utils.js).
    * @private
-   * @returns {Promise<Object>} Resolves with { audioSystem } when ready.
+   * @returns {boolean} True if seeding succeeded.
    */
-  Donkeycraft.InitSequence.prototype._initAudio = function () {
-    var self = this;
-    return new Promise(function (resolve) {
-      try {
-        // Seed the shared permutation table and PRNG for terrain generation.
-        // The noise module exposes _gen._seedRng() for this purpose.
-        // Also seed Donkeycraft.PerlinNoise (from math-utils.js) independently,
-        // since terrain-generator.js uses PerlinNoise.fbm/noise2D while textures
-        // use _gen._noise2D — they are intentionally independent noise systems.
-        if (Donkeycraft._gen && Donkeycraft._gen._seedRng) {
-          var seed = self._config ? self._config.SEED : 42;
-          Donkeycraft._gen._seedRng(seed);
-        }
-        // Seed PerlinNoise from math-utils.js with the same seed for terrain generation.
-        if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
-          Donkeycraft.PerlinNoise.init(seed);
-        }
-
-        if (
-          typeof window.AudioContext === 'undefined' &&
-          typeof window.webkitAudioContext === 'undefined'
-        ) {
-          Donkeycraft.Logger.warn(
-            'InitSequence',
-            'Web Audio API not available — audio disabled'
-          );
-          resolve({ perlinNoiseReady: true });
-          return;
-        }
-
-        // Create audio system — AudioContext may start suspended on some browsers.
-        var audioSys = new Donkeycraft.AudioSystem();
-        audioSys.init().then(function () {
-          // Check if destroy was called while waiting for init to complete
-          if (self._destroyed) {
-            audioSys.destroy().catch(function () {});
-            resolve({ perlinNoiseReady: true });
-            return;
-          }
-
-          // Attempt to resume if the context is in 'suspended' state.
-          // This is required on mobile browsers and some desktop browsers
-          // that defer audio context creation until a user gesture.
-          // CRITICAL FIX: Wait for resumeContext() to complete before resolving
-          // so that _audioReady is true when the promise resolves.
-          if (audioSys._context && audioSys._context.state === 'suspended') {
-            audioSys.resumeContext().then(function (resumed) {
-              Donkeycraft.Logger.info(
-                'InitSequence',
-                'AudioContext resumed: ' + (resumed ? 'yes' : 'no')
-              );
-              resolve({ audioSystem: audioSys, perlinNoiseReady: true });
-            }).catch(function () {
-              // Resume failed — context may still become ready after user interaction.
-              Donkeycraft.Logger.warn(
-                'InitSequence',
-                'AudioContext could not be auto-resumed: audio will start after first user interaction.'
-              );
-              resolve({ audioSystem: audioSys, perlinNoiseReady: true });
-            });
-          } else {
-            // Context is already running — resolve immediately.
-            Donkeycraft.Logger.info(
-              'InitSequence',
-              'AudioContext ready (state: ' + audioSys._context.state + ')'
-            );
-            resolve({ audioSystem: audioSys, perlinNoiseReady: true });
-          }
-        }).catch(function (err) {
-          Donkeycraft.Logger.warn(
-            'InitSequence',
-            'Audio init failed: ' + err.message
-          );
-          // Still resolve with noise ready so terrain can generate
-          resolve({ perlinNoiseReady: true });
-        });
-      } catch (e) {
-        Donkeycraft.Logger.warn(
-          'InitSequence',
-          'Audio exception: ' + e.message
-        );
-        resolve({}); // Graceful fallback
+  Donkeycraft.InitSequence.prototype._seedNoise = function () {
+    try {
+      var seed = this._config ? this._config.SEED : 42;
+      if (Donkeycraft._gen && Donkeycraft._gen._seedRng) {
+        Donkeycraft._gen._seedRng(seed);
       }
-    });
+      if (Donkeycraft.PerlinNoise && Donkeycraft.PerlinNoise.init) {
+        Donkeycraft.PerlinNoise.init(seed);
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
   };
 
   /**
@@ -774,7 +701,7 @@
 
   /**
    * initialize — run the full async initialization pipeline sequentially.
-   * Phases: config → indexeddb → texture-atlas → audio.
+   * Phases: config → indexeddb → texture-atlas.
    * IndexedDB must open BEFORE texture generation so cached textures can be loaded.
    * Emits 'init:phase:start', 'init:phase:end' per phase, and 'init:complete' on success.
    * If destroy() is called mid-pipeline, the promise rejects with an error.
@@ -791,6 +718,8 @@
           }
           self._setPhase('config');
           self._endPhase('config');
+          // Seed noise generators after config phase
+          self._seedNoise();
           return Promise.resolve();
         },
       },
@@ -816,16 +745,6 @@
           self._setPhase('texture-atlas');
           return self._initTextureAtlas().then(function (result) {
             self._endPhase('texture-atlas');
-            return result;
-          });
-        },
-      },
-      {
-        name: 'audio',
-        fn: function () {
-          self._setPhase('audio');
-          return self._initAudio().then(function (result) {
-            self._endPhase('audio');
             return result;
           });
         },
@@ -869,16 +788,6 @@
         if (texResult && texResult.atlas && texResult.atlas.canvas) {
           self._systems.textureAtlasCanvas = texResult.atlas.canvas;
         }
-        // Merge audio phase results (audioSystem, perlinNoiseReady)
-        var audioResult = self._getPhaseResult('audio');
-        if (audioResult) {
-          if (audioResult.audioSystem) {
-            self._systems.audioSystem = audioResult.audioSystem;
-          }
-          if (audioResult.perlinNoiseReady) {
-            self._systems.perlinNoiseReady = true;
-          }
-        }
         // Merge indexedDB phase results (worldStore, assetCache, storage) if available
         var idbResult = self._getPhaseResult('indexeddb');
         if (idbResult) {
@@ -909,7 +818,7 @@
 
   /**
    * getPhase — return the current or last completed initialization phase name.
-   * @returns {string} Phase name (e.g., 'config', 'texture-atlas', 'audio', 'indexeddb', 'none').
+   * @returns {string} Phase name (e.g., 'config', 'texture-atlas', 'indexeddb', 'none').
    */
   Donkeycraft.InitSequence.prototype.getPhase = function () {
     return this._currentPhase;

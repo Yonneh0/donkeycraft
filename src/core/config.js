@@ -115,7 +115,7 @@
       // Level data auto-save interval in milliseconds
       LEVEL_DATA_AUTO_SAVE_INTERVAL: 60000, // Auto-save level data (spawn, time, player state) every 60 seconds
 
-      // Asset cache settings — IndexedDB-based texture/sound persistence
+      // Asset cache settings — IndexedDB-based texture persistence
       ASSET_CACHE_VERSION: 1, // Cache version number; increment to force full cache invalidation
       ASSET_CACHE_MAX_AGE_MS: 86400000, // Maximum age for cached assets before expiration (24 hours in ms)
 

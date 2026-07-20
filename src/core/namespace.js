@@ -21,7 +21,6 @@
    * 6. `math-utils.js` — Donkeycraft.Vector3, Donkeycraft.Matrix4, Donkeycraft.Quaternion,
    *    Donkeycraft.PerlinNoise, Donkeycraft.lerp, Donkeycraft.clamp, Donkeycraft.map,
    *    Donkeycraft.round, Donkeycraft.inRange
-   * 7. `audio.js` — Donkeycraft.AudioSystem
    *
    * ## Properties
    * @property {string} VERSION - Semantic version string (e.g., '0.1.0').

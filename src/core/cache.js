@@ -1,5 +1,5 @@
 // Donkeycraft — Asset Cache
-// IndexedDB-based persistent cache for procedurally generated assets (textures, sounds).
+// IndexedDB-based persistent cache for procedurally generated assets (textures).
 // Uses checksum-based invalidation: if generation parameters change, cache is invalidated.
 (function () {
   'use strict';
@@ -15,7 +15,7 @@
 
   /**
    * AssetCache — IndexedDB-based persistent cache for procedurally generated assets.
-   * Stores texture atlas canvases as blob URLs and sounds as base64 data URIs.
+   * Stores texture atlas canvases and individual block textures.
    * @param {string} [dbName=donkeycraft-assets] — IndexedDB database name.
    */
   Donkeycraft.AssetCache = function (dbName) {
@@ -313,103 +313,8 @@
   };
 
   /**
-   * Get a cached sound from IndexedDB.
-   * @param {string} soundName — Sound name/identifier.
-   * @returns {Promise<string|null>} Resolves with base64 data URI or null if not cached.
-   */
-  Donkeycraft.AssetCache.prototype.getSound = function (soundName) {
-    var self = this;
-    if (!this.isReady()) {
-      return Promise.resolve(null);
-    }
-
-    return new Promise(function (resolve) {
-      try {
-        var transaction = self._db.transaction(
-          [Donkeycraft.ASSET_CACHE_STORE_NAME],
-          'readonly'
-        );
-        var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
-        var request = store.get('sound:' + soundName);
-
-        request.onsuccess = function () {
-          if (request.result && request.result.data) {
-            resolve(request.result.data);
-          } else {
-            resolve(null);
-          }
-        };
-
-        request.onerror = function () {
-          resolve(null);
-        };
-      } catch (e) {
-        resolve(null);
-      }
-    });
-  };
-
-  /**
-   * Cache a sound as base64 data URI to IndexedDB.
-   * @param {string} soundName — Sound name/identifier.
-   * @param {string} base64Data — Base64-encoded audio data URI (e.g., 'data:audio/wav;base64,...').
-   * @returns {Promise<boolean>} Resolves true on success.
-   */
-  Donkeycraft.AssetCache.prototype.setSound = function (soundName, base64Data) {
-    var self = this;
-    if (!this.isReady() || !soundName || typeof base64Data !== 'string') {
-      return Promise.resolve(false);
-    }
-
-    return new Promise(function (resolve) {
-      try {
-        var transaction = self._db.transaction(
-          [Donkeycraft.ASSET_CACHE_STORE_NAME],
-          'readwrite'
-        );
-        var store = transaction.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
-        var data = {
-          key: 'sound:' + soundName,
-          type: 'sound',
-          data: base64Data,
-          cachedAt: Date.now(),
-        };
-
-        var request = store.put(data);
-
-        request.onsuccess = function () {
-          resolve(true);
-        };
-
-        request.onerror = function () {
-          if (request.error && request.error.name === 'QuotaExceededError') {
-            self.clearExpired().then(function () {
-              var txn2 = self._db.transaction(
-                [Donkeycraft.ASSET_CACHE_STORE_NAME],
-                'readwrite'
-              );
-              var store2 = txn2.objectStore(Donkeycraft.ASSET_CACHE_STORE_NAME);
-              var req2 = store2.put(data);
-              req2.onsuccess = function () {
-                resolve(true);
-              };
-              req2.onerror = function () {
-                resolve(false);
-              };
-            });
-          } else {
-            resolve(false);
-          }
-        };
-      } catch (e) {
-        resolve(false);
-      }
-    });
-  };
-
-  /**
    * has — check if a specific asset is cached.
-   * @param {string} key — Cache key (e.g., 'texture-atlas:default', 'sound:step1').
+   * @param {string} key — Cache key (e.g., 'texture-atlas:default', 'texture:1').
    * @returns {Promise<boolean>} True if the key exists in cache.
    */
   Donkeycraft.AssetCache.prototype.has = function (key) {
@@ -605,8 +510,8 @@
               size = cursor.value.imageData.data
                 ? cursor.value.imageData.data.length
                 : 0;
-            } else if (cursor.value.data) {
-              size = cursor.value.data.length;
+            } else if (cursor.value.base64) {
+              size = cursor.value.base64.length;
             }
 
             entries.push({

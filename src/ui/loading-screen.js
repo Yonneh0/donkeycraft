@@ -30,12 +30,11 @@
   /**
    * Phase metadata for display names and ordering.
    */
-  var PHASE_ORDER = ['config', 'indexeddb', 'texture-atlas', 'audio'];
+  var PHASE_ORDER = ['config', 'indexeddb', 'texture-atlas'];
   var PHASE_LABELS = {
     config: 'Validating configuration',
     indexeddb: 'Initializing storage',
     'texture-atlas': 'Generating textures',
-    audio: 'Setting up audio system',
   };
 
   /**

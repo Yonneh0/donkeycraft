@@ -27,14 +27,14 @@ The game supports Survival mode (with health, hunger, XP, and crafting), Creativ
 ### Storage
 - **WorldStore** (`src/core/world-store.js`) — IndexedDB world persistence with automatic chunk save batching, schema versioning, and quota exceeded recovery
 - **Storage** (`src/core/storage.js`) — Hybrid IndexedDB + in-memory LRU cache for terrain chunks; batched writes, automatic eviction, and deferred flush
-- **AssetCache** (`src/core/cache.js`) — IndexedDB-based persistent cache for texture atlases and sounds with checksum-based invalidation and ImageData serialization
+- **AssetCache** (`src/core/cache.js`) — IndexedDB-based persistent cache for texture atlases with checksum-based invalidation and ImageData serialization
 - **LevelData** (`src/core/level-data.js`) — World-level state management (spawn, mode, time, seed, player data) with periodic auto-save to WorldStore
 
 ### Rendering
 - **Custom WebGL 1.0 pipeline** — No Three.js, no external libraries
 - **Chunk-based rendering** — 16×256×16 chunks with frustum culling
 - **Mesh optimization** — Face culling removes hidden faces between solid blocks
-- **Procedural assets** — 285+ block textures and 13 sound categories generated via Simplex noise and Web Audio API
+- **Procedural assets** — 285+ block textures generated via Simplex noise
 - **Lighting** — Directional sunlight, ambient light, block light propagation with BFS flood fill
 - **Distance fog** — Biome-aware fog density and sky color
 - **Sky rendering** — Day/night gradient with sun, moon, stars, and cloud layer
@@ -198,8 +198,7 @@ src/                # Source code
   core.css           # Base styles: full-screen canvas, overlay positioning
   game.js            # Main game class: loop, init, pause/resume
   core/
-    audio.js              # Web Audio API wrapper
-    cache.js              # Asset cache (texture atlases, sounds)
+    cache.js              # Asset cache (texture atlases)
     config.js             # Game configuration constants
     eventbus.js           # Pub/sub event system
     init-sequence.js      # Async initialization pipeline
@@ -270,7 +269,6 @@ src/                # Source code
     nether-generator.js   # Nether terrain: bedrock, lava, basalt columns
     noise.js              # Permutation table, fade, lerp, grad, 2D Perlin, FBM, Mulberry32
     ore-generator.js      # Ore vein placement per biome/Y-level
-    sound-manager.js      # SoundGenerator, AssetManager, AssetGenerator
     structure-generator.js# Surface structures
     terrain-generator.js  # Heightmap generation with Perlin noise layers
     texture-blocks.js     # Block textures: ores, metals, concrete/wool families
