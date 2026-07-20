@@ -20,7 +20,7 @@
     this._gameMode = options.gameMode || 'survival';
 
     // WorldTime instance for time-of-day calculations (including freeze support)
-    this._worldTime = new Donkeycraft.WorldTime(0);
+this._worldTime = new Donkeycraft.WorldTime(6000);
 
     // Core WebGL systems
     this._canvas = null;
@@ -141,6 +141,9 @@
 
     // Keybindings panel (top-center display)
     this._keybindingsPanel = null;
+
+    // Cached atlas canvas from init-sequence (set via setCachedAtlasCanvas)
+    this._cachedAtlasCanvas = null;
   };
 
   /**
@@ -503,6 +506,11 @@
           'Terrain module initialization had errors: ' +
             (e && e.message ? e.message : String(e))
         );
+      }
+
+      // Emit sub-phase event after terrain modules initialized
+      if (this._eventBus) {
+        try { this._eventBus.emit('init:subphase', { phase: 'game-init', subPhase: 'terrain-modules', message: 'Terrain modules ready — generating chunks...', progress: 15 }); } catch (e) {}
       }
 
       // ============================================================
@@ -1656,8 +1664,24 @@
   // ============================================================
 
   /**
+   * setCachedAtlasCanvas — store an atlas canvas generated during init-sequence
+   * so _buildTextureAtlasAsync() can skip texture regeneration and upload directly.
+   * @param {HTMLCanvasElement} canvas - The atlas canvas from init-sequence.
+   */
+  Donkeycraft.Game.prototype.setCachedAtlasCanvas = function (canvas) {
+    if (canvas && canvas.getContext) {
+      this._cachedAtlasCanvas = canvas;
+      Donkeycraft.Logger.info(
+        'Game',
+        'Cached atlas canvas received — will skip texture generation'
+      );
+    }
+  };
+
+  /**
    * _buildTextureAtlasAsync — asynchronously build the texture atlas using requestIdleCallback.
-   * Checks AssetCache first for a cached atlas before generating textures from scratch.
+   * If a cached atlas canvas was provided from init-sequence, uploads it directly to WebGL
+   * and skips texture generation entirely. Otherwise checks AssetCache first before generating.
    * Chunks texture registration and canvas upload into batches to avoid blocking the main thread.
    * @private
    */
@@ -1673,7 +1697,38 @@
     var gameInstance = this;
     var worldName = 'default';
 
-    // Try loading cached texture atlas from AssetCache first
+    // Priority 1: Use atlas canvas from init-sequence (avoids double generation)
+    if (this._cachedAtlasCanvas) {
+      Donkeycraft.Logger.info(
+        'Game',
+        'Using atlas canvas from init-sequence — skipping texture generation'
+      );
+      var atlas = new Donkeycraft.TextureAtlas(this._gl);
+      if (atlas.loadFromCanvas(this._cachedAtlasCanvas)) {
+        this._textureAtlas = atlas;
+        Donkeycraft.Logger.info(
+          'Game',
+          'Init-sequence atlas loaded successfully (' +
+            this._cachedAtlasCanvas.width +
+            'x' +
+            this._cachedAtlasCanvas.height +
+            ')'
+        );
+        // Wire atlas onto terrain renderer
+        if (this._terrainRenderer && this._terrainRenderer.setTextureAtlas) {
+          this._terrainRenderer.setTextureAtlas(atlas);
+        }
+      } else {
+        Donkeycraft.Logger.warn(
+          'Game',
+          'Init-sequence atlas upload failed — falling back to cache/generation'
+        );
+        // Fall through to AssetCache check
+      }
+      return; // Successfully used init-sequence atlas, no need for AssetCache or generation
+    }
+
+    // Priority 2: Try loading cached texture atlas from AssetCache first
     if (
       Donkeycraft.AssetCache &&
       typeof Donkeycraft.AssetCache.prototype.getTextureAtlas === 'function'
@@ -2380,6 +2435,20 @@
     // Without this call, updateChunks() is never invoked on the first frame because
     // _updateChunks() returns early when _lastPlayerChunkX/Z hasn't changed.
     this._terrainRenderer.updateChunks(chunkX, chunkZ);
+  };
+
+  /**
+   * _emitInitSubPhase — emit an init:subphase event safely via the event bus.
+   * Used to provide real-time progress feedback during game.js heavy initialization.
+   * @private
+   * @param {string} subPhase - Sub-phase identifier.
+   * @param {string} message - Display message for loading screen.
+   * @param {number} progress - Progress percentage (0-100).
+   */
+  Donkeycraft.Game.prototype._emitInitSubPhase = function (subPhase, message, progress) {
+    if (this._eventBus) {
+      try { this._eventBus.emit('init:subphase', { phase: 'game-init', subPhase: subPhase, message: message, progress: progress }); } catch (e) {}
+    }
   };
 
   /**

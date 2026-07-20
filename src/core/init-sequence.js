@@ -860,10 +860,14 @@
           config: self._config,
           eventBus: self._eventBus,
         };
-        // Merge texture-atlas phase results (generated textures)
+        // Merge texture-atlas phase results (generated textures + atlas canvas)
         var texResult = self._getPhaseResult('texture-atlas');
         if (texResult && texResult.textures) {
           self._systems.generatedTextures = texResult.textures;
+        }
+        // Store the WebGL atlas canvas for game.js to reuse (avoids double generation)
+        if (texResult && texResult.atlas && texResult.atlas.canvas) {
+          self._systems.textureAtlasCanvas = texResult.atlas.canvas;
         }
         // Merge audio phase results (audioSystem, perlinNoiseReady)
         var audioResult = self._getPhaseResult('audio');

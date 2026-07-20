@@ -1068,6 +1068,27 @@ void main() {
                     gameMode: gameSystems.gameMode || 'survival'
                 });
 
+                // Pass atlas canvas from init-sequence to avoid double generation
+                if (initSystems && initSystems.textureAtlasCanvas) {
+                  game.setCachedAtlasCanvas(initSystems.textureAtlasCanvas);
+                }
+
+                // Wire loading screen to receive init:subphase events from game.js EventBus
+                // This provides real-time progress feedback during heavy game.init() operations
+                var gameInitSubPhaseHandler = function(data) {
+                  loadingScreen.handleSubPhase(data);
+                };
+                // Subscribe BEFORE init() so events emitted during chunk generation are captured
+                if (game.getEventBus) {
+                  // EventBus is created inside init(), so we need a small delay
+                  setTimeout(function() {
+                    var gb = game.getEventBus();
+                    if (gb && typeof gb.on === 'function') {
+                      gb.on('init:subphase', gameInitSubPhaseHandler);
+                    }
+                  }, 0);
+                }
+
                 // Initialize all subsystems (WebGL, shaders, player, chunks, etc.)
                 var initOk = game.init();
                 if (!initOk) {
