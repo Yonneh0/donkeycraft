@@ -212,6 +212,18 @@ this._worldTime = new Donkeycraft.WorldTime(6000);
         }, 0);
       }
 
+      // Listen for tab visibility changes — when the page is restored,
+      // re-attempt texture atlas building in case WebGL context was suspended
+      // or requestIdleCallback was throttled while hidden.
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && gameInstance._running && !gameInstance._textureAtlas) {
+          // Tab became visible and textures still not built — retry
+          setTimeout(function () {
+            gameInstance._buildTextureAtlasAsync();
+          }, 50);
+        }
+      });
+
       // Create terrain renderer (pass lighting for dynamic time-of-day)
       this._terrainRenderer = new Donkeycraft.TerrainRenderer(
         this._gl,
@@ -1989,6 +2001,11 @@ this._worldTime = new Donkeycraft.WorldTime(6000);
    */
   Donkeycraft.Game.prototype._tick = function (dt, tickCount) {
     if (!this._running || this._paused) return;
+
+    // Advance world time by one tick each game tick (skip when frozen)
+    if (this._worldTime && !this._worldTime.isTimeFrozen()) {
+      this._worldTime.tick();
+    }
 
     // Safety clamp: prevent spiral-of-death on frame drops (cap dt at 100ms).
     dt = Math.min(dt, 0.1);

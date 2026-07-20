@@ -193,8 +193,8 @@
         );
 
         if (
-          Donkeycraft.AssetGenerator &&
-          typeof Donkeycraft.AssetGenerator.generateAllTexturesAsync === 'function'
+          Donkeycraft.TextureGenerator &&
+          typeof Donkeycraft.TextureGenerator.generateAllTexturesAsync === 'function'
         ) {
           // Step 1: Try to load cached textures from IndexedDB first
           var assetCache = null;
@@ -267,7 +267,7 @@
 
                 // Step 2: Generate textures — the async function will use the cache
                 // Pass the cached map to skip already-cached textures
-                Donkeycraft.AssetGenerator.generateAllTexturesAsync(
+                Donkeycraft.TextureGenerator.generateAllTexturesAsync(
                   function (pct, msg) {
                     self._emitSubPhase('texture-atlas', 'block-textures', msg || 'Generating block textures...', pct);
                   },
@@ -409,7 +409,7 @@
 
           // Helper: generate textures and build atlas (used when no cache or cache failed)
           function _generateAndBuildAtlas(cachedMap) {
-            Donkeycraft.AssetGenerator.generateAllTexturesAsync(
+            Donkeycraft.TextureGenerator.generateAllTexturesAsync(
               function (pct, msg) {
                 self._emitSubPhase('texture-atlas', 'block-textures', msg || 'Generating block textures...', pct);
               },
@@ -492,7 +492,7 @@
         } else {
           Donkeycraft.Logger.warn(
             'InitSequence',
-            'AssetGenerator not available — skipping texture generation'
+            'TextureGenerator not available — skipping texture generation'
           );
           resolve({ textures: {}, atlas: null });
         }

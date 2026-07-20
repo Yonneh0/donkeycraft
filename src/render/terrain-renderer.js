@@ -749,8 +749,22 @@
         var cx = chunkMesh._chunkX;
         var cz = chunkMesh._chunkZ;
 
-        // Expand AABB by padding to prevent incorrect culling when camera is pitched
-        var pad = this._frustumAabbPadding;
+        // Distance-based AABB padding to prevent incorrect culling when camera is pitched.
+        // When looking straight down, the frustum bottom plane angles sharply — distant
+        // chunks can fall entirely "below" this plane with a fixed small padding.
+        // Padding scales linearly: 1 block per 2 blocks of horizontal distance (min 2).
+        var camPos = this._camera ? this._camera.getPosition() : null;
+        var pad = 2; // minimum padding for nearby chunks
+        if (camPos) {
+          var chunkCenterX = (cx + 0.5) * cs;
+          var chunkCenterZ = (cz + 0.5) * cs;
+          var dx = chunkCenterX - camPos.x;
+          var dz = chunkCenterZ - camPos.z;
+          var distSq = dx * dx + dz * dz;
+          var dist = Math.sqrt(distSq);
+          pad = Math.max(2, Math.floor(dist / 2));
+        }
+
         if (
           !this._isBoxInFrustum(
             cx * cs - pad,
