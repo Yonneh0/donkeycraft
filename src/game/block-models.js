@@ -137,21 +137,21 @@
    * Must match ATLAS_GRID from texture-atlas.js.
    * @constant {number}
    */
-  var ATLAS_COLS = 16;
+  var ATLAS_COLS = 32;
 
   /**
    * Number of texture tiles per column in the atlas grid.
    * Must match ATLAS_ROWS (ATLAS_GRID) from texture-atlas.js.
    * @constant {number}
    */
-  var ATLAS_ROWS = 16;
+  var ATLAS_ROWS = 32;
 
   /**
    * Maximum block ID that fits in the atlas.
    * Block IDs >= MAX_BLOCK_ID fall back to placeholder texture (ID 0).
    * @constant {number}
    */
-  var MAX_BLOCK_ID = ATLAS_COLS * ATLAS_ROWS; // 256
+  var MAX_BLOCK_ID = ATLAS_COLS * ATLAS_ROWS; // 1024
 
   // ============================================================
   // BlockModel — represents a single baked block model
@@ -473,7 +473,7 @@
         : null;
       var lookupId = textureBlock ? textureBlock.id : blockId;
 
-      // Clamp to atlas bounds — IDs >= 256 overflow the atlas
+      // Clamp to atlas bounds — IDs >= 1024 overflow the atlas
       if (lookupId < 0 || lookupId >= MAX_BLOCK_ID) {
         lookupId = 0;
       }

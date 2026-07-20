@@ -2,8 +2,8 @@
 // Atlas generation: compiles all block textures into a single WebGL texture with proper UV coordinate mapping.
 //
 // Texture Atlas Layout:
-// - 16×16 grid of 16×16 pixel textures = 256×256 total atlas size
-// - Block ID maps to grid position: col = id % 16, row = floor(id / 16)
+// - 32×32 grid of 16×16 pixel textures = 512×512 total atlas size
+// - Block ID maps to grid position: col = id % 32, row = floor(id / 32)
 // - texSubImage2D places the first image row at V=0 (bottom of texture region), so UVs map directly
 // - Nearest-neighbor filtering is used for pixelated rendering
 //
@@ -27,20 +27,20 @@
    * Number of texture tiles per row/column in the atlas grid.
    * @constant {number}
    */
-  var ATLAS_GRID = 16;
+  var ATLAS_GRID = 32;
 
   /**
    * Total atlas size in pixels (TEX_SIZE × ATLAS_GRID).
    * @constant {number}
    */
-  var ATLAS_SIZE = TEX_SIZE * ATLAS_GRID; // 256
+  var ATLAS_SIZE = TEX_SIZE * ATLAS_GRID; // 512
 
   /**
    * Maximum block ID that fits in the atlas (ATLAS_GRID² - 1).
    * Block IDs >= MAX_BLOCK_ID will fall back to placeholder texture.
    * @constant {number}
    */
-  var MAX_BLOCK_ID = ATLAS_GRID * ATLAS_GRID; // 256
+  var MAX_BLOCK_ID = ATLAS_GRID * ATLAS_GRID; // 1024
 
   // ============================================================
   // TextureAtlas — stitches block textures into a single WebGL texture
@@ -133,14 +133,7 @@
     if (canvas.width !== ATLAS_SIZE || canvas.height !== ATLAS_SIZE) {
       Donkeycraft.Logger.warn(
         'TextureAtlas',
-        'Canvas size mismatch: expected ' +
-          ATLAS_SIZE +
-          'x' +
-          ATLAS_SIZE +
-          ', got ' +
-          canvas.width +
-          'x' +
-          canvas.height
+        'Canvas size mismatch: expected ' + ATLAS_SIZE + 'x' + ATLAS_SIZE + ', got ' + canvas.width + 'x' + canvas.height
       );
       return false;
     }
@@ -177,16 +170,13 @@
 
       var col = id % ATLAS_GRID;
       var row = Math.floor(id / ATLAS_GRID);
-      var u = col * TEX_SIZE;
-      var v = row * TEX_SIZE;
-
       this._uvMap[id] = {
-        u: u / ATLAS_SIZE,
-        v: v / ATLAS_SIZE,
+        u: (col * TEX_SIZE) / ATLAS_SIZE,
+        v: (row * TEX_SIZE) / ATLAS_SIZE,
         uSize: TEX_SIZE / ATLAS_SIZE,
         vSize: TEX_SIZE / ATLAS_SIZE,
-        pixelU: u,
-        pixelV: v,
+        pixelU: col * TEX_SIZE,
+        pixelV: row * TEX_SIZE,
         pixelUSize: TEX_SIZE,
         pixelVSize: TEX_SIZE,
       };
@@ -298,15 +288,11 @@
   /**
    * Generate the atlas texture from registered images.
    *
-   * Creates a 256×256 WebGL texture and uploads each 16×16 block image to its
+   * Creates a 512×512 WebGL texture and uploads each 16×16 block image to its
    * correct grid position. UV coordinates are computed and stored for later lookup.
    *
    * Unregistered block IDs will show as blue placeholder pixels in the atlas.
-   * Block IDs >= 256 are skipped (don't fit in the 16×16 grid).
-   *
-   * UV coordinate formula:
-   *   col = id % 16, row = floor(id / 16)
-   *   u = col / 256, v = row * 16 / 256
+   * Block IDs >= 1024 are skipped (don't fit in the 32×32 grid).
    *
    * @returns {boolean} True if atlas generation succeeded.
    */
@@ -330,7 +316,7 @@
     gl.bindTexture(gl.TEXTURE_2D, this._texture);
 
     /**
-     * Create a blue placeholder array (256×256 atlas, RGBA format).
+     * Create a blue placeholder array (512×512 atlas, RGBA format).
      * Each pixel: [0, 0, 255, 255] — fully opaque blue.
      * @type {Uint8Array}
      */
@@ -369,12 +355,22 @@
       : [];
     var blockCount = blocks.length;
 
+    var _warnedIds = {};
     for (var b = 0; b < blockCount; b++) {
       var block = blocks[b];
       var id = block.id;
 
       // Skip block IDs that don't fit in the atlas grid
-      if (id >= MAX_BLOCK_ID) continue;
+      if (id >= MAX_BLOCK_ID) {
+        if (!_warnedIds[id]) {
+          Donkeycraft.Logger.warn(
+            'TextureAtlas',
+            'Block ID ' + id + ' (' + block.name + ') exceeds atlas capacity (' + MAX_BLOCK_ID + ') — skipping'
+          );
+          _warnedIds[id] = true;
+        }
+        continue;
+      }
 
       // Calculate atlas grid position: column and row
       var col = id % ATLAS_GRID;
@@ -553,35 +549,17 @@
 
   /**
    * Get UV coordinates for a block ID using the standard atlas grid layout.
+   * Returns null for out-of-range IDs (no fallback clamping to avoid silent texture misalignment).
    *
-   * This is a static utility that computes UVs based on the formula:
-   *   col = blockId % 16, row = floor(blockId / 16)
-   *
-   * texSubImage2D places pixel data with the first image row at V=0 (bottom of texture),
-   * so V coordinates map directly without flipping.
-   *
-   * Block IDs >= 256 fall back to the last atlas row (ID 255).
-   *
-   * @param {number} blockId - Block ID (must be a non-negative integer, typically 0-255).
+   * @param {number} blockId - Block ID (must be 0-1023).
    * @returns {{u0: number, v0: number, u1: number, v1: number}|null}
-   *   UV coordinates normalized to [0, 1]: {u0, v0} = bottom-left corner, {u1, v1} = top-right corner.
-   *   Returns null if blockId is not a non-negative integer.
    */
   Donkeycraft.TextureAtlas.getBlockUV = function (blockId) {
-    // Validate blockId is a non-negative integer
-    if (!Number.isInteger(blockId) || blockId < 0) {
+    if (!Number.isInteger(blockId) || blockId < 0 || blockId >= MAX_BLOCK_ID) {
       return null;
     }
-
-    // Atlas grid layout: column = blockId % 16, row = floor(blockId / 16)
     var tileU = blockId % ATLAS_GRID;
     var tileV = Math.floor(blockId / ATLAS_GRID);
-
-    // Clamp tileV to atlas bounds for block IDs >= 256
-    if (tileV >= ATLAS_GRID) tileV = ATLAS_GRID - 1;
-
-    // Compute UV corners. V maps directly since texSubImage2D places row 0 at V=0.
-    // u0, v0 = bottom-left corner; u1, v1 = top-right corner
     return {
       u0: tileU / ATLAS_GRID,
       v0: tileV / ATLAS_GRID,
@@ -629,7 +607,6 @@
      * Generate a procedural placeholder atlas for testing (no image files needed).
      *
      * Each block gets a unique color based on its ID using golden-angle HSL distribution.
-     * The canvas is uploaded directly to the WebGL texture without Image intermediate.
      *
      * @param {WebGLRenderingContext} gl - WebGL context.
      * @returns {Donkeycraft.TextureAtlas}

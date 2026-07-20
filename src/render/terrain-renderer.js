@@ -14,7 +14,7 @@
    * @param {WebGLRenderingContext} gl - WebGL context.
    * @param {Donkeycraft.ShaderManager} shaderManager - Shader manager instance.
    * @param {Donkeycraft.Fog} fog - Fog system for distance fog.
-   * @param {Lighting} [lighting] - Optional lighting system for dynamic time-of-day lighting.
+   * @param {Lighting} [lighting] - Optional lighting system.
    */
   Donkeycraft.TerrainRenderer = function (gl, shaderManager, fog, lighting) {
     this._gl = gl;
@@ -22,7 +22,6 @@
     this._fog = fog;
     this._lighting = lighting || null;
 
-    // Identity model matrix (static — chunks use identity transform)
     this._identityMatrix = Donkeycraft.Matrix4.createIdentity();
 
     // Chunk mesh storage: map "chunkX,chunkZ" → ChunkMesh
@@ -32,30 +31,27 @@
     // Dirty chunks needing rebuild
     this._dirtyChunks = {};
 
-    // Pending meshes: chunks whose geometry couldn't be built yet (e.g., block data not ready)
-    // map "chunkX,chunkZ" → { x: number, z: number, retries: number }
+    // Pending meshes: chunks deferred due to empty geometry
     this._pendingMeshes = {};
 
-    /** Maximum retry attempts for pending mesh builds before giving up. */
+    /** Max retry attempts for pending mesh builds. */
     this._maxPendingRetries = 30;
 
-    /** Maximum chunks to rebuild per frame (spreads builds across frames). */
+    /** Max chunks to rebuild per frame. */
     this._maxChunksPerFrame = 2;
 
-    /** Counter for chunks processed in the current frame. */
+    /** Chunks processed in the current frame. */
     this._chunksProcessedThisFrame = 0;
 
-    /** Placeholder texture — created lazily on first need. */
+    /** Placeholder texture for missing atlas data. */
     this._placeholderTexture = null;
 
-    // Geometry builder and mesh optimizer
     this._geometryBuilder = new Donkeycraft.GeometryBuilder();
     this._meshOptimizer = new Donkeycraft.MeshOptimizer();
 
     /** Whether to skip water blocks during terrain mesh building. */
     this._skipWaterBlocks = false;
 
-    // Reusable temp buffer for matrix multiplication
     this._tempMatrixData = new Float32Array(16);
 
     // World data access — set by game loop
@@ -64,65 +60,45 @@
     // Render state
     this._renderDistance = RENDER_DISTANCE;
 
-    // Frustum planes (extracted from view-projection matrix when matrices change)
+    // Frustum planes
     this._frustumPlanes = null;
     this._lastFrustumKey = null;
 
-    // Cached matrix data for frustum extraction
+    // Cached matrix data
     this._cachedProjData = null;
     this._cachedViewData = null;
 
-    // AABB padding for frustum culling (prevents incorrect culling when camera is pitched)
+    // AABB padding for frustum culling
     this._frustumAabbPadding = 2;
 
-    // Camera reference for back-face culling optimization
+    // Camera reference
     this._camera = null;
 
-    /**
-     * Whether to enable CPU-side back-face culling during mesh build.
-     * When true, the mesh optimizer removes triangles facing away from the camera,
-     * reducing draw call overhead for enclosed areas and complex terrain.
-     * @type {boolean}
-     */
+    /** Enable CPU-side back-face culling during mesh build. */
     this._enableBackFaceCulling = false;
   };
 
-  /**
-   * Set the world block getter function used to query block IDs at world coordinates.
-   * @param {Function} getBlockFunc - Function(worldX, worldY, worldZ) returning block ID.
-   */
+  /** Set the world block getter function. */
   Donkeycraft.TerrainRenderer.prototype.setWorldData = function (getBlockFunc) {
     this._getBlockFunc = getBlockFunc;
   };
 
-  /**
-   * Set the camera reference for back-face culling optimization.
-   * @param {Donkeycraft.Camera} camera - Camera instance, or null to disable.
-   */
+  /** Set the camera reference. */
   Donkeycraft.TerrainRenderer.prototype.setCamera = function (camera) {
     this._camera = camera || null;
   };
 
-  /**
-   * Set the lighting system for dynamic time-of-day lighting.
-   * @param {Donkeycraft.Lighting|null} lighting - Lighting system instance, or null.
-   */
+  /** Set the lighting system. */
   Donkeycraft.TerrainRenderer.prototype.setLighting = function (lighting) {
     this._lighting = lighting || null;
   };
 
-  /**
-   * Set the texture atlas to use for terrain rendering.
-   * @param {Donkeycraft.TextureAtlas} atlas - Texture atlas instance.
-   */
+  /** Set the texture atlas. */
   Donkeycraft.TerrainRenderer.prototype.setTextureAtlas = function (atlas) {
     this._textureAtlas = atlas;
   };
 
-  /**
-   * Enable or disable skipping water blocks during terrain mesh building.
-   * @param {boolean} enabled - Whether to skip water blocks.
-   */
+  /** Enable/disable skipping water blocks. */
   Donkeycraft.TerrainRenderer.prototype.setSkipWaterBlocks = function (
     enabled
   ) {

@@ -26,14 +26,14 @@
    * Must match ATLAS_GRID from texture-atlas.js and ATLAS_COLS/ROWS from block-models.js.
    * @constant {number}
    */
-  var ATLAS_GRID = 16;
+  var ATLAS_GRID = 32;
 
   /**
    * Maximum block ID that fits in the atlas.
    * Block IDs >= MAX_BLOCK_ID fall back to placeholder texture (ID 0).
    * @constant {number}
    */
-  var MAX_BLOCK_ID = ATLAS_GRID * ATLAS_GRID; // 256
+  var MAX_BLOCK_ID = ATLAS_GRID * ATLAS_GRID; // 1024
 
   // ============================================================
   // Face definitions for visible block faces
@@ -626,7 +626,7 @@
    *   `u = u0 + cornerU * (u1 - u0)`
    *   `v = v0 + cornerV * (v1 - v0)`
    *
-   * Block IDs >= 256 fall back to the placeholder texture (ID 0) in tiers 1 and 2.
+   * Block IDs >= 1024 fall back to the placeholder texture (ID 0) in tiers 1 and 2.
    * Tier 3 clamps tileV to atlas bounds for overflow block IDs.
    *
    * @private
@@ -685,7 +685,6 @@
     }
 
     // ---- Tier 2: TextureAtlas static method for simple block UV lookup ----
-    // Used by blocks with a single texture per face (most standard blocks).
     if (
       Donkeycraft.TextureAtlas &&
       typeof Donkeycraft.TextureAtlas.getBlockUV === 'function'
@@ -702,14 +701,17 @@
     }
 
     // ---- Tier 3: Tile-based UV calculation (ultimate fallback) ----
-    // Assumes a 16-tile-wide atlas where blockId maps to tile position:
-    //   col = blockId % 16, row = floor(blockId / 16)
-    // texSubImage2D places row 0 at V=0, so no V-flip needed.
     var tileU = blockId % ATLAS_GRID;
     var tileV = Math.floor(blockId / ATLAS_GRID);
 
-    // Clamp tileV to atlas bounds for block IDs >= 256 (overflow the 16×16 grid).
-    if (tileV >= ATLAS_GRID) tileV = ATLAS_GRID - 1;
+    // Out-of-range ID — return placeholder UV instead of clamping silently.
+    if (tileV >= ATLAS_GRID || tileV < 0) {
+      Donkeycraft.Logger.warn(
+        'GeometryBuilder',
+        '_getBlockUV: blockId ' + blockId + ' exceeds atlas bounds — returning placeholder UV'
+      );
+      return { u0: 0, v0: 0, u1: 1 / ATLAS_GRID, v1: 1 / ATLAS_GRID };
+    }
 
     return {
       u0: tileU / ATLAS_GRID,

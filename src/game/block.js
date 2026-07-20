@@ -125,10 +125,10 @@
 
     // Grass block face variants — separate block IDs for proper atlas UV mapping
     registerBlock(233, 'grass_block_top', 0.6, 0.6, 8, 1, false, false, 0, 15);
-    registerBlock(300, 'grass_block_side', 0.6, 0.6, 8, 1, false, false, 0, 15);
+    registerBlock(143, 'grass_block_side', 0.6, 0.6, 8, 1, false, false, 0, 15);
 
-    // Bedrock (ID 1000) — world boundary block, unbreakable
-    registerBlock(1000, 'bedrock', -1, 3600000.0, -1, 0, false, false, 0, 15);
+    // Bedrock — world boundary block, unbreakable
+    registerBlock(144, 'bedrock', -1, 3600000.0, -1, 0, false, false, 0, 15);
 
     // Ores (IDs 10-20) — added copper_ore and tin_ore
     registerBlock(10, 'coal_ore', 3.0, 6.0, 10, 1, false, false, 0, 15);
